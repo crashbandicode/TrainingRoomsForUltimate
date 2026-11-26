@@ -76,15 +76,11 @@ impl PlayTrack {
     pub fn allocated(&self) -> bool { self.made.load(Ordering::SeqCst) }
     pub fn live(&self, slot: usize, frame: &ReplayFrame) { self.rows.live(slot, frame); }
     pub fn seed(&self, slot: usize, frame: Option<ReplayFrame>) { self.rows.seed(slot, frame); }
-    pub fn seed_due(&self, slot: usize) -> bool {
-        let key = self.key.load(Ordering::SeqCst);
-        key != IDLE && key as u32 as usize == slot && self.count.load(Ordering::Acquire) == 0
-    }
-
-    pub fn fed(&self, slot: usize, generation: u32, count: u32) {
+    pub fn fed(&self, slot: usize, generation: u32, count: u32, seed: impl FnOnce()) {
         let key = u64::from(generation) << 32 | slot as u64;
         if self.key.load(Ordering::SeqCst) == key && count > 0 && count <= self.limit.load(Ordering::Acquire)
             && (count == 1 || self.count.load(Ordering::Acquire) != 0) {
+            if count == 1 { seed(); }
             self.rows.push(count as usize - 1, slot);
             self.count.store(count, Ordering::Release);
         }
@@ -200,18 +196,18 @@ mod tests {
         assert!(track.begin("walk", 1, 23, (2, 3), 3, true));
         track.live(1, &sample(1.0));
         track.live(0, &sample(101.0));
-        track.fed(0, 23, 1);
-        track.fed(1, 22, 1);
-        track.fed(1, 23, 4);
-        track.fed(1, 23, 1);
+        track.fed(0, 23, 1, || panic!("wrong role seeded"));
+        track.fed(1, 22, 1, || panic!("old generation seeded"));
+        track.fed(1, 23, 4, || panic!("past the limit"));
+        track.fed(1, 23, 1, || {});
         track.live(1, &sample(3.0));
-        track.fed(1, 23, 3);
+        track.fed(1, 23, 3, || panic!("not the first input"));
         let (open, rows) = track.end().unwrap();
         assert_eq!((open.id.as_str(), open.slot, open.generation), ("walk", 1, 23));
         assert_eq!(rows.len(), 1);
         assert_eq!((rows[0][0].x, rows[0][1].x), (1.0, 101.0));
         assert!(track.begin("walk", 1, 24, (2, 3), 3, true));
-        track.fed(1, 24, 2);
+        track.fed(1, 24, 2, || panic!("missing first input"));
         assert!(track.end().is_none());
         track.note_done("walk", (2, 3));
         assert!(!track.begin("walk", 1, 25, (2, 3), 3, true));
@@ -234,7 +230,7 @@ mod tests {
         let host = include_str!("../../runtime/features/recording_host.rs");
         let editor = include_str!("../../runtime/macros/replay_capture.rs");
         assert!(states.contains("play_sampling()"));
-        assert_eq!(host.matches("play_seed_due(").count(), 2);
+        assert!(host.contains("take_cpu_frame_seeded(") && host.contains("on_player_poll_seeded("));
         assert_eq!(host.matches("seed_both(super::recorder::cpu_body(), rr_host::play_seed)").count(), 2);
         assert!(host.contains("TAKE.seed(slot, frame)"));
         assert!(host.contains("store(slot, frame);"));

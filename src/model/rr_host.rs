@@ -1231,12 +1231,17 @@ pub(crate) fn player_tint() -> Option<[f32; 3]> {
 }
 
 pub fn take_player_frame() -> Option<InputFrame> {
-    take_frame(Role::Player)
+    take_frame(Role::Player, || {})
+}
+
+#[cfg(test)]
+pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
+    take_cpu_frame_seeded(|| {})
 }
 
 #[cfg(any(test, target_os = "switch"))]
-pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
-    let frame = take_frame(Role::Cpu);
+pub(crate) fn take_cpu_frame_seeded(seed: impl FnOnce()) -> Option<InputFrame> {
+    let frame = take_frame(Role::Cpu, seed);
     if let Some(frame) = frame.filter(|_| make_actor_cpu() && INPUT_MODE.load(Ordering::Acquire) & 1 != 0) {
         MAKE_CPU_FRAME.store(pack(frame), Ordering::Release);
         INPUT_POLLS[0].fetch_add(1, Ordering::Release);
@@ -1250,12 +1255,18 @@ pub(crate) fn take_cpu_frame() -> Option<InputFrame> {
 /// # Safety
 /// `out` is null or a live mapped-input record for this poll.
 pub unsafe fn on_player_poll(out: *mut MappedInputs) -> bool {
+    on_player_poll_seeded(out, || {})
+}
+
+/// # Safety
+/// `out` is null or the live mapped-input record for this poll.
+pub unsafe fn on_player_poll_seeded(out: *mut MappedInputs, seed: impl FnOnce()) -> bool {
     if out.is_null() {
         return false;
     }
     let delay_before = DELAY_OWED[role_index(Role::Player)].load(Ordering::Acquire);
     // The fighter's poll takes the first input after the worker has published it.
-    let injected = take_player_frame();
+    let injected = take_frame(Role::Player, seed);
     if let Some(frame) = injected {
         *out = to_mapped(frame);
     } else if DELAY_OWED[role_index(Role::Player)].load(Ordering::Acquire) < delay_before {
@@ -1529,7 +1540,6 @@ pub fn play_sampling() -> bool { PLAY.sampling() }
 pub fn play_allocated() -> bool { PLAY.allocated() }
 pub fn play_live(slot: usize, frame: &ReplayFrame) { PLAY.live(slot, frame); }
 pub fn play_seed(slot: usize, frame: Option<ReplayFrame>) { PLAY.seed(slot, frame); }
-pub fn play_seed_due(role: Role) -> bool { PLAY.seed_due(role_index(role)) }
 pub fn take_generated() -> bool { PLAY.take_written() }
 
 #[inline(never)]
@@ -2261,6 +2271,7 @@ fn step_role(machine: &mut Playback, book: &Book, role: Role) {
 #[cfg(test)]
 thread_local! {
     static POLL_ON_PUBLISH: core::cell::Cell<Option<fn(Role)>> = const { core::cell::Cell::new(None) };
+    static BEFORE_TAKE: core::cell::Cell<Option<Box<dyn FnOnce()>>> = const { core::cell::Cell::new(None) };
 }
 
 /// A cut clears the run flag. If it races this publish, the hook's cut flag still
@@ -2906,15 +2917,13 @@ fn taken_frames() -> (Role, Vec<InputFrame>) {
 
 /// One frame for this game frame. Nothing while a warp's restore is pending: a frame fed before the
 /// restore is undone by it, so the run waits where it is.
-fn take_frame(role: Role) -> Option<InputFrame> {
-    PLAY.poll(|| {
-        let (frame, generation) = pop_frame(role)?;
-        credit_frame(role, generation);
-        Some(frame)
-    })
+fn take_frame(role: Role, seed: impl FnOnce()) -> Option<InputFrame> {
+    #[cfg(test)]
+    if let Some(publish) = BEFORE_TAKE.take() { publish(); }
+    pop_frame(role, |generation| PLAY.poll(|| credit_frame(role, generation, seed))).map(|(frame, _)| frame)
 }
 
-fn pop_frame(role: Role) -> Option<(InputFrame, usize)> {
+fn pop_frame(role: Role, taken: impl FnOnce(usize)) -> Option<(InputFrame, usize)> {
     // A pending restore must land before an input or it would undo that input.
     if WARP_HOLD.load(Ordering::Acquire) || start_gated() || cut_flag(role).load(Ordering::Acquire)
         || role == Role::Cpu && RESET_CPU.load(Ordering::Acquire)
@@ -2925,13 +2934,13 @@ fn pop_frame(role: Role) -> Option<(InputFrame, usize)> {
     if DELAY_OWED[role_index(role)].fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_sub(1)).is_ok() {
         return None;
     }
-    role_frames(role).pop_tagged().map(|(frame, generation)| {
+    role_frames(role).pop_tagged_with(taken).map(|(frame, generation)| {
         PLAYED.fetch_add(1, Ordering::AcqRel);
         (unpack(frame), generation)
     })
 }
 
-fn credit_frame(role: Role, generation: usize) {
+fn credit_frame(role: Role, generation: usize, seed: impl FnOnce()) {
     let count = &FED[role_index(role)];
     let previous = count.load(Ordering::Relaxed);
     let generation = generation as u32;
@@ -2941,7 +2950,7 @@ fn credit_frame(role: Role, generation: usize) {
         1
     };
     count.store((u64::from(generation) << 32) | u64::from(next), Ordering::Release);
-    PLAY.fed(role_index(role), generation, next);
+    PLAY.fed(role_index(role), generation, next, seed);
 }
 
 fn role_frames(role: Role) -> &'static FrameQueue {
@@ -3416,12 +3425,12 @@ mod tests {
             assert_eq!(fed_frames(role), 0);
             assert_eq!(take().map(|frame| frame.buttons), Some(1));
             assert_eq!(fed_frames(role), 1);
-            let (old, generation) = pop_frame(role).unwrap();
+            let (old, generation) = pop_frame(role, |_| {}).unwrap();
             assert_eq!(old.buttons, 2);
             request_preview(&id, role, 2, 5);
             tick(&root);
             assert_eq!(fed_frames(role), 0);
-            credit_frame(role, generation);
+            credit_frame(role, generation, || {});
             assert_eq!(fed_frames(role), 0);
             for (count, buttons) in (1..=3).zip(3..=5) {
                 assert_eq!(take().map(|frame| frame.buttons), Some(buttons));
@@ -5007,6 +5016,46 @@ mod tests {
         super::super::macros::positions::read(&root.join(MACROS_DIR), id, &recording.frames)
     }
 
+    #[test]
+    fn a_poll_that_straddles_generation_arm_seeds_the_first_input_once() {
+        let _hold = hold();
+        for role in [Role::Cpu, Role::Player] { straddle_arm(role); }
+    }
+
+    fn straddle_arm(role: Role) {
+        let (root, id, recording) = generated_fixture("generated-seed-at-take", 3);
+        if role == Role::Player {
+            let mut index = RecordingIndex::load(&root).unwrap();
+            index.set_active(role, Some(&id), 1).unwrap();
+            index.save(&root).unwrap();
+            set_role_fighter(role, 7);
+            set_playback_delay(2);
+        }
+        let publish_root = root.clone();
+        BEFORE_TAKE.set(Some(Box::new(move || generated_play(&publish_root, role))));
+        let seeds = std::cell::Cell::new(0);
+        let seed = || {
+            seeds.set(seeds.get() + 1);
+            generated_sample(role, 42);
+        };
+        let poll = || match role {
+            Role::Cpu => take_cpu_frame_seeded(seed),
+            Role::Player => {
+                let mut out = MappedInputs::default();
+                unsafe { on_player_poll_seeded(&mut out, seed) }.then(|| to_frame(out))
+            }
+        };
+        if role == Role::Player {
+            for _ in 0..2 { assert_eq!(poll(), None); }
+            assert_eq!(seeds.get(), 0, "a delay poll is not input zero");
+        }
+        for input in &recording.frames { assert_eq!(poll(), Some(*input)); }
+        tick(&root);
+        let rows = generated_rows(&root, &id, &recording).unwrap();
+        assert_eq!((seeds.get(), rows[0][0].x, rows[0][1].x), (1, 42.0, 142.0));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     fn a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter() {
         let _hold = hold();
         let (root, first_id, first) = generated_fixture("generated-missing-partner", 3);
@@ -5504,12 +5553,12 @@ mod tests {
         let writes = positions::writes();
         let open = play_sampling();
         PLAY.poll(|| {
-            let (frame, generation) = pop_frame(Role::Cpu).unwrap();
+            let (frame, generation) = pop_frame(Role::Cpu, |_| {}).unwrap();
             assert_eq!(frame, recording.frames[1]);
             play_track_service(&root);
             assert_eq!(positions::writes(), writes);
             if open { assert!(play_sampling()); }
-            credit_frame(Role::Cpu, generation);
+            credit_frame(Role::Cpu, generation, || {});
         });
         tick(&root);
         assert_eq!(generated_rows(&root, &id, &recording).map(|rows| rows.len()), Some(2));
