@@ -1355,7 +1355,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "2366abd59886b5fe4a029681c658828f58f8a6997baebee482e96ad4c19ea1ab",
+   "dest_sha256": "cb414c92839e1f87c209c5d6e689100f7d1899b92fc5779289bbeb68e66c85a0",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1466,6 +1466,21 @@
      "old": "        self.load(id)",
      "new": "        let mut recording = self.load(id)?;\n        recording.set_track(super::positions::read(self.dir(), id, &recording.frames));\n        Ok(recording)",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    const STREAM_READ: bool = true;\n    fn read_summary(id: &str, reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroEntry, MacroError>> {\n        Ok(read_header(reader)?.map(|rec| rec.summary(id)))\n    }\n    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }",
+     "new": "    const STREAM_READ: bool = true;\n    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }",
+     "reason": "Use the normal input-only macro decoder for the list as well as load (sidecar decision, 2026-11-26 03:10:37Z)."
+    },
+    {
+     "old": "\n// Feed the normal macro decoder its normal fields, but skip position rows when only\n// making a menu entry. Their shape and values are checked when the macro is opened.\nstruct HeaderFields<'a, A> { map: A, track: &'a mut Option<bool> }\n\nimpl<'de, A: MapAccess<'de>> MapAccess<'de> for HeaderFields<'_, A> {\n    type Error = A::Error;\n    fn next_key_seed<K: DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error> {\n        while let Some(key) = self.map.next_key::<String>()? {\n            if key != \"track\" { return seed.deserialize(key.into_deserializer()).map(Some); }\n            if self.track.is_some() { return Err(de::Error::duplicate_field(\"track\")); }\n            *self.track = Some(self.map.next_value::<Option<de::IgnoredAny>>()?.is_some());\n        }\n        Ok(None)\n    }\n    fn next_value_seed<V: DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value, Self::Error> {\n        self.map.next_value_seed(seed)\n    }\n}\n\nstruct MacroHeader;\nimpl<'de> Visitor<'de> for MacroHeader {\n    type Value = (MacroRecording, bool);\n    fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str(\"a named macro\") }\n    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {\n        let mut track = None;\n        let fields = de::value::MapAccessDeserializer::new(HeaderFields { map, track: &mut track });\n        let rec = serde::Deserialize::deserialize(fields)?;\n        Ok((rec, track.unwrap_or(false)))\n    }\n}\n\n/// A macro read without its position rows, for the list and for playback. The file's version is still checked against\n/// the presence of the key; the rows' shape and values are checked when the macro is opened whole.\nfn read_header(reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroRecording, MacroError>> {\n    let mut de = serde_json::Deserializer::from_reader(reader);\n    // A `track` key (a file of a build that kept positions in the macro) is skipped, here as in a whole load.\n    let (rec, _) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;\n    de.end()?;\n    Ok(rec.validate_header().and_then(|()| {\n        rec.validate_frame_count()?;\n        Ok(rec)\n    }))\n}\n\nimpl Store<MacroRecording> {",
+     "new": "\nimpl Store<MacroRecording> {",
+     "reason": "Use the normal input-only macro decoder for the list as well as load (sidecar decision, 2026-11-26 03:10:37Z)."
+    },
+    {
+     "old": "use super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};\nuse super::recording::Placement;\nuse serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, Visitor};",
+     "new": "use super::recording::{MacroError, MacroRecording, Placement, MII_SCHEMA_VERSION, SCHEMA_VERSION};",
+     "reason": "Use the normal input-only macro decoder for the list as well as load (sidecar decision, 2026-11-26 03:10:37Z)."
     }
    ]
   },

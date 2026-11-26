@@ -122,9 +122,6 @@ pub trait Record: Serialize + DeserializeOwned {
     const STREAM_READ: bool = false;
     fn stream_write(&self) -> bool { false }
     fn owns_reader(_reader: impl Read) -> serde_json::Result<bool> { Ok(true) }
-    fn read_summary(_id: &str, _reader: &mut dyn Read) -> serde_json::Result<Result<Self::Summary, Self::Error>> {
-        unreachable!("only a streaming record supplies a header reader")
-    }
     /// A record with a file of its own beside the record's (a macro's positions): before the record is written under
     /// `id`, after it is in place, and after it is deleted. Default: nothing.
     fn before_write(&self, _dir: &Path, _id: &str) {}
@@ -682,10 +679,7 @@ impl Payload {
     }
 
     fn summary<R: Record>(&mut self, id: &str) -> io::Result<Result<R::Summary, R::Error>> {
-        match self {
-            Self::File(f, len) if R::STREAM_READ => streamed::<R, _>(f, *len, |r| R::read_summary(id, r)),
-            _ => Ok(self.parsed::<R>(id)?.map(|r| r.summary(id))),
-        }
+        Ok(self.parsed::<R>(id)?.map(|r| r.summary(id)))
     }
 
     fn parsed<R: Record>(&mut self, id: &str) -> io::Result<Result<R, R::Error>> {
