@@ -100,6 +100,11 @@ pub fn deltas(selected: impl Fn(u32) -> Option<ReplayFrame>, other: impl Fn(u32)
     if deltas == [None; 2] { Ask::None } else { Ask::Group { target: target & 1, deltas } }
 }
 
+/// A world point as one word, compared exactly.
+fn key(at: [f32; 2]) -> u64 {
+    u64::from(at[0].to_bits()) << 32 | u64::from(at[1].to_bits())
+}
+
 /// One editor's scrub state.
 pub struct Block {
     ask: hos_lock::Published<Ask>,
@@ -111,6 +116,12 @@ pub struct Block {
     /// Each role's last world point and tagged verdict. Only the game side touches these, under `holds`.
     classed: [AtomicU64; 2],
     stands: [AtomicU64; 2],
+    /// The group's home while a target that was held is not (`point`): the target role plus one, and the point.
+    home: (AtomicU32, AtomicU64),
+    /// Each role's last write (`pushed`): its point, and the request's generation plus one.
+    wrote: [(AtomicU64, AtomicU64); 2],
+    /// Each role's refusal of a body the game pushed off its point: the point, the request, the body's id.
+    pushed: [(AtomicU64, AtomicU64, AtomicU32); 2],
     /// The ask's generation, plus one, each role's fighter frame last acted under; zero before its first frame.
     acked: [AtomicU32; 2],
     /// The roles the last group ask moved (bit 0 Player 1, bit 1 the CPU).
@@ -130,6 +141,9 @@ impl Block {
             shown: AtomicU32::new(0),
             classed: [const { AtomicU64::new(0) }; 2],
             stands: [const { AtomicU64::new(0) }; 2],
+            home: (AtomicU32::new(0), AtomicU64::new(0)),
+            wrote: [const { (AtomicU64::new(0), AtomicU64::new(0)) }; 2],
+            pushed: [const { (AtomicU64::new(0), AtomicU64::new(0), AtomicU32::new(0)) }; 2],
             acked: [const { AtomicU32::new(0) }; 2],
             moved: AtomicU32::new(0),
             settle: AtomicU32::new(0),
@@ -165,6 +179,7 @@ impl Block {
         for verdict in &self.stands {
             verdict.store(0, Ordering::Release);
         }
+        self.home.0.store(0, Ordering::Release);
     }
 
     fn forgotten(&self) -> bool {
@@ -184,7 +199,7 @@ impl Block {
     /// Recheck on a new ask even at identical coordinates, or if a moving anchor changes this ask's world point.
     pub fn standable(&self, slot: usize, at: [f32; 2], class: impl FnOnce() -> bool) -> bool {
         let (Some(point), Some(verdict)) = (self.classed.get(slot), self.stands.get(slot)) else { return false };
-        let key = u64::from(at[0].to_bits()) << 32 | u64::from(at[1].to_bits());
+        let key = key(at);
         // Zero means invalid; the low bit of a tagged answer is the verdict.
         let tag = (u64::from(self.ask.generation()) + 1) << 1;
         let cached = verdict.load(Ordering::Relaxed);
@@ -195,6 +210,63 @@ impl Block {
         point.store(key, Ordering::Relaxed);
         verdict.store(tag | u64::from(ok), Ordering::Relaxed);
         ok
+    }
+
+    /// The game thread: where the role in `slot` is asked to be. `origin`: where the target role's hold found its
+    /// body, when it is held; `free`: where the target stands when it is not. A target that was held keeps its home when it
+    /// is let go while a group is still asked for: its published position is read before the hold's step, so on that
+    /// frame it is still the point it was held at, and its partner would be placed from there.
+    pub fn point(&self, slot: usize, origin: impl FnOnce(usize) -> Option<[f32; 2]>, free: impl FnOnce(usize) -> Option<[f32; 2]>) -> Option<Spot> {
+        let Some(target) = self.target_slot() else {
+            self.home.0.store(0, Ordering::Relaxed);
+            return None;
+        };
+        let role = target as u32 + 1;
+        let home = if let Some(at) = origin(target) {
+            self.home.1.store(key(at), Ordering::Relaxed);
+            self.home.0.store(role, Ordering::Relaxed);
+            at
+        } else if self.home.0.load(Ordering::Relaxed) == role {
+            let kept = self.home.1.load(Ordering::Relaxed);
+            [f32::from_bits((kept >> 32) as u32), f32::from_bits(kept as u32)]
+        } else {
+            free(target)?
+        };
+        self.held_at(slot, home)
+    }
+
+    /// The game thread, after the hold's step for the role in `slot`. `moved`: where the game has the body, when the
+    /// hold reports that the game moved it off the point written on the frame before. The scrub refuses a body the
+    /// game moved sideways: its x is not the x asked, compared exactly as the hold compares (plus and minus zero are
+    /// one place: the CPU's Training home is x 0). Walls and the ends of floors do that; gravity and
+    /// a floor under the point never move x, so a body the floor takes straight up or down stays held and is shown
+    /// where the floor has it. (A ceiling pushing straight down is not refused.) The report is about this request
+    /// only when that write was this role's, for this request (`generation`, read before the ask), at this point:
+    /// then the body is refused here, and `true` says to let it go. Otherwise this frame's write is noted and the
+    /// next frame is judged.
+    pub fn pushed(&self, slot: usize, generation: u32, body: u32, at: [f32; 2], moved: Option<[f32; 2]>) -> bool {
+        let (Some(wrote), Some(pushed)) = (self.wrote.get(slot), self.pushed.get(slot)) else { return false };
+        let (key, request) = (key(at), u64::from(generation) + 1);
+        let sideways = moved.is_some_and(|seen| seen[0] != at[0]);
+        if sideways && wrote.0.load(Ordering::Relaxed) == key && wrote.1.load(Ordering::Relaxed) == request {
+            pushed.0.store(key, Ordering::Relaxed);
+            pushed.1.store(request, Ordering::Relaxed);
+            pushed.2.store(body, Ordering::Relaxed);
+            wrote.1.store(0, Ordering::Relaxed);
+            return true;
+        }
+        wrote.0.store(key, Ordering::Relaxed);
+        wrote.1.store(request, Ordering::Relaxed);
+        false
+    }
+
+    /// The game thread: the game pushed this body off this point under this request (`pushed`). It is not taken again
+    /// until the shown request, the point or the body changes.
+    pub fn refused(&self, slot: usize, generation: u32, body: u32, at: [f32; 2]) -> bool {
+        self.pushed.get(slot).is_some_and(|pushed| {
+            pushed.0.load(Ordering::Relaxed) == key(at) && pushed.1.load(Ordering::Relaxed) == u64::from(generation) + 1
+                && pushed.2.load(Ordering::Relaxed) == body
+        })
     }
 
     /// Publish an ask. A group ask names the roles a later "nobody" waits for, and ends an older start's wait.
@@ -246,11 +318,11 @@ impl Block {
         self.settle.store(0, Ordering::Release);
     }
 
-    /// The role whose home anchors the group.
+    /// A forgotten group has no anchor, even while its old hold awaits release.
     pub fn target_slot(&self) -> Option<usize> {
         match self.ask() {
-            Ask::Group { target, .. } => Some(usize::from(target)),
-            Ask::None => None,
+            Ask::Group { target, .. } if !self.forgotten() => Some(usize::from(target)),
+            _ => None,
         }
     }
 
@@ -1252,6 +1324,155 @@ mod tests {
         }
     }
 
+    /// P3 (tr-primary-2 2026-11-26 16:19:09Z): the target role is let go while its partner stays held. The target's
+    /// published position is read at the top of its fighter frame, before the hold's step, so on that frame it is
+    /// still the point the target was held at. The partner's point is traced callback by callback.
+    #[test]
+    fn the_groups_home_stays_when_the_target_is_let_go() {
+        let block = Block::new();
+        let home = [-30.0, 0.5];
+        let group = |target: [f32; 2], partner: [f32; 2]| Ask::Group {
+            target: 0,
+            deltas: [Some(spot(target[0], target[1], 1.0)), Some(spot(partner[0], partner[1], -1.0))],
+        };
+        let at = |point: Option<Spot>| point.map(|spot| spot.at);
+        // Frame 136: both are held. The target's hold found it at home.
+        block.ask_at(Some(136), group([12.0, 30.0], [-40.0, 0.0]));
+        assert_eq!(at(block.point(0, |_| Some(home), |_| panic!("a held target has an origin"))), Some([-18.0, 30.5]));
+        assert_eq!(at(block.point(1, |_| Some(home), |_| panic!("a held target has an origin"))), Some([-70.0, 0.5]));
+        // Frame 137: the stage refuses the target's point and its hold is gone. Its position as published on this
+        // frame is still where it was held.
+        block.ask_at(Some(137), group([4.0, -8.0], [-52.0, -15.0]));
+        let held = [-18.0, 30.5];
+        assert_eq!(at(block.point(1, |_| None, |_| Some(held))), Some([-82.0, -14.5]), "the partner's first callback after the target is let go");
+        assert_eq!(at(block.point(0, |_| None, |_| Some(held))), Some([-26.0, -7.5]), "the target is asked from home too");
+        for _ in 0..3 {
+            assert_eq!(at(block.point(1, |_| None, |_| Some(home))), Some([-82.0, -14.5]));
+        }
+        // Nobody is asked: the home goes with the holds. The next group starts from where the target stands then.
+        block.ask_at(None, Ask::None);
+        assert_eq!(block.point(1, |_| panic!("nobody is asked"), |_| panic!("nobody is asked")), None);
+        block.ask_at(Some(137), group([4.0, -8.0], [-52.0, -15.0]));
+        assert_eq!(at(block.point(1, |_| None, |_| Some([10.0, 0.5]))), Some([-42.0, -14.5]));
+        // Another target role does not take the first one's home.
+        assert_eq!(at(block.point(0, |_| Some(home), |_| None)), Some([-26.0, -7.5]));
+        block.ask_at(Some(138), Ask::Group { target: 1, deltas: [Some(spot(1.0, 0.0, 1.0)), Some(spot(0.0, 0.0, 1.0))] });
+        assert_eq!(at(block.point(0, |_| None, |_| Some([5.0, 0.5]))), Some([6.0, 0.5]));
+        // A hold made on another body is forgotten, and its home with it.
+        block.ask_at(Some(139), group([0.0, 0.0], [1.0, 0.0]));
+        assert_eq!(at(block.point(1, |_| Some(home), |_| None)), Some([-29.0, 0.5]));
+        block.forget();
+        // The replacing body's callback asks for its point before release drops the old hold.
+        assert_eq!(block.point(0, |_| Some(home), |_| None), None);
+        block.ask_at(Some(140), group([0.0, 0.0], [1.0, 0.0]));
+        assert_eq!(at(block.point(1, |_| None, |_| Some([7.0, 0.5]))), Some([8.0, 0.5]), "use the replacement's home");
+    }
+
+    /// P3 (tr-primary-2 2026-11-26 13:43:10Z, 13:47:51Z; rv-preview-vis 13:44:24Z, 16:20:59Z): a body the game pushes
+    /// off its point is refused there, for that shown request and that body, and is not taken again.
+    #[test]
+    fn a_body_the_game_pushes_off_its_point_is_refused_for_that_request_and_body() {
+        let block = Block::new();
+        let ask = Ask::Group { target: 0, deltas: [Some(spot(0.0, 0.0, 1.0)), Some(spot(-51.0, -15.0, -1.0))] };
+        let (wall, open) = ([-81.0, -3.5], [-87.0, -3.5]);
+        let (player, cpu, other) = (0x100, 0x200, 0x300);
+        block.ask_at(Some(137), ask);
+        let request = block.generation();
+        // The first frame of a hold writes. Nothing of this request has been judged yet, whatever the hold reports.
+        assert!(!block.pushed(1, request, cpu, wall, Some([-81.5, -3.5])), "the write judged was not this request's");
+        assert!(!block.refused(1, request, cpu, wall));
+        // The next frame reads the body off the point this request wrote.
+        assert!(block.pushed(1, request, cpu, wall, Some([-81.5, -3.5])), "pushed off its own write");
+        // Ten unchanged callbacks: refused. The other role is held at its point throughout.
+        for _ in 0..10 {
+            assert!(block.refused(1, request, cpu, wall));
+            assert!(!block.refused(0, request, player, open) && !block.pushed(0, request, player, open, None));
+        }
+        // Another body at the same point under the same request gets its own try.
+        assert!(!block.refused(1, request, other, wall));
+        // A new shown frame with the same points is another request.
+        block.ask_at(Some(138), ask);
+        let next = block.generation();
+        assert_ne!(next, request);
+        assert!(!block.refused(1, next, cpu, wall));
+        // The body is written at the wall again; before the next frame the shown frame moves it to open air. The
+        // hold's report on that frame is about the wall's write and says nothing of the open point.
+        assert!(!block.pushed(1, next, cpu, wall, None));
+        block.ask_at(Some(139), ask);
+        let moved = block.generation();
+        assert!(!block.pushed(1, moved, cpu, open, Some([-81.5, -3.5])), "the write judged was the wall's");
+        assert!(!block.pushed(1, moved, cpu, open, None) && !block.refused(1, moved, cpu, open), "exact in open air: held");
+        // A request published during the callback: the callback had read the older generation before the ask. The
+        // refusal is the older request's; the new one asks afresh.
+        assert!(!block.pushed(1, moved, cpu, wall, None));
+        block.ask_at(Some(140), ask);
+        assert!(block.pushed(1, moved, cpu, wall, Some([-81.5, -3.5])));
+        assert!(block.refused(1, moved, cpu, wall) && !block.refused(1, block.generation(), cpu, wall));
+    }
+
+    /// P3, the ruled test (tr-primary-2 2026-11-26 17:47:24Z): the scrub refuses a body the game moved sideways, its
+    /// x not bit for bit the x asked; a body the floor takes straight up or down stays held. The reports are the
+    /// shared hold's (`CpuPreview::observe`), on the words its seam read in a game where there are any.
+    #[test]
+    fn a_sideways_push_refuses_and_a_vertical_take_holds() {
+        use crate::model::crosshair::{hold_step, BodyRead, Origin};
+        // The hold's fall step and the asked height of the wall rows (Eden, run place-float-xps-05).
+        let fall = [0.0, f32::from_bits(0xbd83_126f)];
+        let y = f32::from_bits(0xc061_adaa);
+        let air = |at: [f32; 2]| BodyRead { at, landed: false, speed: Some(fall), frame: 0 };
+        let landed = |at: [f32; 2]| BodyRead { at, landed: true, speed: Some([0.0; 2]), frame: 0 };
+        // What the hold reports on the frame after it wrote `asked`, the game having left the body as `read`.
+        let report = |asked: [f32; 2], read: BodyRead| {
+            let mut slot = None;
+            hold_step(&mut slot, 7, false, || Origin { at: [0.0, 0.01], grounded: true, facing: 1.0 });
+            let hold = slot.as_mut().unwrap();
+            hold.observe(asked, BodyRead { frame: 1, ..air(asked) }, false);
+            hold.observe(asked, BodyRead { frame: 2, ..read }, false);
+            hold.displaced.map(|moved| moved.at)
+        };
+        // The scrub's verdict on the second frame of a hold at `asked`: let go, or held.
+        let let_go = |asked: [f32; 2], read: BodyRead| {
+            let block = Block::new();
+            block.ask_at(Some(137), Ask::Group { target: 0, deltas: [None, Some(spot(0.0, 0.0, 1.0))] });
+            let request = block.generation();
+            assert!(!block.pushed(1, request, 0x200, asked, None));
+            let moved = report(asked, read);
+            (moved.is_some(), block.pushed(1, request, 0x200, asked, moved), block.refused(1, request, 0x200, asked))
+        };
+        // Sideways. The seam's words at the long floor's left wall: asked x -81, left at x -81.55, still in the air.
+        let wall = [f32::from_bits(0xc2a3_1bfc), f32::from_bits(0xc065_2266)];
+        assert_eq!(let_go([-81.0, y], air(wall)), (true, true, true), "a wall pushed it");
+        // A body the game threw out of a solid: its speed carries the push; its x is not the x asked.
+        let thrown = BodyRead { at: [-85.852_455, -9.132_209], landed: false, speed: Some([-45.752_274, -0.706_175_8]), frame: 0 };
+        assert_eq!(let_go([-40.100_18, -8.426_033], thrown), (true, true, true));
+        // Free of the wall, one unit further out: the read is the point plus the fall step, and nothing is reported.
+        assert_eq!(let_go([-82.0, y], air([-82.0, y + fall[1]])), (false, false, false), "exact in open air");
+        // Vertical. A fighter standing where it was recorded is held as an air hold at the floor's height. Which of
+        // these the game reads there is not read in a game yet; none of them lets the body go.
+        let stand = [-30.0, 0.01];
+        assert_eq!(let_go(stand, landed(stand)), (true, false, false), "landed on the floor at its point");
+        assert_eq!(let_go(stand, air(stand)), (true, false, false), "kept in the air at the floor's height");
+        assert_eq!(let_go(stand, BodyRead { speed: Some([0.0; 2]), ..air(stand) }), (false, false, false), "at rest");
+        // A point within one fall step over the floor: the floor takes the body, a few hundredths under its point.
+        assert_eq!(let_go([-30.0, 0.05], landed(stand)), (true, false, false), "taken by the floor: held, shown on it");
+        // Minus zero is the same place as zero, for the hold and for the scrub: a fighter standing at x 0 (the CPU's
+        // Training home) is not let go on such a read, reported or not.
+        assert_eq!(let_go([0.0, y], air([-0.0, y + fall[1]])), (false, false, false));
+        assert_eq!(let_go([0.0, 0.01], landed([-0.0, 0.01])), (true, false, false));
+        // The smallest step of x away is another place.
+        let beside = f32::from_bits(0xc2a2_0001);
+        assert_eq!(let_go([-81.0, y], air([beside, y + fall[1]])), (true, true, true), "one bit of x");
+        // The game side hands the hold's report over, and asks for the refusal before it takes the body.
+        let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
+        let hold = runtime.split_once("unsafe fn hold(").map_or("", |(_, rest)| rest);
+        let judged = "if block.pushed(index, generation, body, spot.at, slot.and_then(|hold| hold.displaced).map(|moved| moved.at)) {";
+        let order = |texts: &[&str]| texts.iter().map(|text| hold.find(text)).collect::<Vec<_>>().windows(2).all(|pair| pair[0].is_some() && pair[0] < pair[1]);
+        assert!(order(&["block.refused(index, generation, body, spot.at)", "placement::hold_at(slot, accessor, body, spot.at, false)", judged, "state::set_lr(accessor, spot.facing);"]));
+        assert!(hold.contains(&format!("{judged}\n        release(slot, accessor);\n        return SEEN_OFF;")), "a pushed body is let go and reads off");
+        assert!(runtime.contains("Some(spot) => hold(block, generation, slot, &mut holds[slot], accessor, spot),"), "the request the callback read");
+        assert!(runtime.contains("block.point(slot, |target| holds[target].map(|hold| hold.origin().at), |target| {"), "the group's home is the model's");
+    }
+
     #[test]
     fn a_point_in_the_ground_or_past_the_blast_lines_holds_nobody() {
         use crate::model::stage_geometry::{classify, Copied, Met};
@@ -1299,7 +1520,7 @@ mod tests {
         // The line is true for a point in the ground and for one past a blast line; the bridge's word is unchanged.
         assert_eq!((Pos::Off.text(), Pos::Off.word()), ("Can't stand there on this stage.", "off"));
         let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
-        assert!(runtime.contains("if !in_bounds(spot.at, limits) || !block.standable(index, spot.at, || stands(accessor, spot.at)) {"));
+        assert!(runtime.contains("if !in_bounds(spot.at, limits) || block.refused(index, generation, body, spot.at) || !block.standable(index, spot.at, || stands(accessor, spot.at)) {"));
         assert!(runtime.contains("RayProbe::new(accessor).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at))"));
         assert!(!runtime.contains(".lock()"), "the fighter frame takes no blocking lock");
     }
