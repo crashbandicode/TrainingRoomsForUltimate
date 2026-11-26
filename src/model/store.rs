@@ -187,7 +187,23 @@ impl<R: Record> ListCursor<R> {
         let Some(id) = name.strip_suffix(".json") else {
             return true;
         };
-        let mut data = match check_id::<R>(id).and_then(|()| Payload::open::<R>(&self.store.file(id, "json"), R::MAX_FILE_BYTES)) {
+        let path = self.store.file(id, "json");
+        if R::STREAM_READ {
+            let row = check_id::<R>(id).and_then(|()| Payload::open::<R>(&path, R::MAX_FILE_BYTES))
+                .map_err(lift::<R>).and_then(|mut data| {
+                    if !data.owns::<R>().map_err(|e| lift::<R>(e.into()))? { return Ok(None); }
+                    data.summary::<R>(id).map_err(|e| lift::<R>(e.into()))?.map(Some)
+                });
+            match row {
+                Ok(Some(s)) => self.entries.push((R::summary_name(&s).to_lowercase(), id.to_owned(), s)),
+                Ok(None) => (),
+                Err(e) => self.skipped.push(SkippedFile { file: name, reason: e.to_string() }),
+            }
+            return true;
+        }
+        // Keep the ordinary record decoder's return slot directly in this frame.
+        // Passing a ComboRecord through Payload::record added an entire second copy on the menu stack.
+        let data = match check_id::<R>(id).and_then(|()| read_bounded(&path, R::MAX_FILE_BYTES)) {
             Ok(data) => data,
             Err(err) => {
                 let reason = lift::<R>(err).to_string();
@@ -195,16 +211,9 @@ impl<R: Record> ListCursor<R> {
                 return true;
             }
         };
-        match data.owns::<R>().map_err(|e| lift::<R>(e.into())).and_then(|owns| {
-            if !owns { return Ok(None); }
-            if R::STREAM_READ {
-                data.summary::<R>(id).map_err(|e| lift::<R>(e.into()))?.map(|s| Some((R::summary_name(&s).to_lowercase(), s)))
-            } else {
-                data.record::<R>(id).map(|r| Some((r.name().to_lowercase(), r.summary(id))))
-            }
-        }) {
-            Ok(Some((name, summary))) => self.entries.push((name, id.to_owned(), summary)),
-            Ok(None) => (),
+        if !R::owns(&data) { return true; }
+        match decode::<R>(id, &data) {
+            Ok(rec) => self.entries.push((rec.name().to_lowercase(), id.to_owned(), rec.summary(id))),
             Err(err) => self.skipped.push(SkippedFile { file: name, reason: err.to_string() }),
         }
         true
@@ -293,7 +302,7 @@ impl<R: Record> Store<R> {
             }
         }
         self.restore_orphaned_backups(&mut names);
-        names.sort();
+        names.sort_unstable();
         Ok(ListCursor { store: self.clone(), names: names.into_iter(), entries: Vec::new(), skipped })
     }
 
