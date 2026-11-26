@@ -150,8 +150,9 @@ impl PlayTrack {
 
     pub fn write_wanted(existing: Option<(Source, u32)>, rows: usize, inputs: usize) -> (bool, bool) {
         match existing {
-            Some((Source::Recorded, _)) => (false, true),
-            Some((Source::Generated, count)) if count as usize >= rows => (false, count as usize >= inputs),
+            // A file that covers the playback's frames stays, whatever made it. A whole one is done; a short one
+            // (a stopped playback, a take whose positions ended early) is replaced when a playback covers more.
+            Some((_, count)) if count as usize >= rows => (false, count as usize >= inputs),
             _ => (rows > 0, rows >= inputs),
         }
     }
@@ -181,7 +182,14 @@ mod tests {
     }
 
     fn write_wanted_follows_the_rule() {
-        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 0)), 5, 5), (false, true));
+        // A whole recorded file is never replaced. One that is shorter than the inputs (SP-17: a take's positions
+        // stopped early) is replaced by a playback that covers more frames, as a short generated file is.
+        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 5)), 5, 5), (false, true));
+        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 5)), 2, 5), (false, true));
+        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 1_200)), 1_553, 1_553), (true, true));
+        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 1_200)), 1_300, 1_553), (true, false));
+        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 1_200)), 900, 1_553), (false, false));
+        assert_eq!(PlayTrack::write_wanted(Some((Source::Recorded, 0)), 5, 5), (true, true));
         assert_eq!(PlayTrack::write_wanted(Some((Source::Generated, 5)), 2, 5), (false, true));
         assert_eq!(PlayTrack::write_wanted(Some((Source::Generated, 3)), 2, 5), (false, false));
         assert_eq!(PlayTrack::write_wanted(Some((Source::Generated, 2)), 3, 5), (true, false));

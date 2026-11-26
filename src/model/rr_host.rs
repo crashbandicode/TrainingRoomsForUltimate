@@ -1470,6 +1470,19 @@ pub fn service_pending(root: &Path, player: SavedState, cpu: SavedState) -> Tick
     tick
 }
 
+/// The worker's pass once migration has finished. A take that is being recorded gets its next block of positions on
+/// every pass, whether or not anything else waits: with the pending test in front of it the positions stopped at
+/// the two blocks the Record chord's pass had made (SP-17). Then what waits is serviced.
+pub fn worker_tick(root: &Path, player: SavedState, cpu: SavedState) -> Option<Tick> {
+    if CAP_ROLE.load(Ordering::Acquire) != 0 {
+        TAKE.service(true, CAP_LEN.load(Ordering::Acquire));
+    }
+    if !pending() {
+        return None;
+    }
+    Some(service_pending(root, player, cpu))
+}
+
 pub fn set_role_fighter(role: Role, kind: i32) {
     ROLE_KIND[role_index(role)].store(kind, Ordering::Release);
     if role == Role::Player {
@@ -5264,6 +5277,22 @@ mod tests {
         assert!(!play_sampling());
     }
 
+    /// A positions file a take left short (SP-17) heals through use: a playback that covers more frames replaces it.
+    fn a_short_recorded_track_heals_on_a_full_playback() {
+        use crate::engine::macros::positions::{self, Source};
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-heal", 5);
+        let dir = root.join(MACROS_DIR);
+        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 99.0, y: 3.0 };
+        positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 3], Source::Recorded).unwrap();
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        for i in 0..5 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert_eq!(positions::kept(&dir, &id, &recording.frames), Some((Source::Generated, 5)));
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap()[4][0].x, 4.0);
+    }
+
     fn an_adopted_generated_track_is_cropped_as_generated() {
         use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
         use crate::engine::macros::positions::{self, Source};
@@ -7606,6 +7635,46 @@ mod tests {
         assert_eq!((absent.poses[0].fighter_kind, absent.poses[1].fighter_kind, absent.speeds), (-1, -1, [(0.0, 0.0); 2]), "a role without a body is a never-seen pose at rest");
     }
 
+    /// SP-17 (dup-audit, 2026-11-26 12:45:51Z): takes of 1,553 and 3,253 frames kept 1,200 frames of positions. The
+    /// worker's pass reached the take's blocks only while other work was pending. This drives the pass the worker
+    /// runs and nothing else, and reads the positions file back.
+    fn a_long_take_keeps_its_positions_on_the_workers_pass_alone() {
+        use crate::engine::macro_ui::scrub_track::TAKE;
+        use crate::engine::macros::positions;
+        const FRAMES: usize = 1_553;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("long-take");
+        let _ = service_at(&root, &none(), "2026-11-26", state(8), state(7));
+        let pass = || worker_tick(&root, state(8), state(7));
+        let at = |index: usize| ReplayFrame { input: InputFrame::default(), start: StartState::neutral(8, 0, 1.0), x: index as f32, y: 2.0 };
+        set_record_role(Role::Player);
+        on_chords(true, false, false);
+        assert!(pass().is_some(), "the Record edge is serviced");
+        for index in 0..FRAMES {
+            TAKE.live(0, &at(index));
+            push_capture(ROLE_PLAYER, InputFrame { buttons: (index % 7 + 1) as u32, ..InputFrame::default() });
+            // Two game frames to a worker pass. Nothing else waits, so the pass has no tick.
+            if index % 2 == 1 {
+                assert!(!pending(), "a take alone is not pending work (frame {index})");
+                assert!(pass().is_none());
+            }
+        }
+        on_chords(true, false, false);
+        assert!(pass().is_some(), "the stop is serviced");
+        let dir = root.join(MACROS_DIR);
+        let macros = Library::new(&dir);
+        let id = macros.list().unwrap().entries[0].id.clone();
+        let recording = macros.load(&id).unwrap();
+        assert_eq!(recording.frames.len(), FRAMES);
+        let rows = positions::read(&dir, &id, &recording.frames).expect("a positions file");
+        assert_eq!(rows.len(), FRAMES, "the positions stop before the take does");
+        assert_eq!((rows[0][0].x, rows[1_200][0].x, rows[FRAMES - 1][0].x), (0.0, 1_200.0, (FRAMES - 1) as f32));
+        let host = include_str!("../runtime/features/recording_host.rs");
+        assert!(host.contains("if let Some(tick) = rr_host::worker_tick(root, player, cpu) {") && !host.contains("rr_host::pending()"),
+            "the worker's pass has a pending test of its own in front of the take");
+    }
+
     /// The runtime's side of the two tests above: the fighter frame hands its live pose to `fighter_frame` before the
     /// Save States Off return and keeps no pose of its own; Record reads the two role bodies the chord step resolved,
     /// not a published pose or accessor.
@@ -8158,6 +8227,7 @@ mod tests {
             ("a_recording_keeps_where_and_how_fast_it_started", a_recording_keeps_where_and_how_fast_it_started as fn()),
             ("the_live_pose_is_published_with_save_states_off", the_live_pose_is_published_with_save_states_off as fn()),
             ("a_take_starts_at_the_bodies_read_at_the_chord", a_take_starts_at_the_bodies_read_at_the_chord as fn()),
+            ("a_long_take_keeps_its_positions_on_the_workers_pass_alone", a_long_take_keeps_its_positions_on_the_workers_pass_alone as fn()),
             ("the_runtime_publishes_before_the_off_return_and_record_reads_the_bodies", the_runtime_publishes_before_the_off_return_and_record_reads_the_bodies as fn()),
             ("play_gives_the_recorded_start_speed_only_with_momentum_kept", play_gives_the_recorded_start_speed_only_with_momentum_kept as fn()),
         ]);
@@ -8185,6 +8255,7 @@ mod tests {
                     ("delay_polls_and_a_stop_before_the_first_input_keep_nothing", super::delay_polls_and_a_stop_before_the_first_input_keep_nothing as fn()),
                     ("a_longer_generated_track_replaces_a_shorter_one_only", super::a_longer_generated_track_replaces_a_shorter_one_only as fn()),
                     ("a_generated_track_never_replaces_a_recorded_one", super::a_generated_track_never_replaces_a_recorded_one as fn()),
+                    ("a_short_recorded_track_heals_on_a_full_playback", super::a_short_recorded_track_heals_on_a_full_playback as fn()),
                     ("a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter", super::a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter as fn()),
                     ("an_adopted_generated_track_is_cropped_as_generated", super::an_adopted_generated_track_is_cropped_as_generated as fn()),
                     ("the_play_chord_pass_opens_and_writes_no_positions_file", super::the_play_chord_pass_opens_and_writes_no_positions_file as fn()),
