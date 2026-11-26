@@ -43,6 +43,33 @@ fn scratch() -> PathBuf {
     root
 }
 
+#[test]
+fn scratch_survives_a_leftover_folder_from_an_earlier_run() {
+    struct OldDirs(Vec<PathBuf>);
+    impl Drop for OldDirs {
+        fn drop(&mut self) {
+            for path in &self.0 {
+                let _ = std::fs::remove_dir_all(path);
+            }
+        }
+    }
+
+    let _guard = HostGuard::new();
+    let mut old_dirs = OldDirs(Vec::new());
+    let next = NEXT.load(Ordering::Relaxed);
+    for n in next..next + 512 {
+        let path = std::env::temp_dir().join(format!("tr-playback-immediate-{}-{n}", std::process::id()));
+        match std::fs::create_dir(&path) {
+            Ok(()) => old_dirs.0.push(path),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => panic!("could not create {}: {error}", path.display()),
+        }
+    }
+    let root = scratch();
+    assert!(root.is_dir());
+    assert_eq!(std::fs::read_dir(root).unwrap().count(), 0);
+}
+
 fn state(kind: i32) -> SavedState {
     let mut state = SavedState::never_saved();
     state.fighter_kind = kind;
