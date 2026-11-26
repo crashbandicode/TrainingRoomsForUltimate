@@ -1,12 +1,12 @@
 //! A chain is an ordered list of recording ids in `macros/`, distinguished by `kind`.
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use super::Error;
 #[cfg(test)]
 use crate::model::ordered_ids::IdList;
 use crate::model::store::Record;
+pub(crate) use crate::model::store::is_chain_document;
 
 const SCHEMA: u32 = 1;
 const MAX_FILE_BYTES: u64 = 64 * 1024;
@@ -17,14 +17,6 @@ fn switch_on() -> bool {
 
 fn switch_is_on(on: &bool) -> bool {
     *on
-}
-
-/// `macros/<id>.json` whose `kind` is `chain`. Recordings omit these; the chain list reports the rest.
-pub(crate) fn is_chain_document(bytes: &[u8]) -> bool {
-    serde_json::from_slice::<Value>(bytes)
-        .ok()
-        .and_then(|value| value.get("kind").and_then(Value::as_str).map(|kind| kind == "chain"))
-        .unwrap_or(false)
 }
 
 /// Ordered recording ids and its own start-save switch. It does not store a save id.

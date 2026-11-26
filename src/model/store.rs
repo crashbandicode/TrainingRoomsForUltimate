@@ -30,7 +30,7 @@ use std::{
     collections::BTreeMap,
     ffi::OsString,
     fmt, fs,
-    io::{self, BufReader, BufWriter, Read, Seek, Write},
+    io::{self, BufWriter, Write},
     marker::PhantomData,
     path::{Path, PathBuf},
     sync::{atomic::{AtomicU64, Ordering}, Mutex, MutexGuard, TryLockError},
@@ -118,9 +118,8 @@ pub trait Record: Serialize + DeserializeOwned {
     const SCHEMA_VERSIONS: &'static [u32];
     /// Largest file `load` and `list` will read.
     const MAX_FILE_BYTES: u64;
-    /// Large records can opt out of retaining a second, JSON-sized buffer.
-    const STREAM_READ: bool = false;
-    fn owns_reader(_reader: impl Read) -> serde_json::Result<bool> { Ok(true) }
+    /// Serialize to the temporary file instead of building a JSON-sized save buffer.
+    const STREAM_WRITE: bool = false;
     /// A record with a file of its own beside the record's (a macro's positions): before the record is written under
     /// `id`, after it is in place, and after it is deleted. Default: nothing.
     fn before_write(&self, _dir: &Path, _id: &str) {}
@@ -132,7 +131,6 @@ pub trait Record: Serialize + DeserializeOwned {
     fn name(&self) -> &str;
     /// Listing row for the record stored under `id`.
     fn summary(&self, id: &str) -> Self::Summary;
-    fn summary_name(summary: &Self::Summary) -> &str { let _ = summary; unreachable!("only used by streaming listings") }
     /// Whether `id` (a file name without `.json`) may name a record of this store. Default: [`MAX_ID_CHARS`] of
     /// `[a-z0-9_-]`, the ids the store itself makes. A store whose files people share may accept more.
     fn accepts_id(id: &str) -> bool {
@@ -189,21 +187,6 @@ impl<R: Record> ListCursor<R> {
             return true;
         };
         let path = self.store.file(id, "json");
-        if R::STREAM_READ {
-            let row = check_id::<R>(id).and_then(|()| Payload::open::<R>(&path, R::MAX_FILE_BYTES))
-                .map_err(lift::<R>).and_then(|mut data| {
-                    if !data.owns::<R>().map_err(|e| lift::<R>(e.into()))? { return Ok(None); }
-                    data.summary::<R>(id).map_err(|e| lift::<R>(e.into()))?.map(Some)
-                });
-            match row {
-                Ok(Some(s)) => self.entries.push((R::summary_name(&s).to_lowercase(), id.to_owned(), s)),
-                Ok(None) => (),
-                Err(e) => self.skipped.push(SkippedFile { file: name, reason: e.to_string() }),
-            }
-            return true;
-        }
-        // Keep the ordinary record decoder's return slot directly in this frame.
-        // Passing a ComboRecord through Payload::record added an entire second copy on the menu stack.
         let data = match check_id::<R>(id).and_then(|()| read_bounded(&path, R::MAX_FILE_BYTES)) {
             Ok(data) => data,
             Err(err) => {
@@ -312,15 +295,13 @@ impl<R: Record> Store<R> {
         if !R::accepts_id(id) && !S::accepts_id(id) {
             return Ok(None);
         }
-        let mut data = match Payload::open::<R>(&self.file(id, "json"), R::MAX_FILE_BYTES.max(S::MAX_FILE_BYTES)) {
-            Ok(data) => data,
-            Err(StoreError::Io(e)) => return Err(e),
-            Err(_) => return Ok(None),
+        let Some(data) = read_for_catalog(&self.file(id, "json"), R::MAX_FILE_BYTES.max(S::MAX_FILE_BYTES))? else {
+            return Ok(None);
         };
-        Ok(if R::accepts_id(id) && data.len() <= R::MAX_FILE_BYTES && data.owns::<R>()? {
-            data.summary::<R>(id)?.ok().map(Ok)
-        } else if S::accepts_id(id) && data.len() <= S::MAX_FILE_BYTES {
-            data.parsed::<S>(id)?.ok().map(Err)
+        Ok(if R::accepts_id(id) && data.len() as u64 <= R::MAX_FILE_BYTES && R::owns(&data) {
+            decode::<R>(id, &data).ok().map(|r| Ok(r.summary(id)))
+        } else if S::accepts_id(id) && data.len() as u64 <= S::MAX_FILE_BYTES {
+            decode::<S>(id, &data).ok().map(Err)
         } else {
             None
         })
@@ -337,7 +318,7 @@ impl<R: Record> Store<R> {
     /// Loads and fully validates the record with this id.
     pub fn load(&self, id: &str) -> Result<R, R::Error> {
         check_id::<R>(id).map_err(lift::<R>)?;
-        let mut data = Payload::open::<R>(&self.file(id, "json"), R::MAX_FILE_BYTES)
+        let data = read_bounded(&self.file(id, "json"), R::MAX_FILE_BYTES)
             .map_err(|err| match err {
                 StoreError::Io(inner) if inner.kind() == io::ErrorKind::NotFound => {
                     StoreError::NotFound(id.to_owned())
@@ -345,7 +326,7 @@ impl<R: Record> Store<R> {
                 other => other,
             })
             .map_err(lift::<R>)?;
-        data.record::<R>(id)
+        decode::<R>(id, &data)
     }
 
     /// Saves as a brand-new file and returns its id. The id comes from the
@@ -437,7 +418,7 @@ impl<R: Record> Store<R> {
         let size = if let Some(bytes) = bytes {
             write_replace(&path, &bytes).map_err(|e| lift::<R>(e.into()))?;
             bytes.len() as u64
-        } else if R::STREAM_READ {
+        } else if R::STREAM_WRITE {
             replace_with(&path, |tmp| {
                 let mut writer = BufWriter::new(fs::File::create(tmp)?);
                 serde_json::to_writer(&mut writer, rec)?;
@@ -557,9 +538,16 @@ fn lift<R: Record>(err: StoreError) -> R::Error {
     err.into()
 }
 
+/// The two record types sharing `macros/` need only the tag to identify which decoder owns a file.
+pub(crate) fn is_chain_document(bytes: &[u8]) -> bool {
+    #[derive(serde::Deserialize)]
+    struct Header { kind: Option<String> }
+    serde_json::from_slice::<Header>(bytes).is_ok_and(|header| header.kind.as_deref() == Some("chain"))
+}
+
 fn encode<R: Record>(rec: &R) -> Result<Option<Vec<u8>>, R::Error> {
     rec.validate()?;
-    if R::STREAM_READ { Ok(None) } else { serde_json::to_vec(rec).map(Some).map_err(|err| lift::<R>(err.into())) }
+    if R::STREAM_WRITE { Ok(None) } else { serde_json::to_vec(rec).map(Some).map_err(|err| lift::<R>(err.into())) }
 }
 
 #[cfg(test)]
@@ -642,81 +630,6 @@ fn check_len(bytes: u64, max: u64) -> Result<(), StoreError> {
     Ok(())
 }
 
-enum Payload {
-    Bytes(Vec<u8>),
-    File(fs::File, u64),
-}
-
-impl Payload {
-    fn open<R: Record>(path: &Path, max: u64) -> Result<Self, StoreError> {
-        if !R::STREAM_READ { return read_bounded(path, max).map(Self::Bytes); }
-        payload_read()?;
-        let file = fs::File::open(path)?;
-        let len = file.metadata()?.len();
-        check_len(len, max)?;
-        Ok(Self::File(file, len))
-    }
-
-    fn len(&self) -> u64 {
-        match self { Self::File(_, len) => *len, Self::Bytes(b) => b.len() as u64 }
-    }
-
-    fn owns<R: Record>(&mut self) -> io::Result<bool> {
-        match self {
-            Self::Bytes(bytes) => Ok(R::owns(bytes)),
-            Self::File(f, len) => {
-                let owned = R::owns_reader(BufReader::new(Read::by_ref(f).take(*len)));
-                f.rewind()?;
-                match owned { Err(e) if e.is_io() => Err(e.into()), other => Ok(other.unwrap_or(true)) }
-            }
-        }
-    }
-
-    fn record<R: Record>(&mut self, id: &str) -> Result<R, R::Error> {
-        self.parsed::<R>(id).map_err(|e| lift::<R>(e.into()))?
-    }
-
-    fn summary<R: Record>(&mut self, id: &str) -> io::Result<Result<R::Summary, R::Error>> {
-        Ok(self.parsed::<R>(id)?.map(|r| r.summary(id)))
-    }
-
-    fn parsed<R: Record>(&mut self, id: &str) -> io::Result<Result<R, R::Error>> {
-        let (f, len) = match self {
-            Self::Bytes(data) => return Ok(decode::<R>(id, data)),
-            Self::File(f, len) => (f, *len),
-        };
-        if !R::STREAM_READ {
-            // Only the bounded sibling of a streaming record (a small chain) uses this arm.
-            let mut bytes = Vec::with_capacity(len as usize);
-            f.take(len).read_to_end(&mut bytes)?;
-            return Ok(decode::<R>(id, &bytes));
-        }
-        streamed::<R, _>(f, len, |reader| {
-            let mut record: R = serde_json::from_reader(reader)?;
-            record.adopt(id);
-            Ok(record.validate().map(|()| record))
-        })
-    }
-}
-
-fn streamed<R: Record, T>(f: &mut fs::File, len: u64, read: impl FnOnce(&mut dyn Read) -> serde_json::Result<Result<T, R::Error>>) -> io::Result<Result<T, R::Error>> {
-        Ok(match read(&mut BufReader::new(Read::by_ref(f).take(len))) {
-            Ok(result) => result,
-            Err(e) if e.is_io() => return Err(e.into()),
-            Err(e) => {
-                #[derive(serde::Deserialize)]
-                struct Header { schema_version: u32 }
-                f.rewind()?;
-                match serde_json::from_reader::<_, Header>(BufReader::new(f.take(len))) {
-                    Ok(h) if !R::SCHEMA_VERSIONS.contains(&h.schema_version) =>
-                        Err(lift::<R>(StoreError::UnsupportedVersion { found: h.schema_version })),
-                    Err(err) if err.is_io() => return Err(err.into()),
-                    _ => Err(lift::<R>(e.into())),
-                }
-            }
-        })
-}
-
 fn decode<R: Record>(id: &str, data: &[u8]) -> Result<R, R::Error> {
     match serde_json::from_slice::<R>(data) {
         Ok(mut rec) => {
@@ -727,10 +640,9 @@ fn decode<R: Record>(id: &str, data: &[u8]) -> Result<R, R::Error> {
         Err(err) => {
             // A newer schema may not fit this layout; call that a version
             // problem rather than corruption.
-            let header = serde_json::from_slice::<serde_json::Value>(data)
-                .ok()
-                .and_then(|value| value.get("schema_version").and_then(serde_json::Value::as_u64))
-                .and_then(|version| u32::try_from(version).ok());
+            #[derive(serde::Deserialize)]
+            struct Header { schema_version: u32 }
+            let header = serde_json::from_slice::<Header>(data).ok().map(|h| h.schema_version);
             match header {
                 Some(found) if !R::SCHEMA_VERSIONS.contains(&found) => {
                     Err(lift::<R>(StoreError::UnsupportedVersion { found }))

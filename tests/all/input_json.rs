@@ -3,8 +3,8 @@ use crate::model::hook_stats::heap_bytes;
 use std::{env, fs, path::PathBuf, process::Command};
 
 #[test]
-fn a_full_input_only_macro_never_buffers_its_json() {
-    const TEST: &str = "input_json::a_full_input_only_macro_never_buffers_its_json";
+fn a_full_input_only_macro_streams_its_save_and_loads_from_one_buffer() {
+    const TEST: &str = "input_json::a_full_input_only_macro_streams_its_save_and_loads_from_one_buffer";
     const ROOT: &str = "TR_INPUT_JSON_TEST_DIR";
     let Some(dir) = env::var_os(ROOT).map(PathBuf::from) else {
         let dir = env::temp_dir().join(format!("tr-input-json-{}", std::process::id()));
@@ -41,6 +41,6 @@ fn a_full_input_only_macro_never_buffers_its_json() {
         assert_eq!(rec.frames.len(), MAX_FRAMES);
         assert!(rec.frames.iter().copied().eq((0..MAX_FRAMES).map(input)));
         eprintln!("INPUT_JSON load frames={} peak_above_live={peak}", rec.frames.len());
-        assert!(peak < 1024 * 1024, "buffered the JSON during load");
+        assert!(peak < fs::metadata(path).unwrap().len() as isize + 1024 * 1024, "load retained more than one JSON buffer");
     }
 }

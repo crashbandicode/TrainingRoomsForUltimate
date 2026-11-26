@@ -341,14 +341,6 @@ fn is_switch_on(on: &bool) -> bool {
     *on
 }
 
-/// `macros/<id>.json` whose `kind` is `chain`. A recording list omits these.
-pub fn is_chain_document(bytes: &[u8]) -> bool {
-    serde_json::from_slice::<serde_json::Value>(bytes)
-        .ok()
-        .and_then(|value| value.get("kind").and_then(serde_json::Value::as_str).map(|kind| kind == "chain"))
-        .unwrap_or(false)
-}
-
 fn check_name(name: &str) -> Result<(), MacroError> {
     if name.trim().is_empty() {
         return Err(MacroError::InvalidName("is empty"));

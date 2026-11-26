@@ -66,13 +66,7 @@ impl Record for MacroRecording {
     type Summary = MacroEntry;
     const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION];
     const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;
-    const STREAM_READ: bool = true;
-    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }
-    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {
-        #[derive(serde::Deserialize)]
-        struct Header { kind: Option<String> }
-        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some("chain"))
-    }
+    const STREAM_WRITE: bool = true;
 
     /// A new take or crop under the id: the positions file there goes first, so an interrupted save never leaves an
     /// earlier take's positions bound to the new macro. The same take written again (a rename, a placement, Trim)
@@ -101,7 +95,7 @@ impl Record for MacroRecording {
     }
 
     fn owns(bytes: &[u8]) -> bool {
-        !super::recording::is_chain_document(bytes)
+        !crate::model::store::is_chain_document(bytes)
     }
 
     fn name(&self) -> &str {
