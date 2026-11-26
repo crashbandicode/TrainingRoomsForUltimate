@@ -1174,7 +1174,7 @@ mod tests {
         let unsupported_id = encode_file_id("unsupported");
         fs::write(
             temp.0.join(format!("{unsupported_id}.tmrc")),
-            capture_file(br#"{"schema_version":2}"#),
+            capture_file(br#"{"schema_version":3}"#),
         )
         .unwrap();
         let oversized_id = encode_file_id("oversized");
@@ -1200,6 +1200,139 @@ mod tests {
             assert!(temp.0.join(format!("{id}.tmrc")).exists());
             assert!(archive.load(&id).is_err());
         }
+    }
+
+    fn pose_session() -> ReplaySession {
+        use crate::engine::macros::{PackedPose, Pose};
+        let frame = |n: u32, kind| ReplayFrame {
+            pose: PackedPose::pack(Pose { motion: 100 + u64::from(n), frame: n as f32 + 0.5 }),
+            input: InputFrame { buttons: n, ..InputFrame::default() },
+            start: StartState::neutral(kind, 0, 1.0), x: n as f32, y: -(n as f32),
+        };
+        ReplaySession { tracks: vec![
+            ReplayTrack { fighter: None, entry: 0, frames: vec![frame(1, 5), frame(2, 5), frame(3, 5)], quantized_analog: false },
+            ReplayTrack { fighter: None, entry: 3, frames: vec![frame(4, 9)], quantized_analog: false },
+        ], truncated: false, breaks: Vec::new() }
+    }
+
+    fn manual_capture(id: &str, schema: u32, record_size: usize) -> Vec<u8> {
+        let session = pose_session();
+        let header = serde_json::json!({
+            "schema_version": schema, "replay_id": id, "replay_name": "Match",
+            "game_version": "13.0.5", "truncated": false,
+            "tracks": [
+                {"entry": 0, "frames": 3, "quantized_analog": false},
+                {"entry": 3, "frames": 1, "quantized_analog": false}
+            ]
+        });
+        let mut bytes = capture_file(&serde_json::to_vec(&header).unwrap());
+        for frame in session.tracks.iter().flat_map(|track| &track.frames) {
+            let mut record = [0u8; 44];
+            record[0..4].copy_from_slice(&frame.input.buttons.to_le_bytes());
+            record[8..12].copy_from_slice(&frame.start.fighter_kind.to_le_bytes());
+            record[16..20].copy_from_slice(&frame.start.facing.to_le_bytes());
+            record[36..40].copy_from_slice(&frame.x.to_le_bytes());
+            record[40..44].copy_from_slice(&frame.y.to_le_bytes());
+            bytes.extend_from_slice(&record);
+            if record_size == 52 { bytes.extend_from_slice(&frame.pose.to_le_bytes()); }
+        }
+        bytes
+    }
+
+    fn a_capture_is_written_as_schema_2_with_52_byte_records_and_keeps_each_pose() {
+        let temp = TestDir::new();
+        let archive = CaptureArchive::new(&temp.0);
+        let session = pose_session();
+        let id = archive.save("schema2", "Match", "13.0.5", &session).unwrap();
+        let bytes = fs::read(archive.capture_path(&id)).unwrap();
+        let len = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+        let header: serde_json::Value = serde_json::from_slice(&bytes[12..12 + len]).unwrap();
+        assert_eq!(header["schema_version"], 2);
+        assert_eq!(bytes.len(), 12 + len + 4 * 52);
+        assert_eq!(&bytes[12 + len + 44..12 + len + 52], &session.tracks[0].frames[0].pose.to_le_bytes());
+        let loaded = archive.load(&id).unwrap();
+        for (expected, actual) in session.tracks.iter().zip(&loaded.session.tracks) {
+            assert_eq!(expected.entry, actual.entry);
+            assert_eq!(expected.frames.len(), actual.frames.len());
+            for (expected, actual) in expected.frames.iter().zip(&actual.frames) {
+                assert_eq!(actual.pose, expected.pose);
+            }
+        }
+        let foreign = crate::engine::macros::PackedPose([0, 0x500]);
+        let mut bytes = bytes;
+        bytes[12 + len + 44..12 + len + 52].copy_from_slice(&foreign.to_le_bytes());
+        fs::write(archive.capture_path(&id), bytes).unwrap();
+        assert_eq!(archive.load(&id).unwrap().session.tracks[0].frames[0].pose, foreign);
+    }
+
+    fn a_schema_1_capture_loads_with_no_pose() {
+        let temp = TestDir::new();
+        let id = encode_file_id("old");
+        fs::write(temp.0.join(format!("{id}.tmrc")), manual_capture("old", 1, 44)).unwrap();
+        let loaded = CaptureArchive::new(&temp.0).load(&id).unwrap();
+        for (expected, actual) in pose_session().tracks.iter().zip(&loaded.session.tracks) {
+            assert_eq!(expected.entry, actual.entry);
+            assert_eq!(expected.frames.len(), actual.frames.len());
+            for (expected, actual) in expected.frames.iter().zip(&actual.frames) {
+                assert_frame_eq(expected, actual);
+                assert_eq!(actual.pose, crate::engine::macros::PackedPose::NONE);
+            }
+        }
+    }
+
+    fn the_list_strides_by_the_files_schema() {
+        let temp = TestDir::new();
+        for (name, schema, size) in [("old", 1, 44), ("new", 2, 52)] {
+            let id = encode_file_id(name);
+            fs::write(temp.0.join(format!("{id}.tmrc")), manual_capture(name, schema, size)).unwrap();
+        }
+        let listing = CaptureArchive::new(&temp.0).list().unwrap();
+        assert!(listing.skipped.is_empty(), "{:?}", listing.skipped);
+        assert_eq!(listing.entries.len(), 2);
+        for entry in listing.entries {
+            assert_eq!(entry.sides, [(0, 5), (3, 9)]);
+            assert_eq!(entry.frames, 3);
+        }
+    }
+
+    fn saving_over_a_schema_1_capture_keeps_the_old_file() {
+        let temp = TestDir::new();
+        let id = encode_file_id("old");
+        let path = temp.0.join(format!("{id}.tmrc"));
+        let before = manual_capture("old", 1, 44);
+        fs::write(&path, &before).unwrap();
+        let outcome = CaptureArchive::new(&temp.0).save_with_outcome("old", "Match", "13.0.5", &pose_session()).unwrap();
+        assert_eq!(outcome.id, id);
+        assert!(!outcome.created);
+        assert_eq!(fs::read(path).unwrap(), before);
+    }
+
+    fn a_capture_cut_short_or_padded_is_refused_at_either_record_size() {
+        for (schema, size, cut) in [(2, 52, true), (2, 44, false), (1, 52, false)] {
+            let temp = TestDir::new();
+            let id = encode_file_id("bad");
+            let mut bytes = manual_capture("bad", schema, size);
+            if cut { bytes.truncate(bytes.len() - 8); }
+            fs::write(temp.0.join(format!("{id}.tmrc")), bytes).unwrap();
+            let archive = CaptureArchive::new(&temp.0);
+            assert!(archive.load(&id).is_err());
+            let listing = archive.list().unwrap();
+            assert!(listing.entries.is_empty());
+            assert_eq!(listing.skipped.len(), 1);
+            assert_eq!(listing.skipped[0].file, format!("{id}.tmrc"));
+        }
+    }
+
+    fn schema_3_is_refused() {
+        let temp = TestDir::new();
+        let id = encode_file_id("future");
+        fs::write(temp.0.join(format!("{id}.tmrc")), manual_capture("future", 3, 52)).unwrap();
+        let archive = CaptureArchive::new(&temp.0);
+        assert!(archive.load(&id).is_err());
+        let listing = archive.list().unwrap();
+        assert!(listing.entries.is_empty());
+        assert_eq!(listing.skipped.len(), 1);
+        assert!(listing.skipped[0].reason.contains("unsupported"));
     }
 
     fn two_sides() -> ReplaySession {
@@ -1315,6 +1448,12 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_capture_is_written_as_schema_2_with_52_byte_records_and_keeps_each_pose", a_capture_is_written_as_schema_2_with_52_byte_records_and_keeps_each_pose as fn()),
+            ("a_schema_1_capture_loads_with_no_pose", a_schema_1_capture_loads_with_no_pose as fn()),
+            ("the_list_strides_by_the_files_schema", the_list_strides_by_the_files_schema as fn()),
+            ("saving_over_a_schema_1_capture_keeps_the_old_file", saving_over_a_schema_1_capture_keeps_the_old_file as fn()),
+            ("a_capture_cut_short_or_padded_is_refused_at_either_record_size", a_capture_cut_short_or_padded_is_refused_at_either_record_size as fn()),
+            ("schema_3_is_refused", schema_3_is_refused as fn()),
             ("delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),
             ("a_delete_that_fails_after_it_commits_never_lists_a_broken_capture", a_delete_that_fails_after_it_commits_never_lists_a_broken_capture as fn()),
             ("a_saved_capture_lists_each_side_with_its_fighter", a_saved_capture_lists_each_side_with_its_fighter as fn()),

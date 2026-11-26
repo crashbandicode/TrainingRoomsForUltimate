@@ -785,10 +785,71 @@ mod tests {
         assert!(t.export(&t.window().unwrap(),"mixed","13.0.5",&[14]).is_err());
     }
 
+    fn pose_session() -> LiveSession {
+        use crate::engine::macros::{PackedPose, Pose};
+        let mut s = session();
+        s.truncated = true;
+        s.tracks[0].frames[1].start.fighter_kind = 19;
+        let mut replacement = s.tracks[0].frames[1];
+        replacement.body = 92;
+        replacement.start.fighter_kind = 20;
+        replacement.start.costume = 3;
+        s.tracks[0].frames.push(replacement);
+        s.tracks.insert(0, LiveTrack { fighter: None, entry: 7, frames: vec![frame([0.0; 4])] });
+        for track in &mut s.tracks {
+            for (index, frame) in track.frames.iter_mut().enumerate() {
+                frame.pose = PackedPose::pack(Pose { motion: 100 + track.entry as u64 * 10 + index as u64,
+                    frame: index as f32 + 0.5 });
+            }
+        }
+        s
+    }
+
+    fn assert_poses(expected: &LiveSession, actual: &ReplaySession) {
+        assert_eq!(actual.tracks.len(), expected.tracks.len());
+        for track in &expected.tracks {
+            let found = actual.tracks.iter().find(|actual| actual.entry == track.entry).unwrap();
+            assert_eq!(found.frames.len(), track.frames.len());
+            for (expected, actual) in track.frames.iter().zip(&found.frames) {
+                assert_eq!(actual.pose, expected.pose, "entry {}", track.entry);
+            }
+        }
+    }
+
+    fn a_published_bundle_keeps_each_pose_in_its_cache_and_none_in_the_timeline() {
+        let f = Fixture::new();
+        let s = pose_session();
+        let dir = f.publish(&s);
+        let id = encode_file_id("native-id");
+        let manifest = archive::read_manifest(&dir).unwrap();
+        assert_eq!(manifest.capture, header(&id, "Native title", "13.0.5", &[7, 1]));
+        let timeline = fs::read_to_string(dir.join(TIMELINE_FILE)).unwrap();
+        assert_eq!(timeline.matches("\"animation\"").count(), 4);
+        assert_eq!(timeline.matches("\"animation\":\"unsupported\"").count(), 4);
+        let cache = CaptureArchive::new(&dir).load(&id).unwrap();
+        assert_poses(&s, &cache.session);
+    }
+
+    fn the_canonical_load_returns_the_caches_poses() {
+        let f = Fixture::new();
+        let s = pose_session();
+        let dir = f.publish(&s);
+        let canonical = f.load().unwrap();
+        assert_poses(&s, &canonical.session);
+        let cache = CaptureArchive::new(&dir).load(&encode_file_id("native-id")).unwrap();
+        for (track, cached) in canonical.session.tracks.iter().zip(&cache.session.tracks) {
+            assert_eq!(track.entry, cached.entry);
+            assert_eq!(track.frames.iter().map(|f| f.pose).collect::<Vec<_>>(),
+                cached.frames.iter().map(|f| f.pose).collect::<Vec<_>>());
+        }
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_published_bundle_keeps_each_pose_in_its_cache_and_none_in_the_timeline", a_published_bundle_keeps_each_pose_in_its_cache_and_none_in_the_timeline as fn()),
+            ("the_canonical_load_returns_the_caches_poses", the_canonical_load_returns_the_caches_poses as fn()),
             ("a_sudden_death_break_round_trips_with_its_gap_and_true_counters", a_sudden_death_break_round_trips_with_its_gap_and_true_counters as fn()),
             ("a_delete_that_cannot_start_changes_nothing_in_a_real_bundle", a_delete_that_cannot_start_changes_nothing_in_a_real_bundle as fn()),
             ("a_delete_is_all_or_nothing_for_a_real_bundle", a_delete_is_all_or_nothing_for_a_real_bundle as fn()),
