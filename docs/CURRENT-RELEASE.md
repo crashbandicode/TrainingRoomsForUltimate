@@ -7,19 +7,20 @@
 
 Current release: rc.15
 
-Status: **rc.15, whose newest build is install 5** (commit `b7a382e4`, installed on the project's test console on
-2026-11-25).
+Status: **rc.15, whose newest build is install 6** (commit `5df3d9dc`, installed on the project's test console on
+2026-11-26).
 
 - **Installed:** the file on the card was read back and matches the build.
-- **Tested in Eden, in part:** a short smoke boot on this exact build ran with no crash. Guard the Edge and Juggler
-  opened their set-up on the Training stage, and Guard the Edge also from the island and on Battlefield. Eggs-ercise
-  had its off-stage zone, the recording picker's Off stage switch moved a fighter, a take played and the clip editor
-  previewed. A second boot opened the menu, and Guard the Edge's set-up, in a one-player waiting room. Neither
-  drill was played through, no placement was saved, no second player joined a room, and most of the build's other
-  new items were not touched.
-- **On the console:** one report so far. On 2026-11-25 the operator reported that the clip editor kept refusing
-  with "In is mid-action" after a snap to the move start; Known issues below has the way round. It is a report of what they
-  saw, not a test of the build; the reports on the earlier builds are in the evidence page.
+- **Eden:** install 6 is in testing. At installation, two Training boots were running on its diagnostic build;
+  the installed release file had no smoke verdict. The build before its last fix (`eb39d6bc`) passed its Play-start comparison with install 5, its record,
+  old-macro, snap and browse checks, and part of the diagnostic checks. The Play-start result and the rename result
+  carry over: rename passed by typing in Eden's keyboard window, not by pad. The rest of the build is install 5,
+  which had a short smoke boot and a one-player waiting-room boot.
+- **On the console:** no report on install 6 yet. Three reports on install 5 are on record. The clip editor's
+  "In is mid-action" refusal after a snap (2026-11-25) has its fix in install 6. A fighter placed off stage on a
+  save that stays on the ground once it has landed, and Guard the Edge's starting spot varying between rounds
+  (both 2026-11-26), are not fixed. Known issues below has each. They are reports of what the operator saw, not
+  tests of a build; the reports on the earlier builds are in the evidence page.
 
 What ran, on which build, what did not, and every report from the console: [Install evidence](EVIDENCE-rc15-installs.md).
 What each build changed:
@@ -33,6 +34,7 @@ Open the menu (B + D-pad Up) and read the end of the key hints at the foot of th
 
 | The tag ends with | Build | Installed |
 | --- | --- | --- |
+| `5df3d9dc` | Install 6 | 2026-11-26 |
 | `b7a382e4` | Install 5 | 2026-11-25 |
 | `a945b0c1` | Install 4 | 2026-11-25 |
 | `e7667f26` | Install 3 | 2026-11-24 |
@@ -45,8 +47,17 @@ More: [Getting started › Which build you have](guide/getting-started.md#which-
 
 ## What's new in rc.15
 
-Install 5 (2026-11-25), in short. The full list, and installs 1 to 4, are in the
-[rc.15 release notes](RELEASE-NOTES-rc15.md#install-5).
+Install 6 (2026-11-26), in short. The full list, and installs 1 to 5, are in the
+[rc.15 release notes](RELEASE-NOTES-rc15.md#install-6).
+
+- **Y on In makes a match capture previewable** in the Replay window.
+- **A free playhead in the clip editor:** Left and Right browse the take, Y goes to the nearest move, L and R cut
+  there.
+- **The fighters are shown while you scrub,** from positions kept in a file beside each macro. An old macro gets
+  them when you play it once.
+  [Replay window](menu/recording.md#replay-window)
+
+From install 5 (2026-11-25):
 
 - **Record works while an AI plays Player 1.**
   [When the CPU pilot plays Player 1](guide/controls.md#when-the-cpu-pilot-plays-player-1)
@@ -95,16 +106,28 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 
 ## Known issues
 
-- **"In is mid-action" after a snap in a match capture.** Plain Y snaps In to a mark. If that frame is still
-  mid-action, preview and save are refused. With In selected, hold ZL or ZR (Z on a GameCube pad) and press Y to snap to a
-  move start. Release the modifier, then press X to preview or A to save. This refusal does not apply to Crop on
-  saved files. Reported on install 5 and reproduced in a host test; install 4 uses the same snap code.
-  A fix is merged (`dbded2d1`) for the build after install 5; it is not on the card, and it has not run in a game.
-- **Install 5 test coverage:** one report from console play is on record, not a full hardware verdict. Eden covered
-  parts of Training in the first boot and a one-player Local Wireless waiting room in the second.
+- **Fixed in install 6: "In is mid-action" after a snap in a match capture.** On install 5 (install 4 uses the same snap code), plain Y
+  snaps In to a mark, and if that frame is still mid-action, preview and save are refused. The way round there:
+  with In selected, hold ZL or ZR (Z on a GameCube pad) and press Y, release the modifier, then press X to preview
+  or A to save. In install 6, Y resolves the move itself (`dbded2d1`). In Eden on the build before install 6's last
+  fix (`eb39d6bc`), Y moved In to the attack's start, and X then previewed. No report from the console on it yet.
+- **Placement on a save, reported on install 5:** a fighter switched to Off stage floats, but once it is moved into
+  the ground it lands and then stays on the ground as the crosshair moves. Switch On stage and Off stage again to put
+  it right. Neither install 5 nor install 6 fixes it. A fix is planned for the following build; there is no
+  confirmed in-game fix yet.
+- **Guard the Edge, reported on install 5:** the fighter sometimes starts slightly off the chosen spot, lower on one
+  round and higher on the next. Not fixed in install 5 or in install 6; a fix is planned for the following build.
+  No cause is established.
+  [The operator's reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console)
+- **Test coverage:** install 6 has no report from the console yet, and its own Eden checks are in testing.
+  [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc)
+  Install 5 has three reports from console play, not a full hardware verdict. Eden covered parts of Training in its
+  first boot and a one-player Local Wireless waiting room in its second.
   [Install evidence](EVIDENCE-rc15-installs.md#install-5-b7a382e4)
 - **Playback was slow to start on install 4:** a second or more (the operator's report). Install 5 changes how Play
-  starts; the start has not been timed in a game.
+  starts. Timed in Eden, not on the console, install 5 started a 3-second macro 9 frames after the press, a
+  30-second one 10 or 11, and a ten-minute one 27.
+  [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc)
 - **Not covered by install 4's final Eden session, nor by install 5's smoke boot:** the editor in the waiting room; the Quick Play practice pick, new pick
   and rematch; the airborne entry of a steered special; the deflection half of Match angle and deflection; ledge
   attacks; the Trim setting's migration; and the CPU's playback indicator.

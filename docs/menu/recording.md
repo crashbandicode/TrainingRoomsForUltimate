@@ -335,12 +335,37 @@ at the selected handle, and one timeline with the In and Out handles, the playhe
 | A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
 | B | Stops a preview or its tail without leaving; the next B closes the editor. B closes at once when the editor is idle. |
 
-2026-11-26. The free playhead (Left/Right, Y, then L or R with no handle selected) is merged for the build after
-install 5. With no handle selected on a macro or a capture the strip reads "Hold Left or Right to browse the take, or
+2026-11-26. The free playhead (Left/Right, Y, then L or R with no handle selected) is in install 6.
+With no handle selected on a macro or a capture the strip reads "Hold Left or Right to browse the take, or
 Y for the nearest move."; once the playhead has moved it reads "Playhead moved. L sets the start here, R the end.".
 Starting a preview with X selects the playhead. An accepted A opens the naming prompt; it clears the pending
 cut at the playhead but does not deselect an In or Out handle. A refused preview or export leaves the selection alone.
-The macro clip shows browsing, snapping the playhead and cutting with L and R in Eden. It does not show a match-capture preview or export.
+The playhead clip above shows browsing, the snap and both cuts on one macro, in Eden on install 6's diagnostic build `5df3d9dc`. It does not show a match-capture preview or export.
+
+2026-11-26. Positions while you scrub, in install 6. With In or Out selected, or once the
+playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. Both use
+the target's position when the hold begins, so their recorded spacing is kept. Each fighter's point is judged
+separately. A point outside the camera bounds, inside solid ground or a wall, or beyond the safe blast-line bounds
+is refused. The same applies if the stage geometry cannot be read. The line reads "Can't stand there on this stage."
+if either point is refused. That fighter returns to where its hold began, or stays put if it was not held; the
+other can still be held at a valid point. If the camera bounds themselves are unavailable, the hold is released
+without that warning.
+
+- A macro keeps its positions in a second file beside it, `<id>.pos`. Record writes it, and so do a crop and a
+  capture saved as a macro. The macro format is unchanged. Play starts from the macro's inputs without reading
+  positions at startup. Delete also removes `<id>.pos`; Rename changes the display name, not the ID or either
+  filename.
+- A macro without positions reads "Play it once to see positions while scrubbing.". Play it by itself from its first
+  input, with Play or with X here from the start of the take, and they are saved; after X they show at once. They
+  are that playback's positions, not the original recording's. No positions file is made for a chain step, when the
+  playing character's fighter kind differs from the recorded one, or when Trim skips the first input.
+- A playback stopped early gives positions up to where it stopped; past them the key line reads "Positions end
+  here.". A playback never replaces a valid file saved by Record; a damaged or mismatched one counts as missing.
+- The pose is frozen or neutral, and projectiles, items and damage are not shown. Combos and drills show nothing.
+
+Seen in Eden on `eb39d6bc`, the head before the rule for a point where a fighter cannot stand: the hold at In after
+Record, the old-macro line, positions from one Play and at once after X, and a crop that keeps them. That rule and
+its key line have host tests only; the Eden checks of install 6 itself are in testing.
 
 While a preview plays, the key line reads `B stop preview`. After the last frame the result stays on screen for about
 a second and the key line reads `B back`; B or X ends that tail without closing the editor, and the usual keys return.
