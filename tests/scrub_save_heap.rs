@@ -44,7 +44,8 @@ fn a_maximum_take_serializes_without_a_second_track() {
         let peak = after.peak - before.live;
         writeln!(std::io::stderr(), "SCRUB_LIST path={phase} count={count} peak_above_idle={peak} largest={} time_us={}", after.largest, elapsed.as_micros()).unwrap();
         assert_eq!(count, MAX_FRAMES);
-        assert!(peak < 1024 * 1024 && after.largest < 1024 * 1024, "listing materialized a track");
+        let file_bytes = fs::metadata(folder.join(format!("{id}.json"))).unwrap().len() as isize;
+        assert!(peak < file_bytes + 1024 * 1024, "listing retained more than the macro buffer and decoded inputs");
         return;
     }
     if env::var("TR_SCRUB_PHASE").as_deref() == Ok("load") {

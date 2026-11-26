@@ -669,7 +669,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "8b73c67ddb0b298d2aeea3079ad622c9198e2b35f6425254cd05ec0172be5058",
+   "dest_sha256": "7e766a6cd8d550ae1ab1243c8ebf812944f02de866a8c885ce5bee4e726d1036",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -903,6 +903,11 @@
     {
      "old": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// A macro that carries its position track (`MacroRecording::track`): older readers refuse it.\npub const TRACK_SCHEMA_VERSION: u32 = 3;\n/// Gameplay frame rate assumed when the caller does not supply one.",
      "new": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// Gameplay frame rate assumed when the caller does not supply one.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "\n/// `macros/<id>.json` whose `kind` is `chain`. A recording list omits these.\npub fn is_chain_document(bytes: &[u8]) -> bool {\n    serde_json::from_slice::<serde_json::Value>(bytes)\n        .ok()\n        .and_then(|value| value.get(\"kind\").and_then(serde_json::Value::as_str).map(|kind| kind == \"chain\"))\n        .unwrap_or(false)\n}\n\nfn check_name(name: &str) -> Result<(), MacroError> {",
+     "new": "\nfn check_name(name: &str) -> Result<(), MacroError> {",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
@@ -1355,7 +1360,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "15e11a99552ea84afa094599e365f3b75af65ede3f33b465061979350ae3fa72",
+   "dest_sha256": "28f5fcafb2be3f617ffe608238fbf23cb71620cd426100f19638843cb6c0e3cb",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1500,6 +1505,16 @@
     {
      "old": "    fn before_write(&self, dir: &std::path::Path, id: &str) {\n        if self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {\n            super::positions::remove(dir, id);",
      "new": "    fn before_write(&self, dir: &std::path::Path, id: &str, new: bool) -> std::io::Result<()> {\n        if new || self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {\n            return super::positions::invalidate(dir, id);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        !super::recording::is_chain_document(bytes)",
+     "new": "        !crate::model::store::is_chain_document(bytes)",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    const STREAM_READ: bool = true;\n    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {\n        #[derive(serde::Deserialize)]\n        struct Header { kind: Option<String> }\n        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some(\"chain\"))\n    }",
+     "new": "    const STREAM_WRITE: bool = true;",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
