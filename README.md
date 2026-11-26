@@ -20,8 +20,9 @@ Every option is documented in the [docs](docs/README.md), one page per menu page
 Tested on: Super Smash Bros. Ultimate 13.0.5 · Switch firmware 23.5.0 · Atmosphère 1.12.2
 
 1. Set up Skyline for Smash Ultimate 13.0.5 on your Switch.
-2. Copy `libtraining_rooms.nro`, `libnro_hook.nro` and `libparam_hook.nro` into
+2. Copy `libtraining_rooms.nro` and `libnro_hook.nro` into
    `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/` on the SD card.
+   The hook enables CPU DI, tech and out-of-shield options; its usual companion `libparam_hook.nro` is optional for TrainingRooms.
 3. If `libtraining_modpack.nro` is there, remove it: the two can't run together.
 4. Start the game and open Training. Settings from the Training Modpack are copied over the first time.
 5. Press B + D-pad Up (or Minus) to open the menu.
