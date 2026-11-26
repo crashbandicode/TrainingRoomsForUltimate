@@ -400,7 +400,13 @@ impl TakeTrack {
 
     /// Seed this role at the start of a new take, before its first input is recorded.
     pub fn seed(&self, slot: usize, frame: Option<ReplayFrame>) {
-        if let Some(frame) = frame { self.live(slot, &frame); }
+        if let Some(frame) = frame {
+            self.live(slot, &frame);
+        } else if let Some(live) = self.table().and_then(|table| table.live.get(slot)) {
+            for (index, cell) in live.iter().enumerate() {
+                cell.store(if index == 0 { u32::MAX } else { 0 }, Ordering::Release);
+            }
+        }
     }
 
     /// The game thread, as frame `index` of the take is stored for the role in `slot`: both fighters' states go
