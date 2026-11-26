@@ -197,6 +197,33 @@ impl Block {
         ok
     }
 
+    /// The game thread: where the role in `slot` is asked to be. `origin`: where the target role's hold found its
+    /// body, when it is held; `free`: where the target stands when it is not.
+    pub fn point(&self, slot: usize, origin: impl FnOnce(usize) -> Option<[f32; 2]>, free: impl FnOnce(usize) -> Option<[f32; 2]>) -> Option<Spot> {
+        let target = self.target_slot()?;
+        let home = match origin(target) {
+            Some(at) => at,
+            None => free(target)?,
+        };
+        self.held_at(slot, home)
+    }
+
+    /// The game thread, after the hold's step for the role in `slot`. `displaced`: the hold reports that the game
+    /// moved the body off the point written on the frame before. That is about this request only when that write was
+    /// this role's, for this request (`generation`, read before the ask), at this point: then the body is refused
+    /// here, and `true` says to let it go. Otherwise this frame's write is noted and the next frame is judged.
+    pub fn pushed(&self, slot: usize, generation: u32, body: u32, at: [f32; 2], displaced: bool) -> bool {
+        let _ = (slot, generation, body, at, displaced);
+        false
+    }
+
+    /// The game thread: the game pushed this body off this point under this request (`pushed`). It is not taken again
+    /// until the shown request, the point or the body changes.
+    pub fn refused(&self, slot: usize, generation: u32, body: u32, at: [f32; 2]) -> bool {
+        let _ = (slot, generation, body, at);
+        false
+    }
+
     /// Publish an ask. A group ask names the roles a later "nobody" waits for, and ends an older start's wait.
     fn put(&self, ask: Ask) {
         if let Ask::Group { deltas, .. } = ask {
@@ -1250,6 +1277,90 @@ mod tests {
             assert!(!block.standable(slot, [0.0, 0.0], || permits(4.0)), "frame 11: role {slot} is inside the floor");
             assert!(!block.standable(slot, [0.0, 0.0], || panic!("rechecked an unchanged refusal")));
         }
+    }
+
+    /// P3 (tr-primary-2 2026-11-26 16:19:09Z): the target role is let go while its partner stays held. The target's
+    /// published position is read at the top of its fighter frame, before the hold's step, so on that frame it is
+    /// still the point the target was held at. The partner's point is traced callback by callback.
+    #[test]
+    fn the_groups_home_stays_when_the_target_is_let_go() {
+        let block = Block::new();
+        let home = [-30.0, 0.5];
+        let group = |target: [f32; 2], partner: [f32; 2]| Ask::Group {
+            target: 0,
+            deltas: [Some(spot(target[0], target[1], 1.0)), Some(spot(partner[0], partner[1], -1.0))],
+        };
+        let at = |point: Option<Spot>| point.map(|spot| spot.at);
+        // Frame 136: both are held. The target's hold found it at home.
+        block.ask_at(Some(136), group([12.0, 30.0], [-40.0, 0.0]));
+        assert_eq!(at(block.point(0, |_| Some(home), |_| panic!("a held target has an origin"))), Some([-18.0, 30.5]));
+        assert_eq!(at(block.point(1, |_| Some(home), |_| panic!("a held target has an origin"))), Some([-70.0, 0.5]));
+        // Frame 137: the stage refuses the target's point and its hold is gone. Its position as published on this
+        // frame is still where it was held.
+        block.ask_at(Some(137), group([4.0, -8.0], [-52.0, -15.0]));
+        let held = [-18.0, 30.5];
+        assert_eq!(at(block.point(1, |_| None, |_| Some(held))), Some([-82.0, -14.5]), "the partner's first callback after the target is let go");
+        assert_eq!(at(block.point(0, |_| None, |_| Some(held))), Some([-26.0, -7.5]), "the target is asked from home too");
+        for _ in 0..3 {
+            assert_eq!(at(block.point(1, |_| None, |_| Some(home))), Some([-82.0, -14.5]));
+        }
+        // Nobody is asked: the home goes with the holds. The next group starts from where the target stands then.
+        block.ask_at(None, Ask::None);
+        assert_eq!(block.point(1, |_| panic!("nobody is asked"), |_| panic!("nobody is asked")), None);
+        block.ask_at(Some(137), group([4.0, -8.0], [-52.0, -15.0]));
+        assert_eq!(at(block.point(1, |_| None, |_| Some([10.0, 0.5]))), Some([-42.0, -14.5]));
+        // Another target role does not take the first one's home.
+        assert_eq!(at(block.point(0, |_| Some(home), |_| None)), Some([-26.0, -7.5]));
+        block.ask_at(Some(138), Ask::Group { target: 1, deltas: [Some(spot(1.0, 0.0, 1.0)), Some(spot(0.0, 0.0, 1.0))] });
+        assert_eq!(at(block.point(0, |_| None, |_| Some([5.0, 0.5]))), Some([6.0, 0.5]));
+        // A hold made on another body is forgotten, and its home with it.
+        block.ask_at(Some(139), group([0.0, 0.0], [1.0, 0.0]));
+        assert_eq!(at(block.point(1, |_| Some(home), |_| None)), Some([-29.0, 0.5]));
+        block.forget();
+        block.ask_at(Some(140), group([0.0, 0.0], [1.0, 0.0]));
+        assert_eq!(at(block.point(1, |_| None, |_| Some([7.0, 0.5]))), Some([8.0, 0.5]));
+    }
+
+    /// P3 (tr-primary-2 2026-11-26 13:43:10Z, 13:47:51Z; rv-preview-vis 13:44:24Z, 16:20:59Z): a body the game pushes
+    /// off its point is refused there, for that shown request and that body, and is not taken again.
+    #[test]
+    fn a_body_the_game_pushes_off_its_point_is_refused_for_that_request_and_body() {
+        let block = Block::new();
+        let ask = Ask::Group { target: 0, deltas: [Some(spot(0.0, 0.0, 1.0)), Some(spot(-51.0, -15.0, -1.0))] };
+        let (wall, open) = ([-81.0, -3.5], [-87.0, -3.5]);
+        let (player, cpu, other) = (0x100, 0x200, 0x300);
+        block.ask_at(Some(137), ask);
+        let request = block.generation();
+        // The first frame of a hold writes. Nothing of this request has been judged yet, whatever the hold reports.
+        assert!(!block.pushed(1, request, cpu, wall, true), "the write judged was not this request's");
+        assert!(!block.refused(1, request, cpu, wall));
+        // The next frame reads the body off the point this request wrote.
+        assert!(block.pushed(1, request, cpu, wall, true), "pushed off its own write");
+        // Ten unchanged callbacks: refused. The other role is held at its point throughout.
+        for _ in 0..10 {
+            assert!(block.refused(1, request, cpu, wall));
+            assert!(!block.refused(0, request, player, open) && !block.pushed(0, request, player, open, false));
+        }
+        // Another body at the same point under the same request gets its own try.
+        assert!(!block.refused(1, request, other, wall));
+        // A new shown frame with the same points is another request.
+        block.ask_at(Some(138), ask);
+        let next = block.generation();
+        assert_ne!(next, request);
+        assert!(!block.refused(1, next, cpu, wall));
+        // The body is written at the wall again; before the next frame the shown frame moves it to open air. The
+        // hold's report on that frame is about the wall's write and says nothing of the open point.
+        assert!(!block.pushed(1, next, cpu, wall, false));
+        block.ask_at(Some(139), ask);
+        let moved = block.generation();
+        assert!(!block.pushed(1, moved, cpu, open, true), "the write judged was the wall's");
+        assert!(!block.pushed(1, moved, cpu, open, false) && !block.refused(1, moved, cpu, open), "exact in open air: held");
+        // A request published during the callback: the callback had read the older generation before the ask. The
+        // refusal is the older request's; the new one asks afresh.
+        assert!(!block.pushed(1, moved, cpu, wall, false));
+        block.ask_at(Some(140), ask);
+        assert!(block.pushed(1, moved, cpu, wall, true));
+        assert!(block.refused(1, moved, cpu, wall) && !block.refused(1, block.generation(), cpu, wall));
     }
 
     #[test]
