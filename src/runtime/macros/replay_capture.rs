@@ -18,6 +18,8 @@ use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate:
 use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};
 
 use crate::runtime::lobby::game_mode;
+use crate::runtime::game::natives;
+use crate::engine::macros::PackedPose;
 
 const REPLAY_MODE_13_0_5: u32 = 0x05010100;
 // Native calibration: all 4,222 post-frame samples exactly recovered the mapped
@@ -1280,7 +1282,9 @@ pub fn after_draw() {
 }
 
 pub(crate) unsafe fn state(module: &mut BattleObjectModuleAccessor) -> ReplayFrame {
-    ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState {
+    let accessor = module as *mut BattleObjectModuleAccessor as usize;
+    ReplayFrame { pose: { let (motion, frame) = natives::motion_sample(accessor); PackedPose::sampled(motion, frame) },
+        input: InputFrame::default(), start: StartState {
         fighter_kind: app::utility::get_kind(module),
         costume: WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR) as u32,
         facing: PostureModule::lr(module),
@@ -1324,7 +1328,7 @@ pub(crate) unsafe fn live_state(module: &mut BattleObjectModuleAccessor) -> Opti
             velocity.map(f32::to_bits));
         return None;
     }
-    let sample = LiveFrame { pose: crate::engine::macros::PackedPose::NONE, input: LiveInput::default(), start: before.start,
+    let sample = LiveFrame { pose: before.pose, input: LiveInput::default(), start: before.start,
         x: before.x, y: before.y, position_z: PostureModule::pos_z(module),
         speed_z: velocity[2], body: module.battle_object_id };
     #[cfg(feature = "named-input-trace")]

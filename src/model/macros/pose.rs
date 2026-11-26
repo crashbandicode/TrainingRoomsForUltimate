@@ -18,9 +18,26 @@ pub struct PackedPose(pub [u32; 2]);
 impl PackedPose {
     pub const NONE: Self = Self([0, 0]);
 
-    pub fn pack(_pose: Pose) -> Self { Self::NONE }
+    pub fn pack(pose: Pose) -> Self {
+        if !pose.is_valid() {
+            return Self::NONE;
+        }
+        let frame = (pose.frame * 256.0).round().min(0xFF_FFFF as f32) as u32;
+        Self([pose.motion as u32, ((pose.motion >> 32) as u32) | (frame << 8)])
+    }
 
-    pub fn get(self) -> Option<Pose> { None }
+    pub fn get(self) -> Option<Pose> {
+        let pose = Pose {
+            motion: self.0[0] as u64 | (((self.0[1] & 0xFF) as u64) << 32),
+            frame: (self.0[1] >> 8) as f32 / 256.0,
+        };
+        pose.is_valid().then_some(pose)
+    }
+
+    /// What a sampler stores: no pose unless both reads were granted (a refused read is not a frame of 0).
+    pub fn sampled(motion: Option<u64>, frame: Option<f32>) -> Self {
+        match (motion, frame) { (Some(motion), Some(frame)) => Self::pack(Pose { motion, frame }), _ => Self::NONE }
+    }
 
     pub fn to_le_bytes(self) -> [u8; 8] {
         let first = self.0[0].to_le_bytes();
@@ -75,6 +92,15 @@ mod tests {
         assert_eq!(PackedPose::default(), PackedPose::NONE);
     }
 
+    fn a_refused_read_gives_no_pose_and_frame_zero_is_a_pose() {
+        assert_eq!(PackedPose::sampled(Some(7), None), PackedPose::NONE);
+        assert_eq!(PackedPose::sampled(None, Some(1.0)), PackedPose::NONE);
+        assert_eq!(PackedPose::sampled(None, None), PackedPose::NONE);
+        let zero = PackedPose::sampled(Some(7), Some(0.0));
+        assert_eq!(zero, PackedPose([7, 0]));
+        assert_eq!(zero.get(), Some(Pose { motion: 7, frame: 0.0 }));
+    }
+
     #[test]
     fn case_table() {
         crate::test_table::run(&[
@@ -82,6 +108,7 @@ mod tests {
             ("the_frame_rounds_to_a_256th", the_frame_rounds_to_a_256th as fn()),
             ("a_pose_that_is_not_valid_packs_as_none", a_pose_that_is_not_valid_packs_as_none as fn()),
             ("none_and_foreign_words_give_no_pose", none_and_foreign_words_give_no_pose as fn()),
+            ("a_refused_read_gives_no_pose_and_frame_zero_is_a_pose", a_refused_read_gives_no_pose_and_frame_zero_is_a_pose as fn()),
         ]);
     }
     }
