@@ -38,13 +38,14 @@ fn member<'a>(text: &'a str, head: &str) -> &'a str {
 fn the_samplers_read_the_animation_and_its_frame() {
     let replay = src("src/runtime/macros/replay_capture.rs");
     let state = item(&replay, "fn state(");
-    assert!(state.contains("natives::motion_sample("));
-    assert!(state.contains("PackedPose::sampled("));
+    assert!(state.contains("sampled_pose("));
+    assert!(!state.contains("natives::motion_kind("));
     assert!(!state.contains("natives::motion_frame("));
-    let game = src("src/runtime/game.rs");
-    let motion_sample = member(&game, "fn motion_sample(");
-    assert!(motion_sample.contains("MOTION_KIND_OFFSET"));
-    assert!(motion_sample.contains("MOTION_FRAME_OFFSET"));
+    let sampled = item(&replay, "fn sampled_pose(");
+    assert!(sampled.contains("pose_reads_granted()"));
+    assert!(sampled.contains("natives::motion_kind("));
+    assert!(sampled.contains("natives::motion_frame("));
+    assert!(sampled.contains("PackedPose::pack("));
     assert!(item(&replay, "fn live_state(").contains("pose: before.pose"));
 }
 

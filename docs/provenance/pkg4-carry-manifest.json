@@ -5830,7 +5830,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "d679145684fffdac49d2f0edba4393d6890283a8995fbee49451f04a2eca8f7e",
+   "dest_sha256": "0a29c2deb4d1b61bc5fd9d5fc8f33b4c360eb93769ed81650063ed4c17412d23",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6886,6 +6886,16 @@
      "reason": "scrub-moves SM5 B: sample the two independently guarded animation fields once",
      "old": "use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\n\nconst REPLAY_MODE_13_0_5: u32 = 0x05010100;\n// Native calibration: all 4,222 post-frame samples exactly recovered the mapped\n",
      "new": "use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\nuse crate::runtime::game::natives;\nuse crate::engine::macros::PackedPose;\n\nconst REPLAY_MODE_13_0_5: u32 = 0x05010100;\n// Native calibration: all 4,222 post-frame samples exactly recovered the mapped\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: keep animation reads behind an optional guarded boundary",
+     "old": "    }\n}\n\npub(crate) unsafe fn state(module: &mut BattleObjectModuleAccessor) -> ReplayFrame {\n    let accessor = module as *mut BattleObjectModuleAccessor as usize;\n    ReplayFrame { pose: { let (motion, frame) = natives::motion_sample(accessor); PackedPose::sampled(motion, frame) },\n        input: InputFrame::default(), start: StartState {\n        fighter_kind: app::utility::get_kind(module),\n        costume: WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR) as u32,\n",
+     "new": "    }\n}\n\n/// Both animation reads are granted. A refused read returns 0, which is also a real frame, so one alone is no pose.\nfn pose_reads_granted() -> bool {\n    game::granted(MOTION_KIND_OFFSET) && game::granted(MOTION_FRAME_OFFSET)\n}\n\n/// The fighter's animation and its frame now, or no pose when either read is refused (scrub-moves SM5 B).\nunsafe fn sampled_pose(accessor: usize) -> PackedPose {\n    if !pose_reads_granted() {\n        return PackedPose::NONE;\n    }\n    PackedPose::pack(Pose { motion: natives::motion_kind(accessor), frame: natives::motion_frame(accessor) })\n}\n\npub(crate) unsafe fn state(module: &mut BattleObjectModuleAccessor) -> ReplayFrame {\n    let accessor = module as *mut BattleObjectModuleAccessor as usize;\n    ReplayFrame { pose: sampled_pose(accessor),\n        input: InputFrame::default(), start: StartState {\n        fighter_kind: app::utility::get_kind(module),\n        costume: WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR) as u32,\n"
+    },
+    {
+     "reason": "scrub-moves SM5 B: keep animation reads behind an optional guarded boundary",
+     "old": "use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\nuse crate::runtime::game::natives;\nuse crate::engine::macros::PackedPose;\n\nconst REPLAY_MODE_13_0_5: u32 = 0x05010100;\n// Native calibration: all 4,222 post-frame samples exactly recovered the mapped\n",
+     "new": "use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\nuse crate::runtime::game::{self, natives};\nuse crate::model::sites_pkg2::{MOTION_FRAME_OFFSET, MOTION_KIND_OFFSET};\nuse crate::engine::macros::{PackedPose, Pose};\n\nconst REPLAY_MODE_13_0_5: u32 = 0x05010100;\n// Native calibration: all 4,222 post-frame samples exactly recovered the mapped\n"
     }
    ]
   },

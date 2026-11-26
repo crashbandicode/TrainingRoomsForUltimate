@@ -244,12 +244,6 @@ pub mod natives {
         at::<extern "C" fn(usize) -> u64>(sites_pkg2::MOTION_KIND_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
-    /// The animation's name and its frame, each only when its read is granted.
-    pub unsafe fn motion_sample(accessor: usize) -> (Option<u64>, Option<f32>) {
-        (at::<extern "C" fn(usize) -> u64>(sites_pkg2::MOTION_KIND_OFFSET).map(|f| f(accessor)),
-            at::<extern "C" fn(usize) -> f32>(sites_pkg2::MOTION_FRAME_OFFSET).map(|f| f(accessor)))
-    }
-
     pub unsafe fn change_motion(accessor: usize, motion: u64, frame: f32, rate: f32) {
         if let Some(f) = at::<extern "C" fn(usize, u64, f32, f32, bool, f32, bool, bool) -> u64>(sites_pkg2::MOTION_CHANGE_HOOK_OFFSET) {
             f(accessor, motion, frame, rate, false, 0.0, false, false);

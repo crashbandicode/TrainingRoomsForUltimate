@@ -34,11 +34,6 @@ impl PackedPose {
         pose.is_valid().then_some(pose)
     }
 
-    /// What a sampler stores: no pose unless both reads were granted (a refused read is not a frame of 0).
-    pub fn sampled(motion: Option<u64>, frame: Option<f32>) -> Self {
-        match (motion, frame) { (Some(motion), Some(frame)) => Self::pack(Pose { motion, frame }), _ => Self::NONE }
-    }
-
     pub fn to_le_bytes(self) -> [u8; 8] {
         let first = self.0[0].to_le_bytes();
         let second = self.0[1].to_le_bytes();
@@ -92,13 +87,11 @@ mod tests {
         assert_eq!(PackedPose::default(), PackedPose::NONE);
     }
 
-    fn a_refused_read_gives_no_pose_and_frame_zero_is_a_pose() {
-        assert_eq!(PackedPose::sampled(Some(7), None), PackedPose::NONE);
-        assert_eq!(PackedPose::sampled(None, Some(1.0)), PackedPose::NONE);
-        assert_eq!(PackedPose::sampled(None, None), PackedPose::NONE);
-        let zero = PackedPose::sampled(Some(7), Some(0.0));
+    fn frame_zero_is_a_pose_and_only_zero_words_are_none() {
+        let zero = PackedPose::pack(Pose { motion: 7, frame: 0.0 });
         assert_eq!(zero, PackedPose([7, 0]));
         assert_eq!(zero.get(), Some(Pose { motion: 7, frame: 0.0 }));
+        assert_ne!(zero, PackedPose::NONE);
     }
 
     #[test]
@@ -108,7 +101,7 @@ mod tests {
             ("the_frame_rounds_to_a_256th", the_frame_rounds_to_a_256th as fn()),
             ("a_pose_that_is_not_valid_packs_as_none", a_pose_that_is_not_valid_packs_as_none as fn()),
             ("none_and_foreign_words_give_no_pose", none_and_foreign_words_give_no_pose as fn()),
-            ("a_refused_read_gives_no_pose_and_frame_zero_is_a_pose", a_refused_read_gives_no_pose_and_frame_zero_is_a_pose as fn()),
+            ("frame_zero_is_a_pose_and_only_zero_words_are_none", frame_zero_is_a_pose_and_only_zero_words_are_none as fn()),
         ]);
     }
     }
