@@ -66,8 +66,104 @@ draws it too; with both ticked it is drawn once, in sky blue, and with Windboxes
 *Clip coming.*
 
 Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through olive box or
-circle with a white line pointing the way it pushes. A dot means the wind has no one direction. Fighter articles and
-items can have wind areas too; stage hazards are not drawn.
+circle with a white line pointing the way it pushes. A dot means the wind has no one direction.
+
+| Wind from | Drawn | Examples |
+| --- | --- | --- |
+| A fighter's own move | Yes | Mario's F.L.U.D.D. (a windbox); Ganondorf's up tilt (windboxes inside a wind area) |
+| What a fighter throws or summons | Yes | The pillar of Ness's PK Fire, Samus's bomb, Palutena's Explosive Flame. Zelda's Triforce of Wisdom, which pulls, and Hero's Kaboom take the same path; they were not filmed on their own. |
+| An item | Yes | Sheik's Burst Grenade: its pull is a windbox and its explosion a wind area. The Gust Bellows and a Poké Ball's Pokémon take the same path; they were not filmed on their own. |
+| Stage hazards | No | Pac-Land's fire hydrant |
+
+**Windboxes that are easy to miss.** They are in the game's own move data. The public windbox lists miss the first
+four.
+
+| Fighter | Move | What the data has |
+| --- | --- | --- |
+| King K. Rool | Blunderbuss (neutral special, held) | It pulls with a windbox; grab boxes catch who it pulls in. |
+| King K. Rool | Crownerang (side special) | A small windbox on his arm while he throws the crown. |
+| Palutena | Counter (down special) | A windbox. |
+| Greninja | down taunt | A windbox. |
+| R.O.B. | Gyro | No windbox. Its spin on the ground hits with hitstun, so it is drawn under Hitboxes. |
+
+**Every move with a windbox** in the game's move data. A few moves whose names the data does not give are left out.
+
+| Fighter | Moves with a windbox |
+| --- | --- |
+| Bowser | neutral special (one of the two flames) |
+| Cloud | neutral special, down special |
+| Corrin | up special |
+| Dark Samus, Samus | Final Smash (before the beam) |
+| Ganondorf | up tilt |
+| Greninja | up special (the water), down taunt |
+| Hero | Kaboom; Whack and Thwack |
+| Ice Climbers | down special |
+| Incineroar | side special |
+| Inkling | neutral special (the ink) |
+| Jigglypuff | Final Smash |
+| Kazuya | the last hit of Flash Punch Combo, Final Smash |
+| Ken | Final Smash |
+| King Dedede | neutral special (Inhale) |
+| King K. Rool | neutral special (Blunderbuss, held), side special (Crownerang) |
+| Kirby | neutral special (Inhale) |
+| Little Mac | dash attack, side special |
+| Lucas | down special |
+| Luigi | down special |
+| Mario | down special (F.L.U.D.D.) |
+| Mega Man | up aerial |
+| Meta Knight | neutral special |
+| Mii Brawler | side special (Suplex) |
+| Mii Gunner | down special (Absorbing Vortex, as it ends) |
+| Mii Swordfighter | neutral special (Shuriken of Light) |
+| Ness | down special (as it ends) |
+| Pac-Man | dash attack, down special (the hydrant's water) |
+| Palutena | forward smash, down smash, down special (Counter), Final Smash |
+| Piranha Plant | side special, Final Smash |
+| Pit, Dark Pit | down special |
+| Pyra and Mythra | side special (Pyra's sword), Final Smash |
+| Robin | up special (where it lands) |
+| Rosalina | neutral special (calling Luma back) |
+| Sephiroth | Final Smash |
+| Sheik | up special, side special (the grenade's pull, before it explodes) |
+| Squirtle | neutral special |
+| Toon Link | down aerial (as it lands) |
+| Wii Fit Trainer | neutral special (while charging) |
+| Zelda | down special (the Phantom) |
+
+**Moves with a wind area.** Eden tried the special moves and smashes of every fighter whose moves can make one, and
+Ganondorf's up tilt. Aerials, throws and the other tilts were not tried, so a move missing here may still have one.
+
+| Fighter | Moves with a wind area |
+| --- | --- |
+| Bayonetta | neutral special |
+| Bowser Jr. | neutral special |
+| Chrom | neutral special (Flare Blade), down special, up smash, down smash |
+| Cloud | neutral special, down special |
+| Corrin | neutral special |
+| Dr. Mario | side special |
+| Falco | up special |
+| Fox | up special |
+| Ganondorf | neutral special, up special, down special, up tilt |
+| Greninja | side special, up smash |
+| Ike | neutral special, side special, down special, forward smash, down smash |
+| Ken | every special, forward smash, up smash, down smash |
+| King Dedede | neutral special, up special |
+| Kirby | neutral special |
+| Lucas | neutral special, side special, down special, forward smash, down smash |
+| Lucina | neutral special (when held), down special, forward smash, up smash, down smash |
+| Mario | side special |
+| Marth | neutral special (when held), down special, forward smash, up smash, down smash |
+| Meta Knight | neutral special |
+| Mewtwo | neutral special, down special, forward smash, up smash, down smash |
+| Ness | side special (the PK Fire pillar) |
+| Palutena | every special, forward smash, up smash, down smash |
+| Robin | up smash, down smash |
+| Roy | neutral special, down special, up smash, down smash |
+| Ryu | every special, forward smash, up smash, down smash |
+| Samus | down special (the bomb) |
+| Sheik | side special (the Burst Grenade as it explodes) |
+| Shulk | forward smash, up smash |
+| Wario | down special |
 
 **Launch angles** draws a white line inside each hitbox, pointing where the hit sends the fighter it lands on. The line
 mirrors when the attacker turns around. Two dashes mean the game picks the angle when the hit lands, from how hard it
