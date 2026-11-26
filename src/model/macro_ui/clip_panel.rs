@@ -3,6 +3,7 @@ use {crate::engine::macros::FrameWindow, crate::engine::macros::MacroRecording, 
 use crate::engine::macro_ui::macro_panel::Pad;
 use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};
 use crate::engine::macro_ui::scrub_track::{self, Ask, Pos};
+use crate::engine::macros::positions::{Moves, Source};
 use crate::model::combo_record::UnitKind;
 
 pub const CLIP_BAR_UNITS: u16 = 1600;
@@ -684,13 +685,15 @@ impl ClipEditor {
         if self.file.is_none() {
             let start = self.window.start() as usize;
             let other = (self.session.tracks.len() == 2).then(|| &self.session.tracks[1 - self.track].frames);
-            let state = |frame: &ReplayFrame| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: Default::default(), ..*frame };
+            let state = |frame: &ReplayFrame| ReplayFrame { input: Default::default(), ..*frame };
             let absent = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };
-            recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {
-                frames.iter().enumerate()
+            if let Some(frames) = self.track().frames.get(start..self.window.end() as usize) {
+                let rows: Vec<_> = frames.iter().enumerate()
                     .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])
-                    .collect()
-            }));
+                    .collect();
+                let moves = if rows.iter().flatten().any(|frame| frame.pose.get().is_some()) { Moves::Take } else { Moves::None };
+                recording.set_sourced_track(Source::Recorded, moves, rows);
+            }
         }
         recording
     }
