@@ -336,11 +336,12 @@ Browsing was seen in Eden on `eb39d6bc`, an earlier head of that build; the cuts
 
 2026-11-26. Positions while you scrub, merged for the build after install 5. With In or Out selected, or once the
 playhead has moved, and no preview playing, both fighters are shown where the take had them on that frame. Both use
-the target's position when the hold begins, so their recorded spacing is kept. A fighter is not put at a point where
-it cannot stand on this stage: inside the ground or a wall, outside the camera's limits, past a blast line, or
-anywhere when the stage cannot be read. A held fighter then goes back to where its hold began, and a fighter not yet
-held is left alone. Each fighter's point is judged by itself, so the other one is still shown when its own point
-allows. The key line reads "Can't stand there on this stage.".
+the target's position when the hold begins, so their recorded spacing is kept. Each fighter's point is judged
+separately. A point outside the camera bounds, inside solid ground or a wall, or beyond the safe blast-line bounds
+is refused. The same applies if the stage geometry cannot be read. The line reads "Can't stand there on this stage."
+if either point is refused. That fighter returns to where its hold began, or stays put if it was not held; the
+other can still be held at a valid point. If the camera bounds themselves are unavailable, the hold is released
+without that warning.
 
 - A macro keeps its positions in a second file beside it, `<id>.pos`. Record writes it, and so do a crop and a
   capture saved as a macro. The macro format is unchanged. Play starts from the macro's inputs without reading

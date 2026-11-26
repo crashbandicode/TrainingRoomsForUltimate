@@ -85,8 +85,8 @@ The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.
   missing, so an eligible playback can replace it. The macro does not need positions to play.
 - No positions file is made for a chain step, when the playing character is a different fighter kind from the one
   recorded, or when Trim skips the first input.
-- A fighter is not put at a point where it cannot stand on this stage: inside the ground or a wall, outside the
-  camera's limits, past a blast line, or anywhere when the stage cannot be read. The editor then reads
+- A fighter is not put at a point inside solid ground or a wall, outside the camera's limits, or past the safe
+  blast-line bounds. If either fighter's point fails these checks, the editor reads
   "Can't stand there on this stage."; a fighter already held goes back to where the hold began. Each fighter's
   point is judged by itself, so the other one is still shown when its own point allows.
 - The pose is frozen or neutral; projectiles, items and damage are not shown. Combos and drills show nothing.
@@ -96,12 +96,12 @@ The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.
 - Seen in Eden on `eb39d6bc`, the build before that fix: a recorded take held both fighters at In with no preview,
   In and Out followed the handles, and deselecting let them go; an old macro read "Play it once to see positions
   while scrubbing." and got its positions from one Play; X in the editor showed them at once; a crop kept them.
-- Not shown in a game yet: anything on merge 17 itself (in testing), the waiting room, a fighter swap or a scene
-  change while a fighter is held, a long take, and deleting a macro with its positions. No host test runs the
-  Switch code that holds the fighters.
-- Play starts no later than on install 5. In Eden on one host, each macro started on install 5's frame count or one
-  frame earlier, including the first Play of an old 30-second and an old ten-minute macro, which is the Play that
-  makes their positions. One boot per build.
+- Merge 17's own checks are in testing. Merge 16 did not establish scrub behavior in a waiting room, through a
+  fighter swap or scene change, on the final frame of a long recording, or after deleting a macro with positions.
+  No host test runs the Switch code that holds the fighters.
+- On one Eden host (one boot per build), every tested macro on merge 16 started on install 5's frame count or
+  one frame earlier. That includes the first Play of the old 30-second and ten-minute macros. The unchanged
+  playback path carries this result forward; these are not timings from a merge-17 boot or the console.
   [Replay window](menu/recording.md#replay-window)
 
 ### In work

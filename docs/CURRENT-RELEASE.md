@@ -23,9 +23,10 @@ Status: **rc.15, whose newest build is install 5** (commit `b7a382e4`, installed
   Known issues below has each. They are reports of what they saw, not tests of the build; the reports on the earlier
   builds are in the evidence page.
 - **The next build is not on the card.** It is merge 17 (`5df3d9dc`): three changes to the clip editor and one fix.
-  The operator ordered its install on 2026-11-26. In Eden, the build before the fix started Play no later than
-  install 5 and passed its record, old-macro, snap and browse checks; the fixed build's own Eden checks are in
-  testing, and no result of theirs is claimed.
+  The operator ordered its install on 2026-11-26. In Eden, merge 16 passed its Play-start comparison with
+  install 5, its record, old-macro, snap and browse checks, and part of the diagnostic checks. The Play-start
+  result and rename result carry over: rename passed by typing in Eden's keyboard window, not by pad.
+  Merge 17's own Eden checks are in testing.
   [Next build](RELEASE-NOTES-rc15.md#next-build-not-installed-yet)
 
 What ran, on which build, what did not, and every report from the console: [Install evidence](EVIDENCE-rc15-installs.md).
@@ -110,8 +111,8 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
   its last fix (`eb39d6bc`), Y moved In to the attack's start, and X then previewed.
 - **Placement on a save, reported on install 5:** a fighter switched to Off stage floats, but once it is moved into
   the ground it lands and then stays on the ground as the crosshair moves. Switch On stage and Off stage again to put
-  it right. Not fixed in install 5 or in the next build (merge 17); a fix is planned for the build after it. No
-  cause is established.
+  it right. Neither install 5 nor merge 17 fixes it. A fix is planned for the following build; there is no
+  confirmed in-game fix yet.
 - **Guard the Edge, reported on install 5:** the fighter sometimes starts slightly off the chosen spot, lower on one
   round and higher on the next. Not fixed in install 5 or in the next build (merge 17); a fix is planned for the
   build after it. No cause is established.
