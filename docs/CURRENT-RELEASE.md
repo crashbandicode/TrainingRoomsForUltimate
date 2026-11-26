@@ -114,7 +114,8 @@ The reports behind these: [The operator's reports](EVIDENCE-rc15-installs.md#the
 
 | Found in testing install 6 | What happens | Workaround | Status |
 | --- | --- | --- | --- |
-| Positions stop 20 seconds into a long take | A take longer than 1,200 frames recorded on install 6 keeps positions for its first 1,200 frames. Past them the editor reads "Positions end here." and the fighters are not shown. The take's inputs are whole. | None established. | Open; accepted as a defect. Fix planned for the following build. |
+| Positions stop 20 seconds into a long take | A take longer than 1,200 frames recorded on install 6 keeps positions for its first 1,200 frames. Past them the editor reads "Positions end here." and the fighters are not shown. The take's inputs are whole. | None in install 6: playing the macro does not complete a file that Record saved. | Open; cause read from the code. Fix planned for the following build, where one full playback completes a short file. |
+| X refused after a snap, or with a handle selected | In the clip editor, the first X of a visit is refused with "Let the CPU settle to idle and leave the ledge before previewing" while In or Out is selected and the editor holds the CPU at that frame. Seen on a match capture after Y. | Press L or R again to deselect the handle, then X. | Open; cause read from the code. Fix planned for the following build. |
 | Scrubbing shows where the fighters were, not their moves | The fighters are moved in space and keep the pose they had. Reported by the operator on install 6. | None. | By design in install 6; recorded poses are in design for the following build. |
 
 The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#eden-on-install-6-itself-5df3d9dc-merge-17).

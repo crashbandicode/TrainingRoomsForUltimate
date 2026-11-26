@@ -359,6 +359,8 @@ the line about the move's setup. The fighters are still held or left as describe
   here.". A playback never replaces a valid file saved by Record; a damaged or mismatched one counts as missing.
 - Known defect in install 6: a take longer than 20 seconds (1,200 frames) keeps positions for its first 20 seconds
   only, and reads "Positions end here." past them. [Known issues](../CURRENT-RELEASE.md#known-issues)
+- Known defect in install 6: with In or Out selected, the first X can be refused with "Let the CPU settle to idle
+  and leave the ledge before previewing". Press L or R again to deselect the handle, then X.
 - The pose is frozen or neutral, and projectiles, items and damage are not shown. Combos and drills show nothing.
 
 Seen in Eden on install 6's diagnostic build: the hold at In after Record, In and Out following the handles, the

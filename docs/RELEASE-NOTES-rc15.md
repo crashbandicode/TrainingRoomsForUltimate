@@ -53,6 +53,7 @@ found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CUR
 | Host tests | All 1,176 crop ranges of a 48-frame capture: every preview that worked on install 5 kept its starting state and inputs. The check behind "In is mid-action" is unchanged |
 | Eden, on `eb39d6bc` | With In one frame into an attack, X played nothing and the refusal showed; Y moved In to the attack's start; X then previewed and A saved a macro |
 | Eden, on install 6's diagnostic build | A second Y kept the same move, and the fast case passed |
+| Known issue in install 6 | With In still selected after Y, X can be refused with "Let the CPU settle to idle and leave the ledge before previewing". Press L to deselect In, then X: [Known issues](CURRENT-RELEASE.md#known-issues) |
 
 ### A free playhead in the clip editor
 
@@ -103,7 +104,7 @@ is kept. This works on a macro and on a match capture.
 | Positions made by a playback | Are that playback's, not the original recording's |
 | A valid positions file saved by Record | Is never replaced by a playback. A damaged or mismatched file counts as missing, so an eligible playback can replace it |
 | No positions file is made | For a chain step, when the playing character is a different fighter kind from the one recorded, or when Trim skips the first input |
-| Where the three lines show | They share one place on the strip. On a capture with In in the middle of an action, the hint to snap shows there instead; after a snap, the line about the move's setup does |
+| Where the three lines show | They share one place on the strip. On a capture with In in the middle of an action, the hint to snap shows there instead; after a snap, the line about the move's setup does. For "Can't stand there on this stage." this order is a mistake: the following build shows that line first |
 | Fighter pose | Frozen or neutral; this is not a replay of the animation |
 | Not shown | Projectiles, items and damage. Combos and drills have no position display |
 
