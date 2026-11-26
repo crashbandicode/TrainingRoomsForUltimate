@@ -669,7 +669,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "20575b04a1971235adb242a3f8d3ce58ad00b41e65d2aa815ae0f8608d87cde6",
+   "dest_sha256": "8b2a51f6a349526b33cde72d1690e2d3a5f3796b0b3dbbb5be68a6ac0a1242fe",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -774,6 +774,161 @@
      "old": "    pub actions: Vec<ActionMark>,\n    /// Save id this macro starts from. Absent means the file never had one.",
      "new": "    pub actions: Vec<ActionMark>,\n    /// The fighter the take was recorded on, as a combo file's `recorded_fighter` stores it: its specials are named by\n    /// it whoever Player 1 is. Absent in a take saved before the key existed.\n    #[serde(default, skip_serializing_if = \"Option::is_none\", with = \"crate::model::combo_record::fighter_key\")]\n    pub recorded_fighter: Option<crate::model::move_names::FighterId>,\n    /// Save id this macro starts from. Absent means the file never had one.",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "            ),\n            Self::InvalidName(why) => write!(f, \"invalid name: {why}\"),",
+     "new": "            ),\n            Self::InvalidTrack => f.write_str(\"the position track does not match the frames\"),\n            Self::InvalidName(why) => write!(f, \"invalid name: {why}\"),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "                \"unsupported schema version {found} (supported: {SCHEMA_VERSION} and {MII_SCHEMA_VERSION})\"",
+     "new": "                \"unsupported schema version {found} (supported: {SCHEMA_VERSION} to {TRACK_SCHEMA_VERSION})\"",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    },\n    InvalidName(&'static str),",
+     "new": "    },\n    /// The position track is not one finite entry per frame, or the file's version does not match its presence.\n    InvalidTrack,\n    InvalidName(&'static str),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.schema_version = MII_SCHEMA_VERSION;\n        Ok(())\n    }\n",
+     "new": "        self.schema_version = MII_SCHEMA_VERSION;\n        Ok(())\n    }\n\n    /// Attach the position track a take recorded (one entry per frame), or drop it: the file's version follows.\n    pub fn set_track(&mut self, track: Option<Vec<[super::ReplayFrame; 2]>>) {\n        self.schema_version = match (&track, self.mii) {\n            (Some(_), _) => TRACK_SCHEMA_VERSION,\n            (None, Some(_)) => MII_SCHEMA_VERSION,\n            (None, None) => SCHEMA_VERSION,\n        };\n        self.track = track;\n    }\n\n    /// Keep frames `range` of the recording, with the same slice of its track.\n    pub fn keep(&mut self, range: std::ops::Range<usize>) {\n        self.frames.truncate(range.end);\n        self.frames.drain(..range.start);\n        if let Some(track) = &mut self.track {\n            track.truncate(range.end);\n            track.drain(..range.start.min(track.len()));\n        }\n    }\n",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.schema_version = MII_SCHEMA_VERSION;",
+     "new": "        self.schema_version = self.schema_version.max(MII_SCHEMA_VERSION);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.placement.validate()?;",
+     "new": "        self.placement.validate()\n    }\n\n    pub(super) fn validate_frame_count(&self) -> Result<(), MacroError> {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "                if configuration.canonical().class.kind() == self.start.fighter_kind as u32 => {},\n            _ => return Err(MacroError::InvalidMii(\"schema, fighter class and exact configuration disagree\")),",
+     "new": "                if configuration.canonical().class.kind() == self.start.fighter_kind as u32 => {},\n            (TRACK_SCHEMA_VERSION, None) => {},\n            _ => return Err(MacroError::InvalidMii(\"schema, fighter class and exact configuration disagree\")),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            (MII_SCHEMA_VERSION, Some(configuration))",
+     "new": "            (MII_SCHEMA_VERSION | TRACK_SCHEMA_VERSION, Some(configuration))",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        if !matches!(self.schema_version, SCHEMA_VERSION | MII_SCHEMA_VERSION) {",
+     "new": "        self.validate_header()?;\n        // A track and its version go together: an entry per frame from the first, as far as it goes (not at all,\n        // for a crop past its end), every number finite.\n        let tracked = self.track.as_ref().is_some_and(|track| track.len() <= self.frames.len()\n            && track.iter().flatten().all(|frame| [frame.x, frame.y, frame.start.facing, frame.start.speed_x, frame.start.speed_y].iter().all(|value| value.is_finite())));\n        if self.track.is_some() != (self.schema_version == TRACK_SCHEMA_VERSION) || self.track.is_some() != tracked {\n            return Err(MacroError::InvalidTrack);\n        }\n        self.validate_frame_count()\n    }\n\n    pub(super) fn validate_header(&self) -> Result<(), MacroError> {\n        if !matches!(self.schema_version, SCHEMA_VERSION | MII_SCHEMA_VERSION | TRACK_SCHEMA_VERSION) {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            start_save_on: true,\n        };",
+     "new": "            start_save_on: true,\n            track: None,\n        };",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    pub start_save_on: bool,\n}",
+     "new": "    pub start_save_on: bool,\n    /// Where both fighters were on each frame, as a match capture keeps it (`ReplayFrame` with no input): the\n    /// recorded fighter first, then the other one. One entry per frame from the first; shorter than the frames when\n    /// recording ran out of memory for it; none in a file recorded before it was kept.\n    #[serde(default, skip_serializing_if = \"Option::is_none\", with = \"track_rows\")]\n    pub track: Option<Vec<[super::ReplayFrame; 2]>>,\n}\n\n/// The track in a file: per frame, each fighter's kind, costume, facing, situation, status, speed x, speed y, x and y.\nmod track_rows {\n    use super::super::ReplayFrame;\n    use super::{InputFrame, StartState};\n    use serde::{ser::SerializeSeq, Deserialize};\n\n    type Row = (i32, u32, f32, i32, i32, f32, f32, f32, f32);\n\n    fn row(frame: &ReplayFrame) -> Row {\n        let start = frame.start;\n        (start.fighter_kind, start.costume, start.facing, start.situation, start.status, start.speed_x, start.speed_y, frame.x, frame.y)\n    }\n\n    fn frame(row: Row) -> ReplayFrame {\n        ReplayFrame {\n            input: InputFrame::default(),\n            start: StartState { fighter_kind: row.0, costume: row.1, facing: row.2, situation: row.3, status: row.4, speed_x: row.5, speed_y: row.6 },\n            x: row.7,\n            y: row.8,\n        }\n    }\n\n    pub fn serialize<S: serde::Serializer>(track: &Option<Vec<[ReplayFrame; 2]>>, serializer: S) -> Result<S::Ok, S::Error> {\n        let Some(track) = track else { return serializer.serialize_none() };\n        let mut seq = serializer.serialize_seq(Some(track.len()))?;\n        for [first, second] in track {\n            seq.serialize_element(&[row(first), row(second)])?;\n        }\n        seq.end()\n    }\n\n    pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Vec<[ReplayFrame; 2]>>, D::Error> {\n        #[derive(Deserialize)]\n        struct Rows(#[serde(deserialize_with = \"read_pairs\")] Vec<[ReplayFrame; 2]>);\n        Ok(Option::<Rows>::deserialize(deserializer)?.map(|rows| rows.0))\n    }\n\n    fn read_pairs<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<[ReplayFrame; 2]>, D::Error> {\n        struct Pairs;\n        impl<'de> serde::de::Visitor<'de> for Pairs {\n            type Value = Vec<[ReplayFrame; 2]>;\n            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str(\"a sequence\") }\n            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {\n                let mut pairs = Vec::new();\n                while let Some([a, b]) = seq.next_element::<[Row; 2]>()? {\n                    let len = pairs.len();\n                    if len == pairs.capacity() && len < super::MAX_FRAMES {\n                        pairs.reserve_exact(len.max(4).min(super::MAX_FRAMES - len));\n                    }\n                    pairs.push([frame(a), frame(b)]);\n                }\n                Ok(pairs)\n            }\n        }\n        deserializer.deserialize_seq(Pairs)\n    }\n}",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// Gameplay frame rate assumed when the caller does not supply one.",
+     "new": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// A macro that carries its position track (`MacroRecording::track`): older readers refuse it.\npub const TRACK_SCHEMA_VERSION: u32 = 3;\n/// Gameplay frame rate assumed when the caller does not supply one.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            Self::InvalidTrack => f.write_str(\"the position track does not match the frames\"),",
+     "new": "            Self::InvalidTrack => f.write_str(\"the positions do not match the frames\"),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "                \"unsupported schema version {found} (supported: {SCHEMA_VERSION} to {TRACK_SCHEMA_VERSION})\"",
+     "new": "                \"unsupported schema version {found} (supported: {SCHEMA_VERSION} and {MII_SCHEMA_VERSION})\"",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    /// The position track is not one finite entry per frame, or the file's version does not match its presence.",
+     "new": "    /// A take's positions are longer than its frames, or hold a number that is not finite.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    pub fn set_track(&mut self, track: Option<Vec<[super::ReplayFrame; 2]>>) {\n        self.schema_version = match (&track, self.mii) {\n            (Some(_), _) => TRACK_SCHEMA_VERSION,\n            (None, Some(_)) => MII_SCHEMA_VERSION,\n            (None, None) => SCHEMA_VERSION,\n        };\n        self.track = track;",
+     "new": "    pub fn set_track(&mut self, track: Option<Vec<[super::ReplayFrame; 2]>>) {\n        self.track = track;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    /// Attach the position track a take recorded (one entry per frame), or drop it: the file's version follows.",
+     "new": "    /// Attach the positions a take recorded (one entry per frame from the first), or drop them.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.schema_version = self.schema_version.max(MII_SCHEMA_VERSION);",
+     "new": "        self.schema_version = MII_SCHEMA_VERSION;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "                if configuration.canonical().class.kind() == self.start.fighter_kind as u32 => {},\n            (TRACK_SCHEMA_VERSION, None) => {},\n            _ => return Err(MacroError::InvalidMii(\"schema, fighter class and exact configuration disagree\")),",
+     "new": "                if configuration.canonical().class.kind() == self.start.fighter_kind as u32 => {},\n            _ => return Err(MacroError::InvalidMii(\"schema, fighter class and exact configuration disagree\")),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            (MII_SCHEMA_VERSION | TRACK_SCHEMA_VERSION, Some(configuration))",
+     "new": "            (MII_SCHEMA_VERSION, Some(configuration))",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        if !matches!(self.schema_version, SCHEMA_VERSION | MII_SCHEMA_VERSION | TRACK_SCHEMA_VERSION) {",
+     "new": "        if !matches!(self.schema_version, SCHEMA_VERSION | MII_SCHEMA_VERSION) {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        if self.track.is_some() != (self.schema_version == TRACK_SCHEMA_VERSION) || self.track.is_some() != tracked {",
+     "new": "        if !fits {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        // A track and its version go together: an entry per frame from the first, as far as it goes (not at all,\n        // for a crop past its end), every number finite.\n        let tracked = self.track.as_ref().is_some_and(|track| track.len() <= self.frames.len()",
+     "new": "        // The positions a take carries: an entry per frame from the first, as far as they go (not at all, for a crop\n        // past their end), every number finite.\n        let fits = self.track.as_ref().is_none_or(|track| track.len() <= self.frames.len()",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    pub track: Option<Vec<[super::ReplayFrame; 2]>>,\n}\n\n/// The track in a file: per frame, each fighter's kind, costume, facing, situation, status, speed x, speed y, x and y.\nmod track_rows {\n    use super::super::ReplayFrame;\n    use super::{InputFrame, StartState};\n    use serde::{ser::SerializeSeq, Deserialize};\n\n    type Row = (i32, u32, f32, i32, i32, f32, f32, f32, f32);\n\n    fn row(frame: &ReplayFrame) -> Row {\n        let start = frame.start;\n        (start.fighter_kind, start.costume, start.facing, start.situation, start.status, start.speed_x, start.speed_y, frame.x, frame.y)\n    }\n\n    fn frame(row: Row) -> ReplayFrame {\n        ReplayFrame {\n            input: InputFrame::default(),\n            start: StartState { fighter_kind: row.0, costume: row.1, facing: row.2, situation: row.3, status: row.4, speed_x: row.5, speed_y: row.6 },\n            x: row.7,\n            y: row.8,\n        }\n    }\n\n    pub fn serialize<S: serde::Serializer>(track: &Option<Vec<[ReplayFrame; 2]>>, serializer: S) -> Result<S::Ok, S::Error> {\n        let Some(track) = track else { return serializer.serialize_none() };\n        let mut seq = serializer.serialize_seq(Some(track.len()))?;\n        for [first, second] in track {\n            seq.serialize_element(&[row(first), row(second)])?;\n        }\n        seq.end()\n    }\n\n    pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Vec<[ReplayFrame; 2]>>, D::Error> {\n        #[derive(Deserialize)]\n        struct Rows(#[serde(deserialize_with = \"read_pairs\")] Vec<[ReplayFrame; 2]>);\n        Ok(Option::<Rows>::deserialize(deserializer)?.map(|rows| rows.0))\n    }\n\n    fn read_pairs<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<[ReplayFrame; 2]>, D::Error> {\n        struct Pairs;\n        impl<'de> serde::de::Visitor<'de> for Pairs {\n            type Value = Vec<[ReplayFrame; 2]>;\n            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str(\"a sequence\") }\n            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {\n                let mut pairs = Vec::new();\n                while let Some([a, b]) = seq.next_element::<[Row; 2]>()? {\n                    let len = pairs.len();\n                    if len == pairs.capacity() && len < super::MAX_FRAMES {\n                        pairs.reserve_exact(len.max(4).min(super::MAX_FRAMES - len));\n                    }\n                    pairs.push([frame(a), frame(b)]);\n                }\n                Ok(pairs)\n            }\n        }\n        deserializer.deserialize_seq(Pairs)\n    }\n}",
+     "new": "    pub track: Option<Vec<[super::ReplayFrame; 2]>>,\n}",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    /// recording ran out of memory for it; none in a file recorded before it was kept.\n    #[serde(default, skip_serializing_if = \"Option::is_none\", with = \"track_rows\")]",
+     "new": "    /// recording ran out of memory for it. It is never in the macro's own file: the library keeps it beside it\n    /// (`positions`), and only the clip editor's load reads it back.\n    #[serde(skip)]",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// A macro that carries its position track (`MacroRecording::track`): older readers refuse it.\npub const TRACK_SCHEMA_VERSION: u32 = 3;\n/// Gameplay frame rate assumed when the caller does not supply one.",
+     "new": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// Gameplay frame rate assumed when the caller does not supply one.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "\n/// `macros/<id>.json` whose `kind` is `chain`. A recording list omits these.\npub fn is_chain_document(bytes: &[u8]) -> bool {\n    serde_json::from_slice::<serde_json::Value>(bytes)\n        .ok()\n        .and_then(|value| value.get(\"kind\").and_then(serde_json::Value::as_str).map(|kind| kind == \"chain\"))\n        .unwrap_or(false)\n}\n\nfn check_name(name: &str) -> Result<(), MacroError> {",
+     "new": "\nfn check_name(name: &str) -> Result<(), MacroError> {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.track = track;\n    }",
+     "new": "        self.track = track;\n        self.track_source = super::positions::Source::Recorded;\n    }\n\n    pub fn set_sourced_track(&mut self, source: super::positions::Source, track: Vec<[super::ReplayFrame; 2]>) {\n        self.track = Some(track);\n        self.track_source = source;\n    }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            track: None,\n        };",
+     "new": "            track: None,\n            track_source: super::positions::Source::Recorded,\n        };",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    pub track: Option<Vec<[super::ReplayFrame; 2]>>,\n}",
+     "new": "    pub track: Option<Vec<[super::ReplayFrame; 2]>>,\n    /// A crop inherits the source of its rows; exporting it is not another Record.\n    #[serde(skip)]\n    pub(super) track_source: super::positions::Source,\n}",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): take a position track with its source for editor adoption.",
+     "old": "        self.track_source = source;\n    }\n\n    /// Keep frames `range` of the recording, with the same slice of its track.\n    pub fn keep(&mut self, range: std::ops::Range<usize>) {\n        self.frames.truncate(range.end);\n",
+     "new": "        self.track_source = source;\n    }\n\n    pub fn take_sourced_track(&mut self) -> Option<(super::positions::Source, Vec<[super::ReplayFrame; 2]>)> {\n        self.track.take().map(|track| (self.track_source, track))\n    }\n\n    /// Keep frames `range` of the recording, with the same slice of its track.\n    pub fn keep(&mut self, range: std::ops::Range<usize>) {\n        self.frames.truncate(range.end);\n"
     }
    ]
   },
@@ -782,7 +937,7 @@
    "dest": "src/model/macros/replay.rs",
    "crate": "macros",
    "src_sha256": "b04adf37bf6ab0c2419c9fb1699b13ae174b9fb3438eecc5792b0c1b0eac9721",
-   "dest_sha256": "10cbc214c1bcd59ea502d9cb97df65b33d6fbeaac4692bdc78d53dba676f8e23",
+   "dest_sha256": "af9af0b5525eb41ca486068ba64c460327ceda960c7b6ef5ab5aa8e83dd72f1d",
    "edits": [
     {
      "old": "    pub tracks: Vec<ReplayTrack>,\n    pub truncated: bool,\n}\n\nimpl ReplaySession {\n    /// Associate only values from the same immutable committed capture. Native\n    /// CFMK row numbers and local live entry IDs are different namespaces.\n",
@@ -834,6 +989,11 @@
      "old": "    pub quantized_analog: bool,\n}",
      "new": "    pub quantized_analog: bool,\n    /// The identity of the entry's fighter, read once with the capture (its first frame's fighter); none in a\n    /// capture taken before it was read.\n    pub fighter: Option<crate::model::move_names::FighterId>,\n}",
      "reason": "Mark variants (inbox 2026-11-25 13:43:24Z and 13:54:02Z): a recorded mark keeps its move variant and angle, and the editor names marks through the move-name Namer."
+    },
+    {
+     "old": "#[derive(Clone, Copy, Debug)]",
+     "new": "#[derive(Clone, Copy, Debug, PartialEq)]",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
   },
@@ -1152,6 +1312,16 @@
     {
      "wrap_file": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "old": "    for version in [0, 3, u32::MAX] {",
+     "new": "    for version in [0, 4, u32::MAX] {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    for version in [0, 4, u32::MAX] {",
+     "new": "    for version in [0, 3, u32::MAX] {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
   },
@@ -1210,7 +1380,7 @@
    "dest": "src/model/macros/library.rs",
    "crate": "macros",
    "src_sha256": "f023bf6ccc5908417e2b10014cf26e2311b54260822a2472950e546b468c0275",
-   "dest_sha256": "39a5e69483a07bdcdefe55fa5804cda48511b66c2a5727d9cdb629aceb2333bb",
+   "dest_sha256": "860b6f02eddc1da99b235b89c193cf23206d60a91e7b472b4d68bdfd54f54fa1",
    "edits": [
     {
      "delete_from": "use std::{\n    ffi::OsString,",
@@ -1241,6 +1411,141 @@
      "old": "    fn validate(&self) -> Result<(), MacroError> {\n        MacroRecording::validate(self)\n    }\n\n    fn name(&self) -> &str {",
      "new": "    fn validate(&self) -> Result<(), MacroError> {\n        MacroRecording::validate(self)\n    }\n\n    fn owns(bytes: &[u8]) -> bool {\n        !super::recording::is_chain_document(bytes)\n    }\n\n    fn name(&self) -> &str {",
      "reason": "Recording redesign rr-1: a chain file in macros/ is a different record, so the recording list omits it."
+    },
+    {
+     "old": "            frame_count: self.frames.len(),\n        }",
+     "new": "            frame_count: self.frames.len(),\n            trim: self.trim,\n            placement: self.placement,\n            start_save: self.start_save.clone(),\n            start_save_on: self.start_save_on,\n        }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;\n",
+     "new": "    const MAX_FILE_BYTES: u64 = MAX_FILE_BYTES;\n    const STREAM_READ: bool = true;\n    fn read_summary(id: &str, reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroEntry, MacroError>> {\n        let mut de = serde_json::Deserializer::from_reader(reader);\n        let (rec, tracked) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;\n        de.end()?;\n        Ok(rec.validate_header().and_then(|()| {\n            if tracked != (rec.schema_version == TRACK_SCHEMA_VERSION) { return Err(MacroError::InvalidTrack); }\n            rec.validate_frame_count()?;\n            Ok(rec.summary(id))\n        }))\n    }\n    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn stream_write(&self) -> bool { self.track.is_some() }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {\n        #[derive(serde::Deserialize)]\n        struct Header { kind: Option<String> }\n        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some(\"chain\"))\n    }\n",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION];",
+     "new": "    const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION, super::recording::TRACK_SCHEMA_VERSION];",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    pub frame_count: usize,\n}",
+     "new": "    pub frame_count: usize,\n    pub trim: crate::model::trim::Trim,\n    pub placement: Placement,\n    pub start_save: Option<String>,\n    pub start_save_on: bool,\n}\n\n// Feed the normal macro decoder its normal fields, but skip position rows when only\n// making a menu entry. Their shape and values are checked when the macro is opened.\nstruct HeaderFields<'a, A> { map: A, track: &'a mut Option<bool> }\n\nimpl<'de, A: MapAccess<'de>> MapAccess<'de> for HeaderFields<'_, A> {\n    type Error = A::Error;\n    fn next_key_seed<K: DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error> {\n        while let Some(key) = self.map.next_key::<String>()? {\n            if key != \"track\" { return seed.deserialize(key.into_deserializer()).map(Some); }\n            if self.track.is_some() { return Err(de::Error::duplicate_field(\"track\")); }\n            *self.track = Some(self.map.next_value::<Option<de::IgnoredAny>>()?.is_some());\n        }\n        Ok(None)\n    }\n    fn next_value_seed<V: DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value, Self::Error> {\n        self.map.next_value_seed(seed)\n    }\n}\n\nstruct MacroHeader;\nimpl<'de> Visitor<'de> for MacroHeader {\n    type Value = (MacroRecording, bool);\n    fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str(\"a named macro\") }\n    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {\n        let mut track = None;\n        let fields = de::value::MapAccessDeserializer::new(HeaderFields { map, track: &mut track });\n        let rec = serde::Deserialize::deserialize(fields)?;\n        Ok((rec, track.unwrap_or(false)))\n    }\n}",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "#[derive(Clone, Debug, PartialEq, Eq)]",
+     "new": "#[derive(Clone, Debug, PartialEq)]",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "use super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};\n",
+     "new": "use super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};\nuse super::recording::{Placement, TRACK_SCHEMA_VERSION};\nuse serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, Visitor};\n",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        let mut de = serde_json::Deserializer::from_reader(reader);\n        let (rec, tracked) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;\n        de.end()?;\n        Ok(rec.validate_header().and_then(|()| {\n            if tracked != (rec.schema_version == TRACK_SCHEMA_VERSION) { return Err(MacroError::InvalidTrack); }\n            rec.validate_frame_count()?;\n            Ok(rec.summary(id))\n        }))",
+     "new": "        Ok(read_header(reader)?.map(|rec| rec.summary(id)))",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "\n/// The named-macro library: the original API, now on the generic store.",
+     "new": "\n/// A macro read without its position rows, for the list and for playback. The file's version is still checked against\n/// the presence of the key; the rows' shape and values are checked when the macro is opened whole.\nfn read_header(reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroRecording, MacroError>> {\n    let mut de = serde_json::Deserializer::from_reader(reader);\n    let (rec, tracked) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;\n    de.end()?;\n    Ok(rec.validate_header().and_then(|()| {\n        if tracked != (rec.schema_version == TRACK_SCHEMA_VERSION) { return Err(MacroError::InvalidTrack); }\n        rec.validate_frame_count()?;\n        Ok(rec)\n    }))\n}\n\nimpl Store<MacroRecording> {\n    /// Loads a macro for playback: all of it but the position track, which playback never reads and which is not\n    /// built. Crop and the clip editor load the whole file (`load`).\n    pub fn load_played(&self, id: &str) -> Result<MacroRecording, MacroError> {\n        self.load(id)\n    }\n}\n\n/// The named-macro library: the original API, now on the generic store.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.load(id)",
+     "new": "        self.load_with(id, |reader| {\n            Ok(read_header(reader)?.map(|mut rec| {\n                // The file's version names its track; the played copy has none.\n                rec.set_track(None);\n                rec\n            }))\n        })",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION, super::recording::TRACK_SCHEMA_VERSION];",
+     "new": "    const SCHEMA_VERSIONS: &'static [u32] = &[SCHEMA_VERSION, MII_SCHEMA_VERSION];",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    /// Loads a macro for playback: all of it but the position track, which playback never reads and which is not\n    /// built. Crop and the clip editor load the whole file (`load`).\n    pub fn load_played(&self, id: &str) -> Result<MacroRecording, MacroError> {\n        self.load_with(id, |reader| {\n            Ok(read_header(reader)?.map(|mut rec| {\n                // The file's version names its track; the played copy has none.\n                rec.set_track(None);\n                rec\n            }))\n        })",
+     "new": "    /// Loads a macro for the clip editor: the macro, and its positions when the file beside it binds it\n    /// (`positions`). Playback, the list and every other load read the macro only (`load`).\n    pub fn load_edited(&self, id: &str) -> Result<MacroRecording, MacroError> {\n        self.load(id)",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    Ok(rec.validate_header().and_then(|()| {\n        if tracked != (rec.schema_version == TRACK_SCHEMA_VERSION) { return Err(MacroError::InvalidTrack); }\n        rec.validate_frame_count()?;",
+     "new": "    Ok(rec.validate_header().and_then(|()| {\n        rec.validate_frame_count()?;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    let (rec, tracked) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;",
+     "new": "    // A `track` key (a file of a build that kept positions in the macro) is skipped, here as in a whole load.\n    let (rec, _) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "use super::recording::{Placement, TRACK_SCHEMA_VERSION};",
+     "new": "use super::recording::Placement;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some(\"chain\"))\n    }",
+     "new": "        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some(\"chain\"))\n    }\n\n    /// A new take or crop under the id: the positions file there goes first, so an interrupted save never leaves an\n    /// earlier take's positions bound to the new macro. The same take written again (a rename, a placement, Trim)\n    /// carries no positions in memory and keeps the file that binds its inputs.\n    fn before_write(&self, dir: &std::path::Path, id: &str) {\n        if self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {\n            super::positions::remove(dir, id);\n        }\n    }\n\n    /// The positions go beside the macro once it is in place. A failed write leaves a macro without positions.\n    fn after_write(&self, dir: &std::path::Path, id: &str) {\n        if let Some(track) = &self.track {\n            if super::positions::write(dir, id, &self.frames, track).is_err() {\n                super::positions::remove(dir, id);\n            }\n        }\n    }\n\n    fn after_delete(dir: &std::path::Path, id: &str) {\n        super::positions::remove(dir, id);\n    }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.load(id)",
+     "new": "        let mut recording = self.load(id)?;\n        recording.set_track(super::positions::read(self.dir(), id, &recording.frames));\n        Ok(recording)",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            if super::positions::write(dir, id, &self.frames, track).is_err() {",
+     "new": "            if super::positions::write(dir, id, &self.frames, track, super::positions::Source::Recorded).is_err() {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn stream_write(&self) -> bool { self.track.is_some() }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {",
+     "new": "    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    const STREAM_READ: bool = true;\n    fn read_summary(id: &str, reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroEntry, MacroError>> {\n        Ok(read_header(reader)?.map(|rec| rec.summary(id)))\n    }\n    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }",
+     "new": "    const STREAM_READ: bool = true;\n    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "\n// Feed the normal macro decoder its normal fields, but skip position rows when only\n// making a menu entry. Their shape and values are checked when the macro is opened.\nstruct HeaderFields<'a, A> { map: A, track: &'a mut Option<bool> }\n\nimpl<'de, A: MapAccess<'de>> MapAccess<'de> for HeaderFields<'_, A> {\n    type Error = A::Error;\n    fn next_key_seed<K: DeserializeSeed<'de>>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error> {\n        while let Some(key) = self.map.next_key::<String>()? {\n            if key != \"track\" { return seed.deserialize(key.into_deserializer()).map(Some); }\n            if self.track.is_some() { return Err(de::Error::duplicate_field(\"track\")); }\n            *self.track = Some(self.map.next_value::<Option<de::IgnoredAny>>()?.is_some());\n        }\n        Ok(None)\n    }\n    fn next_value_seed<V: DeserializeSeed<'de>>(&mut self, seed: V) -> Result<V::Value, Self::Error> {\n        self.map.next_value_seed(seed)\n    }\n}\n\nstruct MacroHeader;\nimpl<'de> Visitor<'de> for MacroHeader {\n    type Value = (MacroRecording, bool);\n    fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str(\"a named macro\") }\n    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {\n        let mut track = None;\n        let fields = de::value::MapAccessDeserializer::new(HeaderFields { map, track: &mut track });\n        let rec = serde::Deserialize::deserialize(fields)?;\n        Ok((rec, track.unwrap_or(false)))\n    }\n}\n\n/// A macro read without its position rows, for the list and for playback. The file's version is still checked against\n/// the presence of the key; the rows' shape and values are checked when the macro is opened whole.\nfn read_header(reader: &mut dyn std::io::Read) -> serde_json::Result<Result<MacroRecording, MacroError>> {\n    let mut de = serde_json::Deserializer::from_reader(reader);\n    // A `track` key (a file of a build that kept positions in the macro) is skipped, here as in a whole load.\n    let (rec, _) = serde::Deserializer::deserialize_map(&mut de, MacroHeader)?;\n    de.end()?;\n    Ok(rec.validate_header().and_then(|()| {\n        rec.validate_frame_count()?;\n        Ok(rec)\n    }))\n}\n\nimpl Store<MacroRecording> {",
+     "new": "\nimpl Store<MacroRecording> {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "use super::recording::{MacroError, MacroRecording, MII_SCHEMA_VERSION, SCHEMA_VERSION};\nuse super::recording::Placement;\nuse serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, Visitor};",
+     "new": "use super::recording::{MacroError, MacroRecording, Placement, MII_SCHEMA_VERSION, SCHEMA_VERSION};",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            super::positions::remove(dir, id);\n        }\n    }\n",
+     "new": "            super::positions::remove(dir, id);\n        }\n        Ok(())\n    }\n",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    fn before_write(&self, dir: &std::path::Path, id: &str) {\n        if self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {\n            super::positions::remove(dir, id);",
+     "new": "    fn before_write(&self, dir: &std::path::Path, id: &str, new: bool) -> std::io::Result<()> {\n        if new || self.track.is_some() || !super::positions::binds(dir, id, &self.frames) {\n            return super::positions::invalidate(dir, id);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        !super::recording::is_chain_document(bytes)",
+     "new": "        !crate::model::store::is_chain_document(bytes)",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    const STREAM_READ: bool = true;\n    fn summary_name(summary: &MacroEntry) -> &str { &summary.name }\n    fn owns_reader(reader: impl std::io::Read) -> serde_json::Result<bool> {\n        #[derive(serde::Deserialize)]\n        struct Header { kind: Option<String> }\n        Ok(serde_json::from_reader::<_, Header>(reader)?.kind.as_deref() != Some(\"chain\"))\n    }",
+     "new": "    const STREAM_WRITE: bool = true;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            if super::positions::write(dir, id, &self.frames, track, super::positions::Source::Recorded).is_err() {",
+     "new": "            if super::positions::write(dir, id, &self.frames, track, self.track_source).is_err() {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        recording.set_track(super::positions::read(self.dir(), id, &recording.frames));",
+     "new": "        if let Some((source, track)) = super::positions::read_with_source(self.dir(), id, &recording.frames) {\n            recording.set_sourced_track(source, track);\n        }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
   },
@@ -1249,7 +1554,7 @@
    "dest": "src/model/macros/library/tests.rs",
    "crate": "macros",
    "src_sha256": "be96184687f698ec92aa4c7954fdd3299f2c7bcf2edd3586eea8958539af8e55",
-   "dest_sha256": "ca931022c699555ed1722de876906583cd7f1b80fcd9292adf7534292b6ae1f7",
+   "dest_sha256": "0b7d897fe064ec134aa0d39d10fcc445366c48fa6b86822dccb42ea8543fc9d7",
    "edits": [
     {
      "old": "use super::*;\nuse {crate::engine::macros::test_util::{frames, recording, start, TempDir}, crate::engine::macros::MomentumMode, crate::engine::macros::Placement, crate::engine::macros::MAX_FRAMES};\n\nconst _: () = assert!(SLUG_CHARS + \"-9999\".len() <= MAX_ID_CHARS);\n",
@@ -1293,6 +1598,101 @@
     {
      "wrap_file": "lib_unit_tests",
      "reason": "rc.9 test cut: the unit tests compile in the lib's test binary only (`lib_unit_tests!`, src/lib.rs)"
+    },
+    {
+     "old": "        MacroEntry { id, name: \"Same\".to_owned(), fighter_kind: 8, costume: 2, frame_count: 8 }",
+     "new": "        MacroEntry { id, name: \"Same\".to_owned(), fighter_kind: 8, costume: 2, frame_count: 8,\n            trim: crate::model::trim::Trim::Off, placement: Placement::default(), start_save: None, start_save_on: true }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    assert!(matches!(lib.load(\"garbage\"), Err(MacroError::Parse(_))));\n    assert!(matches!(lib.load(\"nothing\"), Err(MacroError::NotFound(ref id)) if id == \"nothing\"));",
+     "new": "    assert!(matches!(lib.load(\"garbage\"), Err(MacroError::Parse(_))));\n    let tracked = |short_row: bool| edited_json(|v| {\n        v[\"schema_version\"] = json!(3);\n        v[\"track\"] = json!([[[8, 2, -1, 3, 17, 1, 0, 40, 5], [18, 0, 1, 0, 0, 0, 0, -20, 7]]]);\n        if short_row { v[\"track\"][0][1].as_array_mut().unwrap().pop(); }\n    });\n    let path = tmp.path().join(\"tracked.json\");\n    fs::write(&path, tracked(false)).unwrap();\n    assert_eq!(lib.load(\"tracked\").unwrap().track.unwrap()[0][1].y, 7.0);\n    fs::write(&path, tracked(true)).unwrap();\n    let err = lib.load(\"tracked\").unwrap_err();\n    assert!(matches!(err, MacroError::Parse(_)), \"short v3 track row: {err}\");\n    assert!(matches!(lib.load(\"nothing\"), Err(MacroError::NotFound(ref id)) if id == \"nothing\"));",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        lib.load(\"shape\"),\n        Err(MacroError::UnsupportedVersion { found: 3 })\n    ));",
+     "new": "        lib.load(\"shape\"),\n        Err(MacroError::UnsupportedVersion { found: 4 })\n    ));",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        Err(MacroError::UnsupportedVersion { found: 3 })",
+     "new": "        Err(MacroError::UnsupportedVersion { found: 4 })",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        br#\"{\"schema_version\":3,\"frames\":\"packed\"}\"#,",
+     "new": "        br#\"{\"schema_version\":4,\"frames\":\"packed\"}\"#,",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    // A version-3 file whose layout this crate cannot parse is still a version error.",
+     "new": "    // A version-4 file whose layout this crate cannot parse is still a version error.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        tmp.path().join(\"future.json\"),\n        edited_json(|v| v[\"schema_version\"] = json!(3)),\n    )",
+     "new": "        tmp.path().join(\"future.json\"),\n        edited_json(|v| v[\"schema_version\"] = json!(4)),\n    )",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        reason(\"future.json\").contains(\"unsupported schema version 3\"),",
+     "new": "        reason(\"future.json\").contains(\"unsupported schema version 4\"),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            edited_json(|v| v[\"schema_version\"] = json!(3)),",
+     "new": "            edited_json(|v| v[\"schema_version\"] = json!(4)),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            frame_count: 8,\n        }]",
+     "new": "            frame_count: 8,\n            trim: rec.trim, placement: rec.placement, start_save: rec.start_save.clone(), start_save_on: rec.start_save_on,\n        }]",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    assert!(matches!(lib.load(\"garbage\"), Err(MacroError::Parse(_))));\n    let tracked = |short_row: bool| edited_json(|v| {\n        v[\"schema_version\"] = json!(3);\n        v[\"track\"] = json!([[[8, 2, -1, 3, 17, 1, 0, 40, 5], [18, 0, 1, 0, 0, 0, 0, -20, 7]]]);\n        if short_row { v[\"track\"][0][1].as_array_mut().unwrap().pop(); }\n    });\n    let path = tmp.path().join(\"tracked.json\");\n    fs::write(&path, tracked(false)).unwrap();\n    assert_eq!(lib.load(\"tracked\").unwrap().track.unwrap()[0][1].y, 7.0);\n    fs::write(&path, tracked(true)).unwrap();\n    let err = lib.load(\"tracked\").unwrap_err();\n    assert!(matches!(err, MacroError::Parse(_)), \"short v3 track row: {err}\");\n    assert!(matches!(lib.load(\"nothing\"), Err(MacroError::NotFound(ref id)) if id == \"nothing\"));",
+     "new": "    assert!(matches!(lib.load(\"garbage\"), Err(MacroError::Parse(_))));\n    assert!(matches!(lib.load(\"nothing\"), Err(MacroError::NotFound(ref id)) if id == \"nothing\"));",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        lib.load(\"shape\"),\n        Err(MacroError::UnsupportedVersion { found: 4 })\n    ));",
+     "new": "        lib.load(\"shape\"),\n        Err(MacroError::UnsupportedVersion { found: 3 })\n    ));",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        Err(MacroError::UnsupportedVersion { found: 4 })",
+     "new": "        Err(MacroError::UnsupportedVersion { found: 3 })",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        br#\"{\"schema_version\":4,\"frames\":\"packed\"}\"#,",
+     "new": "        br#\"{\"schema_version\":3,\"frames\":\"packed\"}\"#,",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    // A version-4 file whose layout this crate cannot parse is still a version error.",
+     "new": "    // A version-3 file whose layout this crate cannot parse is still a version error.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        tmp.path().join(\"future.json\"),\n        edited_json(|v| v[\"schema_version\"] = json!(4)),\n    )",
+     "new": "        tmp.path().join(\"future.json\"),\n        edited_json(|v| v[\"schema_version\"] = json!(3)),\n    )",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        reason(\"future.json\").contains(\"unsupported schema version 4\"),",
+     "new": "        reason(\"future.json\").contains(\"unsupported schema version 3\"),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            edited_json(|v| v[\"schema_version\"] = json!(4)),",
+     "new": "            edited_json(|v| v[\"schema_version\"] = json!(3)),",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    assert_eq!(Library::new(tmp.path()).list().unwrap(), Listing::default());\n}",
+     "new": "    assert_eq!(Library::new(tmp.path()).list().unwrap(), Listing::default());\n}\n\n#[test]\nfn listing_and_loading_ignore_the_same_unknown_v1_fields() {\n    let tmp = TempDir::new();\n    let lib = Library::new(tmp.path());\n    let original = recording(\"Shared\");\n    let id = lib.save_new(&original).unwrap();\n    let path = tmp.path().join(format!(\"{id}.json\"));\n    let json = fs::read_to_string(&path).unwrap();\n    // Since positions moved to a sidecar, \"track\" has no meaning in v1, even to the list.\n    fs::write(path, json.replacen('{', r#\"{\"track\":null,\"track\":[],\"#, 1)).unwrap();\n    assert_eq!(lib.load(&id).unwrap(), original);\n    let listing = lib.list().unwrap();\n    assert!(listing.skipped.is_empty(), \"{:?}\", listing.skipped);\n    assert_eq!(ids(&listing), [id.as_str()]);\n}",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
   },
@@ -1301,7 +1701,7 @@
    "dest": "src/model/macros/mod.rs",
    "crate": "macros",
    "src_sha256": "561c0de012c6f235d735c9d956305c7aa98fe0cdf7a1c560552a0a6275abc4ad",
-   "dest_sha256": "a229296067e12c6f052ba38c419817e64e389f420d1aa304313e7749f5076a89",
+   "dest_sha256": "eab5c31a4d6e2e02754da202dbf2d4f977cb1809d2985b0e9dd6fd0c25a74f8f",
    "edits": [
     {
      "old": "mod capture_settings;\n",
@@ -1433,6 +1833,11 @@
      "old": "pub use recording::{InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES, MAX_GAME_VERSION_BYTES, MAX_NAME_CHARS};",
      "new": "pub use recording::{ActionMark, InputFrame, MacroError, MacroRecording, MomentumMode, Placement, StartState, MAX_FRAMES, MAX_GAME_VERSION_BYTES, MAX_NAME_CHARS};",
      "reason": "Replay editor (install 4, inbox 22:10:39Z item 2 and 22:27:12Z): the crop strip over the game, move marks, Y snap, the CPU / Player 1 play target and the recorded `actions` key."
+    },
+    {
+     "old": "mod move_start;\nmod recording;",
+     "new": "mod move_start;\npub mod positions;\nmod recording;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
   },
@@ -1600,7 +2005,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "33f7207d5ea8a52754de0503e084caf2d772a98f04c42fa41d5322932101c22b",
+   "dest_sha256": "e10ca2772f4ceb78d00f22e5648c41039dd604c3b0877ea68ee81adef0d7a5a3",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2362,6 +2767,126 @@
      "old": "self.marks.snap_in(self.window.cursor()).map(|at| at.min(self.window.total() - 1))",
      "new": "self.marks.nearest(self.window.cursor()).map(|(start, _)| start).filter(|&at| at < self.window.total())",
      "reason": "Free playhead (2026-11-26 01:25:49Z): Y goes to the marked move shown as nearest, not the unmarked start of the take. Selected handle boundary snapping stays unchanged."
+    },
+    {
+     "old": "        match crop.and_then(|mut take| { attach(&mut take)?; Ok(take) }) {",
+     "new": "        match crop.map(|take| self.tracked(take)).and_then(|mut take| { attach(&mut take)?; Ok(take) }) {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "                    self.window = self.session.tracks[0].window().expect(\"nonempty capture\");\n                    self.marks = track_marks(&self.session.tracks[0]);",
+     "new": "                    self.window = self.session.tracks[0].window().expect(\"nonempty capture\");\n                    self.anchor = self.window.start();\n                    self.marks = track_marks(&self.session.tracks[0]);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        self.window = window;\n        self.marks = track_marks(&self.session.tracks[index]);",
+     "new": "        self.window = window;\n        self.anchor = self.window.start();\n        self.marks = track_marks(&self.session.tracks[index]);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            kept.frames = recording.frames[self.window.start() as usize..self.window.end() as usize].to_vec();",
+     "new": "            kept.keep(self.window.start() as usize..self.window.end() as usize);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "\n    fn export_selection(&self, name: &str) -> Result<MacroRecording, String> {",
+     "new": "\n    /// A capture saved as a macro carries the kept frames' states: the selected fighter's and, when the capture has\n    /// exactly two, the other one's (kind -1 where there is none). The new file scrubs as its capture does.\n    fn tracked(&self, mut recording: MacroRecording) -> MacroRecording {\n        if self.file.is_none() {\n            let start = self.window.start() as usize;\n            let other = (self.session.tracks.len() == 2).then(|| &self.session.tracks[1 - self.track].frames);\n            let state = |frame: &ReplayFrame| ReplayFrame { input: Default::default(), ..*frame };\n            let absent = ReplayFrame { input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };\n            recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {\n                frames.iter().enumerate()\n                    .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])\n                    .collect()\n            }));\n        }\n        recording\n    }\n\n    fn export_selection(&self, name: &str) -> Result<MacroRecording, String> {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            target: self.plays_on_player() }",
+     "new": "            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if self.off => Pos::Off, pos => pos } }\n    }\n\n    /// What the fighters show at `shown_frame` (the selected handle's frame, or the moved playhead's), and what the\n    /// key line says about it. A capture and a macro with a track go through the same rule (`scrub_track::deltas`).\n    pub fn scrub(&self) -> (Ask, Pos) {\n        let Some(at) = self.shown_frame() else { return (Ask::None, Pos::None) };\n        match &self.file {\n            Some(FileSource::Combo(_)) => return (Ask::None, Pos::None),\n            Some(FileSource::Macro { recording, .. }) if recording.track.is_none() => return (Ask::None, Pos::NoTrack),\n            _ => {}\n        }\n        // Fighter 0 is the selected (a macro: the recorded) one; fighter 1 the other, when the source has it.\n        let frame = |fighter: usize, index: u32| match &self.file {\n            Some(FileSource::Macro { recording, .. }) => recording.track.as_ref()?.get(index as usize).map(|pair| pair[fighter])\n                .filter(|frame| frame.start.fighter_kind >= 0),\n            Some(FileSource::Combo(_)) => None,\n            None => {\n                let track = match (fighter, self.session.tracks.len()) {\n                    (0, _) => self.track,\n                    (_, 2) => 1 - self.track,\n                    _ => return None,\n                };\n                self.session.tracks[track].frames.get(index as usize).copied()\n            }\n        };\n        let target = u8::from(self.plays_on_player() != Some(true));\n        let ask = scrub_track::deltas(|index| frame(0, index), |index| frame(1, index), self.anchor, at, target);\n        match (ask, &self.file) {\n            (Ask::None, Some(FileSource::Macro { .. })) => (ask, Pos::End),\n            (Ask::None, _) => (ask, Pos::None),\n            _ => (ask, Pos::Held),\n        }\n    }\n\n    /// The worker: what the game side did with the last ask, for the key line.\n    /// Whether the key line changed.\n    pub fn note_scrub(&mut self, pos: Pos) -> bool {\n        let off = pos == Pos::Off;\n        std::mem::replace(&mut self.off, off) != off",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0 })",
+     "new": "            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor: 0, off: false })",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            open_guard, error: None, marks, replay_player: false, watch_base: 0 })",
+     "new": "            open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor, off: false })",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        let window = session.tracks[0].window()?;\n        let marks = track_marks(&session.tracks[0]);",
+     "new": "        let window = session.tracks[0].window()?;\n        let anchor = window.start();\n        let marks = track_marks(&session.tracks[0]);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    watch_base: u32,\n}",
+     "new": "    watch_base: u32,\n    /// The frame the scrub's positions are measured from: the In when the clip, its capture or its track was opened.\n    anchor: u32,\n    /// The game side left a fighter where it was: its point is outside the stage (`note_scrub`).\n    off: bool,\n}",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    pub target: Option<bool>,\n}",
+     "new": "    pub target: Option<bool>,\n    /// What the key line says about the fighters' positions at the selected handle (`scrub_track`).\n    pub pos: Pos,\n}",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        String::new()",
+     "new": "        view.pos.text().to_owned()",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};\nuse crate::model::combo_record::UnitKind;",
+     "new": "use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};\nuse crate::engine::macro_ui::scrub_track::{self, Ask, Pos};\nuse crate::model::combo_record::UnitKind;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        let off = pos == Pos::Off;\n        std::mem::replace(&mut self.off, off) != off",
+     "new": "        std::mem::replace(&mut self.noted, pos) != pos",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if self.off => Pos::Off, pos => pos } }",
+     "new": "            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if matches!(self.noted, Pos::Off | Pos::None) => self.noted, pos => pos } }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor: 0, off: false })",
+     "new": "            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor: 0, noted: Pos::Held })",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor, off: false })",
+     "new": "            open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor, noted: Pos::Held })",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    /// The game side left a fighter where it was: its point is outside the stage (`note_scrub`).\n    off: bool,",
+     "new": "    /// What the game side did with the last ask (`note_scrub`): held, off the stage, or nobody (a swapped fighter).\n    noted: Pos,",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): test adopting matching, longer tracks without changing selection.",
+     "old": "    #[test]\n    fn case_table() {\n        crate::test_table::run(&[\n            (\"the_playhead_browses_the_whole_take_and_leaves_in_and_out\", the_playhead_browses_the_whole_take_and_leaves_in_and_out as fn()),\n            (\"y_snaps_the_playhead_to_the_nearest_mark\", y_snaps_the_playhead_to_the_nearest_mark as fn()),\n            (\"l_and_r_cut_here_after_the_playhead_moved\", l_and_r_cut_here_after_the_playhead_moved as fn()),\n",
+     "new": "    #[test]\n    fn case_table() {\n        crate::test_table::run(&[\n            (\"generated_positions_reach_the_open_editor_at_once\", generated_positions_reach_the_open_editor_at_once as fn()),\n            (\"the_playhead_browses_the_whole_take_and_leaves_in_and_out\", the_playhead_browses_the_whole_take_and_leaves_in_and_out as fn()),\n            (\"y_snaps_the_playhead_to_the_nearest_mark\", y_snaps_the_playhead_to_the_nearest_mark as fn()),\n            (\"l_and_r_cut_here_after_the_playhead_moved\", l_and_r_cut_here_after_the_playhead_moved as fn()),\n"
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): test adopting matching, longer tracks without changing selection.",
+     "old": "        ClipEditor::macro_file(recording, player).unwrap()\n    }\n\n    fn b_stops_a_clip_preview_without_leaving() {\n        for mut e in [editor(), saved_macro(false), saved_macro(true)] {\n            e.on_action(ClipAction::SelectIn);\n",
+     "new": "        ClipEditor::macro_file(recording, player).unwrap()\n    }\n\n    fn generated_positions_reach_the_open_editor_at_once() {\n        let mut e = saved_macro(false);\n        let recording = match &e.file {\n            Some(FileSource::Macro { recording, .. }) => (**recording).clone(),\n            _ => panic!(\"macro\"),\n        };\n        e.on_action(ClipAction::SelectIn);\n        e.on_action(ClipAction::Nudge(1));\n        assert_eq!(e.scrub().1, Pos::NoTrack);\n        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_track(Some(vec![[frame, frame], [frame, frame]]));\n        assert!(e.adopt_positions(loaded.clone()));\n        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);\n        assert_eq!(e.scrub().1, Pos::Held);\n        e.on_action(ClipAction::Nudge(1));\n        assert_eq!(e.scrub().1, Pos::End);\n        let mut other = loaded.clone();\n        other.frames[0].buttons ^= 1;\n        assert!(!e.adopt_positions(other));\n        let mut shorter = loaded.clone();\n        shorter.set_track(Some(vec![[frame, frame]]));\n        assert!(!e.adopt_positions(shorter));\n        assert_eq!(e.scrub().1, Pos::End);\n        e.on_action(ClipAction::Nudge(-1));\n        assert_eq!(e.scrub().1, Pos::Held);\n        assert!(!combo_editor().adopt_positions(loaded));\n    }\n\n    fn b_stops_a_clip_preview_without_leaving() {\n        for mut e in [editor(), saved_macro(false), saved_macro(true)] {\n            e.on_action(ClipAction::SelectIn);\n"
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): add an inert position-adoption seam.",
+     "old": "    pub fn crop_kind(&self) -> i32 { self.track().frames[self.window.start() as usize].start.fighter_kind }\n    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n",
+     "new": "    pub fn crop_kind(&self) -> i32 { self.track().frames[self.window.start() as usize].start.fighter_kind }\n    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, _loaded: MacroRecording) -> bool { false }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n"
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): adopt a matching, longer generated track without changing the selection.",
+     "old": "    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, _loaded: MacroRecording) -> bool { false }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n",
+     "new": "    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, loaded: MacroRecording) -> bool {\n        let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };\n        let Some(track) = loaded.track else { return false };\n        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {\n            return false;\n        }\n        recording.set_track(Some(track));\n        true\n    }\n\n    /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.\n    pub fn shown_frame(&self) -> Option<u32> {\n"
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): exercise adoption of a generated position track.",
+     "old": "        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_track(Some(vec![[frame, frame], [frame, frame]]));\n        assert!(e.adopt_positions(loaded.clone()));\n        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);\n        assert_eq!(e.scrub().1, Pos::Held);\n",
+     "new": "        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);\n        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };\n        let mut loaded = recording.clone();\n        loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated, vec![[frame, frame], [frame, frame]]);\n        assert!(e.adopt_positions(loaded.clone()));\n        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);\n        assert_eq!(e.scrub().1, Pos::Held);\n"
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): preserve the source of a generated or recorded position track when adopting it.",
+     "old": "    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, loaded: MacroRecording) -> bool {\n        let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };\n        let Some(track) = loaded.track else { return false };\n        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {\n            return false;\n        }\n        recording.set_track(Some(track));\n        true\n    }\n\n",
+     "new": "    pub fn pause(&mut self) { self.playing = false; }\n    pub fn report_error(&mut self, message: String) { self.error = Some(message); }\n\n    pub fn adopt_positions(&mut self, mut loaded: MacroRecording) -> bool {\n        let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };\n        let Some((source, track)) = loaded.take_sourced_track() else { return false };\n        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {\n            return false;\n        }\n        recording.set_sourced_track(source, track);\n        true\n    }\n\n"
     }
    ]
   },
@@ -5125,7 +5650,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "83d6ab1ebf238ab5ea6bf341d4c1397b922a6be3a808b461852e24ddb776a5c5",
+   "dest_sha256": "b250a3845792fea2cec53ca777b9b41f9461e66b49a7a9894caa05e1f7a11793",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -6071,6 +6596,51 @@
      "reason": "Refused save keeps the browse (lead fold, place-t1a 2026-11-26): the closure names the editor as the lock-order test classifies it (view on receiver editor: the panel models take no lock)",
      "old": "        let file = editor.as_ref().is_some_and(|editor| !matches!(editor.context(), crate::engine::macro_ui::clip_panel::ClipContext::Replay { .. }));\n        let source = editor.as_ref().and_then(|editor| editor.source.clone());\n        let requested = editor.as_ref().is_some_and(|editor| editor.request.is_some());\n        let effect = editor.as_mut().map(|e| {\n            if file || !matches!(action, ClipAction::Confirm) { return e.on_action(action); }\n            let view = e.view();\n            let configuration = e.target_for(view.entry, e.crop_kind(), view.previous_selected).ok().flatten().and_then(Target::configuration);\n            e.confirm_macro(|recording| {\n                if let Some(configuration) = configuration { recording.set_mii(configuration).map_err(|e| e.to_string())?; }\n                else if MiiClass::from_kind(recording.start.fighter_kind as u32).is_some() {\n                    // restriction: replay-mii-metadata\n",
      "new": "        let file = editor.as_ref().is_some_and(|editor| !matches!(editor.context(), crate::engine::macro_ui::clip_panel::ClipContext::Replay { .. }));\n        let source = editor.as_ref().and_then(|editor| editor.source.clone());\n        let requested = editor.as_ref().is_some_and(|editor| editor.request.is_some());\n        let effect = editor.as_mut().map(|editor| {\n            if file || !matches!(action, ClipAction::Confirm) { return editor.on_action(action); }\n            let view = editor.view();\n            let configuration = editor.target_for(view.entry, editor.crop_kind(), view.previous_selected).ok().flatten().and_then(Target::configuration);\n            editor.confirm_macro(|recording| {\n                if let Some(configuration) = configuration { recording.set_mii(configuration).map_err(|e| e.to_string())?; }\n                else if MiiClass::from_kind(recording.start.fighter_kind as u32).is_some() {\n                    // restriction: replay-mii-metadata\n"
+    },
+    {
+     "old": "pub fn worker_preview_notices() {\n    service_file_name();",
+     "new": "pub fn worker_preview_notices() {\n    scrub_service();\n    service_file_name();",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "\npub fn worker_preview_notices() {",
+     "new": "\n/// The worker: what the open editor's selected handle shows goes to the fighters (`scrub_track`), and what they did\n/// with it comes back for the key line. With no editor nothing is asked, and the block is freed once no body is held.\nfn scrub_service() {\n    use crate::engine::macro_ui::scrub_track::{Ask, Block, SEEN_IDLE, SLOT};\n    let mut editor = EDITOR.lock().unwrap();\n    let Some(editor) = editor.as_mut() else {\n        let idle = SLOT.with(|block| {\n            block.set_ask(Ask::None);\n            (0..2).all(|slot| block.seen(slot) == SEEN_IDLE)\n        });\n        if idle == Some(true) {\n            SLOT.withdraw();\n        }\n        SLOT.reap();\n        return;\n    };\n    if SLOT.empty() {\n        let _ = SLOT.publish(Block::new());\n    }\n    let ask = editor.scrub().0;\n    let pos = SLOT.with(|block| {\n        block.set_ask(ask);\n        block.pos()\n    });\n    if pos.is_some_and(|pos| editor.note_scrub(pos)) {\n        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n    }\n}\n\npub fn worker_preview_notices() {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        let idle = SLOT.with(|block| {\n            block.set_ask(Ask::None);\n            (0..2).all(|slot| block.seen(slot) == SEEN_IDLE)\n        });\n        if idle == Some(true) {\n            SLOT.withdraw();\n        }\n        SLOT.reap();",
+     "new": "        SLOT.close();",
+     "reason": "Scrub close (2026-11-26 02:36:50Z): exercise the same worker close operation during the first pending hold."
+    },
+    {
+     "old": "    use crate::engine::macro_ui::scrub_track::{Ask, Block, SEEN_IDLE, SLOT};",
+     "new": "    use crate::engine::macro_ui::scrub_track::{Block, SLOT};",
+     "reason": "Scrub close (2026-11-26 02:36:50Z): exercise the same worker close operation during the first pending hold."
+    },
+    {
+     "old": "        block.set_ask(ask);",
+     "new": "        block.show(shown, ask);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    let ask = editor.scrub().0;",
+     "new": "    let (shown, ask) = (editor.shown_frame(), editor.scrub().0);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        crate::engine::macros::Library::new(root.join(crate::engine::library::MACROS_DIR)).load(id)",
+     "new": "        crate::engine::macros::Library::new(root.join(crate::engine::library::MACROS_DIR)).load_edited(id)",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        block.show(shown, ask);",
+     "new": "        block.ask_at(shown, ask);",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "reason": "Generated positions (operator 2026-11-26; tr-primary-2 03:24:51Z, 03:36:17Z): load a generated track outside the editor lock and adopt it only for the same open macro.",
+     "old": "\npub fn worker_preview_notices() {\n    scrub_service();\n    service_file_name();\n    if PENDING.lock().unwrap().is_none() && RELOAD.lock().unwrap().is_none() {\n        let play = {\n",
+     "new": "\npub fn worker_preview_notices() {\n    scrub_service();\n    if rr_host::take_generated() {\n        let id = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.as_ref().map(|(id, _)| id.clone()));\n        if let Some(id) = id {\n            let dir = std::path::Path::new(crate::model::storage::ROOT).join(crate::engine::library::MACROS_DIR);\n            if let Ok(loaded) = crate::engine::macros::Library::new(dir).load_edited(&id) {\n                let mut editor = EDITOR.lock().unwrap();\n                if let Some(editor) = editor.as_mut().filter(|editor| editor.source.as_ref().is_some_and(|(source, _)| source == &id)) {\n                    if editor.clip.adopt_positions(loaded) {\n                        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n                    }\n                }\n            }\n        }\n    }\n    service_file_name();\n    if PENDING.lock().unwrap().is_none() && RELOAD.lock().unwrap().is_none() {\n        let play = {\n"
     }
    ]
   },

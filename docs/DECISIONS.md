@@ -1,5 +1,11 @@
 # Decisions for the operator
 
+2026-11-26. Scrub positions: operator ruling 2026-11-26 ~02:45Z (raising stack limit is fine).
+Only the diagnostic trace writer's recorded static bound changes: 2,880 to 2,896 bytes, as measured
+on the `bac7a4d5` ELF. Its allocation stays at 28,672 bytes. Restoring the direct combo decoder
+keeps the menu worker at 56,432 bytes in both ELFs, within its unchanged 57,152-byte bound
+and 90,112-byte allocation. These are static depths, not new gameplay high-water measurements.
+
 2026-11-24. Replace rc.12 TR7's two-value crop setting with Start, End, Both and Off, and add the playback
 indicator (inbox 22:10:39Z). A macro's or input drill's own Trim applies at play time without changing its stored
 frames; hit combos have no Trim row (inbox 22:29:37Z).

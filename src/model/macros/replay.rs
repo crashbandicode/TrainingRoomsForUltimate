@@ -4,7 +4,7 @@ use {crate::engine::macros::FrameWindow, crate::engine::macros::InputFrame, crat
 
 /// Input and start-context observation. Native simulation provides the preview;
 /// no animation/pose samples are retained in the per-frame capture buffer.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ReplayFrame {
     pub input: InputFrame,
     pub start: StartState,

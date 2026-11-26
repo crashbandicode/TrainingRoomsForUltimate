@@ -2,6 +2,7 @@
 use {crate::engine::macros::FrameWindow, crate::engine::macros::MacroRecording, crate::engine::macros::MoveStart, crate::engine::macros::MoveStartRules, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::ReplayTrack, crate::engine::macros::MAX_NAME_CHARS};
 use crate::engine::macro_ui::macro_panel::Pad;
 use crate::engine::macro_ui::clip_marks::{Marks, Span, SHOWN_MARKS};
+use crate::engine::macro_ui::scrub_track::{self, Ask, Pos};
 use crate::model::combo_record::UnitKind;
 
 pub const CLIP_BAR_UNITS: u16 = 1600;
@@ -149,7 +150,7 @@ pub fn clip_help(view: &ClipView, coarse: &str, chord: &str, pace: i32) -> ClipH
         format!("Move at {} + {}f setup. Plays from the temporary preview setup.",
             start.action_frame, start.action_frame - start.frame)
     } else if view.clean_start {
-        String::new()
+        view.pos.text().to_owned()
     } else {
         format!("Press {chord}+Y to snap to the move start, then X to preview.")
     };
@@ -308,6 +309,8 @@ pub struct ClipView {
     pub near: Option<(u32, Option<u32>)>,
     /// Where a preview plays: Player 1 (`true`) or the CPU. `None` when the source has no preview.
     pub target: Option<bool>,
+    /// What the key line says about the fighters' positions at the selected handle (`scrub_track`).
+    pub pos: Pos,
 }
 
 pub struct ClipEditor {
@@ -330,6 +333,10 @@ pub struct ClipEditor {
     marks: Marks,
     replay_player: bool,
     watch_base: u32,
+    /// The frame the scrub's positions are measured from: the In when the clip, its capture or its track was opened.
+    anchor: u32,
+    /// What the game side did with the last ask (`note_scrub`): held, off the stage, or nobody (a swapped fighter).
+    noted: Pos,
 }
 
 fn prepare(mut session: ReplaySession) -> Option<ReplaySession> {
@@ -364,13 +371,14 @@ impl ClipEditor {
     pub fn new(session: ReplaySession, clean_statuses: Vec<i32>) -> Result<Self, String> {
         let session = prepare(session).ok_or("Play a saved replay in Vault first")?;
         let window = session.tracks[0].window()?;
+        let anchor = window.start();
         let marks = track_marks(&session.tracks[0]);
         let mut open_guard = OpenInputGuard::new();
         open_guard.arm();
         Ok(Self { session, file: None, previous: None, previous_selected: false, track: 0, window,
             handle: Handle::Playhead, playing: false, browsed: false, clean_statuses, move_rules: None, move_start: None,
             source_name: "Latest Vault capture".into(), previous_name: "Previous Vault capture".into(),
-            open_guard, error: None, marks, replay_player: false, watch_base: 0 })
+            open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor, noted: Pos::Held })
     }
 
     /// Saved files have one side and one start context. A combo has link units,
@@ -402,7 +410,7 @@ impl ClipEditor {
             file: Some(file), previous: None, previous_selected: false, track: 0,
             window: FrameWindow::new(total).map_err(|error| error.to_string())?, handle: Handle::Playhead, playing: false, browsed: false,
             clean_statuses: Vec::new(), move_rules: None, move_start: None,
-            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0 })
+            source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor: 0, noted: Pos::Held })
     }
 
     /// Where X previews: a saved macro's play role, a capture's play target, nothing for a combo or a drill.
@@ -509,6 +517,16 @@ impl ClipEditor {
     pub fn pause(&mut self) { self.playing = false; }
     pub fn report_error(&mut self, message: String) { self.error = Some(message); }
 
+    pub fn adopt_positions(&mut self, mut loaded: MacroRecording) -> bool {
+        let Some(FileSource::Macro { recording, .. }) = &mut self.file else { return false };
+        let Some((source, track)) = loaded.take_sourced_track() else { return false };
+        if loaded.frames != recording.frames || recording.track.as_ref().is_some_and(|held| held.len() >= track.len()) {
+            return false;
+        }
+        recording.set_sourced_track(source, track);
+        true
+    }
+
     /// The frame the fighters are shown at while scrubbing: the selected handle's, or the moved playhead's; nobody is held on None.
     pub fn shown_frame(&self) -> Option<u32> {
         (!self.playing && self.context().preview() && (self.handle != Handle::Playhead || self.browsed)).then_some(self.window.cursor())
@@ -539,7 +557,45 @@ impl ClipEditor {
             source_name: self.source_name.clone(), error: self.error.clone(),
             marks, mark_count, move_text: self.marks.text(at, out_handle),
             mark_total: self.marks.list().len() as u32, near: self.marks.nearest(self.window.cursor()),
-            target: self.plays_on_player() }
+            target: self.plays_on_player(), pos: match self.scrub().1 { Pos::Held if matches!(self.noted, Pos::Off | Pos::None) => self.noted, pos => pos } }
+    }
+
+    /// What the fighters show at `shown_frame` (the selected handle's frame, or the moved playhead's), and what the
+    /// key line says about it. A capture and a macro with a track go through the same rule (`scrub_track::deltas`).
+    pub fn scrub(&self) -> (Ask, Pos) {
+        let Some(at) = self.shown_frame() else { return (Ask::None, Pos::None) };
+        match &self.file {
+            Some(FileSource::Combo(_)) => return (Ask::None, Pos::None),
+            Some(FileSource::Macro { recording, .. }) if recording.track.is_none() => return (Ask::None, Pos::NoTrack),
+            _ => {}
+        }
+        // Fighter 0 is the selected (a macro: the recorded) one; fighter 1 the other, when the source has it.
+        let frame = |fighter: usize, index: u32| match &self.file {
+            Some(FileSource::Macro { recording, .. }) => recording.track.as_ref()?.get(index as usize).map(|pair| pair[fighter])
+                .filter(|frame| frame.start.fighter_kind >= 0),
+            Some(FileSource::Combo(_)) => None,
+            None => {
+                let track = match (fighter, self.session.tracks.len()) {
+                    (0, _) => self.track,
+                    (_, 2) => 1 - self.track,
+                    _ => return None,
+                };
+                self.session.tracks[track].frames.get(index as usize).copied()
+            }
+        };
+        let target = u8::from(self.plays_on_player() != Some(true));
+        let ask = scrub_track::deltas(|index| frame(0, index), |index| frame(1, index), self.anchor, at, target);
+        match (ask, &self.file) {
+            (Ask::None, Some(FileSource::Macro { .. })) => (ask, Pos::End),
+            (Ask::None, _) => (ask, Pos::None),
+            _ => (ask, Pos::Held),
+        }
+    }
+
+    /// The worker: what the game side did with the last ask, for the key line.
+    /// Whether the key line changed.
+    pub fn note_scrub(&mut self, pos: Pos) -> bool {
+        std::mem::replace(&mut self.noted, pos) != pos
     }
 
     /// Report actual input consumption, relative to the selected range. Drawing
@@ -600,11 +656,28 @@ impl ClipEditor {
         })
     }
 
+    /// A capture saved as a macro carries the kept frames' states: the selected fighter's and, when the capture has
+    /// exactly two, the other one's (kind -1 where there is none). The new file scrubs as its capture does.
+    fn tracked(&self, mut recording: MacroRecording) -> MacroRecording {
+        if self.file.is_none() {
+            let start = self.window.start() as usize;
+            let other = (self.session.tracks.len() == 2).then(|| &self.session.tracks[1 - self.track].frames);
+            let state = |frame: &ReplayFrame| ReplayFrame { input: Default::default(), ..*frame };
+            let absent = ReplayFrame { input: Default::default(), start: crate::engine::macros::StartState::neutral(-1, 0, 1.0), x: 0.0, y: 0.0 };
+            recording.set_track(self.track().frames.get(start..self.window.end() as usize).map(|frames| {
+                frames.iter().enumerate()
+                    .map(|(index, frame)| [state(frame), other.and_then(|other| other.get(start + index)).map_or(absent, state)])
+                    .collect()
+            }));
+        }
+        recording
+    }
+
     fn export_selection(&self, name: &str) -> Result<MacroRecording, String> {
         if let Some(FileSource::Macro { recording, .. }) = &self.file {
             let mut kept = (**recording).clone();
             kept.name = name.to_owned();
-            kept.frames = recording.frames[self.window.start() as usize..self.window.end() as usize].to_vec();
+            kept.keep(self.window.start() as usize..self.window.end() as usize);
             kept.actions = if self.marks.recorded() {
                 Marks::window(&recording.actions, self.window.start(), self.window.end())
             } else {
@@ -637,6 +710,7 @@ impl ClipEditor {
         });
         self.track = index;
         self.window = window;
+        self.anchor = self.window.start();
         self.marks = track_marks(&self.session.tracks[index]);
         self.playing = false;
         self.browsed = false;
@@ -759,6 +833,7 @@ impl ClipEditor {
                     self.previous_selected = !self.previous_selected;
                     self.track = 0;
                     self.window = self.session.tracks[0].window().expect("nonempty capture");
+                    self.anchor = self.window.start();
                     self.marks = track_marks(&self.session.tracks[0]);
                     self.handle = Handle::Playhead;
                     self.move_start = None;
@@ -809,7 +884,7 @@ impl ClipEditor {
             let prefix: String = self.source_name.chars().take(MAX_NAME_CHARS.saturating_sub(suffix.chars().count())).collect();
             self.export_selection(&format!("{prefix}{suffix}"))
         };
-        match crop.and_then(|mut take| { attach(&mut take)?; Ok(take) }) {
+        match crop.map(|take| self.tracked(take)).and_then(|mut take| { attach(&mut take)?; Ok(take) }) {
             Ok(take) => { self.error = None; self.browsed = false; self.pause(); ClipEffect::Export(Box::new(take)) }
             Err(error) => { self.report_error(error.clone()); ClipEffect::Error(error) }
         }
@@ -1232,6 +1307,36 @@ mod tests {
         ClipEditor::macro_file(recording, player).unwrap()
     }
 
+    fn generated_positions_reach_the_open_editor_at_once() {
+        let mut e = saved_macro(false);
+        let recording = match &e.file {
+            Some(FileSource::Macro { recording, .. }) => (**recording).clone(),
+            _ => panic!("macro"),
+        };
+        e.on_action(ClipAction::SelectIn);
+        e.on_action(ClipAction::Nudge(1));
+        assert_eq!(e.scrub().1, Pos::NoTrack);
+        let before = (e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor);
+        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 2.0, y: 3.0 };
+        let mut loaded = recording.clone();
+        loaded.set_sourced_track(crate::engine::macros::positions::Source::Generated, vec![[frame, frame], [frame, frame]]);
+        assert!(e.adopt_positions(loaded.clone()));
+        assert_eq!((e.view().start, e.view().end, e.view().cursor, e.view().handle, e.anchor), before);
+        assert_eq!(e.scrub().1, Pos::Held);
+        e.on_action(ClipAction::Nudge(1));
+        assert_eq!(e.scrub().1, Pos::End);
+        let mut other = loaded.clone();
+        other.frames[0].buttons ^= 1;
+        assert!(!e.adopt_positions(other));
+        let mut shorter = loaded.clone();
+        shorter.set_track(Some(vec![[frame, frame]]));
+        assert!(!e.adopt_positions(shorter));
+        assert_eq!(e.scrub().1, Pos::End);
+        e.on_action(ClipAction::Nudge(-1));
+        assert_eq!(e.scrub().1, Pos::Held);
+        assert!(!combo_editor().adopt_positions(loaded));
+    }
+
     fn b_stops_a_clip_preview_without_leaving() {
         for mut e in [editor(), saved_macro(false), saved_macro(true)] {
             e.on_action(ClipAction::SelectIn);
@@ -1543,6 +1648,7 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("generated_positions_reach_the_open_editor_at_once", generated_positions_reach_the_open_editor_at_once as fn()),
             ("the_playhead_browses_the_whole_take_and_leaves_in_and_out", the_playhead_browses_the_whole_take_and_leaves_in_and_out as fn()),
             ("y_snaps_the_playhead_to_the_nearest_mark", y_snaps_the_playhead_to_the_nearest_mark as fn()),
             ("l_and_r_cut_here_after_the_playhead_moved", l_and_r_cut_here_after_the_playhead_moved as fn()),
