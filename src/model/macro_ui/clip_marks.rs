@@ -391,6 +391,8 @@ pub fn bridge_clip(view: &crate::engine::macro_ui::clip_panel::ClipView, ctx: Op
     use crate::engine::macro_ui::clip_panel::{ClipContext, Handle};
     Clip {
         pos: view.pos.word(),
+        pose: if view.fighter_keys { view.poses } else { [""; 2] },
+        fighter: if view.fighter_keys { view.fighters } else { [""; 2] },
         ctx: ctx.unwrap_or(match view.context {
             ClipContext::Replay { .. } => "replay",
             ClipContext::Macro { player: true } => "macro.p1",

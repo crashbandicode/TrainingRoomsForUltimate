@@ -15,10 +15,12 @@ use crate::engine::library::Role;
 use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};
 use crate::engine::rr_host;
 use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
-use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};
+use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, shoulder_action, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};
 
 use crate::runtime::lobby::game_mode;
 use crate::runtime::game::{self, natives};
+use crate::runtime::roster::{character_roster, roster_requests};
+use crate::runtime::ui::facts;
 use crate::model::sites_pkg2::{MOTION_FRAME_OFFSET, MOTION_KIND_OFFSET};
 use crate::engine::macros::{PackedPose, Pose};
 
@@ -924,11 +926,19 @@ fn scrub_service() {
         let _ = SLOT.publish(Block::new());
     }
     let (shown, ask) = (editor.shown_frame(), editor.scrub().0);
-    let pos = SLOT.with(|block| {
+    let observed = SLOT.with(|block| {
         block.ask_at(shown, ask);
-        block.pos()
+        (block.pos(), [block.pose(0).0, block.pose(1).0])
     });
-    if pos.is_some_and(|pos| editor.note_scrub(pos)) {
+    let mut changed = editor.note_fighters(
+        [roster_requests::player_kind().map(|kind| kind as i32), facts::fact_cpu_kind()],
+        !character_roster::busy() && facts::fact_ready_go(),
+    );
+    if let Some((pos, poses)) = observed {
+        changed |= editor.note_scrub(pos);
+        changed |= editor.note_poses(poses);
+    }
+    if changed {
         crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
     }
 }
@@ -967,9 +977,44 @@ fn service_wanted_play() {
     }
 }
 
+fn service_wanted_fighter() {
+    use crate::engine::macro_ui::scrub_track::SLOT;
+    if roster_requests::take_clip_reply() == Some(false) {
+        let refused = EDITOR.lock().unwrap().as_mut().is_some_and(|editor| editor.fighter_loading().is_some() && editor.cancel_fighter());
+        if refused {
+            // restriction: clip-fighter-refused
+            notify("The roster refused the fighter switch".into());
+            return;
+        }
+    }
+    let (wanted, timed_out) = {
+        let mut editor = EDITOR.lock().unwrap();
+        let Some(editor) = editor.as_mut() else { return };
+        if editor.tick_fighter_load() {
+            (None, true)
+        } else if editor.wanted_fighter().is_some() && SLOT.released() {
+            (editor.take_wanted_fighter(), false)
+        } else {
+            (None, false)
+        }
+    };
+    if timed_out {
+        notify("The fighter did not load; the editor keeps the current one".into());
+        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+        return;
+    }
+    if let Some((player, kind)) = wanted {
+        // restriction: clip-fighter-by-kind
+        roster_requests::request_clip_kind(player, kind as u32);
+        crate::runtime::diag_log::diagnostic(format_args!(
+            "[Scrub] fighter role={} kind={kind}: the roster is asked", if player { "p1" } else { "cpu" }));
+    }
+}
+
 pub fn worker_preview_notices() {
     scrub_service();
     service_wanted_play();
+    service_wanted_fighter();
     if rr_host::take_generated() {
         let id = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.as_ref().map(|(id, _)| id.clone()));
         if let Some(id) = id {
@@ -1204,21 +1249,38 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
         if controller.just_down.b() { cancel_reload(); }
         return;
     }
+    {
+        let mut editor = EDITOR.lock().unwrap();
+        if let Some(editor) = editor.as_mut().filter(|editor| editor.wanted_fighter().is_some() || editor.fighter_loading().is_some()) {
+            if controller.just_down.b() {
+                editor.cancel_fighter();
+                crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+            }
+            return;
+        }
+    }
+    let p = controller.just_down;
+    let b = controller.current_buttons;
+    let gcc = controller.style == ControllerStyle::GCController;
+    let modifier = if gcc { b.zr() } else { b.zl() || b.zr() };
     let held = controller.current_buttons;
     if TARGET_TAP.lock().unwrap().zr_tap(held)
         && clip_view().is_some_and(|v| v.target.is_some()) {
         on_action(ClipAction::SwapTarget);
         return;
     }
+    if modifier && clip_view().is_some_and(|v| v.playing) {
+        if let Some(action) = shoulder_action(p.l() || (gcc && p.real_digital_l()), p.r() || (gcc && p.real_digital_r()), modifier) {
+            on_action(action);
+            *HOLD.lock().unwrap() = (0, 0, false);
+            return;
+        }
+    }
     if clip_view().is_some_and(|v| v.playing) {
         if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }
         *HOLD.lock().unwrap() = (0, 0, false);
         return;
     }
-    let p = controller.just_down;
-    let b = controller.current_buttons;
-    let gcc = controller.style == ControllerStyle::GCController;
-    let modifier = if gcc { b.zr() } else { b.zl() || b.zr() };
     let left = b.dpad_left() || b.l_left() || b.r_left();
     let right = b.dpad_right() || b.l_right() || b.r_right();
     let direction = i32::from(right) - i32::from(left);
@@ -1236,8 +1298,7 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
         else if confirm { Some(ClipAction::Confirm) }
         else if p.x() { Some(if modifier { ClipAction::ToggleCapture } else { ClipAction::TogglePlay }) }
         else if p.y() { Some(if modifier { ClipAction::UseLeadIn } else { ClipAction::Snap }) }
-        else if p.l() || (gcc && p.real_digital_l()) { Some(ClipAction::SelectIn) }
-        else if p.r() || (gcc && p.real_digital_r()) { Some(ClipAction::SelectOut) }
+        else if let Some(action) = shoulder_action(p.l() || (gcc && p.real_digital_l()), p.r() || (gcc && p.real_digital_r()), modifier) { Some(action) }
         else {
             direction_action(
                 p.dpad_left() || p.l_left() || p.r_left(),
