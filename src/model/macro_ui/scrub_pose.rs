@@ -241,8 +241,41 @@ mod tests {
         // A set the fighter did not take (it has no animation of that name) leaves nothing of the scrub's on it.
         assert!(order(&["natives::change_motion(accessor, pose.motion, pose.frame, 0.0, false);",
             "if natives::motion_kind(accessor) != pose.motion {", "natives::change_motion(accessor, FALL, 0.0, 1.0, true);", "let shown = read();"]));
+        // Every way out of the role's frame reports: a body let go, a hold that could not be made, a held body.
+        assert!(order(&["None => release(block, slot, &mut holds[slot], accessor),", "block.set_seen(slot, seen);\n        block.ack(slot, generation);"]),
+            "a body is let go before its frame reports the release");
+        assert!(hold.contains("else {\n        block.set_pose(index, POSE_NONE, PackedPose::NONE);\n        return SEEN_IDLE;\n    };"));
+        assert_eq!(hold.matches("release(block, index, slot, accessor)").count(), 3, "no camera limits, a refused point, a pushed body");
+        // The animation only: the status is never forced.
+        assert!(!hold.contains("status_request") && !hold.contains("change_status"));
         assert!(hold.contains("crate::engine::rr_host::live_pose(index).fighter_kind"), "the body's kind, as the recorder publishes it");
         assert!(!hold.contains("fighter_kind(accessor)"), "no native outside the placement unit's set");
+    }
+
+    #[test]
+    fn a_posed_role_whose_partners_fighter_was_swapped_is_still_let_go_as_posed() {
+        let block = super::super::scrub_track::Block::new();
+        let shown = pose(12.5);
+        // Both roles are posed. Player 1's fighter is swapped: its frame finds a hold made on another body.
+        block.set_pose(0, POSE_SHOWN, shown);
+        block.set_pose(1, POSE_SHOWN, shown);
+        let partner = block.pose(1);
+        block.forget();
+        assert_eq!([block.pose(0), block.pose(1)], [(POSE_NONE, PackedPose::NONE); 2], "forget clears both roles' reports");
+        block.set_pose(1, partner.0, partner.1);
+        // The CPU's body is still the one the scrub posed: its own frame lets it go by this report.
+        assert_eq!(block.pose(1), (POSE_SHOWN, shown));
+        assert_eq!(block.pose(0), (POSE_NONE, PackedPose::NONE), "the swapped role's new body was never posed");
+        let hold = include_str!("../../runtime/features/scrub_hold.rs");
+        let swapped = hold.split_once("if holds[slot].is_some_and(|hold| hold.body() != natives::battle_object_id(accessor)) {").map_or("", |(_, rest)| rest);
+        let swapped = swapped.split_once("\n        }\n").map_or("", |(inside, _)| inside);
+        assert_eq!(swapped.lines().filter(|line| !line.trim_start().starts_with("//")).map(str::trim).collect::<Vec<_>>(),
+            ["let partner = block.pose(slot ^ 1);", "block.forget();", "block.set_pose(slot ^ 1, partner.0, partner.1);"]);
+        // The plain animation before the wake: the posed arm of the release reads that report.
+        let release = hold.split_once("unsafe fn release(").map_or("", |(_, rest)| rest);
+        let posed = release.find("if block.pose(index).0 == POSE_SHOWN {").expect("the release reads the role's report");
+        let plain = release.find("natives::change_motion(accessor, if hold.origin().grounded { WAIT } else { FALL }, 0.0, 1.0, true);").expect("the plain animation");
+        assert!(posed < plain && plain < release.find("state::set_sleep(accessor, false);").expect("the wake"));
     }
     }
 }
