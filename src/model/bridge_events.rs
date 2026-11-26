@@ -44,6 +44,8 @@ pub struct Clip {
     pub marks: u32,
     pub mark: Option<(u32, Option<u32>)>,
     pub text: MoveText,
+    /// The scrub's position state (`scrub_track::Pos::word`); written only when it is not `none`.
+    pub pos: &'static str,
 }
 
 /// The strip's move text on a `clip` line: at most 48 bytes, cut at a character; a quote, a backslash or a control
@@ -80,6 +82,9 @@ impl Clip {
             None => line.write_str("none"),
         };
         let _ = write!(line, " move=\"{}\"", self.text.as_str());
+        if !matches!(self.pos, "" | "none") {
+            let _ = write!(line, " pos={}", self.pos);
+        }
         line
     }
 }

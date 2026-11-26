@@ -299,7 +299,7 @@ pub struct ClipView {
     pub near: Option<(u32, Option<u32>)>,
     /// Where a preview plays: Player 1 (`true`) or the CPU. `None` when the source has no preview.
     pub target: Option<bool>,
-    /// What the key line says about the fighters positions at the selected handle (`scrub_track`).
+    /// What the key line says about the fighters' positions at the selected handle (`scrub_track`).
     pub pos: Pos,
 }
 

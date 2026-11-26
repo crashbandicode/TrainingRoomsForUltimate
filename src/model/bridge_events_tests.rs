@@ -5,7 +5,7 @@ fn hold(polls: u32) -> Event {
 }
 
 fn clip() -> Clip {
-    Clip { ctx: "replay", total: 200, start: 12, end: 157, cursor: 156, playing: true, handle: "playhead", running: true,
+    Clip { pos: "none", ctx: "replay", total: 200, start: 12, end: 157, cursor: 156, playing: true, handle: "playhead", running: true,
         target: "cpu", marks: 2, mark: Some((90, None)), text: MoveText::new("66 frames into Special") }
 }
 

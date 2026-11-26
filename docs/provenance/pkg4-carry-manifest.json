@@ -669,7 +669,7 @@
    "dest": "src/model/macros/recording.rs",
    "crate": "macros",
    "src_sha256": "7f611cd67f13b8c41dbcfe6a411b82ea4d4d9eb4a0a7e3687f46e3ac2dbd8596",
-   "dest_sha256": "36b4f7cf204e08e2ddb25956422c8a662476807eadb81582528803c4bdb2dbb0",
+   "dest_sha256": "759571802c64fc47531b34d0f2cddbc11276f3dcf9c9a5f79990e1a30294fbee",
    "edits": [
     {
      "old": "    pub frames: Vec<InputFrame>,\n}",
@@ -833,6 +833,36 @@
     {
      "old": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// Gameplay frame rate assumed when the caller does not supply one.",
      "new": "pub const MII_SCHEMA_VERSION: u32 = 2;\n/// A macro that carries its position track (`MacroRecording::track`): older readers refuse it.\npub const TRACK_SCHEMA_VERSION: u32 = 3;\n/// Gameplay frame rate assumed when the caller does not supply one.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    /// The position track is not one finite entry per frame, or the files version does not match its presence.",
+     "new": "    /// The position track is not one finite entry per frame, or the file's version does not match its presence.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "            track.truncate(range.end);\n        }",
+     "new": "            track.truncate(range.end);\n            track.drain(..range.start.min(track.len()));\n        }",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "        let _ = track;",
+     "new": "        self.track = track;",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    /// Attach the position track a take recorded (one entry per frame), or drop it: the files version follows.",
+     "new": "    /// Attach the position track a take recorded (one entry per frame), or drop it: the file's version follows.",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    pub fn deserialize<de, D: serde::Deserializer<de>>(deserializer: D) -> Result<Option<Vec<[ReplayFrame; 2]>>, D::Error> {",
+     "new": "    pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Vec<[ReplayFrame; 2]>>, D::Error> {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "/// The track in a file: per frame, each fighters kind, costume, facing, situation, status, speed x, speed y, x and y.",
+     "new": "/// The track in a file: per frame, each fighter's kind, costume, facing, situation, status, speed x, speed y, x and y.",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
@@ -1680,7 +1710,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "0621e98e2ded935a804f4495b55563781ae37c09f3d7b27fe7569c711f4857f1",
+   "dest_sha256": "0b1ccb77bb06ba0aec94dc4d5072eab43fd7d3dda93d6f9472d5131e75afbfb8",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2316,6 +2346,11 @@
     {
      "old": "use crate::engine::macro_ui::scrub_track::{Ask, Pos};",
      "new": "use crate::engine::macro_ui::scrub_track::{self, Ask, Pos};",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "    /// What the key line says about the fighters positions at the selected handle (`scrub_track`).",
+     "new": "    /// What the key line says about the fighters' positions at the selected handle (`scrub_track`).",
      "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
@@ -5080,7 +5115,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "4dafde3542c76ae3953b8e3f15e3cb96abf02f09d1f752672b50bcead507141a",
+   "dest_sha256": "6543e3f245c1aa4c65526984dfcfb299d26e3e71093852310cea379d620652eb",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -5986,6 +6021,16 @@
      "reason": "Vault Play back carries its origin to the preview start so the configured delay applies only to playback",
      "old": "                crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());\n",
      "new": "                if playback {\n                    crate::engine::rr_host::request_clip_playback(*recording, clip_play_role());\n                } else {\n                    crate::engine::rr_host::request_clip_preview(*recording, clip_play_role());\n                }\n"
+    },
+    {
+     "old": "pub fn worker_preview_notices() {\n    service_file_name();",
+     "new": "pub fn worker_preview_notices() {\n    scrub_service();\n    service_file_name();",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
+    },
+    {
+     "old": "\npub fn worker_preview_notices() {",
+     "new": "\n/// The worker: what the open editor's selected handle shows goes to the fighters (`scrub_track`), and what they did\n/// with it comes back for the key line. With no editor nothing is asked, and the block is freed once no body is held.\nfn scrub_service() {\n    use crate::engine::macro_ui::scrub_track::{Ask, Block, SEEN_IDLE, SLOT};\n    let mut editor = EDITOR.lock().unwrap();\n    let Some(editor) = editor.as_mut() else {\n        let idle = SLOT.with(|block| {\n            block.set_ask(Ask::None);\n            (0..2).all(|slot| block.seen(slot) == SEEN_IDLE)\n        });\n        if idle == Some(true) {\n            SLOT.retire();\n        }\n        SLOT.reap();\n        return;\n    };\n    if SLOT.empty() {\n        let _ = SLOT.publish(Block::new());\n    }\n    let ask = editor.scrub().0;\n    let pos = SLOT.with(|block| {\n        block.set_ask(ask);\n        block.pos()\n    });\n    if let Some(pos) = pos {\n        let before = editor.view().pos;\n        editor.note_scrub(pos);\n        if editor.view().pos != before {\n            crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);\n        }\n    }\n}\n\npub fn worker_preview_notices() {",
+     "reason": "Scrub positions (operator 2026-11-25 23:58:25Z; inbox 2026-11-26 00:06:54Z): a selected handle holds the fighter at the place it had on that frame, from the capture or from a track remembered during the X preview."
     }
    ]
   },

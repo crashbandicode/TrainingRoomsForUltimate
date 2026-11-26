@@ -288,7 +288,7 @@ impl MacroRecording {
             (None, Some(_)) => MII_SCHEMA_VERSION,
             (None, None) => SCHEMA_VERSION,
         };
-        let _ = track;
+        self.track = track;
     }
 
     /// Keep frames `range` of the recording, with the same slice of its track.
@@ -297,6 +297,7 @@ impl MacroRecording {
         self.frames.drain(..range.start);
         if let Some(track) = &mut self.track {
             track.truncate(range.end);
+            track.drain(..range.start.min(track.len()));
         }
     }
 

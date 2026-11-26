@@ -46,7 +46,7 @@ impl Pos {
     /// The key line's text; empty when there is nothing to say.
     pub const fn text(self) -> &'static str {
         match self {
-            Pos::NoTrack => "",
+            Pos::NoTrack => "Re-record to see positions while scrubbing.",
             Pos::Off => "Off this stage.",
             Pos::None | Pos::Held => "",
         }
@@ -72,8 +72,7 @@ pub const SEEN_OFF: u32 = 2;
 /// is on its way to a blast line.
 pub fn in_bounds(at: [f32; 2], limits: [f32; 4]) -> bool {
     let [left, right, top, bottom] = limits;
-    let _ = (left, right, top, bottom, at);
-    true
+    left <= at[0] && at[0] <= right && bottom <= at[1] && at[1] <= top
 }
 
 /// The one point rule for captures and macros: each fighter's delta on frame `at` from the selected fighter's place
@@ -85,8 +84,7 @@ pub fn deltas(selected: impl Fn(u32) -> Option<ReplayFrame>, other: impl Fn(u32)
     let mut deltas = [None; 2];
     deltas[usize::from(target & 1)] = selected(at).map(delta);
     deltas[usize::from(target & 1 ^ 1)] = other(at).map(delta);
-    let _ = deltas;
-    Ask::None
+    if deltas == [None; 2] { Ask::None } else { Ask::Group { target: target & 1, deltas } }
 }
 
 /// One editor's scrub state.
@@ -217,7 +215,7 @@ impl Slot {
     /// The worker: free a retired block once no reader is inside `with`. True when nothing is left to free.
     pub fn reap(&self) -> bool {
         let ptr = self.ptr.load(Ordering::SeqCst);
-        if false && ptr & 1 == 1 && ptr != NO_BLOCK && self.readers.load(Ordering::SeqCst) == NO_READER {
+        if ptr & 1 == 1 && ptr != NO_BLOCK && self.readers.load(Ordering::SeqCst) == NO_READER {
             // SAFETY: the word is a retired block of `publish`: no reader is inside (the count), and none can enter,
             // since a reader that counts itself after this check reads an odd word.
             drop(unsafe { Box::from_raw((ptr & !1) as *mut Block) });
@@ -348,7 +346,7 @@ impl TakeTrack {
             for (cell, live) in cells.iter().zip(table.live[slot].iter().chain(&table.live[1 - slot])) {
                 cell.store(live.load(Ordering::Acquire), Ordering::Release);
             }
-            table.len.store(0, Ordering::Release);
+            table.len.store(index + 1, Ordering::Release);
         }
         table.readers.fetch_sub(1, Ordering::SeqCst);
     }
@@ -456,6 +454,8 @@ mod tests {
             editor.on_action(action);
             assert_eq!(editor.scrub(), (Ask::None, Pos::NoTrack));
             assert_eq!(clip_help(&editor.view(), "ZL", "ZL", 0).notice, "Re-record to see positions while scrubbing.");
+            let line = crate::engine::macro_ui::clip_marks::bridge_clip(&editor.view(), Some("macro.p1"), false).text();
+            assert!(line.ends_with(" pos=no_track"), "{line}");
         }
         // X does not stand in for the missing track.
         assert!(matches!(editor.on_action(ClipAction::TogglePlay), ClipEffect::PreviewFile { .. }));
