@@ -449,8 +449,8 @@ On: the CPU crouches in place instead of standing. Off: it stands.
 Lets the game's CPU play Player 1 for you. This group shows one of two things. If the separate CPU pilot plugin is
 installed, it shows only the P1 control row. Without it, it shows P1 CPU Control and P1 CPU Level.
 
-The same Record rule applies to both pilots. On **install 4**, Record is refused while the AI plays Player 1.
-In the **next build**, Record captures Player 1's inputs as the game receives them, including the AI's inputs.
+The same Record rule applies to both pilots. Install 4 refused Record while the AI played Player 1.
+In installs 5 and 6, Record captures Player 1's inputs as the game receives them, including the AI's inputs.
 Play on Player 1 is still refused while the AI drives that fighter.
 
 ### P1 control
