@@ -100,6 +100,11 @@ pub fn deltas(selected: impl Fn(u32) -> Option<ReplayFrame>, other: impl Fn(u32)
     if deltas == [None; 2] { Ask::None } else { Ask::Group { target: target & 1, deltas } }
 }
 
+/// A world point as one word, compared exactly.
+fn key(at: [f32; 2]) -> u64 {
+    u64::from(at[0].to_bits()) << 32 | u64::from(at[1].to_bits())
+}
+
 /// One editor's scrub state.
 pub struct Block {
     ask: hos_lock::Published<Ask>,
@@ -111,6 +116,12 @@ pub struct Block {
     /// Each role's last world point and tagged verdict. Only the game side touches these, under `holds`.
     classed: [AtomicU64; 2],
     stands: [AtomicU64; 2],
+    /// The group's home while a target that was held is not (`point`): the target role plus one, and the point.
+    home: (AtomicU32, AtomicU64),
+    /// Each role's last write (`pushed`): its point, and the request's generation plus one.
+    wrote: [(AtomicU64, AtomicU64); 2],
+    /// Each role's refusal of a body the game pushed off its point: the point, the request, the body's id.
+    pushed: [(AtomicU64, AtomicU64, AtomicU32); 2],
     /// The ask's generation, plus one, each role's fighter frame last acted under; zero before its first frame.
     acked: [AtomicU32; 2],
     /// The roles the last group ask moved (bit 0 Player 1, bit 1 the CPU).
@@ -130,6 +141,9 @@ impl Block {
             shown: AtomicU32::new(0),
             classed: [const { AtomicU64::new(0) }; 2],
             stands: [const { AtomicU64::new(0) }; 2],
+            home: (AtomicU32::new(0), AtomicU64::new(0)),
+            wrote: [const { (AtomicU64::new(0), AtomicU64::new(0)) }; 2],
+            pushed: [const { (AtomicU64::new(0), AtomicU64::new(0), AtomicU32::new(0)) }; 2],
             acked: [const { AtomicU32::new(0) }; 2],
             moved: AtomicU32::new(0),
             settle: AtomicU32::new(0),
@@ -165,6 +179,7 @@ impl Block {
         for verdict in &self.stands {
             verdict.store(0, Ordering::Release);
         }
+        self.home.0.store(0, Ordering::Release);
     }
 
     fn forgotten(&self) -> bool {
@@ -184,7 +199,7 @@ impl Block {
     /// Recheck on a new ask even at identical coordinates, or if a moving anchor changes this ask's world point.
     pub fn standable(&self, slot: usize, at: [f32; 2], class: impl FnOnce() -> bool) -> bool {
         let (Some(point), Some(verdict)) = (self.classed.get(slot), self.stands.get(slot)) else { return false };
-        let key = u64::from(at[0].to_bits()) << 32 | u64::from(at[1].to_bits());
+        let key = key(at);
         // Zero means invalid; the low bit of a tagged answer is the verdict.
         let tag = (u64::from(self.ask.generation()) + 1) << 1;
         let cached = verdict.load(Ordering::Relaxed);
@@ -198,12 +213,24 @@ impl Block {
     }
 
     /// The game thread: where the role in `slot` is asked to be. `origin`: where the target role's hold found its
-    /// body, when it is held; `free`: where the target stands when it is not.
+    /// body, when it is held; `free`: where the target stands when it is not. A target that was held keeps its home when it
+    /// is let go while a group is still asked for: its published position is read before the hold's step, so on that
+    /// frame it is still the point it was held at, and its partner would be placed from there.
     pub fn point(&self, slot: usize, origin: impl FnOnce(usize) -> Option<[f32; 2]>, free: impl FnOnce(usize) -> Option<[f32; 2]>) -> Option<Spot> {
-        let target = self.target_slot()?;
-        let home = match origin(target) {
-            Some(at) => at,
-            None => free(target)?,
+        let Some(target) = self.target_slot() else {
+            self.home.0.store(0, Ordering::Relaxed);
+            return None;
+        };
+        let role = target as u32 + 1;
+        let home = if let Some(at) = origin(target) {
+            self.home.1.store(key(at), Ordering::Relaxed);
+            self.home.0.store(role, Ordering::Relaxed);
+            at
+        } else if self.home.0.load(Ordering::Relaxed) == role {
+            let kept = self.home.1.load(Ordering::Relaxed);
+            [f32::from_bits((kept >> 32) as u32), f32::from_bits(kept as u32)]
+        } else {
+            free(target)?
         };
         self.held_at(slot, home)
     }
@@ -213,15 +240,27 @@ impl Block {
     /// this role's, for this request (`generation`, read before the ask), at this point: then the body is refused
     /// here, and `true` says to let it go. Otherwise this frame's write is noted and the next frame is judged.
     pub fn pushed(&self, slot: usize, generation: u32, body: u32, at: [f32; 2], displaced: bool) -> bool {
-        let _ = (slot, generation, body, at, displaced);
+        let (Some(wrote), Some(pushed)) = (self.wrote.get(slot), self.pushed.get(slot)) else { return false };
+        let (key, request) = (key(at), u64::from(generation) + 1);
+        if displaced && wrote.0.load(Ordering::Relaxed) == key && wrote.1.load(Ordering::Relaxed) == request {
+            pushed.0.store(key, Ordering::Relaxed);
+            pushed.1.store(request, Ordering::Relaxed);
+            pushed.2.store(body, Ordering::Relaxed);
+            wrote.1.store(0, Ordering::Relaxed);
+            return true;
+        }
+        wrote.0.store(key, Ordering::Relaxed);
+        wrote.1.store(request, Ordering::Relaxed);
         false
     }
 
     /// The game thread: the game pushed this body off this point under this request (`pushed`). It is not taken again
     /// until the shown request, the point or the body changes.
     pub fn refused(&self, slot: usize, generation: u32, body: u32, at: [f32; 2]) -> bool {
-        let _ = (slot, generation, body, at);
-        false
+        self.pushed.get(slot).is_some_and(|pushed| {
+            pushed.0.load(Ordering::Relaxed) == key(at) && pushed.1.load(Ordering::Relaxed) == u64::from(generation) + 1
+                && pushed.2.load(Ordering::Relaxed) == body
+        })
     }
 
     /// Publish an ask. A group ask names the roles a later "nobody" waits for, and ends an older start's wait.
