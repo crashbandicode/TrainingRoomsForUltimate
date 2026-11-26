@@ -13,13 +13,33 @@ fn a_maximum_take_serializes_without_a_second_track() {
         // The production allocator's peak is process-wide: run just this case in a fresh process.
         let root = env::temp_dir().join(format!("tr-scrub-save-{}", std::process::id()));
         fs::create_dir(&root).unwrap();
-        let status = Command::new(env::current_exe().unwrap()).args(["--exact", TEST, "--nocapture"])
-            .env(KEY, &root).status();
-        let completed = root.join("measured").is_file();
+        let run = |phase| Command::new(env::current_exe().unwrap()).args(["--exact", TEST, "--nocapture"])
+            .env(KEY, &root).env("TR_SCRUB_PHASE", phase).status().unwrap().success();
+        let saved = run("save");
+        let loaded = root.join("measured").is_file() && run("load");
         fs::remove_dir_all(root).unwrap();
-        assert!(status.unwrap().success() && completed, "isolated save measurement did not pass");
+        assert!(saved && loaded, "isolated checks: save={saved}, load={loaded}");
         return;
     };
+
+    let folder = root.join(MACROS_DIR);
+    if env::var("TR_SCRUB_PHASE").as_deref() == Ok("load") {
+        let id = fs::read_to_string(root.join("measured")).unwrap();
+        let library = Library::new(&folder);
+        let before = heap_bytes();
+        let mut rec = library.load(&id).unwrap();
+        let load_peak = heap_bytes().peak - before.live;
+        assert_eq!(rec.track.as_ref().unwrap().len(), MAX_FRAMES);
+        rec.name.push_str(" revised");
+        let before = heap_bytes();
+        library.overwrite(&id, &rec).unwrap();
+        let overwrite_alloc = heap_bytes().total - before.total;
+        assert_eq!(fs::read(folder.join(format!("{id}.json"))).unwrap(), serde_json::to_vec(&rec).unwrap());
+        writeln!(std::io::stderr(), "SCRUB_LOAD frames={MAX_FRAMES} peak_above_idle={load_peak} overwrite_alloc={overwrite_alloc}").unwrap();
+        assert!(load_peak < 4 * 1024 * 1024, "load kept a second large allocation");
+        assert!(overwrite_alloc < 256 * 1024, "overwrite buffered the whole macro");
+        return;
+    }
 
     let baseline = heap_bytes();
     let take = TakeTrack::new();
@@ -48,7 +68,6 @@ fn a_maximum_take_serializes_without_a_second_track() {
     let RecordStop::Saved { id, .. } = stop else { panic!("maximum take was not saved") };
 
     // Reopen via the store, not just serde. Everything from here is outside the measured save peak.
-    let folder = root.join(MACROS_DIR);
     let rec = Library::new(&folder).load(&id).unwrap();
     assert_eq!(rec.frames.len(), MAX_FRAMES);
     let stored = rec.track.as_ref().unwrap();
@@ -63,5 +82,7 @@ fn a_maximum_take_serializes_without_a_second_track() {
     writeln!(std::io::stderr(), "SCRUB_SAVE frames={MAX_FRAMES} track={track_bytes} json={} json_capacity={} peak_above_idle={peak} serializer_scratch={scratch}",
         bytes.len(), encoded.capacity()).unwrap();
     assert!(scratch < 4096, "serializing to a nonallocating writer requested {scratch} bytes");
-    fs::write(root.join("measured"), b"ok").unwrap();
+    fs::write(root.join("measured"), id).unwrap();
+    // At drain the packed recording blocks and decoded track briefly coexist; not two whole tracks plus JSON.
+    assert!(peak < 7 * 1024 * 1024, "saving still buffered the entire JSON file");
 }
