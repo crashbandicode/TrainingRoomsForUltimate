@@ -17,11 +17,18 @@ both fighters' hurtboxes are yellow pills; at 1/4 speed Mario's neutral air show
 
 ## Install
 
-Put the NRO at `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/libtraining_rooms.nro`, next to
-`libnro_hook.nro`, which it needs (`libparam_hook.nro` is the usual companion; this build doesn't call it). **Never
-install it together with `libtraining_modpack.nro`.**
-Settings and saves live in `sd:/ultimate/TrainingRooms/`. On first boot, settings, save states and recordings from the
-Training Modpack fork's `sd:/ultimate/TrainingModpack/` are imported once by copying.
+| Install | Where and what |
+| --- | --- |
+| Put the NRO at | `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/libtraining_rooms.nro` |
+| Next to | `libnro_hook.nro`, which it needs (`libparam_hook.nro` is the usual companion; this build doesn't call it) |
+| **Never install it together with** | `libtraining_modpack.nro` |
+| Settings and saves live in | `sd:/ultimate/TrainingRooms/` |
+| On first boot | Settings, save states and recordings from the Training Modpack fork's `sd:/ultimate/TrainingModpack/` are imported once by copying |
+
+![The first-boot import, file by file: what is copied from the fork's folder, what is regenerated and what is left](decisions/S1-import-details.png)
+
+*The import as decided on 2026-11-01, when `replay_captures/` was also made a full copy. As the picture says, the
+originals are never touched, and a destination that exists is never overwritten. [Decisions](DECISIONS.md)*
 
 ```mermaid
 flowchart LR
@@ -59,9 +66,17 @@ The first time Training or a waiting room's practice opens on a new install, Tra
 Welcome, Open Menu, Save State, Load State, Input Record and Input Playback. A later launch leaves those reminders off.
 The chords in the table stay available.
 
-In the menu: L/R change page, ZL + Up/Down jumps to the previous or next section, A edits, Y resets a row, X saves the
-current values as defaults, B goes back. Each page ends with *Reset page to defaults*, which asks first. The menu reopens
-where you left it. The chords are edited on Display & Controls › Button chords.
+| In the menu | Key |
+| --- | --- |
+| Change page | L/R |
+| Jumps to the previous or next section | ZL + Up/Down |
+| Edits | A |
+| Resets a row | Y |
+| Saves the current values as defaults | X |
+| Goes back | B |
+
+Each page ends with *Reset page to defaults*, which asks first. The menu reopens where you left it. The chords are
+edited on Display & Controls › Button chords.
 
 The key hints at the foot of every page end with the build tag: the version, then the build name and the commit the NRO
 was built from, for example `0.2.0-rc.14 · rc14 1a2b3c4d`. Builds before rc.14 kept the version `0.2.0-rc.6` and told
@@ -89,7 +104,13 @@ neutral air keeps its red hitbox on screen for over a second (the frame strip's 
 
 Hitbox Visualization (Display & Controls) draws the fighters' hurtboxes (yellow), hitboxes and grab boxes. Since rc.3
 every fighter sphere is the plugin's own disc, so none is ever missing, even with two large fighters; projectiles keep
-the game's effect spheres, and the discs trail the camera by one to two frames while it pans.
+the game's effect spheres, and the discs trail the camera by one to two frames while it pans. Since rc.13 a long box
+is drawn as one pill.
+
+![Ridley's hurtboxes three ways: the real Eden frame with rows of discs, the same discs redrawn from a dump, and the same capsules as pills](decisions/rc13-hitbox-pills.png)
+
+*The mock-up behind the rc.13 decision (2026-11-14): the left and middle panels are a capsule as a row of discs, the
+right panel is the same capsules as one pill each. [Decisions](DECISIONS.md)*
 
 ### Frame strip
 
@@ -124,37 +145,40 @@ Hold R + D-pad Up and a small "Game speed" pop-up shows the current speed betwee
 it, D-pad Left and Right step one speed at a time; the steps stop at the slowest and fastest speeds instead of wrapping
 around. Let go and the pop-up closes; the speed stays.
 
-- While you hold the chord, no other chord fires, and the chord's buttons and D-pad Left / Right don't reach the game.
-  The rest of Player 1's controller still does, so you can keep moving.
-- **In Training** the speeds are Training's own: 1/4, 1/2, 2/3, x1 and x1.5. The chord sets the same Speed setting as
-  the game's pause menu (Other Settings › Speed), so the pause menu and the HUD's stopwatch show the speed you chose, and a speed chosen in the pause menu is where the
-  pop-up starts. 1 Frame stays in the pause menu: while Training is on 1 Frame, the pop-up shows "1 Frame", and the
-  first step goes from x1.
-  The stopwatch appears as soon as you step away from x1 and goes away when you step back to x1.
+| Where | What the chord does |
+| --- | --- |
+| While you hold the chord | No other chord fires, and the chord's buttons and D-pad Left / Right don't reach the game. The rest of Player 1's controller still does, so you can keep moving. |
+| **In Training** | The speeds are Training's own: 1/4, 1/2, 2/3, x1 and x1.5. The chord sets the same Speed setting as the game's pause menu (Other Settings › Speed), so the pause menu and the HUD's stopwatch show the speed you chose, and a speed chosen in the pause menu is where the pop-up starts. 1 Frame stays in the pause menu: while Training is on 1 Frame, the pop-up shows "1 Frame", and the first step goes from x1. The stopwatch appears as soon as you step away from x1 and goes away when you step back to x1. |
+| **In the waiting-room practice** | The speed is local: 1/4, 1/2, 2/3, x1 and x1.5 change only your practice, while the room's timers and the other player stay at normal speed. Each practice session starts at x1. |
+| A Quickplay or online match | It never changes one: a match always starts at normal speed. |
+| **With the standalone CPU pilot** driving Player 1 | The chord works the same way. In the waiting-room practice the pilot still gets one input per game update at every speed, x1.5 included, so its inputs are never doubled. |
 
-  **Clip** [`rc8-speed-hud-fixed.gif`](media/rc8-speed-hud-fixed.gif): Hold R + D-pad Up, Right: the stopwatch reads x1.5; Left back to x1: it goes away
+<!-- R14 (worker B's r14bc-eca14e4b pair): keep this line only if R14 passes on the final head. -->
 
-  *Eden, 2026-11-11, the rc.8 head `3f9d61dd` (diag NRO `61533917`, log lines only), in Training: x1 with no
-  stopwatch; R + D-pad Up held, Right, and the stopwatch reads x1.5; held again, Left back to x1, and it goes away.*
-- **In the waiting-room practice** the speed is local: 1/4, 1/2, 2/3, x1 and x1.5 change only your practice, while the
-  room's timers and the other player stay at normal speed. Each practice session starts at x1.
-- It never changes a Quickplay or online match: a match always starts at normal speed.
-- **With the standalone CPU pilot** driving Player 1, the chord works the same way. In the waiting-room practice the
-  pilot still gets one input per game update at every speed, x1.5 included, so its inputs are never doubled.
-  <!-- R14 (worker B's r14bc-eca14e4b pair): keep this line only if R14 passes on the final head. -->
+**Clip** [`rc8-speed-hud-fixed.gif`](media/rc8-speed-hud-fixed.gif): Hold R + D-pad Up, Right: the stopwatch reads x1.5; Left back to x1: it goes away
+
+*Eden, 2026-11-11, the rc.8 head `3f9d61dd` (diag NRO `61533917`, log lines only), in Training: x1 with no
+stopwatch; R + D-pad Up held, Right, and the stopwatch reads x1.5; held again, Left back to x1, and it goes away.*
 
 Both chords are rows of Display & Controls › Button chords ("Input display" and "Game speed"), editable and clearable
 like the others. They don't fire while L is held, so Online Deluxe's L + R + D-pad overlay chords leave them alone.
 
 With Online Deluxe 0.10.5 or later, a chord doesn't fire while Deluxe's window shows a page with rows (Settings, Window
-Options, Plugins or a plugin's own page) if Deluxe uses its D-pad there. Deluxe moves a row with D-pad Up/Down only
-when none of ZL, ZR, R and L is held, and changes a value with D-pad Left/Right only while ZR (without ZL) is held. So
-ZR + Right on its CPU Pilot page no longer also opens the Recording pop-up, and ZR + Left (Play on Player 1) waits too.
-The other factory chords (Save and Load, Record, Playback, the cycles, Input display) work beside the open page (rc.12;
-before, every D-pad chord waited, and Save and Load did nothing while the page stayed open). Its Performance view
-doesn't stop any chord, and the menu shortcuts still work. A Save or Load press that doesn't happen says why in a
-notice (Saves › Save States). On a GameCube controller, Deluxe's L + R is both triggers: the ZL/ZR chords and the
-two chords above don't fire while both triggers are held, and one trigger works as before.
+Options, Plugins or a plugin's own page) if Deluxe uses its D-pad there.
+
+| Deluxe uses its D-pad | When |
+| --- | --- |
+| Deluxe moves a row with D-pad Up/Down | Only when none of ZL, ZR, R and L is held |
+| And changes a value with D-pad Left/Right | Only while ZR (without ZL) is held |
+
+| Beside Deluxe's open page | What happens |
+| --- | --- |
+| ZR + Right on its CPU Pilot page | So it no longer also opens the Recording pop-up |
+| ZR + Left (Play on Player 1) | Waits too |
+| The other factory chords (Save and Load, Record, Playback, the cycles, Input display) | Work beside the open page (rc.12; before, every D-pad chord waited, and Save and Load did nothing while the page stayed open) |
+| Its Performance view | Doesn't stop any chord, and the menu shortcuts still work |
+| A Save or Load press that doesn't happen | Says why in a notice (Saves › Save States) |
+| On a GameCube controller | Deluxe's L + R is both triggers: the ZL/ZR chords and the two chords above don't fire while both triggers are held, and one trigger works as before |
 
 ### Combos
 
