@@ -1600,7 +1600,7 @@
    "dest": "src/model/macro_ui/clip_panel.rs",
    "crate": "tui",
    "src_sha256": "0064feed6e12daaa07f3881e49c930bb335458b4216f104a12373fd935db5ea0",
-   "dest_sha256": "689dc86a0ba978797b6b760243e04d808f94da80223f65b0994df0f2367c1b8d",
+   "dest_sha256": "89430249f38a746356c84f058774ea65b096bde6b3e91cf164a891abae420829",
    "edits": [
     {
      "old": "            Pad::Extra => ClipAction::TogglePlay,\n        })",
@@ -2327,6 +2327,11 @@
      "old": "        window.seek(self.window.cursor().min(window.total() - 1));",
      "new": "        window.seek(match self.handle {\n            Handle::In => window.start(),\n            Handle::Out => window.end() - 1,\n            Handle::Playhead => self.window.cursor().min(window.total() - 1),\n        });",
      "reason": "Free playhead (2026-11-26 00:45:28Z): after a fighter switch the shown frame is the selected handle on the new track, including a longer full take."
+    },
+    {
+     "reason": "Free playhead (operator 2026-11-26; tr-primary-2 00:31:52Z): the two cut-here refusals cite their restriction row",
+     "old": "                let handle = if matches!(action, ClipAction::SelectIn) { Handle::In } else { Handle::Out };\n                if self.handle == Handle::Playhead && self.browsed {\n                    let cursor = self.window.cursor();\n                    match handle {\n                        Handle::In => {\n                            if cursor >= self.window.end() { return ClipEffect::Error(\"Playhead is past Out: set Out first\".into()); }\n",
+     "new": "                let handle = if matches!(action, ClipAction::SelectIn) { Handle::In } else { Handle::Out };\n                if self.handle == Handle::Playhead && self.browsed {\n                    let cursor = self.window.cursor();\n                    // restriction: clip-cut-here-order\n                    match handle {\n                        Handle::In => {\n                            if cursor >= self.window.end() { return ClipEffect::Error(\"Playhead is past Out: set Out first\".into()); }\n"
     }
    ]
   },

@@ -693,6 +693,7 @@ impl ClipEditor {
                 let handle = if matches!(action, ClipAction::SelectIn) { Handle::In } else { Handle::Out };
                 if self.handle == Handle::Playhead && self.browsed {
                     let cursor = self.window.cursor();
+                    // restriction: clip-cut-here-order
                     match handle {
                         Handle::In => {
                             if cursor >= self.window.end() { return ClipEffect::Error("Playhead is past Out: set Out first".into()); }
