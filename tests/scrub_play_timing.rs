@@ -2,7 +2,7 @@ use crate::engine::library::{Chain, LoopCount, RecordingIndex, Role, MACROS_DIR}
 use crate::engine::macros::{InputFrame, Library, MacroRecording, StartState};
 use crate::engine::rr_host as host;
 use crate::model::{state::record::SavedState, store::Store};
-use std::{env, fs, io::Write, path::Path, process::Command, time::Instant};
+use std::{env, fs, path::Path, process::Command, time::Instant};
 
 const RUNS: usize = 21;
 
@@ -72,6 +72,6 @@ fn report(name: &str, frames: usize, json: u64, mut what: impl FnMut()) {
         TIMED.with(|timed| timed.take()).unwrap_or(began).elapsed().as_micros()
     }).collect();
     times.sort_unstable();
-    writeln!(std::io::stderr(), "PLAY_TIMING what={name} frames={frames} json_bytes={json} runs={RUNS} median_us={} min_us={} max_us={}",
-        times[RUNS / 2], times[0], times[RUNS - 1]).unwrap();
+    eprintln!("PLAY_TIMING what={name} frames={frames} json_bytes={json} runs={RUNS} median_us={} min_us={} max_us={}",
+        times[RUNS / 2], times[0], times[RUNS - 1]);
 }
