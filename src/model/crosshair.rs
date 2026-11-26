@@ -74,6 +74,13 @@ pub enum PreviewAct {
     Stand,
 }
 
+/// The game moved a body the hold had put in the air: where it is now, and whether it stands on the ground.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Displaced {
+    pub at: [f32; 2],
+    pub landed: bool,
+}
+
 /// A picker's hold on the CPU: the body itself waits at its start point. In view the game draws it under the
 /// crosshair; out of view the game draws its own magnifier of it, with the direction pointer, at the screen edge.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -81,6 +88,14 @@ pub struct CpuPreview {
     body: u32,
     origin: Origin,
     frames: u8,
+    /// The air point the hold wrote on the frame before.
+    wrote: Option<[f32; 2]>,
+    /// The caller has asked for the lift again at this point.
+    relifted: bool,
+    /// The game moved the body off the point written on the frame before, as read at the top of this frame. The
+    /// game's physics runs under the hold, so a held body is one fall step under its point on every frame: that
+    /// is the hold's own. Moved is the ground, another x, or a y above the point. The callers decide what it means.
+    pub displaced: Option<Displaced>,
     /// The hold put the body to sleep, as of this frame's write: whoever lets it go wakes it.
     pub asleep: bool,
     /// The game's own `FLAG_IS_LOUPE` of the body, read back after this frame's write.
@@ -95,6 +110,17 @@ impl CpuPreview {
     /// Where the body stood when the picker took it: where it goes back when the picker is left.
     pub const fn origin(&self) -> Origin {
         self.origin
+    }
+
+    /// One frame's read of the body, taken before this frame's write. `at`: the point asked for on this frame;
+    /// `seen` and `landed`: where the game has the body and whether it stands on the ground; `grounded`: the hold
+    /// is a floor stand.
+    pub fn observe(&mut self, _at: [f32; 2], _seen: [f32; 2], _landed: bool, _grounded: bool) {}
+
+    /// The caller asks for the placing frames again at the point now asked for. Once at a point; `false` when it
+    /// has been asked there already.
+    pub fn lift_again(&mut self) -> bool {
+        false
     }
 
     fn act(&mut self, grounded: bool) -> PreviewAct {
@@ -121,7 +147,9 @@ pub fn preview_step(slot: &mut Option<CpuPreview>, body: u32, origin: impl FnOnc
 /// that it settles again before it is held.
 pub fn hold_step(slot: &mut Option<CpuPreview>, body: u32, grounded: bool, origin: impl FnOnce() -> Origin) -> PreviewAct {
     if slot.is_none_or(|preview| preview.body != body) {
-        *slot = Some(CpuPreview { body, origin: origin(), frames: 0, asleep: false, magnified: false });
+        *slot = Some(CpuPreview {
+            body, origin: origin(), frames: 0, wrote: None, relifted: false, displaced: None, asleep: false, magnified: false,
+        });
     }
     slot.as_mut().map_or(PreviewAct::Lift, |preview| preview.act(grounded))
 }
@@ -251,6 +279,88 @@ mod tests {
         assert_eq!(hold_step(&mut slot, 7, true, || panic!("the same body")), PreviewAct::Stand);
         assert_eq!(hold_step(&mut slot, 7, false, || panic!("the same body")), PreviewAct::Lift);
         assert_eq!(slot.unwrap().origin(), origin(3.0));
+    }
+
+    /// A body held in the air at `at` for the settle and one frame more, read one fall step under it each frame.
+    fn held_in_air(at: [f32; 2]) -> Option<CpuPreview> {
+        let mut slot = None;
+        for _ in 0..PREVIEW_SETTLE + 1 {
+            hold_step(&mut slot, 7, false, || origin(3.0));
+            slot.as_mut().unwrap().observe(at, [at[0], at[1] - 0.087], false, false);
+        }
+        slot
+    }
+
+    /// Eden, run place-float-xps-03 (merge 17): carried down through the long floor at x -40, the body landed at
+    /// (-40, 0.01) and stayed there while the crosshair went up to y 29.57.
+    #[test]
+    fn a_body_the_game_landed_is_reported_and_is_lifted_again_once_at_a_spot() {
+        let mut slot = held_in_air([-40.0, 0.573967]);
+        let hold = slot.as_mut().unwrap();
+        hold.observe([-40.0, -0.426033], [-40.0, 0.486967], false, false);
+        assert_eq!(hold.displaced, None, "one fall step under its point is the hold's own");
+        hold.observe([-40.0, -1.426033], [-40.0, 0.01], true, false);
+        assert_eq!(hold.displaced, Some(Displaced { at: [-40.0, 0.01], landed: true }));
+        // The crosshair leaves the ground: the caller asks for the lift, once at this spot.
+        hold.observe([-40.0, 3.573967], [-40.0, 0.01], true, false);
+        assert!(hold.lift_again());
+        assert!(!hold.lift_again(), "a spot is tried once");
+        let settle = usize::from(PREVIEW_SETTLE);
+        let acts: Vec<_> = (0..settle + 1).map(|_| hold_step(&mut slot, 7, false, || panic!("the same body"))).collect();
+        assert!(acts[..settle].iter().all(|act| *act == PreviewAct::Lift));
+        assert_eq!(acts[settle], PreviewAct::Hold);
+        // In the air again nothing is reported, and another spot may be lifted to again.
+        let hold = slot.as_mut().unwrap();
+        hold.observe([-40.0, 3.573967], [-40.0, 3.486967], false, false);
+        assert_eq!(hold.displaced, None);
+        hold.observe([-40.0, 4.573967], [-40.0, 3.486967], false, false);
+        assert!(hold.lift_again());
+    }
+
+    /// The same run, against the long floor's left wall (x -80) at y -2.43: the body followed to x -82, and read
+    /// x -81.08 for an asked -81, still in Fall. SP-10's CPU is the same with a wider body: asked x -81.72, left at
+    /// x -86.85; exact at x -86.96.
+    #[test]
+    fn a_body_a_wall_pushed_is_reported_while_still_in_the_air() {
+        let mut slot = held_in_air([-82.0, -2.426033]);
+        let hold = slot.as_mut().unwrap();
+        hold.observe([-81.0, -2.426033], [-82.0, -2.513033], false, false);
+        assert_eq!(hold.displaced, None);
+        hold.observe([-80.0, -2.426033], [-81.083, -2.416], false, false);
+        assert_eq!(hold.displaced, Some(Displaced { at: [-81.083, -2.416], landed: false }));
+        let mut slot = held_in_air([-81.72, -15.10]);
+        let hold = slot.as_mut().unwrap();
+        hold.observe([-81.72, -15.10], [-86.85, -15.187], false, false);
+        assert_eq!(hold.displaced, Some(Displaced { at: [-86.85, -15.187], landed: false }));
+        let mut slot = held_in_air([-86.96, -15.10]);
+        let hold = slot.as_mut().unwrap();
+        hold.observe([-86.96, -15.10], [-86.96, -15.187], false, false);
+        assert_eq!(hold.displaced, None);
+    }
+
+    /// The 36 Guard the Edge holds of runs place-float-xps-03 and -04: -68.51303 for a picked -68.42603.
+    #[test]
+    fn a_held_body_one_fall_step_under_its_point_is_not_displaced() {
+        let mut slot = held_in_air([-125.0, -68.42603]);
+        let hold = slot.as_mut().unwrap();
+        hold.observe([-125.0, -68.42603], [-125.0, -68.51303], false, false);
+        assert_eq!(hold.displaced, None);
+    }
+
+    #[test]
+    fn a_first_frame_and_a_floor_stand_report_nothing() {
+        let mut slot = None;
+        hold_step(&mut slot, 7, false, || origin(3.0));
+        let hold = slot.as_mut().unwrap();
+        hold.observe([5.0, 9.0], [3.0, 0.0], true, false);
+        assert_eq!(hold.displaced, None, "nothing was written before the first frame");
+        hold.observe([5.0, 9.0], [5.0, 0.01], true, false);
+        assert!(hold.displaced.is_some());
+        hold.observe([5.0, 0.0], [5.0, 0.01], true, true);
+        assert_eq!(hold.displaced, None, "a floor stand rests where the game puts it");
+        // Taken into the air after a stand, the first frame has no written air point to compare with.
+        hold.observe([5.0, 9.0], [5.0, 0.01], true, false);
+        assert_eq!(hold.displaced, None);
     }
 
     /// The operator's picture: the CPU start of Guard the Edge at (-199, -8), left of the Fixed camera's view.

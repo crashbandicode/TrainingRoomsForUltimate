@@ -2344,6 +2344,30 @@ mod tests {
     }
 
     #[test]
+    fn the_shared_hold_reports_a_moved_body_and_the_picker_lifts_a_landed_one() {
+        let placement = include_str!("../runtime/features/placement.rs");
+        let hold_at = placement.split("pub(super) unsafe fn hold_at(").nth(1).unwrap().split("\n}").next().unwrap();
+        // The body is read before this frame's write, against the point written on the frame before.
+        assert!(hold_at.find("natives::pos_x(body)").unwrap() < hold_at.find("crosshair::hold_step(").unwrap());
+        assert!(hold_at.contains(".observe(at, seen, landed, grounded)"));
+        // The hold itself stays the three writes it was: the report changes nothing it does.
+        let hold = placement.split("pub(super) unsafe fn hold(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(!hold.contains("displaced") && !hold.contains("init_pos"));
+        // The placement picker: a landed body is lifted again when its spot is free air by the shared stage rule.
+        let place = include_str!("../runtime/features/record_place.rs");
+        let frame = place.split("pub unsafe fn frame(").nth(1).unwrap().split("pub fn look(").next().unwrap();
+        let held = frame.split("placement::hold_at(&mut holds[who.index()]").nth(1).unwrap();
+        let landed = held.find("moved.landed").expect("the picker reads the report");
+        let free = held.find("placement::free_at(accessor, fighter.at)").expect("the shared stage rule");
+        assert!(landed < free && free < held.find(".lift_again()").expect("the lift is asked for"));
+        let free_at = placement.split("pub(super) unsafe fn free_at(").nth(1).unwrap().split("\n}").next().unwrap();
+        assert!(free_at.contains("classify(") && free_at.contains("can_stand("));
+        // The drill's picker and its rounds do not act on the report; the scrub reads it through the same hold.
+        assert!(!include_str!("../runtime/features/edge_juggle.rs").contains("displaced"));
+        assert!(include_str!("../runtime/features/scrub_hold.rs").contains("placement::hold_at("));
+    }
+
+    #[test]
     fn the_pickers_share_one_floor_read() {
         let place = include_str!("../runtime/features/record_place.rs");
         let tech = include_str!("../runtime/features/tech.rs");
