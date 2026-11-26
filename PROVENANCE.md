@@ -248,3 +248,45 @@ measurement (REVISION32) is an input to the size budget, not a rule.
 
 ## Standalone validation lockfiles
 The Cargo.lock files beside the vendored/local library manifests are project-generated validation metadata, not upstream source edits. Before the RC freeze, offline resolution pinned every package/version/source/checksum to an identity already present in the shipped root Cargo.lock (including serde_json1.0.151). They let standalone --locked tests run without mutating the frozen source. SDK Rust source and manifests remain unchanged.
+
+## Addendum, 2026-11-26: the per-file output is re-scanned at stage `m5q`
+
+Nothing above is rewritten: it is the 2026-11-01 reading of stage `m5i`, and its Summary and Per-feature tables still
+give the `m5i` numbers. This addendum records what changed in the generated files beside it.
+
+- **Why.** The carried files come from stage `m5q`: both carry manifests name it. `tools/carry_ui_items.py`, which the
+  gate runs, reads the scan. So `docs/provenance/provenance-files.{json,md}` are now the output of
+  `tools/provenance_scan.py` over `m5q` and the same merge-base tree, and `docs/provenance/feature-groups.{json,md}`
+  are the output of `tools/feature_groups.py` over that.
+- **Kept in step by a check.** `tools/check_provenance.py` regenerates the four files from the stage the carry
+  manifests name and compares them byte for byte; `--write` is how they were regenerated. The gate runs the check
+  before every test step, on the machine that holds the stage and the upstream tree.
+
+| | `m5i`, 2026-11-01 | `m5q`, 2026-11-26 |
+| --- | ---: | ---: |
+| Files | 889 | 883 |
+| ours-new | 756 | 754 |
+| upstream-identical | 80 | 71 |
+| mixed | 52 | 57 |
+| binary-differs | 1 | 1 |
+| dropped by the fork | 3 | 7 |
+
+- **Eight paths are new, all ours-new:** `docs/cpu-rolls-apply.md`, `docs/skyline-logger-race.md`, `src/log_stress.rs`,
+  `src/training/cpu_rolls.rs`, `training_mod_consts/src/body_bank/mii_publish.rs`,
+  `training_mod_consts/src/cpu_rolls.rs`, `training_mod_consts/src/log_stress.rs`,
+  `training_mod_consts/src/notice_queue.rs`.
+- **Five files went from upstream-identical to mixed:** `src/training/directional_influence.rs`, `src/training/sdi.rs`,
+  `src/training/shield_tilt.rs`, `src/training/throw.rs`, `src/training/ui/notifications.rs`.
+- **Fourteen GIF rows are gone.** Ten were ours: `docs/feature-walkthroughs/character-items.gif`, `kirby-hats.gif` and
+  `mii-selection.gif`; `docs/fighter-hotswap/character-cycles.gif`; `docs/lobby-practice/waiting-room.gif`;
+  `docs/mii-replay-discovery/mii-discovery-existing.gif` and `mii-discovery-new.gif`;
+  `docs/named-macros/images/fighter.gif`; `docs/setup-library/library.gif` and `restore.gif`. Four were upstream's,
+  under `photos/`: `FLy0xiw.gif`, `character_item.gif`, `ezgif-2-299a3e9b46.gif`, `mash_trigger_tumble.gif`; they now
+  count as dropped by the fork. The files are no longer in the stage folders, in `m5i` as well as in `m5q`. Who removed
+  them, and when, is not known. They are documents and upstream photos, not carried sources.
+- **A hand note is dropped.** In the `m5i` table the row of `src/replay_preview.rs` carried a note written by hand:
+  "Retired by F7; Recording playback owns preview." The scan writes no notes, so the regenerated table does not have
+  it. It is recorded here instead.
+- **Feature groups.** Seven of the new paths match no grouping rule and are listed as unmapped in
+  `feature-groups.md`: every new path above except `training_mod_consts/src/body_bank/mii_publish.rs`. The grouping
+  rules were not changed.

@@ -40,3 +40,13 @@ fn the_carry_tools_pass_their_host_tests() {
     };
     assert!(out.status.success(), "{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
 }
+
+#[test]
+fn the_provenance_check_passes_its_host_tests() {
+    let root = env!("CARGO_MANIFEST_DIR");
+    let out = match Command::new("python3").current_dir(root).args(["-I", "tools/test_check_provenance.py"]).output() {
+        Ok(out) => out,
+        Err(_) => return,
+    };
+    assert!(out.status.success(), "{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+}
