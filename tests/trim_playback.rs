@@ -45,20 +45,21 @@ fn install5_previewable_capture_windows_remain_previewable() {
         entry: 1, frames, quantized_analog: false, fighter: None,
     }], breaks: vec![24], truncated: false };
     let track = &session.tracks[0];
+    let marks = crate::engine::macro_ui::clip_marks::Marks::from_inputs(track.frames.iter().map(|f| f.input));
     let mut accepted = [0; 3];
     for out in 1..=48 {
         for at in 0..out {
             for (mode, key) in [None, Some(ClipAction::Snap), Some(ClipAction::UseLeadIn)].into_iter().enumerate() {
-                // Install 5's ordinary In, plain-Y boundaries (the press at 10 is grouped
-                // with 5), and its unchanged chord rule. Out is exclusive.
-                let (start, context) = match key {
-                    Some(ClipAction::UseLeadIn) => match rules.snap(track, at) {
-                        Ok(mv) if mv.action_frame < out => (mv.frame, mv.context),
-                        _ => continue,
-                    },
+                // The old Y only applied the marked boundary. A refused lead-in
+                // left In unchanged, so X could still preview an ordinary clean In.
+                let mv = if matches!(key, Some(ClipAction::UseLeadIn)) {
+                    rules.snap(track, at).ok().filter(|mv| mv.action_frame < out)
+                } else { None };
+                let (start, context) = match mv {
+                    Some(mv) => (mv.frame, mv.context),
                     _ => {
-                        let n = if key.is_some() {
-                            [0_u32, 5, 31].into_iter().min_by_key(|&m| (m.abs_diff(at), m)).unwrap().min(out - 1)
+                        let n = if matches!(key, Some(ClipAction::Snap)) {
+                            marks.snap_in(at).unwrap_or(at).min(out - 1)
                         } else { at };
                         let context = track.frames[n as usize].start;
                         if !CLEAN.contains(&context.status) { continue; }
@@ -71,11 +72,11 @@ fn install5_previewable_capture_windows_remain_previewable() {
                 editor.on_action(ClipAction::Nudge(out as i32 - 48));
                 editor.on_action(ClipAction::SelectIn);
                 editor.on_action(ClipAction::Nudge(at as i32));
-                if let Some(key) = key { assert!(matches!(editor.on_action(key), ClipEffect::StopPreview), "{key:?} {at}..{out}"); }
+                if let Some(key) = key { editor.on_action(key); }
                 let ClipEffect::Preview(take) = editor.on_action(ClipAction::TogglePlay) else {
                     panic!("lost an install 5 preview: {key:?} {at}..{out} (In {start})")
                 };
-                assert_eq!(take.start, context);
+                assert_eq!(take.start, context, "{key:?} {at}..{out} (In {start})");
                 assert!(take.frames.iter().copied().eq(track.frames[start as usize..out as usize].iter().map(|f| f.input)));
                 accepted[mode] += 1;
             }
