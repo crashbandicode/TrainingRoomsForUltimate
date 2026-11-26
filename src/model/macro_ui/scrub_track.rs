@@ -296,12 +296,16 @@ fn frame_of(cells: [u32; STATE_CELLS]) -> ReplayFrame {
     }
 }
 
-/// One block of a take's track, when the memory is there.
+/// One block of a take's track, when the memory is there: zeroed in one allocation, not built cell by cell.
 fn new_block() -> Option<Box<[AtomicU32]>> {
-    let mut cells = Vec::new();
-    cells.try_reserve_exact(TAKE_CHUNK * FRAME_CELLS).ok()?;
-    cells.resize_with(TAKE_CHUNK * FRAME_CELLS, || AtomicU32::new(0));
-    Some(cells.into_boxed_slice())
+    let cells = TAKE_CHUNK * FRAME_CELLS;
+    let layout = std::alloc::Layout::array::<AtomicU32>(cells).ok()?;
+    // SAFETY: the layout is not empty; all-zero bytes are a valid `AtomicU32` (zero, what each cell started as); the
+    // box owns exactly this allocation and frees it with the same layout.
+    unsafe {
+        let ptr = std::alloc::alloc_zeroed(layout) as *mut AtomicU32;
+        (!ptr.is_null()).then(|| Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, cells)))
+    }
 }
 
 /// The worker: free a block. No new push finds it; with a push already inside one, it stays for a later pass.
