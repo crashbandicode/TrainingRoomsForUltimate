@@ -5,11 +5,8 @@ lib_unit_tests! {
 use super::*;
 
 /// A folder of its own under the system temp dir, empty.
-fn folder(tag: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("tr-combo-share-{tag}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+fn folder(tag: &str) -> crate::test_scratch::Scratch {
+    crate::test_scratch::Scratch::new(&format!("tr-combo-share-{tag}"))
 }
 
 fn write(dir: &std::path::Path, file: &str, text: &str) {

@@ -860,8 +860,8 @@ mod tests {
             (0..frames as u32).map(|i| InputFrame { buttons: i, ..InputFrame::default() }).collect()).unwrap();
         recording.set_track(Some(track));
         recording.validate().expect("a shorter track is valid");
-        let dir = std::env::temp_dir().join(format!("tr-scrub-short-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
+        let scratch = crate::test_scratch::Scratch::new("tr-scrub-short");
+        let dir = scratch.join("root");
         let library = crate::engine::macros::Library::new(&dir);
         let id = library.save_new(&recording).unwrap();
         let back = library.load_edited(&id).unwrap();
@@ -953,8 +953,8 @@ mod tests {
         assert_eq!(saved.track, Some((2..9).map(|i| [state(0, i), state(1, i)]).collect()));
         saved.validate().unwrap();
         // Reopened from its file, it scrubs both bodies at the capture's spacing, with no preview.
-        let dir = std::env::temp_dir().join(format!("tr-scrub-capture-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
+        let scratch = crate::test_scratch::Scratch::new("tr-scrub-capture");
+        let dir = scratch.join("root");
         let library = crate::engine::macros::Library::new(&dir);
         let file = library.load_edited(&library.save_new(&saved).unwrap()).unwrap();
         let _ = std::fs::remove_dir_all(&dir);

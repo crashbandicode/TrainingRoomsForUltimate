@@ -78,20 +78,7 @@ fn actual_runtime_reload_waits_without_weakening_active_attempt_identity() {
         .replace("// COVERED", covered)
         .replace("// RESTORE", restore)
         .replace("// END_PRACTICE", end);
-    let unique = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let dir =
-        std::env::temp_dir().join(format!("tr-mashout-reload-{}-{unique}", std::process::id()));
-    fs::create_dir(&dir).unwrap();
-    struct Cleanup(std::path::PathBuf);
-    impl Drop for Cleanup {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
-    let _cleanup = Cleanup(dir.clone());
+    let dir = crate::test_scratch::Scratch::new("tr-mashout-reload");
     let input = dir.join("actual.rs");
     let binary = dir.join(format!("actual{}", std::env::consts::EXE_SUFFIX));
     fs::write(&input, fixture).unwrap();

@@ -35,12 +35,8 @@ impl Drop for HostGuard {
     }
 }
 
-fn scratch() -> PathBuf {
-    let root = std::env::temp_dir().join(format!(
-        "tr-playback-immediate-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)
-    ));
-    std::fs::create_dir(&root).unwrap();
-    root
+fn scratch() -> crate::test_scratch::Scratch {
+    crate::test_scratch::Scratch::new("tr-playback-immediate")
 }
 
 #[test]
@@ -57,8 +53,9 @@ fn scratch_survives_a_leftover_folder_from_an_earlier_run() {
     let _guard = HostGuard::new();
     let mut old_dirs = OldDirs(Vec::new());
     let next = NEXT.load(Ordering::Relaxed);
+    let temp = crate::test_scratch::Scratch::new("tr-old-name-regression");
     for n in next..next + 512 {
-        let path = std::env::temp_dir().join(format!("tr-playback-immediate-{}-{n}", std::process::id()));
+        let path = temp.parent().unwrap().join(format!("tr-playback-immediate-{}-{n}", std::process::id()));
         match std::fs::create_dir(&path) {
             Ok(()) => old_dirs.0.push(path),
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
@@ -67,7 +64,7 @@ fn scratch_survives_a_leftover_folder_from_an_earlier_run() {
     }
     let root = scratch();
     assert!(root.is_dir());
-    assert_eq!(std::fs::read_dir(root).unwrap().count(), 0);
+    assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
 }
 
 fn state(kind: i32) -> SavedState {
@@ -82,7 +79,7 @@ fn recording(name: &str, len: usize) -> MacroRecording {
 }
 
 struct Fixture {
-    root: PathBuf,
+    root: crate::test_scratch::Scratch,
     active: String,
     ids: Vec<String>,
     save: String,

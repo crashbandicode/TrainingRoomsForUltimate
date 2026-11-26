@@ -2240,7 +2240,7 @@
       "dest": "src/model/mii/draft_store.rs",
       "crate": "mii",
       "src_sha256": "dcca386efde444feee28fedd097cc5acb3b3f8c98353335d04a995305bf17451",
-      "dest_sha256": "1a25b80fcad17c3102949bbaaa8d6e63b9d39019b25889e4605b0f79b26c9a7b",
+      "dest_sha256": "728e5c64ef8ab74a6d1a7c5482715f88e90d583e0614584b5905e30e6048fc39",
       "edits": [
         {
           "old": ".args([\"--exact\", \"draft_store::tests::preset_continues_in_a_fresh_process\", \"--nocapture\"])",
@@ -2298,6 +2298,11 @@
             ]
           ],
           "reason": "rc.10 S3b (docs/CODE-REDUCTION-rc10.md; the primary 2026-11-12 05:25Z): the rest of the dead code: types no Switch build uses and what touches them are removed, or moved behind #[cfg(test)] where only tests use them"
+        },
+        {
+          "reason": "P0: use the shared unwind-safe scratch directory in test-only fixtures.",
+          "old": "    lib_unit_tests! {\n    use super::*;\n    use crate::engine::mii::inventory::{classify, MiiClass, RawSlot, TaggedId, CHARINFO_LEN, TAG_CHARA, TAG_HAT, TAG_OUTFIT};\n    use std::sync::atomic::{AtomicU64, Ordering};\n\n    struct Temp(PathBuf);\n    impl Temp {\n        fn new() -> Self {\n            static NEXT: AtomicU64 = AtomicU64::new(0);\n            let dir = std::env::temp_dir().join(format!(\"mii-store-{}-{}\", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));\n            fs::create_dir(&dir).unwrap();\n            Self(dir)\n        }\n    }\n    impl Drop for Temp { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }\n\n    fn draft(moves: [u8; 4]) -> Draft {\n        let template = classify(&RawSlot { index: 0, slot_id: 2622, name_len: 1,\n            name_units: [65, 0, 0, 0, 0, 0, 0, 0, 0, 0], colour: 1, voice: 37,\n",
+          "new": "    lib_unit_tests! {\n    use super::*;\n    use crate::engine::mii::inventory::{classify, MiiClass, RawSlot, TaggedId, CHARINFO_LEN, TAG_CHARA, TAG_HAT, TAG_OUTFIT};\n    struct Temp(crate::test_scratch::Scratch);\n    impl Temp {\n        fn new() -> Self {\n            Self(crate::test_scratch::Scratch::new(\"mii-store\"))\n        }\n    }\n    fn draft(moves: [u8; 4]) -> Draft {\n        let template = classify(&RawSlot { index: 0, slot_id: 2622, name_len: 1,\n            name_units: [65, 0, 0, 0, 0, 0, 0, 0, 0, 0], colour: 1, voice: 37,\n"
         }
       ]
     },
@@ -3352,7 +3357,7 @@
       "dest": "src/model/mii/saved.rs",
       "crate": "mii",
       "src_sha256": "56a7f3f2957398f6efbfd5944e1a1dbab5c45bbae2057916c8b2dff92d54a976",
-      "dest_sha256": "ff233b90591ab2b80a54e6a2332bfca945982e3f2636be61f946b1e63a95929a",
+      "dest_sha256": "23d862a18e889bd0d818afa2a9dd8652022d5d2a43dd2b15a16dbab825004e1a",
       "edits": [
         {
           "old": "\n/// Owned bytes only. Validation of class, tags, name length and specials is shared with inventory.\npub fn parse_header(id: u32, index: usize, bytes: &[u8; HEADER_LEN]) -> Result<RawSlot, String> {\n    let u32_at = |off| u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap());\n    let u64_at = |off| u64::from_le_bytes(bytes[off..off + 8].try_into().unwrap());\n    let stored = u32_at(0);\n    if stored != id {\n        return Err(format!(\"filename id {id} differs from header id {stored}\"));\n    }\n    let mut name_units = [0; 10];\n    for (i, unit) in name_units.iter_mut().enumerate() {\n",
@@ -3413,6 +3418,11 @@
             ]
           ],
           "reason": "rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): cases that add no line coverage removed, with the helpers only they used"
+        },
+        {
+          "reason": "P0: use the shared unwind-safe scratch directory in test-only fixtures.",
+          "old": "    }\n\n    fn real_file_adapter_reads_only_and_detects_truncation() {\n        let unique = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();\n        let dir = std::env::temp_dir().join(format!(\"mii-catalog-test-{}-{unique}\", std::process::id()));\n        std::fs::create_dir(&dir).unwrap();\n        struct Cleanup(std::path::PathBuf);\n        impl Drop for Cleanup { fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); } }\n        let _cleanup = Cleanup(dir.clone());\n        let file = dir.join(\"mii_7.bin\");\n        let mut bytes = vec![0; SLOT_SIZE]; bytes[..HEADER_LEN].copy_from_slice(&header(7));\n        std::fs::write(&file, &bytes).unwrap();\n",
+          "new": "    }\n\n    fn real_file_adapter_reads_only_and_detects_truncation() {\n        let dir = crate::test_scratch::Scratch::new(\"mii-catalog-test\");\n        let file = dir.join(\"mii_7.bin\");\n        let mut bytes = vec![0; SLOT_SIZE]; bytes[..HEADER_LEN].copy_from_slice(&header(7));\n        std::fs::write(&file, &bytes).unwrap();\n"
         }
       ]
     },

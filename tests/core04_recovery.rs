@@ -14,11 +14,8 @@ use model::storage::{self, file};
 use serde_json::{json, Value};
 
 /// A fresh empty folder for one test.
-fn folder(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("tr-recovery-{}-{name}", std::process::id()));
-    let _ = fs::remove_dir_all(&dir);
-    fs::create_dir_all(&dir).unwrap();
-    dir
+fn folder(name: &str) -> crate::test_scratch::Scratch {
+    crate::test_scratch::Scratch::new(&format!("tr-recovery-{name}"))
 }
 
 fn one_hot(len: usize, at: usize) -> Vec<u8> {

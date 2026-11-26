@@ -186,21 +186,12 @@ mod tests {
     use super::*;
     use serde_json::{json, Value};
 
-    struct Dir(std::path::PathBuf);
+    struct Dir(crate::test_scratch::Scratch);
     impl Dir {
         fn new(name: &str) -> Self {
-            let dir = std::env::temp_dir().join(format!("tr-trace-slot-{name}-{}", std::process::id()));
-            let _ = std::fs::remove_dir_all(&dir);
-            std::fs::create_dir_all(&dir).unwrap();
-            Self(dir)
+            Self(crate::test_scratch::Scratch::new(&format!("tr-trace-slot-{name}")))
         }
     }
-    impl Drop for Dir {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
-
     fn read(path: &Path) -> Value {
         serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
     }

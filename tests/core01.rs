@@ -365,8 +365,7 @@ fn core01_developer_ini_fails_closed() {
 #[test]
 fn core01_developer_ini_load_from_files() {
     use model::developer_ini::{load, Reason, MAX_BYTES};
-    let dir = std::env::temp_dir().join(format!("tr-devini-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
+    let dir = crate::test_scratch::Scratch::new("tr-devini");
     let path = |name: &str| dir.join(name).to_str().unwrap().to_owned();
     assert_eq!(load(&path("absent.ini")).reason, Reason::Missing);
     std::fs::write(path("clean.ini"), "developer_page=on\n").unwrap();
