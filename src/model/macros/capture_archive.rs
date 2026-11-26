@@ -17,7 +17,7 @@ use {crate::engine::macros::InputFrame, crate::engine::macros::ReplayFrame, crat
 
 const MAGIC: &[u8; 8] = b"TMRCAP01";
 const FIXED_HEADER_BYTES: usize = 12;
-const CAPTURE_SCHEMA_VERSION: u32 = 1;
+const CAPTURE_SCHEMA_VERSION: u32 = 2;
 const TEMP_CREATE_ATTEMPTS: usize = 64;
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -25,8 +25,9 @@ static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
 pub const MAX_CAPTURE_HEADER_BYTES: usize = 16 * 1024;
 /// Largest number of concurrent fighter entries represented in a capture.
 pub const MAX_CAPTURE_TRACKS: usize = 8;
-/// Explicit binary record size: input (8), start state (28), and position (8).
-pub const CAPTURE_RECORD_BYTES: usize = 44;
+/// Explicit binary record size: input (8), start state (28), position (8), and pose (8).
+pub const CAPTURE_RECORD_BYTES: usize = 52;
+pub const LEGACY_CAPTURE_RECORD_BYTES: usize = 44;
 /// Maximum UTF-8 byte length of the native replay id stored in the header.
 pub const MAX_CAPTURE_REPLAY_ID_BYTES: usize = 96;
 /// Maximum UTF-8 byte length of the display name stored in the header.
@@ -131,12 +132,13 @@ impl CaptureArchive {
                     return Err(invalid_data("capture path is not a regular file"));
                 }
                 let (mut capture, header) = open_capture(&path, id)?;
+                let record_bytes = capture_record_bytes(header.schema_version)?;
                 let mut sides = Vec::with_capacity(header.tracks.len());
                 for track in &header.tracks {
                     let mut first = [0u8; CAPTURE_RECORD_BYTES];
-                    read_exact_capture(&mut capture, &mut first, "sample data")?;
+                    read_exact_capture(&mut capture, &mut first[..record_bytes], "sample data")?;
                     sides.push((track.entry, read_i32(&first, 8)));
-                    capture.seek(SeekFrom::Current(i64::from(track.frames - 1) * CAPTURE_RECORD_BYTES as i64))?;
+                    capture.seek(SeekFrom::Current(i64::from(track.frames - 1) * record_bytes as i64))?;
                 }
                 Ok(Some(CaptureEntry {
                     id: id.to_owned(),
@@ -180,13 +182,14 @@ impl CaptureArchive {
         // Menu/frame code never parses the potentially large shared JSONL stream.
         let path = self.shared_cache_path(id)?.unwrap_or_else(|| self.capture_path(id));
         let (file, header) = open_capture(&path, id)?;
+        let record_bytes = capture_record_bytes(header.schema_version)?;
         let mut reader = BufReader::new(file);
         let mut tracks = Vec::with_capacity(header.tracks.len());
 
         for track_header in &header.tracks {
             let mut frames = Vec::with_capacity(track_header.frames as usize);
             for frame_index in 0..track_header.frames {
-                let frame = read_frame(&mut reader)?;
+                let frame = read_frame(&mut reader, record_bytes)?;
                 if let Some(problem) = frame_problem(&frame) {
                     return Err(invalid_data(format!(
                         "invalid sample in entry {} frame {}: {problem}",
@@ -308,7 +311,7 @@ impl CaptureArchive {
                 header_bytes.len()
             )));
         }
-        let expected_len = expected_file_len(header_bytes.len(), &header.tracks)?;
+        let expected_len = expected_file_len(header_bytes.len(), &header.tracks, CAPTURE_RECORD_BYTES)?;
         if expected_len > MAX_CAPTURE_FILE_BYTES {
             return Err(invalid_input(format!(
                 "capture would be {expected_len} bytes (maximum {MAX_CAPTURE_FILE_BYTES})"
@@ -467,17 +470,12 @@ fn read_capture_header(
     read_exact_capture(file, &mut header_bytes, "JSON header")?;
     let version: HeaderVersion = serde_json::from_slice(&header_bytes)
         .map_err(|err| invalid_data(format!("malformed capture JSON header: {err}")))?;
-    if version.schema_version != CAPTURE_SCHEMA_VERSION {
-        return Err(invalid_data(format!(
-            "unsupported capture schema version {} (supported: {CAPTURE_SCHEMA_VERSION})",
-            version.schema_version
-        )));
-    }
+    let record_bytes = capture_record_bytes(version.schema_version)?;
     let header: CaptureHeader = serde_json::from_slice(&header_bytes)
         .map_err(|err| invalid_data(format!("malformed capture JSON header: {err}")))?;
     validate_header(&header, file_id)?;
 
-    let expected_len = expected_file_len(header_len, &header.tracks)?;
+    let expected_len = expected_file_len(header_len, &header.tracks, record_bytes)?;
     if expected_len != file_len {
         return Err(if expected_len > file_len {
             invalid_data(format!(
@@ -493,12 +491,7 @@ fn read_capture_header(
 }
 
 fn validate_header(header: &CaptureHeader, file_id: &str) -> io::Result<()> {
-    if header.schema_version != CAPTURE_SCHEMA_VERSION {
-        return Err(invalid_data(format!(
-            "unsupported capture schema version {} (supported: {CAPTURE_SCHEMA_VERSION})",
-            header.schema_version
-        )));
-    }
+    capture_record_bytes(header.schema_version)?;
     validate_replay_id(&header.replay_id).map_err(invalid_data)?;
     validate_replay_name(&header.replay_name).map_err(invalid_data)?;
     validate_game_version(&header.game_version).map_err(invalid_data)?;
@@ -546,11 +539,21 @@ fn validate_header(header: &CaptureHeader, file_id: &str) -> io::Result<()> {
     Ok(())
 }
 
-fn expected_file_len(header_len: usize, tracks: &[TrackHeader]) -> io::Result<u64> {
+fn capture_record_bytes(schema: u32) -> io::Result<usize> {
+    match schema {
+        1 => Ok(LEGACY_CAPTURE_RECORD_BYTES),
+        CAPTURE_SCHEMA_VERSION => Ok(CAPTURE_RECORD_BYTES),
+        _ => Err(invalid_data(format!(
+            "unsupported capture schema version {schema} (supported: 1, {CAPTURE_SCHEMA_VERSION})"
+        ))),
+    }
+}
+
+fn expected_file_len(header_len: usize, tracks: &[TrackHeader], record_bytes: usize) -> io::Result<u64> {
     let sample_bytes = tracks
         .iter()
         .try_fold(0u64, |total, track| {
-            total.checked_add(u64::from(track.frames).checked_mul(CAPTURE_RECORD_BYTES as u64)?)
+            total.checked_add(u64::from(track.frames).checked_mul(record_bytes as u64)?)
         })
         .ok_or_else(|| invalid_data("capture size calculation overflowed"))?;
     (FIXED_HEADER_BYTES as u64)
@@ -761,14 +764,17 @@ fn write_frame(writer: &mut impl Write, frame: &ReplayFrame) -> io::Result<()> {
     record[32..36].copy_from_slice(&frame.start.speed_y.to_le_bytes());
     record[36..40].copy_from_slice(&frame.x.to_le_bytes());
     record[40..44].copy_from_slice(&frame.y.to_le_bytes());
+    record[44..52].copy_from_slice(&frame.pose.to_le_bytes());
     writer.write_all(&record)
 }
 
-fn read_frame(reader: &mut impl Read) -> io::Result<ReplayFrame> {
+fn read_frame(reader: &mut impl Read, record_bytes: usize) -> io::Result<ReplayFrame> {
     let mut record = [0u8; CAPTURE_RECORD_BYTES];
-    read_exact_capture(reader, &mut record, "sample data")?;
+    read_exact_capture(reader, &mut record[..record_bytes], "sample data")?;
     let frame = ReplayFrame {
-        pose: crate::engine::macros::PackedPose::NONE,
+        pose: if record_bytes == CAPTURE_RECORD_BYTES {
+            crate::engine::macros::PackedPose::from_le_bytes(record[44..52].try_into().unwrap())
+        } else { crate::engine::macros::PackedPose::NONE },
         input: InputFrame {
             buttons: read_u32(&record, 0),
             lstick_x: record[4] as i8,
@@ -1382,7 +1388,7 @@ mod tests {
         let archive = CaptureArchive::new(&temp.0);
         let session = two_sides();
         let id = encode_file_id("staged");
-        let header = CaptureHeader { schema_version: 1, replay_id: "staged".into(), replay_name: "Staged".into(),
+        let header = CaptureHeader { schema_version: CAPTURE_SCHEMA_VERSION, replay_id: "staged".into(), replay_name: "Staged".into(),
             game_version: "13.0.5".into(), miis: None, truncated: false, breaks: Vec::new(),
             tracks: session.tracks.iter().map(|track| TrackHeader {
                 entry: track.entry, frames: track.frames.len() as u32, quantized_analog: track.quantized_analog,

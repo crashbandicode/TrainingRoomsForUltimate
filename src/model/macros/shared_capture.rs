@@ -253,7 +253,10 @@ impl SharedCaptureArchive {
         let (mut projected, projected_miis) = projector.finish(session.truncated)?;
         // The identity read with the capture goes into the editor cache's header; the timeline has no field for it.
         for track in &mut projected.tracks {
-            track.fighter = session.tracks.iter().find(|live| live.entry == track.entry).and_then(|live| live.fighter);
+            let live = session.tracks.iter().find(|live| live.entry == track.entry).ok_or_else(|| bad("missing live track"))?;
+            if track.frames.len() != live.frames.len() { return Err(bad("live track length disagrees with projection")); }
+            track.fighter = live.fighter;
+            for (frame, live) in track.frames.iter_mut().zip(&live.frames) { frame.pose = live.pose; }
         }
         CaptureArchive::new(&staging).save_with_miis(replay_id, replay_name, game_version, &projected, projected_miis.as_ref())?;
         prescan(&staging.join(TIMELINE_FILE))?;
@@ -318,7 +321,12 @@ impl SharedCaptureArchive {
         let cache = CaptureArchive::new(&dir).load(id)?;
         same_identity(&cache, &replay_id, name, version, miis.as_ref())?;
         if !same_projection(&session, &cache.session) { return Err(bad("compact cache disagrees with canonical timeline")); }
-        for (track, cached) in session.tracks.iter_mut().zip(&cache.session.tracks) { track.fighter = cached.fighter; }
+        for track in &mut session.tracks {
+            let cached = cache.session.tracks.iter().find(|cached| cached.entry == track.entry).ok_or_else(|| bad("missing cache track"))?;
+            if track.frames.len() != cached.frames.len() { return Err(bad("cache track length disagrees with projection")); }
+            track.fighter = cached.fighter;
+            for (frame, cached) in track.frames.iter_mut().zip(&cached.frames) { frame.pose = cached.pose; }
+        }
         Ok(SavedCapture { replay_id, replay_name: name.into(), game_version: version.into(), session, miis })
     }
 }
