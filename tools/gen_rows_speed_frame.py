@@ -6,7 +6,7 @@
 The rows below are the source of truth for labels, kinds and notes; the guard bytes come from the ELF (.text or .rodata),
 the host test `native_seams::tests::compared_rows_match_the_owned_elf` re-checks them on every `cargo test`, and
 `speed_frame_rows_tests` decodes every offset and constant the runtime uses from these guard words. The design is
-`docs/design/rc15-speed-frame.md`.
+`docs/DECISIONS.md#rc15-speed-frame`.
 """
 import struct
 import sys

@@ -3,7 +3,7 @@
 The chip the menu draws stretches the spark's white streaks x2.0 along the SDI vector (SPEC-core-07
 section 4.6, "Streaks (N10)"; DECISIONS.md N10). The host render of the stock 13.0.5 effect file stays
 outside the repo (di-sdi-extract); the repo keeps byte copies of the two Up layers under
-`docs/menu-mockup/captures/renders/` (docs/menu-mockup/index.md, "DI and SDI chip renders", pinned by
+`docs/menu-mockup/captures/renders/` (docs/DECISIONS.md#menu-mockup, "DI and SDI chip renders", pinned by
 sha256). This tool measures those byte copies the way the recorded review measured them
 (index.md "SDI burst, longer"): the solid burst is the largest connected run of pixels with
 alpha >= 230 (crown and legs; the thin `spark1` line is a separate component and is excluded), and its
@@ -105,7 +105,7 @@ def read_png(path):
 def burst(width, height, alpha):
     """The solid burst's bounds: the union of every connected component of alpha >= ALPHA pixels that is
     wider than the thin `spark1` line (2 px in 13.0.5), dropping stray pixels. 8-connected, like the
-    recorded review measurement (docs/menu-mockup/index.md, "SDI burst, longer")."""
+    recorded review measurement (docs/DECISIONS.md#menu-mockup, "SDI burst, longer")."""
     mask = [a >= ALPHA for a in alpha]
     seen = bytearray(len(mask))
     union = None
@@ -142,7 +142,7 @@ def main():
         path = root / RENDERS / name
         actual = hashlib.sha256(path.read_bytes()).hexdigest()
         if actual != digest:
-            fail(f"{name}: sha256 {actual} is not the pinned {digest} (docs/menu-mockup/index.md)")
+            fail(f"{name}: sha256 {actual} is not the pinned {digest} (docs/DECISIONS.md#menu-mockup)")
     width, height, alpha = read_png(root / RENDERS / FIRST)
     (l, t, r, b) = burst(width, height, alpha)
     first_w, first_h, first_top = r - l + 1, b - t + 1, t

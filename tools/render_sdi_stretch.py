@@ -33,7 +33,7 @@ BASE_T = 0.3            # W9's still
 # (factor, how): "key" = the emitter's own key table at KEY_LIFE; "scale" = S.y multiplied by the factor
 VARIANTS = [(1.17, "key"), (1.4, "scale"), (1.7, "scale"), (2.0, "scale")]
 KEY_LIFE = 0.5
-CHOSEN = 2.0            # the variant the SDI chips draw (see docs/menu-mockup/index.md)
+CHOSEN = 2.0            # the variant the SDI chips draw (see docs/DECISIONS.md#menu-mockup)
 TOOL_SHA = "b123bc3baa7ba3c47d963327f756d6fc086433df2f9003303544558e73e7b0bb"   # W9 tools/render_chips.py
 EFF_SHA = "8ff5bad0681cc922dfc4988acfb0212def0514d717bb62b4df17b916d04e0023"    # stock 13.0.5 ef_common.eff
 W9_UP_SHA = "9d665a9051a1f54030ed53529f2eba1c18bf1a3196f5fdffe75b1b54fa061254"  # out/chips/sdi-up-4x-layer.png
