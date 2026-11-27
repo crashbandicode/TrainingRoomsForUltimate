@@ -1,17 +1,26 @@
 # rc.8 binds: the input display toggle and the game speed (design, 2026-11-11)
 
+The display and speed chords shipped in rc.8. The [game speed guide](../guide/game-speed.md) covers the current scale, including **1 Frame**.
+
 - **Scope:** rc.8 §1–§3 (`artifacts/phase23/TASK-rc8.md`).
 - **Owner and branch:** the docs lane, branch `p23/rc8-binds` from `p23/rc7-final` `722525a5`.
 - **Sources:**
   - QCF's static RE, `quickplay-cancel-fix-work/RESEARCH-rc8-speed.md` ("QCF §n" below);
   - this lane's own reads of the owned 13.0.5 main ELF (sha256 `0789f0a4…`), with `llvm-objdump-21`;
   - the plugin's source at `722525a5`.
-- This is a design working file. Its requirement table quotes the operator's request clause by clause, as the
-  completion checklist asks of a design report. The README and the user docs carry no quotes.
 
 ![The two binds: the editor rows, the pop-up while the combo is held, and where each place writes the speed](../decisions/rc8-binds.png)
 
-## 1. What exists today
+*Original proposal; the speed lists and apply path changed.*
+
+## 1. Baseline on 2026-11-11
+
+| Existing control | Source at the design base |
+| --- | --- |
+| Input display | SPEC-input-06, `input_display_strip` |
+| Eight editable chords | SPEC-input-04, `options::CHORD_ROWS` |
+| Standing notices | `TrModDisp0` |
+| Native Training speed | `PauseMenu+0xb54` |
 
 - **The input display is the frame strip** (SPEC-input-06; operator decision INPUT-VIZ option A, 2026-11-05).
   - It's the settings row `input_display_strip` (`Off`, `Frame strip`; factory `Frame strip`), shown as "Input
@@ -40,21 +49,19 @@
 
 ## 2. The native speed, checked against the ELF
 
-QCF §1–§4 holds where this lane read it again. These sites were confirmed instruction by instruction:
-
 | site | what the bytes say | used for |
 | --- | --- | --- |
-| `0x1bbacc0` (the menu setter) | `ldr w8,[x1]` the item (≤ 12, jump table `0x44f89dc`); `ldr x19,[x0,#8]` the menu; `ldr w20,[x2]` the value | QCF §6's first trace point is right: the entry's `[x1]`/`[x2]` as u32 are the item and the value |
-| `.1bbaf10`–`.1bbaf2c` (item 7, value unchanged) | `add x21,x19,#0x538; …; str w20,[x19,#0xb54]; bl 0x1bbbd30(menu, value, menu+0x538)` | **the bind's Training write is this native path**: the store and the text, with no slide and no SE |
+| `0x1bbacc0` (the menu setter) | `ldr w8,[x1]`: item ≤12, jump table `0x44f89dc`; `ldr x19,[x0,#8]`: menu; `ldr w20,[x2]`: value | QCF §6: entry u32 values at `[x1]` and `[x2]` identify item and value. |
+| `.1bbaf10`–`.1bbaf2c` (item 7, value unchanged) | `add x21,x19,#0x538; …; str w20,[x19,#0xb54]; bl 0x1bbbd30(menu, value, menu+0x538)` | Training chord uses native store and text without slide or sound. |
 | `.1bbbb70`–`.1bbbbcc` (item 7, value changed) | text via `0x1bbbd30`, the slide `+0x558`/`+0x568`, `str w20,[x19,#0xb54]`, then SE `0x15_1ca6_c028` unless `[[0x532f8d0]+8]+0x191` is set | the menu's own change: not used (an SE with the menu closed) |
 | `0x1bbbd30` (value → text) | `sub w8,w1,#2; cmp w8,#4; b.hi` (default `x1`), jump table `0x44f8a24`, `0x377a120(pane, label)` | called with the setter's own arguments |
 | only 2 callers of `0x1bbbd30`: `.1bbaf2c`, `.1bbbb7c` | the menu never refreshes the Speed text by itself when it opens | why a bare store isn't enough |
-| `.155b4a8`–`.155b5ec` (the speed code of `FUN_0155a000`, pause/resume side only; the bind repeats its writes) | applied value `x25+0x194` against `+0xb54`; on a change it frees the battle's slot (`{in_use 0, divisor 1}`, dirty `+0x40 = 1`, slot `0xff`) | the slot steps the lobby copies |
-| `.155b654`, `.155b674`, `.155b864` | x1/1 Frame: code 0 and rate 60; 2/3: code 4, rate `0x78`; x1.5: code 6, rate `0xb4` | QCF's rate trace points are right |
-| `.13e5500` (Training HUD) | ~~`ldr w9,[[hud+8]+0x80+0xb54]` every frame~~ **corrected 2026-11-11 (R1 defect, §3.6):** only in the HUD's menu state 6, never in play | ~~the speed icon refreshes itself~~ the bind runs this refresh itself |
-| `0x1fca5c0` `BattleObjectSlow__rate_request_impl` | `ldr x0,[0x52c3610]`; `ldrb [x0,#0x40]` dirty → `0x14a2cd0` (max divisor over `{in_use, N}` at `+0x20..+0x3f`), else default byte `[0x52c5189]` | the lobby's slot takes effect through the game's own rate |
+| `.155b4a8`–`.155b5ec` (the speed code of `FUN_0155a000`, pause/resume side only; the bind repeats its writes) | Compare `x25+0x194` with `+0xb54`; change frees slot: `{0,1}`, dirty `+0x40=1`, slot `0xff`. | the slot steps the lobby copies |
+| `.155b654`, `.155b674`, `.155b864` | Code/rate: x1 and 1 Frame 0/60; 2/3 4/`0x78`; x1.5 6/`0xb4`. | QCF's rate trace points are right |
+| `.13e5500` (Training HUD) | R1 correction, 2026-11-11 (§3.6): `ldr w9,[[hud+8]+0x80+0xb54]` runs only in menu state 6. | The bind refreshes the speed icon during play. |
+| `0x1fca5c0` `BattleObjectSlow__rate_request_impl` | `ldr x0,[0x52c3610]`; dirty `ldrb [x0,#0x40]` selects `0x14a2cd0`, else default `[0x52c5189]`. | Native maximum divisor across `{in_use,N}` slots at `+0x20..+0x3f` applies the lobby rate. |
 | **create** `.1345f74`–`.134601c` | only when `*(0x52c3610) == 0`: 0x48 bytes, all 16 slots `{0, 1}`, dirty 1 | **a new table has no slot in use** |
-| **destroy** `.134d52c`–`.134d558` | `[0x523d138] = 1.0f`, the table freed, `*(0x52c3610) = 0`, in the same teardown that empties BattleObjectManager | the practice battle's table goes with the battle |
+| **destroy** `.134d52c`–`.134d558` | Set `[0x523d138]=1.0f`, free table, clear `*(0x52c3610)` while emptying BattleObjectManager. | the practice battle's table goes with the battle |
 
 - **Corrections to QCF:**
   - **The lobby trace point.** QCF's `main+0x155b4bc` (register x8) records x8 *before* `ldr x8,[x20,#0xb38]` runs.
@@ -62,7 +69,7 @@ QCF §1–§4 holds where this lane read it again. These sites were confirmed in
     counter on `main+0x155b510` (the path with no Training object).
   - **The slow table** the rate code reads is `*(0x52c3610)`. The exported `lib::Singleton<app::BattleObjectSlow>::instance_`
     is at `0x52b8550` (QCF's index lists that), but no code read here uses it for the slots.
-- **Still inferred** (each has an Eden check in §6):
+- **Inferences at the design date** (the original runtime checks are in §6):
   1. The native Left/Right order of the Speed item (QCF §1: no static table).
   2. The thread of `FUN_01559590` (QCF §3: the main loop, inferred).
   3. That battle objects advance by the slow rate (QCF §3: from the export's name).
@@ -72,7 +79,10 @@ QCF §1–§4 holds where this lane read it again. These sites were confirmed in
 
 ## 3. Decisions
 
-Where a choice is the operator's, this takes the sensible default and states it. Nothing waits on a question.
+| Factory chord | rc.8 action |
+| --- | --- |
+| R + D-pad Down | Toggle the frame strip. |
+| R + D-pad Up | Open Game speed; Left/Right choose a speed. |
 
 1. **Two new chord rows** in the same "Button chords" editor, with no new screen:
    - "Input display" (`input_display_toggle`), default **R + D-pad Down**;
@@ -84,10 +94,9 @@ Where a choice is the operator's, this takes the sensible default and states it.
      20:48Z chose it for rc.8).**
      - Unlike the eight others, these two rows don't pass while L is held, unless the row's own chord holds L
        (`chords::passes_without_l`). An open speed hold takes no Left/Right step while L is held.
-     - **Why:** Online Deluxe 0.10.4's chords on the card are L + R + a button: L + R + D-pad Down cycles its window's
-       pages, L + R + D-pad Up starts its 30 s capture, and L + R + X toggles. Extra buttons don't disqualify a chord,
-       so L + R + Down also flipped the input display, and L + R + Up would open the speed pop-up. The CPU pilot and
-       the counterpick plugin set their options in that same window.
+     - Online Deluxe 0.10.4 used L + R + D-pad Down for window pages, L + R + D-pad Up for its 30-second capture, and L + R + X to toggle.
+     - Extra buttons still matched the default binds. Down also flipped the input display; Up would have opened the speed popup.
+     - The CPU pilot and counterpick plugin shared that window.
      - **The card scan** ([rc8-chord-survey.md](rc8-chord-survey.md): `ultimate/` configs and the plugins' NRO
        strings, read-only, 2026-11-11): no other plugin chord with R and a D-pad direction was found. The NRO strings
        show only text, so chords hard-coded as button masks aren't covered.
@@ -110,14 +119,13 @@ Where a choice is the operator's, this takes the sensible default and states it.
    - It goes to the front at once (`notices::show_now`, new): `upsert` would wait behind a notice on screen.
    - It's updated on each step and cleared on release. A notice it covered comes back with the time it had left.
 5. **The speeds and their order:**
-   - **Training:** the five speeds Training offers: 1/4, 1/2, 2/3, x1, x1.5 (values 5, 4, 3, 1, 6).
+   - **Training in rc.8:** the five speeds offered by its chord: 1/4, 1/2, 2/3, x1, x1.5 (values 5, 4, 3, 1, 6).
      - **In rc.8, 1 Frame stayed in the native menu.** The [later frame-step design](rc15-speed-frame.md) added it to the bind.
-     - When Training is on 1 Frame, the pop-up shows "1 Frame", and the first step goes from x1's place.
+     - At native-menu 1 Frame in rc.8, the popup showed “1 Frame” and stepped from x1’s position. In rc.15 it steps from the slow end of the list.
    - **Waiting-room practice:** ~~1/4, 1/2, x1~~. **Superseded 2026-11-11 (rc.8 R2, `TASK-rc8.md` "SCOPE REOPENED"):**
      the same five as Training. 2/3 is a paced slot and x1.5 an extra world step, both local
-     (`docs/design/rc8-lobby-speed.md`; QCF's Eden pairs `qcf-spd04y`/`qcf-spd05y`).
-   - **The order** is slowest to fastest until the Eden trace of the native Left/Right (T1) is in. Then the Training
-     list takes the native order.
+     ([waiting-room speed design](rc8-lobby-speed.md); QCF's Eden pairs `qcf-spd04y`/`qcf-spd05y`).
+   - The rc.8 design proposed checking native Left/Right order with T1. The shipped chord lists speeds from slowest to fastest.
 6. **Training writes the game's own field, the native way:**
    - It stores `PauseMenu+0xb54`, then calls `0x1bbbd30(menu, value, menu+0x538)`. That's the setter's own
      unchanged-value path (`.1bbaf28`/`.1bbaf2c`): text, no slide, no SE.
@@ -168,8 +176,7 @@ Where a choice is the operator's, this takes the sensible default and states it.
 8. **Never online-affecting.** No Quickplay or online match may start with a plugin slot or a rate other than 60:
    - The slot is taken only while the lobby practice is live: the lobby engine active, the live mode words the waiting
      room, and the native waiting-room UI not busy.
-   - **It's released on the first frame where that stops,** and on session clear. The match-found UI turns "busy" in
-     the practice, before the round, and the practice keeps running frames then.
+   - **It's released on the first frame where that stops,** and on session clear. A busy UI also releases the slot while the practice is still live. Match-found teardown was measured separately below.
    - **A release writes only into the table it was taken from,** and only when the slot still holds `{1, N}`. The
      table pointer is kept at take. Once the scene has left the practice, the plugin writes nothing at all; the
      game's own teardown then owns the table.
@@ -194,7 +201,7 @@ Where a choice is the operator's, this takes the sensible default and states it.
      words (the QCF pattern): `0xb38`, `0x210`, `0x80`, `0xb54`, `0x538`, `0x52c3610`, `+0x20`, `+0x40`, and the
      init's `{0, 1}` pattern.
    - **If any row fails, the speed bind is off** (its install line says so), and the display bind still works.
-10. **No locks on a game path:** the new state is atomics, or `try_lock` used only by game threads.
+10. **Game-path synchronization:** the new state is atomics, or `try_lock` used only by game threads.
     - The teardown release too (R8): if `LOBBY` is taken, it sets `RELEASE_PENDING`, and the next `lobby_frame` makes
       the release, still only in the practice.
     - The menu worker gets the display toggle as an atomic counter.
@@ -206,19 +213,26 @@ Where a choice is the operator's, this takes the sensible default and states it.
 | Requirement clause | Design | Test |
 | --- | --- | --- |
 | A bind brings up the input display | §3.1–3.2: the chord row `input_display_toggle`; its request flips `input_display_strip` through the menu worker | `the_ten_chords_keep_todays_defaults_and_add_two`, `input_display_chord_raises_its_request`, `display_toggle_flips_the_strip_row` |
-| A bind lowers the game speed | §3.1, 3.3: the chord row `game_speed`, a hold that opens the speed pop-up; §3.6: the speed applied at once in Training (the game's own apply writes, done by the bind on P1's poll) | `the_ten_chords_keep_todays_defaults_and_add_two`, `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release`, `mode_apply_does_the_speed_codes_writes`, `registry_find_walks_the_games_map`, `game_speed_rows_decode_the_training_apply` |
-| It follows Training mode's own speed setting and its values | §2, §3.5–3.6: the native values 1..6 at `PauseMenu+0xb54` and its labels; there is no 3/4 (the slow speeds are 2/3, 1/2, 1/4) | `speeds_are_the_native_values_and_labels`, `game_speed_rows_decode_the_native_offsets` |
+| A bind lowers the game speed | §3.1, §3.3, §3.6: hold `game_speed` for popup; P1’s poll applies Training speed. | `the_ten_chords_keep_todays_defaults_and_add_two`, `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release`, `mode_apply_does_the_speed_codes_writes`, `registry_find_walks_the_games_map`, `game_speed_rows_decode_the_training_apply` |
+| It follows Training mode's own speed setting and its values | §2, §3.5–3.6: native labels/values 1–6 at `PauseMenu+0xb54`. Slow speeds: 2/3, 1/2, 1/4. | `speeds_are_the_native_values_and_labels`, `game_speed_rows_decode_the_native_offsets` |
 | The speed can be changed quickly while practising | §3.3: one combo, Left/Right while held, no menu | `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release` |
 | A small pop-up shows the speed | §3.4: the standing notice "Game speed" with the speed between the D-pad glyphs | `popup_body_shows_the_speed_between_the_dpad_glyphs` |
-| Left or Right steps the speed while the combo is held | §3.3: newly pressed D-pad Left/Right steps, clamped; other chords blocked; the step buttons hidden | `training_steps_walk_the_speeds_and_stop_at_the_ends`, `hold_hides_the_chord_and_step_buttons_and_blocks_other_chords` |
+| Left or Right steps the speed while the combo is held | §3.3: newly pressed D-pad Left/Right steps, clamped; other chords blocked; the step buttons hidden | `the_scale_has_one_frame_slowest_and_stops_at_both_ends`, `hold_hides_the_chord_and_step_buttons_and_blocks_other_chords` |
 | The pop-up goes away on release | §3.3: closes on the poll no chord button is held; the speed stays | `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release` |
 | In Training the change shows in the Training menu | §3.6: `+0xb54` stored, then `0x1bbbd30(menu, value, menu+0x538)`, the setter's own unchanged-value path | `training_write_is_the_native_store_then_text`, `game_speed_rows_decode_the_native_offsets` |
-| R1 defect (2026-11-11 18:20Z): the HUD stopwatch stayed on x1.5 after the chord stepped back to x1 | §3.6: after the store and text, the UI tick runs the game's indicator refresh (`hud_icon`): `out_speed` and the flag cleared at x1, `in_speed` and the flag set away from it | `hud_icon_shows_away_from_x1_and_hides_back_at_x1`, `hud_icon_matches_the_speed_after_every_step_from_either_flag`, `game_speed_rows_decode_the_hud_icon` |
-| Chord overlap (2026-11-11 20:01Z, option 2): the two rc.8 Training binds (Input display R + D-pad Down, and the speed hold's R + D-pad Up/Left/Right) do not pass while L is held | §3.1: `chords::passes_without_l` for the two rows; an open hold takes no step with L held | `input_display_chord_raises_its_request`, `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release`, `only_the_rc8_rows_mind_l` |
-| The bind works in the waiting room | §3.7–3.8: a plugin slot `{1, N}` in the BattleObjectSlow table, the native take and free steps, released before any round | `slot_take_and_free_match_the_native_steps`, `lobby_offers_the_training_speeds`, `lobby_slot_is_released_outside_the_practice_and_never_written_elsewhere` |
-| The speed-up is local too (§2b, owned by QCF) | §3.5, superseded by `docs/design/rc8-lobby-speed.md` (rc.8 R2): the lobby offers all five, 2/3 and x1.5 local | `lobby_offers_the_training_speeds` |
+| R1, 2026-11-11 18:20Z: stopwatch incorrectly displayed x1.5 after returning to x1. | §3.6: UI tick synchronizes flag and `in_speed`/`out_speed` via `hud_icon` after store/text. | `hud_icon_shows_away_from_x1_and_hides_back_at_x1`, `hud_icon_matches_the_speed_after_every_step_from_either_flag`, `game_speed_rows_decode_the_hud_icon` |
+| Option 2, 2026-11-11 20:01Z: protect default display and speed controls while L is held. | §3.1: `chords::passes_without_l` for the two rows; an open hold takes no step with L held | `input_display_chord_raises_its_request`, `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release`, `only_the_rc8_rows_mind_l` |
+| The bind works in the waiting room | §3.7–3.8: take/free the native BattleObjectSlow slot `{1,N}`; release before a round. | `slot_take_and_free_match_the_native_steps`, `lobby_offers_the_training_speeds`, `lobby_slot_is_released_outside_the_practice_and_never_written_elsewhere` |
+| The speed-up is local too (§2b, owned by QCF) | rc.8 R2: local 2/3 and x1.5 completed its five-speed lobby list | `lobby_offers_the_training_speeds` |
 
 ## 5. Code shape
+
+| Owner | Responsibility |
+| --- | --- |
+| `model::game_speed` | Speed scale, hold, native slot lifecycle |
+| `model::chords` | Controller samples and visibility |
+| `runtime::features::game_speed` | Native writes and notice |
+| Menu worker | Persist display changes |
 
 - **`model::game_speed`** (pure, host-tested):
   - `Speed` (the native values and labels) and the two speed lists;
@@ -237,9 +251,15 @@ Where a choice is the operator's, this takes the sensible default and states it.
 - **The menu worker** applies the display toggle (an atomic count from the poll) as a change of `input_display_strip`.
 - **Size:** measured at the end and raised in its own commit. Raising it as needed was approved beforehand.
 
-## 6. Eden proof (integration schedules it on the integrated build)
+## 6. Original rc.8 integration tests
 
-**Rows:**
+| Later evidence | Record |
+| --- | --- |
+| Training speed chord | [Feature ledger](../FEATURE-LEDGER.md), row 81 |
+| Waiting-room timing and match transition | Same ledger, row 82 |
+| Stopwatch on and off | Same ledger, row 83 |
+
+**Original rows**
 
 - **Training:** hold the speed combo; the pop-up shows; Right, Left; release.
   - The native Training menu shows the value.
@@ -263,13 +283,14 @@ Where a choice is the operator's, this takes the sensible default and states it.
 | T3 | `main+0x1fca5d0` x0, `[x0+0x20]` 32 bytes | the slots in use (the lobby's own, none at a match's start) |
 | T4 | `main+0x155b4c0` x8; counters `main+0x155b510` | the lobby battle has no Training object (inferred 4) |
 | T5 | counters `main+0x134601c` (create), `main+0x134d558` (destroy) | the teardown order (inferred 5) |
-| T6 | `thread_id` at `main+0x155b5b8`, `main+0x13e5500`, the plugin's `lobby::frame` and `hud_draw::draw` | the threads (inferred 2), and that the Training text runs where the game's HUD reads the field |
+| T6 | `thread_id` at `main+0x155b5b8`, `main+0x13e5500`, the plugin's `lobby::frame` and `hud_draw::draw` | Thread identity (inference 2); Training text runs on the HUD’s field-reading thread. |
 
-## 7. Not in this change
+## 7. Original scope and later decisions
 
-- ~~2/3 and x1.5 in the lobby (QCF §2b).~~ In rc.8 after all (R2, `docs/design/rc8-lobby-speed.md`).
-- 1 Frame from the bind.
-- Any change to `button_config.ini`.
-- **Overlap with worker A (§4/§6/§7):** A's `compat/menu.rs::PENDING` fix may touch the menu worker near the
-  display toggle's consumer. This branch keeps its worker change to one call site and notes it for integration's
-  merge.
+| Scope at the design date | Outcome |
+| --- | --- |
+| QCF §2b: 2/3 and x1.5 in the lobby | Included in rc.8 R2; see the [waiting-room speed design](rc8-lobby-speed.md). |
+| 1 Frame from the bind | [Frame stepping](rc15-speed-frame.md) shipped after the 2026-11-21 decision. |
+| `button_config.ini` | rc.8 kept the existing menu shortcuts. |
+| Worker A, §4/§6/§7 | `compat/menu.rs::PENDING` shared the menu worker with the display-toggle consumer. |
+| Integration | The rc.8 branch limited its worker change to one call site. |
