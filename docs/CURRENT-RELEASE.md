@@ -29,6 +29,8 @@ To uninstall, remove only `libtraining_rooms.nro`. Keep saved data and shared ho
 | --- | --- |
 | Switch recorded fighters after loading finishes | [Guide](guide/recording.md) |
 | Return fighters to their spots after scrubbing a pose | [Guide](guide/recording.md) |
+| Explain loading and extra fighter groups in the menu | [Loading](menu/fighters-and-stages.md#loading) |
+| Clarify what L+R+A does in Training | [Controls](guide/controls.md) |
 | Read the CPU-first setup order in Guard the Edge | [Guide](guide/guard-the-edge.md) |
 | Count Tech practice attempts with factory launch settings | [Guide](guide/tech-practice.md) |
 
@@ -37,7 +39,10 @@ To uninstall, remove only `libtraining_rooms.nro`. Keep saved data and shared ho
 | Feature | Hardware | Eden |
 | --- | --- | --- |
 | Switch recorded fighters after loading finishes | no | no |
-| Return fighters to their spots after scrubbing a pose | no | yes |
+| Returning fighters to their spots after scrubbing | no | no |
+| Showing a recorded pose while scrubbing | no | yes |
+| Loading and Group Swap help | no | no |
+| L+R+A help | no | no |
 | Read the CPU-first setup order in Guard the Edge | no | yes |
 | Count Tech practice attempts with factory launch settings | no | yes |
 
