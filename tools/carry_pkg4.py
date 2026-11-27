@@ -25,11 +25,11 @@ Nothing under the stage is ever written.
 """
 import argparse, hashlib, json, os, posixpath, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import test_cut  # rc.9: the manifest edits `cut_tests`, `wrap_tests` and `wrap_file` (docs/TEST-CUT-LEDGER-rc9.md)
+import test_cut  # rc.9: the manifest edits `cut_tests`, `wrap_tests` and `wrap_file` (docs/TEST-PROVENANCE.md#test-cut-ledger-rc9)
 
 STAGES = os.environ.get("TR_CARRY_STAGES") or "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
 DEFAULT_MANIFEST = "docs/provenance/pkg4-carry-manifest.json"
-LEDGER = "docs/provenance/pkg4-carry-ledger.md"
+LEDGER = "tools/provenance-data/pkg4-carry-ledger.txt"
 EXTERNAL = {"training_mod_consts": "consts", "training_mod_mii": "mii", "training_mod_tui": "tui", "training_mod_macros": "macros",
             "training_mod_sync": "sync"}
 HEADS = "crate|" + "|".join(EXTERNAL)

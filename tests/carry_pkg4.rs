@@ -19,10 +19,10 @@ fn carried_files_match_the_manifest() {
 #[test]
 fn the_ledger_is_generated_from_the_manifest() {
     let root = env!("CARGO_MANIFEST_DIR");
-    let before = std::fs::read_to_string(format!("{root}/docs/provenance/pkg4-carry-ledger.md")).expect("ledger present");
+    let before = std::fs::read_to_string(format!("{root}/tools/provenance-data/pkg4-carry-ledger.txt")).expect("ledger present");
     let Some(out) = run(&["tools/carry_pkg4.py", "ledger"]) else { return };
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-    let after = std::fs::read_to_string(format!("{root}/docs/provenance/pkg4-carry-ledger.md")).unwrap();
+    let after = std::fs::read_to_string(format!("{root}/tools/provenance-data/pkg4-carry-ledger.txt")).unwrap();
     assert_eq!(before, after, "run `python3 -I tools/carry_pkg4.py ledger` and commit the result");
 }
 
