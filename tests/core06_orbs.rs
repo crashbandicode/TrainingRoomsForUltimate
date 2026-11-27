@@ -962,6 +962,41 @@ fn a_command_before_the_pass_holds_its_locks_is_applied_before_the_pass() {
     }
 }
 
+#[test]
+fn a_command_for_another_article_does_not_protect_a_passive_slot_from_eviction() {
+    let generations = hitbox::FighterGenerations::new();
+    for commanded in [2, 4] {
+        let mut reference = orbs::Articles::new();
+        let mut fighters = Box::new(hitbox::SetTable::new());
+        let (link, mut table, mut articles) = linked();
+        let issue = |id| Command::Wind { id, key: id as usize * 16 };
+        for command in [single_shape(16, 1, None, 77), issue(2), issue(3), issue(4)] {
+            immediate(&mut fighters, &mut reference, &generations, &command);
+            assert_eq!(post(link, &generations, &command), model::handoff::Put::Stored);
+        }
+        drain(&mut table, &mut articles, &generations);
+
+        // Sampling finds only hurt spheres for article 2. At main the racing command ran after the pass.
+        *reference.track(2, 32, None, false).unwrap().1 = false;
+        *articles.track(2, 32, None, false).unwrap().1 = false;
+        let racing = issue(commanded);
+        assert_eq!(post(link, &generations, &racing), model::handoff::Put::Stored);
+        articles.settle();
+        immediate(&mut fighters, &mut reference, &generations, &racing);
+        immediate(&mut fighters, &mut reference, &generations, &issue(5));
+        assert_eq!(post(link, &generations, &issue(5)), model::handoff::Put::Stored);
+        drain(&mut table, &mut articles, &generations);
+
+        assert_eq!(reference.tracked().contains(&(1, 16)), commanded != 2);
+        assert_eq!(articles.tracked(), reference.tracked(), "command for article {commanded}");
+        if commanded != 2 {
+            let (set, _) = articles.track(1, 16, None, false).unwrap();
+            set.reconcile(&[], true, &mut OrbSink { status: 10 });
+            assert!(set.spheres().any(|s| s.key == hitbox::sphere_key(hitbox::KIND_GRAB, 77, 0)));
+        }
+    }
+}
+
 fn a_catch_during_the_pass_survives_the_passes_forget() {
     use model::handoff::Put;
     fn identities(articles: &orbs::Articles) -> Vec<(u32, usize)> {
