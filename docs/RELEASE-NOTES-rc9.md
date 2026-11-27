@@ -6,6 +6,10 @@
 
 ## Fixed
 
+| Fix | Recorded result |
+| --- | --- |
+| Deluxe window shows a page with rows | TrainingRooms D-pad chords are suppressed |
+
 ### The D-pad chords and Online Deluxe's window (C4)
 
 - With Online Deluxe 0.10.5, TrainingRooms' chords that use the D-pad don't fire while Deluxe's window shows a page
@@ -53,6 +57,10 @@
 
 ## Good to know
 
+| Quickplay action | Recorded result |
+| --- | --- |
+| Leave Battle | Close the TrainingRooms menu first |
+
 ### Leaving a Quickplay room with the TrainingRooms menu open (C13)
 
 - The QuickPlay cancel fix plugin keeps the game's Pause › Leave Battle available for a few seconds after you join a
@@ -65,6 +73,10 @@
 - The rc.9 build tag at the foot of each menu page named the candidate, for example `0.2.0-rc.6 · rc9 01950601`.
 
 ## The plugins that ship beside it
+
+| Companion plugin | Recorded result |
+| --- | --- |
+| Online Deluxe 0.10.5 | Reports its window and page state |
 
 ### Online Deluxe 0.10.5
 
@@ -97,6 +109,10 @@
 - To bring the toggle back, set `gamepad_nav_toggle = on` in `sd:/ultimate/imgui_smash/config.ini`.
 
 ## For developers
+
+| Host suite | Recorded result |
+| --- | --- |
+| Test count | 41,918 before the cut, 865 after the table-driven replacements |
 
 - **The host tests:** the suite went from 41,918 tests to 865, under the 1,000 limit.
   - The cut first took it to 942. Every cut and the reason for it is in [TEST-CUT-LEDGER-rc9.md](TEST-CUT-LEDGER-rc9.md).

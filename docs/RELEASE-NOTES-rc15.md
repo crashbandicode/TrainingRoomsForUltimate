@@ -39,13 +39,14 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 
 ## Preview build
 
-This preview was tested in Eden. Its planned console install was cancelled; it is not the next release.
-
 | Preview | Details |
 | --- | --- |
 | Built from | `cc71537c` (the footer ends with it) |
 | Release file | `78db86f5…`, 5,419,008 bytes |
 | At cancellation | Install 6 was still on the card. |
+
+This preview was tested in Eden. Its planned console install was cancelled; it is not the next release.
+
 
 ### Scrubbing shows the recorded moves
 
@@ -662,16 +663,17 @@ Taps and a hold move Min from 0 through 0.5 and 3 to 8%, and Max from 150 throug
 
 ## Before install 1
 
-The first rc.15 build (2026-11-15) added the clip editor, input drills, article hurtboxes and the colour legend
-([Current release](CURRENT-RELEASE.md)). Between that build and install 1, more went into rc.15 without notes of its
-own. By theme, with the page that describes each:
-
 | Theme | What went in | More |
 | --- | --- | --- |
 | Practice games | Eggs-ercise, Break the Targets, Tech practice, Mash out, Parry practice, Guard the Edge and Juggler, each with its own screen and a Start row. | [Practice games](menu/fighters-and-stages.md#practice-games) |
 | Waiting rooms | Lobby Practice is On from the first start. | [Lobby Practice is On by default](guide/waiting-rooms.md#lobby-practice-is-on-by-default) |
 | Recording | The pop-up's Player or CPU side stays until you change it, and Place fighters before Record sets both fighters up first. | [Place fighters before Record](menu/recording.md#place-fighters-before-record) |
 | The menu | A held Up or Down repeats and speeds up, and L and R turn the page from inside a game's screen, a fighter grid or an editor. | [Moving around](guide/using-the-menu.md#moving-around) |
+
+The first rc.15 build (2026-11-15) added the clip editor, input drills, article hurtboxes and the colour legend
+([Current release](CURRENT-RELEASE.md)). Between that build and install 1, more went into rc.15 without notes of its
+own. By theme, with the page that describes each:
+
 
 The build on the card just before install 1 (`17060a5e`, installed 2026-11-23 at 11:40) was played by the operator
 that day. What they reported, and what came of it:

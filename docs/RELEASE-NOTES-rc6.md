@@ -9,6 +9,10 @@ The switch and reset times below are the ranges reported for rc.6. The [feature 
 
 ## New
 
+| Addition | Recorded result |
+| --- | --- |
+| Sequence drilling | Practise an ordered list of combos |
+
 ### Sequence drilling
 
 rc.5 let you build and edit sequences, but not drill them. rc.6 drills them.
@@ -145,6 +149,10 @@ leaves the game's own level everywhere.
 
 ## Fixed
 
+| Fix | Recorded result |
+| --- | --- |
+| Save, Load and Auto-load | Follow the save bound in the pop-up |
+
 - **Save, Load and Auto-load use the bound save.** In rc.5 they used the old save-state slot file, whatever the pop-up
   showed as bound. Save writes the bound save, and Load and Auto-load on death warp to it. With nothing bound,
   Auto-load does nothing.
@@ -193,6 +201,10 @@ leaves the game's own level everywhere.
 
 ## Known issues
 
+| Observed issue | Recorded result |
+| --- | --- |
+| Menu-close freeze | Four occurrences in Eden |
+
 - **The game can freeze when the menu closes (rare).** In Eden it happened four times: once in Training after a diagnostic CPU-cycle reload with Cycle Preload Off, and three times in Quickplay's waiting area while paging through the menu (in the two longest loops, after 36 and 38 clean closes in a row).
   - Other loops of the same steps closed the menu cleanly.
   - While the game was frozen, none of this mod's code was running; the game's own code was busy.
@@ -211,6 +223,10 @@ leaves the game's own level everywhere.
 - **Record under a pilot:** rc.6 did not refuse it. [Waiting-room controls](guide/waiting-rooms.md#what-is-different-or-refused) describes the current behavior.
 
 ## Corrections to the rc.5 notes
+
+| Correction | Recorded result |
+| --- | --- |
+| Save last combo | The row was absent in rc.5 |
 
 - "Save last combo still saves the combo you landed": rc.5 had no row for it. rc.6 has it, above.
 - "A named macro can carry the exact Mii it was recorded on": rc.5 loaded the class default. rc.6 loads the exact Mii,

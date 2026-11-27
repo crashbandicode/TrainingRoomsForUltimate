@@ -7,6 +7,10 @@ Notes for players. rc.5 followed `0.2.0-rc.3.1`. There is no separate `0.2.0-rc.
 
 ## Frame strip
 
+| Display | Recorded result |
+| --- | --- |
+| Input history | Last second for Player 1 and the CPU |
+
 The input display is the frame strip: the last second of Player 1 and the CPU, a chip for each new button, and readouts for advantage, the link, and the timing of the press.
 
 ADVANTAGE is the CPU's first actionable frame minus yours after the last hit. Plus means you act first. The line says on hit or on shield. Actionable includes cancel windows, so an aerial can read more plus than a frame-data listing that waits out the landing lag.
@@ -21,6 +25,10 @@ A follow-up more than 20 frames after the CPU can act is a new exchange, not a d
 Holding one direction long enough can freeze the strip. A new binned direction, including a move out of neutral, starts it scrolling again.
 
 ## Recording
+
+| Action | Recorded result |
+| --- | --- |
+| Load | Warps to a save without starting a recording |
 
 - A save state only warps. Load does not start a recording. rc.5 used the old save-state slot for Save, Load and Auto-load on death, regardless of the binding shown in the pop-up. rc.6 made all three follow that binding.
 - Record follows the pop-up's role. It captures Player 1 until that role is CPU. Stopping writes a named macro and that macro's start save.
@@ -54,6 +62,10 @@ The first time Training opens on a new install, the six reminders are still Welc
 
 ## Migration
 
+| Migration input | Recorded result |
+| --- | --- |
+| Empty slots and indexes | Skipped |
+
 On the first build of the new library:
 
 - Empty recording slots and empty save indexes are skipped.
@@ -64,6 +76,10 @@ On the first build of the new library:
 - Loop On becomes infinite. Loop Off, or no loop row, becomes 1. Player 1 and the CPU then keep their own counts.
 
 ## What leaves
+
+| Playback trigger | Recorded result |
+| --- | --- |
+| Macro with a start save | The role’s Play chord |
 
 The playback machine no longer starts a recording because a save loaded. That job is the macro's start save, started by the role's Play chord.
 
@@ -76,6 +92,10 @@ The Saves page keeps the chord switch, mirroring, auto-load on death, damage on 
 Pins are gone. The five most recently used of each kind are listed first. Y does nothing on the pop-up or the Recording page.
 
 ## Since 0.2.0-rc.3.1
+
+| Addition | Recorded result |
+| --- | --- |
+| Combo helper | Shown under the frame strip |
 
 Recording and the stick row are above. The same build also adds:
 

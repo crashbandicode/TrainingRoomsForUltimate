@@ -7,6 +7,10 @@ These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer
 
 ## New
 
+| Control | Recorded result |
+| --- | --- |
+| R + D-pad Down | Toggles the input display |
+
 ### Input display chord: R + D-pad Down
 
 ![R + D-pad Down hides the frame strip, then shows it again](media/rc8-input-display-chord.gif)
@@ -63,6 +67,10 @@ These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer
 
 ## Fixed
 
+| Recording condition | Recorded result |
+| --- | --- |
+| AI drives Player 1 | Record is refused |
+
 ### Record is refused while an AI drives Player 1
 
 - While an AI drives Player 1, for example the standalone CPU pilot, Record is refused, from the Record chord as well as
@@ -79,6 +87,10 @@ These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer
   still freezes as the menu closes, please report it.
 
 ## With the CPU pilot plugin 0.2.3
+
+| Companion plugin | Recorded result |
+| --- | --- |
+| CPU pilot 0.2.3 | Can drive Player 1 in Quickplay waiting-room practice |
 
 The CPU pilot is a separate plugin, `libssbu_cpu_pilot.nro`. Its 0.2.3 ships beside this build:
 

@@ -116,6 +116,10 @@ each gate's own; they were not compared test by test here.
 
 ## The operator's reports from the console
 
+| Evidence source | Recorded result |
+| --- | --- |
+| Console play reports | Switch observations relayed by the coordinator |
+
 - The operator's own reports from play on a Switch.
 - Most were relayed by the coordinator (inbox 2026-11-25 17:09:15Z, tr-primary-2; the report on install 5, inbox 23:33:51Z).
 - Two were recorded by the coordinator at the time, in its handoff (`artifacts/phase23/HANDOFF-PRIMARY-tr-primary-2.md`); their rows name the entry.
@@ -174,6 +178,10 @@ changed. Receipts: `artifacts/phase23/place-float/eden/out-03/` and `out-04/`; r
 13:36:40Z. The operator chose a change at 13:40:17Z; these runs did not test it.
 
 ## Install 5 (`b7a382e4`)
+
+| Card readback | Recorded result |
+| --- | --- |
+| Install 5 | `99e00e92` → `0cb29525` |
 
 - **Card:** `artifacts/phase23/card-install/20261125-2306Z-card-b7a382e4/deployment.json`. Over DBI's USB file
   transfer, at 23:06. Before `99e00e92`, after `0cb29525`, read back. 21 plugins before and after; the other 20 are
@@ -280,6 +288,10 @@ frame was looked at.
 | A save's placement is changed with the crosshair; the Off stage switch | `6dcf5c40` | `gate-b7a382e4` (one gate for this merge and a docs merge) |
 
 ## Install 6 (`5df3d9dc`)
+
+| Card readback | Recorded result |
+| --- | --- |
+| Install 6 | `0cb29525` → `c1ced861` |
 
 - **Card:** `artifacts/phase23/card-install/20261126-1156Z-card-5df3d9dc/deployment.json`, state
   `installed_verified`. Over DBI's USB file transfer, finished at 12:22:55. Before `0cb29525`, after `c1ced861`,
@@ -404,14 +416,15 @@ files named below were read for this page.
 
 ## Preview build (`cc71537c`)
 
-Staged on 2026-11-27, then removed when the install was cancelled. None of these preview runs used a console.
-
 | Fact | Value | Where |
 | --- | --- | --- |
 | Commit | `cc71537c`, the head of the next build's branch with every part in | — |
 | Release file | sha256 `78db86f5378635a8ce6820b6cdace6feb3d9d1c73ef126aa4475da1e4f03e77a`, 5,419,008 bytes | `artifacts/phase23/next-build/gate-cc71537c/nro/` |
 | After cancellation | The card still held install 6's `c1ced861…` | Card readback, 2026-11-27 04:04Z |
 | Host gate | Six steps exited 0. The six top-level suites reported 3,182 passed, 0 failed, 4 ignored. The summary also counted 15 nested passes and missed a sixteenth whose output was interleaved. | `artifacts/phase23/next-build/gate-cc71537c/`, `logs/test.log:359` |
+
+Staged on 2026-11-27, then removed when the install was cancelled. None of these preview runs used a console.
+
 
 ### Smoke tests on the release file
 
