@@ -10,8 +10,8 @@
 //! NOT YET SWITCH-RUN.
 use super::placement;
 use super::stage_geometry::RayProbe;
-use crate::engine::macro_ui::scrub_pose::{asked_of, decide, drawn, lets_partner_go, takes_partner, Act, FALL, WAIT};
-use crate::engine::macro_ui::scrub_track::{can_stand, in_bounds, Block, Spot, POSE_NONE, POSE_SHOWN, SEEN_HELD, SEEN_IDLE, SEEN_OFF, SLOT};
+use crate::engine::macro_ui::scrub_pose::{asked_of, decide, drawn, takes_partner, Act, FALL, WAIT};
+use crate::engine::macro_ui::scrub_track::{can_stand, in_bounds, Ask, Block, Spot, POSE_NONE, POSE_SHOWN, SEEN_HELD, SEEN_IDLE, SEEN_OFF, SLOT};
 use crate::engine::macros::{PackedPose, Pose};
 use crate::model::crosshair::CpuPreview;
 use crate::model::stage_geometry::{classify, Unread};
@@ -38,9 +38,10 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
             block.set_pose(slot ^ 1, partner.0, partner.1);
         }
         // Nobody is asked any more: the other role's body is let go here too, on this callback, so the game never
-        // tests the two fighters against each other with one home and one still held (`lets_partner_go`). Its own
+        // tests the two fighters against each other with one home and one still held. Its own
         // frame then finds no hold and only reports.
-        if holds[slot ^ 1].is_some() && lets_partner_go(block) {
+        let ask = block.frame_ask(generation);
+        if holds[slot ^ 1].is_some() && matches!(ask, Ask::None) {
             let partner = other_body(slot).filter(|&body| holds[slot ^ 1].is_some_and(|hold| hold.body() == natives::battle_object_id(body)));
             if let Some(partner) = partner {
                 let seen = release(block, slot ^ 1, &mut holds[slot ^ 1], partner);
@@ -48,7 +49,7 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
             }
         }
         let began = holds[slot].is_none();
-        let seen = match point(block, &holds, slot, accessor) {
+        let seen = match point(block, &ask, &holds, slot, accessor) {
             Some(spot) => hold(block, generation, slot, &mut holds[slot], accessor, spot),
             None => release(block, slot, &mut holds[slot], accessor),
         };
@@ -56,7 +57,7 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
         // beside a held one for a frame, to be pushed before its hold reads where it stands (`takes_partner`).
         if takes_partner(began, holds[slot].is_some(), holds[slot ^ 1].is_some()) {
             if let Some(partner) = other_body(slot) {
-                if let Some(spot) = point(block, &holds, slot ^ 1, partner) {
+                if let Some(spot) = point(block, &ask, &holds, slot ^ 1, partner) {
                     let taken = hold(block, generation, slot ^ 1, &mut holds[slot ^ 1], partner, spot);
                     block.set_seen(slot ^ 1, taken);
                 }
@@ -80,8 +81,8 @@ unsafe fn other_body(slot: usize) -> Option<usize> {
 /// Where this role's body is asked to be. The group's home is where the hold found the target role's body: its
 /// hold's origin, which the block keeps when the target is let go while its partner is held (`Block::point`), or
 /// where it stands now when it was not held.
-unsafe fn point(block: &Block, holds: &[Option<CpuPreview>; 2], slot: usize, accessor: usize) -> Option<Spot> {
-    block.point(slot, |target| holds[target].map(|hold| hold.origin().at), |target| {
+unsafe fn point(block: &Block, ask: &Ask, holds: &[Option<CpuPreview>; 2], slot: usize, accessor: usize) -> Option<Spot> {
+    block.point_for(ask, slot, |target| holds[target].map(|hold| hold.origin().at), |target| {
         if target == slot {
             return Some([natives::pos_x(accessor), natives::pos_y(accessor)]);
         }
@@ -98,7 +99,7 @@ unsafe fn point(block: &Block, holds: &[Option<CpuPreview>; 2], slot: usize, acc
 unsafe fn hold(block: &Block, generation: u32, index: usize, slot: &mut Option<CpuPreview>, accessor: usize, spot: Spot) -> u32 {
     let Some(limits) = natives::camera_limit_range() else { return release(block, index, slot, accessor) };
     let body = natives::battle_object_id(accessor);
-    if !in_bounds(spot.at, limits) || block.refused(index, generation, body, spot.at) || !block.standable(index, spot.at, || stands(accessor, spot.at)) {
+    if !in_bounds(spot.at, limits) || block.refused(index, generation, body, spot.at) || !block.standable(index, generation, spot.at, || stands(accessor, spot.at)) {
         release(block, index, slot, accessor);
         return SEEN_OFF;
     }

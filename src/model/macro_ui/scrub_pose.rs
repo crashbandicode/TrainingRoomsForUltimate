@@ -6,7 +6,7 @@
 #[cfg(any(feature = "diag", test))]
 use core::fmt;
 
-use super::scrub_track::{Block, POSE_NONE, POSE_OTHER, POSE_SHOWN};
+use super::scrub_track::{POSE_NONE, POSE_OTHER, POSE_SHOWN};
 use crate::engine::macros::{PackedPose, Pose};
 use crate::model::hash40::hash40;
 
@@ -33,14 +33,6 @@ pub fn asked_of(recorded: PackedPose, has: impl FnOnce(u64) -> bool) -> PackedPo
         Some(pose) if has(pose.motion) => recorded,
         _ => PackedPose::NONE,
     }
-}
-
-/// Nobody is asked any more (the editor's request is none, or the hold was forgotten): the role whose fighter
-/// frame reads that first lets its partner go in the same callback, before itself. The worker publishes the
-/// release at any moment; each role reads it on its own callback, and the game tests the two fighters against
-/// each other after both. Read by one role alone, one body would be home and the other still held for that test.
-pub fn lets_partner_go(block: &Block) -> bool {
-    block.target_slot().is_none()
 }
 
 /// The start of a hold, the same way: the role whose hold `began` on this callback (`held` after its own step)
@@ -131,6 +123,7 @@ impl fmt::Display for PoseLine {
 mod tests {
     lib_unit_tests! {
     use super::*;
+    use super::super::scrub_track::{Ask, Block};
 
     const KIRBY: i32 = 6;
     const SMASH: u64 = 0x12_3456_789a;
@@ -403,13 +396,14 @@ mod tests {
     /// One fighter frame of a role, as `scrub_hold::frame` runs it: the partner is let go first when nobody is asked
     /// any more; then the role is held at its point, or let go.
     fn callback(block: &Block, held: &mut [bool; 2], slot: usize) {
-        if held[slot ^ 1] && lets_partner_go(block) {
+        let ask = block.frame_ask(block.generation());
+        if held[slot ^ 1] && matches!(ask, Ask::None) {
             held[slot ^ 1] = false;
         }
         let began = !held[slot];
-        held[slot] = block.point(slot, |_| Some([0.0; 2]), |_| Some([0.0; 2])).is_some();
+        held[slot] = block.point_for(&ask, slot, |_| Some([0.0; 2]), |_| Some([0.0; 2])).is_some();
         if takes_partner(began, held[slot], held[slot ^ 1]) {
-            held[slot ^ 1] = block.point(slot ^ 1, |_| Some([0.0; 2]), |_| Some([0.0; 2])).is_some();
+            held[slot ^ 1] = block.point_for(&ask, slot ^ 1, |_| Some([0.0; 2]), |_| Some([0.0; 2])).is_some();
         }
     }
 
@@ -506,7 +500,8 @@ mod tests {
         let at = |text: &str| frame.iter().position(|line| *line == text);
         // The partner is let go only when its hold is on the body found, and it reports as it does on its own frame.
         let together = [
-            "if holds[slot ^ 1].is_some() && lets_partner_go(block) {",
+            "let ask = block.frame_ask(generation);",
+            "if holds[slot ^ 1].is_some() && matches!(ask, Ask::None) {",
             "let partner = other_body(slot).filter(|&body| holds[slot ^ 1].is_some_and(|hold| hold.body() == natives::battle_object_id(body)));",
             "if let Some(partner) = partner {",
             "let seen = release(block, slot ^ 1, &mut holds[slot ^ 1], partner);",
@@ -518,14 +513,14 @@ mod tests {
         assert_eq!(frame[first..first + together.len()], together);
         // After a hold on another body was forgotten, and before this role reads its own point.
         let forgot = at("block.set_pose(slot ^ 1, partner.0, partner.1);").expect("the forgotten hold");
-        let own = at("let seen = match point(block, &holds, slot, accessor) {").expect("the role's own point");
+        let own = at("let seen = match point(block, &ask, &holds, slot, accessor) {").expect("the role's own point");
         assert!(forgot < first && first + together.len() <= own);
-        assert_eq!(hold.matches("lets_partner_go(block)").count(), 1);
+        assert_eq!(hold.matches("block.frame_ask(").count(), 1);
         // The start of a hold, the same way: right after the role's own step, and before it reports.
         let start = [
             "if takes_partner(began, holds[slot].is_some(), holds[slot ^ 1].is_some()) {",
             "if let Some(partner) = other_body(slot) {",
-            "if let Some(spot) = point(block, &holds, slot ^ 1, partner) {",
+            "if let Some(spot) = point(block, &ask, &holds, slot ^ 1, partner) {",
             "let taken = hold(block, generation, slot ^ 1, &mut holds[slot ^ 1], partner, spot);",
             "block.set_seen(slot ^ 1, taken);",
             "}",
