@@ -484,6 +484,9 @@ mod tests {
         /// The game's test of the pair, after both fighters: an awake body's push is cleared, and two overlapping
         /// boxes get one each.
         fn pair_test(&mut self) {
+            for role in 0..2 {
+                assert!(!self.back[role] || self.asleep[role], "role {role}, put back from its partner's callback, is awake at the pair test");
+            }
             for (push, asleep) in self.push.iter_mut().zip(self.asleep) {
                 if !asleep {
                     *push = 0.0;
@@ -530,6 +533,7 @@ mod tests {
         /// point, awake while it is being placed and asleep once held. A body the game moved off the point is let go.
         fn hold(&mut self, generation: u32, i: usize, at: f32) {
             let (point, id) = ([at, 0.0], self.ids[i]);
+            self.back[i] = false;
             if self.block.refused(i, generation, id, point) {
                 self.release(i);
                 return;
@@ -611,6 +615,20 @@ mod tests {
             assert_eq!((stage.holds.map(|hold| hold.is_some()), stage.asleep, stage.push), ([false; 2], [false; 2], [0.0; 2]), "{case}: both free");
             assert_eq!((stage.x, stage.speed), (HOME, [0.0; 2]), "{case}");
         }
+        // A release during the placing frames, when the hold has both bodies awake: the partner is put back and put to
+        // sleep there (the pair test checks it), and its own callback lets it go.
+        for (order, published) in [[0, 1], [1, 0]].into_iter().flat_map(|order| (0..3).map(move |published| (order, published))) {
+            let mut stage = Stage::new(true);
+            stage.tick(order, Some((0, Stage::group(true))));
+            stage.tick(order, None);
+            assert_eq!((stage.holds.map(|hold| hold.is_some()), stage.asleep), ([true; 2], [false; 2]), "both are being placed, awake");
+            stage.tick(order, Some((published, Ask::None)));
+            stage.tick(order, None);
+            stage.tick(order, None);
+            assert_eq!((stage.holds.map(|hold| hold.is_some()), stage.asleep, stage.x, stage.speed), ([false; 2], [false; 2], HOME, [0.0; 2]),
+                "order {order:?}, published at {published}");
+        }
+        assert_eq!([partner_sleep(false), partner_sleep(true)], [Some(true), None], "an awake body is put to sleep, and none is woken");
         // A request that still asks Player 1 is no release: the CPU is let go alone, by its own callback, as before.
         let mut stage = held([0, 1], true);
         stage.tick([0, 1], Some((0, Stage::group(false))));
