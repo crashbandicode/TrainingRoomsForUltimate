@@ -637,7 +637,7 @@ Both drills also run in a waiting room with [Lobby Practice](#lobby-practice) On
 
 ### Eggs-ercise
 
-A practice game for your attacks. A target pops up on one of the stage's floors or platforms, or, about half the time, in the air above one, within about a jump's height.
+A practice game for your attacks. With the default settings, look for targets on floors and platforms or in the air above them.
 
 - **Where:** Practice games > Eggs-ercise > the **Eggs-ercise** row (the mode)
 
@@ -651,8 +651,8 @@ A practice game for your attacks. A target pops up on one of the stage's floors 
 | Count | The notice shows the count in a band at the top, under Input Display's strip and the combo bar when they show, so targets keep the middle of the screen. |
 | Clock | The clock runs while the game runs. Pausing or opening the menu stops it. |
 
-- Hit it and it breaks, and the next one pops up somewhere else on screen, at least a few character widths away.
-- Each target flies straight up for about half a second, falls back, bounces once and then rests where it appeared until you hit it; it may drift a little sideways.
+- Hit a target to get the next one. When there is room, about half the candidate spots are in the air, up to 25 units above the floor.
+- At Normal speed the ordinary target rises for about half a second and bounces once. It returns to its starting height but can drift sideways.
 - It passes through platforms.
 
 | Mode | While it runs | At the end |
@@ -779,8 +779,9 @@ With **CPU**:
 
 | Moment | What the CPU does |
 | --- | --- |
-| At each spot | It starts on the ground with 0%, is launched up, drifts a little, falls back, bounces once and then stands where it landed until you hit it. |
-| In the air | It shows the game's own falling pose. **Target speed** applies to it as to the disc. |
+| At each spot | Starts at 0%. Like the disc, it can start above a floor or platform. |
+| In the air | Shows its falling pose. After an ordinary bounce it can stay in the air if it started there. |
+| Target speed | Changes the CPU's flight speed just as it does for the disc. |
 | A hit that the game registers on it, in the air or on the ground, and that **Breaks on** lets count | Breaks the target: the game plays its own hitlag and knockback, then the CPU goes back to 0% at the next spot and flies again. |
 | A hit that doesn't count | Puts it back on its flight. |
 
