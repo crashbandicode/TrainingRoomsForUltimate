@@ -1,12 +1,20 @@
 # The ACTION model (design, 2026-11-24)
 
+The shipped [combo and drill guide](../guide/combos.md) covers recording and grading.
+
 ## What it is
 
-An action is an originating input and the status chain it starts. It owns its release (and so its hold), its angle
-and its aims. A step starts only at an originating input, and the grader compares actions: what was pressed, how long
-it was held, which angle the game chose and where the special went. One description is read by the strip, the bar,
-the menu and the grader. The design and requirement trace are `artifacts/phase23/action-model/DESIGN.md` (base
-`e7667f26`); research is in `artifacts/phase23/research/general-input-recording/REPORT.md` and `REPORT-2.md`.
+```mermaid
+flowchart LR
+    n0x0["Originating input"] --> n0x1["Action and status chain"] --> n0x2["Hold, angle and aim"] --> n0x3["Strip, bar, menu and grader"]
+```
+
+- An action is an originating input and the status chain it starts.
+- It owns its release (and so its hold), its angle and its aims.
+- A step starts only at an originating input, and the grader compares actions: what was pressed, how long it was held, which angle the game chose and where the special went.
+- One description is read by the strip, the bar, the menu and the grader.
+- The design and requirement trace are `artifacts/phase23/action-model/DESIGN.md` (base `e7667f26`).
+- Research is in `artifacts/phase23/research/general-input-recording/REPORT.md` and `REPORT-2.md`.
 
 Travel detail and the angle-and-deflection toggle of DESIGN §8–§9 are described under "Travel parts and the stick
 toggle".
@@ -23,96 +31,116 @@ toggle".
 
 ## Ownership and steps
 
-`action::originates` accepts a press, C-stick input or flick. While grouping a recording,
-`InputCapture::step_with` starts a step when one of these arrives more than 20 frames after the last retained event;
-the drill helper instead grades against the reference's step schedule. A second or later aim starts its own step,
-and a full 12-event step continues in another. Other events append to the active step: a release or first aim does not
-itself split on idle. `Combo::unreleased` discards a release when the capture has no unmatched press for that button.
-A button already held when a take starts is a press.
+```mermaid
+flowchart LR
+    n0x0["Press, C-stick or flick"] --> n0x1["Originating event"] --> n0x2["Step boundary check"]
+```
+
+- `action::originates` accepts a press, C-stick input or flick.
+- While grouping a recording, `InputCapture::step_with` starts a step when one of these arrives more than 20 frames after the last retained event.
+- The drill helper instead grades against the reference's step schedule.
+- A second or later aim starts its own step, and a full 12-event step continues in another.
+- Other events append to the active step: a release or first aim does not itself split on idle. `Combo::unreleased` discards a release when the capture has no unmatched press for that button.
+- A button already held when a take starts is a press.
 
 ## Clear
 
-`Tracker::clear` retains `buttons` and `stick`, clearing its other state. A drill step opened by a press still held
-at clear, with no release after that press, belongs to the clear gesture. A result is provisional while all presses
-that opened its steps remain held, even after the attempt is forgotten. A clear withdraws the leading provisional
-results and restores their displaced history, streak and best; an open gesture-only attempt is discarded. Releasing
-an opening button makes its result and older provisional results final. Load after waits for a provisional result to
-become final and is dropped if the clear withdraws it. Otherwise an ungraded final gesture step is removed and an
-open attempt with a graded step is cleared; an open attempt without a graded step is discarded. Hit-combo clearing
-remains as before.
+```mermaid
+flowchart LR
+    n0x0["Clear gesture"] --> n0x1["Preserve held input"] --> n0x2["Withdraw provisional results"] --> n0x3["Restore history, streak and best"]
+```
 
-The game acts on its Training reset chord about eight frames before it initialises the fighters again (Eden
-`i4-final-yoga-01`: the chord's first status request at frame 58324, the fighter gone at 58332, initialised at
-58336), so the drill takes the reset from the chord. On a poll where Player 1's raw controller holds L+R+A in
-native Training with L+R+A Reset On, the runtime sets `RESET_COMMAND` in that poll's buttons; it rides in the record
-through Input Delay (`input_delay::with_reset_command`, `split_reset_command`), so the game never gets the bit. On a
-frame that carries it the drill clears the attempt as at a clear, after the frame's presses are taken, and leaves
-the hit-combo capture alone. With L+R+A Reset Off the chord resets nothing and its presses are ordinary input.
+- `Tracker::clear` retains `buttons` and `stick`, clearing its other state.
+- A drill step opened by a press still held at clear, with no release after that press, belongs to the clear gesture.
+- A result is provisional while all presses that opened its steps remain held, even after the attempt is forgotten.
+- A clear withdraws the leading provisional results and restores their displaced history, streak and best.
+- An open gesture-only attempt is discarded.
+- Releasing an opening button makes its result and older provisional results final.
+- Load after waits for a provisional result to become final and is dropped if the clear withdraws it.
+- Otherwise an ungraded final gesture step is removed and an open attempt with a graded step is cleared.
+- An open attempt without a graded step is discarded.
+- Hit-combo clearing remains as before.
+
+- The game acts on its Training reset chord about eight frames before it initialises the fighters again (Eden `i4-final-yoga-01`: the chord's first status request at frame 58324, the fighter gone at 58332, initialised at 58336), so the drill takes the reset from the chord.
+- On a poll where Player 1's raw controller holds L+R+A in native Training with L+R+A Reset On, the runtime sets `RESET_COMMAND` in that poll's buttons.
+- It rides in the record through Input Delay (`input_delay::with_reset_command`, `split_reset_command`), so the game never gets the bit.
+- On a frame that carries it the drill clears the attempt as at a clear, after the frame's presses are taken, and leaves the hit-combo capture alone.
+- With L+R+A Reset Off the chord resets nothing and its presses are ordinary input.
 
 ## Grading
-
-`grade_with` matches events in order and uses `GradeContext` for hold and aim ownership.
 
 | Event | Compared |
 | --- | --- |
 | Press, C-stick, flick | Kind, direction and offset; an old presses-only link matches button and its four-way aim. |
 | Special press owning aims | Kind and offset, not its stick direction; the aim events carry the direction. |
-| Release | In a drill, only a reference release marked as reacted is graded, by its owned hold; direction is ignored. A hit link compares releases as before. |
+| Release | Drills grade only reacted reference releases by hold. Hit links retain their release comparison. |
 | Aim | Part and facing-relative eight-way direction; for an aim-bearing target its timing delta is zero. |
 
-`Grade.band` adds `min(saved_hold / 8, 15)` frames to the chosen On-time tolerance. A drill step is graded at its
-deadline: the latest reference event's offset other than an unreacted release, plus the tolerance. A reacted release
-with a saved hold counts from
-the frame the attempt pressed its button (`Combo::owner_press`, `Combo::nth_press`): its offset there is that press
-plus the saved hold and its band. So a button held longer than the saved hold plus the band and the tolerance drops
-the step: as a missing release, or, when another event of the step kept it open, as a release that is off. A
-reference drill release with no owning press gets no mark; an unmatched attempt event is extra. For hit combos a
-release with no counterpart at the hit is not graded. `Tracker::late` reports the originating press of the action
-whose status changed, before any new action opens. Its release becomes `LetGo` if that change occurs on the release
-frame or within the selected On-time tolerance afterwards. A change with no known origin upgrades nothing, and a
-status left while Player 1 could already act belongs to no action: a release that starts a walk long after its move
-ended is not a reaction. An ordinary `Release` stays recorded but contributes no mark or deadline in a drill.
+`grade_with` matches events in order and uses `GradeContext` for hold and aim ownership.
+
+- `Grade.band` adds `min(saved_hold / 8, 15)` frames to the chosen On-time tolerance.
+- A drill step is graded at its deadline: the latest reference event's offset other than an unreacted release, plus the tolerance.
+- A reacted release with a saved hold counts from the frame the attempt pressed its button (`Combo::owner_press`, `Combo::nth_press`): its offset there is that press plus the saved hold and its band.
+- So a button held longer than the saved hold plus the band and the tolerance drops the step: as a missing release, or, when another event of the step kept it open, as a release that is off.
+- A reference drill release with no owning press gets no mark.
+- An unmatched attempt event is extra.
+- For hit combos a release with no counterpart at the hit is not graded. `Tracker::late` reports the originating press of the action whose status changed, before any new action opens.
+- Its release becomes `LetGo` if that change occurs on the release frame or within the selected On-time tolerance afterwards.
+- A change with no known origin upgrades nothing, and a status left while Player 1 could already act belongs to no action: a release that starts a walk long after its move ended is not a reaction.
+- An ordinary `Release` stays recorded but contributes no mark or deadline in a drill.
 
 ## One description
 
-`ActionDesc` carries the opening move, an `of` continuation for `Other`, the side-attack angle, a variant and two
-directions. `write` names the move and writes the angle and parts through `action::arrow`; the strip's
-`append_moves`, combo-bar cell and recording menu use it. Diagonals are two cardinal arrows. The description holds
-kinds, never names; `variant` identifies engine-common motion variants and returns zero when none is known.
-The ledge, get-up and trip attack animations use `Normal` numbers 26, 27 and 28 respectively.
+```mermaid
+flowchart LR
+    n0x0["ActionDesc"] --> n0x1["Move and continuation"] --> n0x2["Angle and parts"] --> n0x3["Shared move label"]
+```
 
-`LinkRec` holds both descriptions in three bytes and remains 124 bytes: each side has 12 bits, five for `of`
-(0 undescribed, 1 described without `of`, 2 onward the indexed move), two for angle (0 none, 1 up, 2 down) and five
-for variant. Follow-up parts come from its aim events. If both links are described, wrong-move compares move, `of`
-and angle, not variant or parts. Otherwise it compares the follow-up endpoints: a reference `other` matches any
-move older files called `other`; a named reference matches only that move.
+- `ActionDesc` carries the opening move, an `of` continuation for `Other`, the side-attack angle, a variant and two directions. `write` names the move and writes the angle and parts through `action::arrow`.
+- The strip's `append_moves`, combo-bar cell and recording menu use it.
+- Diagonals are two cardinal arrows.
+- The description holds kinds, never names.
+- `variant` identifies engine-common motion variants and returns zero when none is known.
+- The ledge, get-up and trip attack animations use `Normal` numbers 26, 27 and 28 respectively.
 
-`Action` stores the tracker action state. At opening its origin is the newest press at most `INPUT_LOOKBACK` (15)
-frames earlier; a hit uses that frame or the action start. `ids::Table::named_move` maps Catch through CatchAttack to
-Grab, Throw to Throw and exactly Final to Final Smash. It maps `CLIFF_ATTACK`, `DOWN_STAND_ATTACK` and
-`SLIP_STAND_ATTACK` to Ledge attack, Getup attack and Trip attack. Each opens its own action from a wait, even one
-that is not actionable, when the tracked move is different. A throw changes a grab's move without opening a new
-action. `Move::legacy` maps these six kinds to `Other`; the lane's colours are unchanged.
+- `LinkRec` holds both descriptions in three bytes and remains 124 bytes: each side has 12 bits, five for `of` (0 undescribed, 1 described without `of`, 2 onward the indexed move), two for angle (0 none, 1 up, 2 down) and five for variant.
+- Follow-up parts come from its aim events.
+- If both links are described, wrong-move compares move, `of` and angle, not variant or parts.
+- Otherwise it compares the follow-up endpoints: a reference `other` matches any move older files called `other`.
+- A named reference matches only that move.
+
+- `Action` stores the tracker action state.
+- At opening its origin is the newest press at most `INPUT_LOOKBACK` (15) frames earlier.
+- A hit uses that frame or the action start. `ids::Table::named_move` maps Catch through CatchAttack to Grab, Throw to Throw and exactly Final to Final Smash.
+- It maps `CLIFF_ATTACK`, `DOWN_STAND_ATTACK` and `SLIP_STAND_ATTACK` to Ledge attack, Getup attack and Trip attack.
+- Each opens its own action from a wait, even one that is not actionable, when the tracked move is different.
+- A throw changes a grab's move without opening a new action. `Move::legacy` maps these six kinds to `Other`.
+- The lane's colours are unchanged.
 
 ## The outcome rule
 
+```mermaid
+flowchart LR
+    n0x0["Special begins"] --> n0x1["Own-status onset"] --> n0x2["Stick follows movement"] --> n0x3["Heading differs from special"] --> n0x4["Aim part"]
+```
+
 `aim::Rule` decides an aim from what the fighter did and what the stick asked for. It reads no fighter kind and holds
-no table of statuses. The letters are those of REPORT-2 §2.2 and of the operator's decisions:
+no table of statuses. The letters are those of REPORT-2 §2.2 and of the recorded decisions:
 
 - **A, inside a special:** from an engine-common special start status (neutral, side, up or down) through the
   fighter's own statuses to the next common status. The start gives the special's own direction: up for an up
   special, down for a down special, either way along the ground for a side special, none for a neutral special.
-- **B, onset:** an entry into an own status opens a candidate at the position of the last frame before it that was
-  not in hitstop, with the velocity the fighter had then. Within `W` frames not in hitstop the fighter must be at
-  least `MOVED` from that position; a status change drops the candidate. The movement is an onset when that status
-  already had one in this special (a re-entry is the next part), or when its velocity is new: it differs from the old
-  velocity by at least `DV`, it is not the old velocity carried on (the old speed at least `CARRIED`, the same way
-  within `FOLLOW`, no faster than the old speed plus `DV`), and it turns by more than `FOLLOW` from the onset before
-  it.
-- **C, stick-follow:** some left-stick sample since the onset before it (or since the originating press) is off
-  centre (`DEAD`) and within `FOLLOW` of the heading. The newest such sample is found by searching backwards from the
-  onset frame. Ground clause: when the fighter stood on the ground before the entry and the heading is level within
-  `FOLLOW`, a stick pointing downward on the same horizontal side also follows it.
+- **B, onset:** an entry into an own status opens a candidate at the position of the last frame before it that was not in hitstop, with the velocity the fighter had then.
+  - Within `W` frames not in hitstop the fighter must be at least `MOVED` from that position.
+  - A status change drops the candidate.
+  - Re-entering a status with an earlier onset in the same special opens the next part.
+  - For a new velocity, require a change of at least `DV` and a turn greater than `FOLLOW` from the preceding onset.
+  - Reject carried motion when old speed was at least `CARRIED`, direction stayed within `FOLLOW`, and speed rose by at most `DV`.
+
+- **C, stick-follow:** some left-stick sample since the onset before it (or since the originating press) is off centre (`DEAD`) and within `FOLLOW` of the heading.
+  - The newest such sample is found by searching backwards from the onset frame.
+  - Ground clause: when the fighter stood on the ground before the entry and the heading is level within `FOLLOW`, a stick pointing downward on the same horizontal side also follows it.
+
 - **D, not the special's own direction:** the heading is more than `FOLLOW` from the direction rule A gave. A
   straight-up up special has no aim.
 - **E, part number:** the onset's ordinal in the special. Every onset counts, also one that rule C or D refuses;
@@ -127,45 +155,49 @@ no table of statuses. The letters are those of REPORT-2 §2.2 and of the operato
 | `DEAD` | 24 raw stick units |
 | `CARRIED` | 0.3 unit/frame |
 
-Hitstop does not consume the movement window or update the previous positions. The strip places an emitted mark at
-the candidate's entry frame; `Tracker::aim_pending` exposes a candidate whose movement is still undecided. The rule
-does not read fighter kind or use a fighter-specific status-number table: it does compare status identities to detect
-entry and re-entry. `src/model/aim_f13_fixture.rs`, generated by `tools/gen_aim_f13_fixture.py` from trace boot
-`f13-trace-0a17-1`, has Pikachu's 14 casts, whose parts the rule reproduces. Other fighters have no dense traces here,
-and this change has not run in a game.
+- Hitstop does not consume the movement window or update the previous positions.
+- The strip places an emitted mark at the candidate's entry frame.
+- `Tracker::aim_pending` exposes a candidate whose movement is still undecided.
+- The rule does not read fighter kind or use a fighter-specific status-number table: it does compare status identities to detect entry and re-entry. `src/model/aim_f13_fixture.rs`, generated by `tools/gen_aim_f13_fixture.py` from trace boot `f13-trace-0a17-1`, has Pikachu's 14 casts, whose parts the rule reproduces.
+- The 2026-11-24 design recorded no dense traces for other fighters and no game run of that change.
 
 ## The angle from the animation
 
-`Tracker::late` reports an action opening and a changed side-tilt or side-smash angle, with its originating press when
-known. `InputCapture::step_late` rewrites the matching C-stick event, or Attack press if there was no C-stick event,
-using `action::angled`; forward or back is retained and the animation supplies up, level or down. An undecided
-direction can wait up to `INPUT_LOOKBACK` frames. `Helper::regrade` updates an already graded step while its attempt
-is open and resolves a newly unclean attempt.
+```mermaid
+flowchart LR
+    n0x0["Tilt or smash animation"] --> n0x1["Originating press"] --> n0x2["Correct captured direction"] --> n0x3["Regrade open attempt"]
+```
+
+- `Tracker::late` reports an action opening and a changed side-tilt or side-smash angle, with its originating press when known. `InputCapture::step_late` rewrites the matching C-stick event, or Attack press if there was no C-stick event, using `action::angled`.
+- Forward or back is retained and the animation supplies up, level or down.
+- An undecided direction can wait up to `INPUT_LOOKBACK` frames. `Helper::regrade` updates an already graded step while its attempt is open and resolves a newly unclean attempt.
 
 ## Travel parts and the stick toggle
+
+```mermaid
+flowchart LR
+    n0x0["Accepted aim"] --> n0x1["Record stick and path"] --> n0x2["Attach travel"] --> n0x3["Compare reference and attempt"]
+```
 
 `action::Travel` is what one travel part measured: the deciding stick (angle in tenths of a degree, deflection in
 percent), the heading and straight-line distance of the whole part (tenths of a degree, tenths of a unit) and eight
 path points in game units from where the part began. Everything is facing-relative: 0° is forward, 90° is up.
 
-- **Measured by the rule.** When `aim::Rule` reports an onset as a part it opens that part: its base position, the
-  special's facing and the deciding stick, which is the newest stick sample since the onset before it (or the press)
-  that points along the heading (`aim::follows`, `action::stick_of`). It keeps up to 16 positions; when they are full
-  it keeps every second one and samples half as often. The part ends on the first frame whose status is not the
-  part's. `Rule::ended` and `Tracker::late().travel` hold the part number and its `Travel` on that frame only.
+- **Measured by the rule.** When `aim::Rule` reports an onset as a part it opens that part: its base position, the special's facing and the deciding stick, which is the newest stick sample since the onset before it (or the press) that points along the heading (`aim::follows`, `action::stick_of`).
+  - It keeps up to 16 positions.
+  - When they are full it keeps every second one and samples half as often.
+  - The part ends on the first frame whose status is not the part's. `Rule::ended` and `Tracker::late().travel` hold the part number and its `Travel` on that frame only.
+
 - **Path.** The line from the base through the kept positions to the last one, resampled at eighths of its length,
   mirrored for a left facing, rounded and saturated to ±127 units.
 - **Kept with the drill.** `InputCapture::step_with` attaches the travel to the newest `Aim` event of that part
-  (`Combo::attach_travel`). A combo has room for `DETAILS` (4) travels, 24 bytes each; a fifth is dropped. The join on
+  (`Combo::attach_travel`). A combo has room for `DETAILS` (4) travels, 30 bytes per stored detail; a fifth is dropped. The join on
   load and a crop move the entries with their events.
-- **Graded in input drills.** When the reference's and the attempt's aim both carry a travel and their eight-way
-  directions agree, `action::path_off` fails the step with `Mark::Path` if any of the eight points is farther apart
-  than `max(PATH_ABS, PATH_REL × the reference path's length)` (6 units, 0.30). With *Match angle and deflection* On,
-  `action::stick_off` then fails it with `Mark::Angle` when the stick's angle is more than `ANGLE_TOL` (10°) off, else
-  with `Mark::Deflection` when its deflection is more than `DEFLECTION_TOL` (15 points) off. The reasons are
-  `AimPath`, `AimAngle` and `AimDeflection` ("S1 1st path off", "S1 1st angle 12 off", "S1 1st deflection 30% low"),
-  reported after an extra aim and before a timing fault. The angle mark and reason use the same tenth of a degree
-  that was graded: a 10.2-degree miss shows `10.2 off`, not `10 off`.
+- **Graded in input drills.** When the reference's and the attempt's aim both carry a travel and their eight-way directions agree, `action::path_off` fails the step with `Mark::Path` if any of the eight points is farther apart than `max(PATH_ABS, PATH_REL × the reference path's length)` (6 units, 0.30).
+  - With *Match angle and deflection* On, `action::stick_off` then fails it with `Mark::Angle` when the stick's angle is more than `ANGLE_TOL` (10°) off, else with `Mark::Deflection` when its deflection is more than `DEFLECTION_TOL` (15 points) off.
+  - The reasons are `AimPath`, `AimAngle` and `AimDeflection` ("S1 1st path off", "S1 1st angle 12 off", "S1 1st deflection 30% low"), reported after an extra aim and before a timing fault.
+  - The angle mark and reason use the same tenth of a degree that was graded: a 10.2-degree miss shows `10.2 off`, not `10 off`.
+
 - **Late travel.** A part can end after its step was graded; `Helper::regrade` grades that step again, as for a late
   angle.
 - **The toggle.** Recording › Options, *Match angle and deflection* (`combo_stick`, Off by default), read into
@@ -174,30 +206,39 @@ path points in game units from where the part began. Everything is facing-relati
 
 ## A special's own travel
 
+```mermaid
+flowchart LR
+    n0x0["Special begins"] --> n0x1["Sample movement"] --> n0x2["First aim or special ends"] --> n0x3["Attach travel to opening press"]
+```
+
 Rule D gives a special that goes its own way no aim event, so a steered special (an up special bent a little to one
 side) left nothing to grade. The rule now also measures the special's own travel, as part 0.
 
-- **What it is.** Player 1's positions from the frame before the special's start status until the special ends, a
-  new special starts or its first aim part opens, in whatever status the fighter moves. While an entry into an own
-  status may still turn out to be an aim part, it does not sample. It is kept only if some position is at least
-  `MOVED` from where the special began; a special that stands still keeps nothing.
+- **What it is.** Player 1's positions from the frame before the special's start status until the special ends, a new special starts or its first aim part opens, in whatever status the fighter moves.
+  - While an entry into an own status may still turn out to be an aim part, it does not sample.
+  - It is kept only if some position is at least `MOVED` from where the special began.
+  - A special that stands still keeps nothing.
+
 - **The stick kept with it** is the one held for the most frames of that travel, by eight-way direction, as its
   newest sample; neutral when no direction was held longest (a tie goes to a direction).
-- **Entry velocity** is the displacement between the two unstopped positions immediately *before* the special
-  starts, with X relative to the fighter's facing. The preceding position supplies the magnitude of the change
-  between the last two velocities. Both velocity and change are stored to 1/256 of a unit. A missing third position
-  gives no timing allowance; a missing velocity is unknown, not zero. Aim parts have no entry.
-- **Handed over** as `Late::travel` with part 0 and `Late::press`, the press that began the special, on the frame the
-  travel ends. The capture attaches it to that press's event (a Special press or a C-stick event), in the same
-  four-entry table. When the table is full an aim's travel takes the place of the last one kept on a press; a press's
-  travel never takes an aim's.
-- **Graded in input drills,** when the reference's and the attempt's press both carry one: the path as for an aim
-  part (`Mark::Path`, "S1 Special path off"). Then, only when some path point is more than `STEER_FLOOR` (2 units)
-  apart **and** both entries are comparable, grade the stick's eight-way direction (`Mark::Steer`, "S1 Special
-  steer wrong"), and with *Match angle and
-  deflection* On its angle and deflection ("S1 Special angle 12 off", "S1 Special deflection 30% low"). Inside the
-  floor or with incomparable or unknown entry, the stick is not compared. A steered special at incomparable entry speed
-  gets no steering, angle or deflection fault; a path outside the independent wide-path tolerance still says path off.
+- **Entry velocity** is the displacement between the two unstopped positions immediately *before* the special starts, with X relative to the fighter's facing.
+  - The preceding position supplies the magnitude of the change between the last two velocities.
+  - Both velocity and change are stored to 1/256 of a unit.
+  - A missing third position gives no timing allowance.
+  - A missing velocity is unknown, not zero.
+  - Aim parts have no entry.
+
+- **Handed over** as `Late::travel` with part 0 and `Late::press`, the press that began the special, on the frame the travel ends.
+  - The capture attaches it to that press's event (a Special press or a C-stick event), in the same four-entry table.
+  - When the table is full an aim's travel takes the place of the last one kept on a press.
+  - A press's travel never takes an aim's.
+
+- **Graded in input drills,** when the reference's and the attempt's press both carry one: the path as for an aim part (`Mark::Path`, "S1 Special path off").
+  - Then, only when some path point is more than `STEER_FLOOR` (2 units) apart **and** both entries are comparable, grade the stick's eight-way direction (`Mark::Steer`, "S1 Special steer wrong"), and with *Match angle and deflection* On its angle and deflection ("S1 Special angle 12 off", "S1 Special deflection 30% low").
+  - Inside the floor or with incomparable or unknown entry, the stick is not compared.
+  - A steered special at incomparable entry speed gets no steering, angle or deflection fault.
+  - A path outside the independent wide-path tolerance still says path off.
+
 - Entries compare up to an inclusive vector distance of 1/16 unit/frame plus the larger observed entry change
   times the selected On-time tolerance in frames. Either entry can be the later one in an accelerating fall. A
   zero-frame tolerance or two constant-speed approaches keep the original 1/16 threshold.
@@ -208,37 +249,46 @@ side) left nothing to grade. The rule now also measures the special's own travel
 
 ## The runtime reads
 
-On sampled Player 1 frames, `input_display::p1_motion` reads the animation for a recognised attack or named move
-behind `ANGLE_ON`, set by the CPU mash unit's guarded row. `p1_position` reads x and y behind `AIM_ON`, set by the
-Recording unit's guarded position rows. The capability table names these boundaries in `tests/capabilities.rs`.
-No hook, native site, lock or static was added for the ACTION model.
+```mermaid
+flowchart LR
+    n0x0["Guarded CPU mash unit"] --> n0x1["Animation read"] --> n0x2["Angle"]
+    n1x0["Guarded Recording unit"] --> n1x1["Position read"] --> n1x2["Travel"]
+```
+
+- On sampled Player 1 frames, `input_display::p1_motion` reads the animation for a recognised attack or named move behind `ANGLE_ON`, set by the CPU mash unit's guarded row. `p1_position` reads x and y behind `AIM_ON`, set by the Recording unit's guarded position rows.
+- The capability table names these boundaries in `tests/capabilities.rs`.
+- No hook, native site, lock or static was added for the ACTION model.
 
 ## Files
 
-On input-drill load, a step beginning with a release or `Aim(1)` joins its predecessor if their events fit in 12;
-the original file is not rewritten by loading. Optional event keys include `hold` and `reacted` for releases and
-`stick`, `heading`, `distance` and `path` for aim travel. A release may write unsigned `hold`, checked for type on reading.
-This build records reactions using the selected On-time tolerance and writes `reacted: true` for an input-drill
-`LetGo` and `reacted: false` for an ordinary release; a non-boolean is rejected. For a legacy release without
-`reacted`, an owned hold under eight frames stays ungraded,
-while a hold of eight or more is graded in its band. An unowned release remains ungraded. Re-recording a drill gives
-it the causal rule.
-Described hit links write both optional objects `from_shown` and `to_shown`: applicable members are `of` (a
-move key), `angle` (`up` or `down`) and `variant` (0–31), and `move` for a Final Smash only. Both objects are
-needed for a described link; `{}` is valid. `from` and `to` write `grab`, `throw`, `ledge_attack`,
-`getup_attack` and `trip_attack` by name (the operator's order of 2026-11-25, which reverses that day's rule
-that the six kinds belong in the description, for these five). It is not backward compatible: install 4
-(`a945b0c1`) and earlier shipped installs refuse a file with one of the five in `from` or `to`. A Final Smash still
-writes `other` with `move`, and the reader refuses `final_smash` straight in `from` or `to`. The reader still
-takes the older form of the five (`other` with `move`) and reads it to the same link; a file read from disk
-keeps its own JSON, and a crop or a new record writes the names. A named `from` or `to` with a `move` member is
-refused. Without both objects a link is compared by its endpoints: `other` stands for any move older files
-call other, a named endpoint for that move only.
+```mermaid
+flowchart LR
+    n0x0["Read saved step"] --> n0x1["Join eligible split steps"] --> n0x2["Grade events"]
+    n1x0["New recording or crop"] --> n1x1["Write selected schema"]
+```
 
-An input drill's aim event that has a travel also writes `stick` (`{"angle": 135.0, "deflection": 100}`, only when a
-stick was kept), `heading`, `distance` and `path` (eight `[dx, dy]` pairs). On reading, an aim event with `path` gets
-a travel: `path` must be eight pairs of integers from −127 to 127, `heading` a number from 0 to under 360,
-`distance` a number of 0 or more, and `stick`, when present, an angle in the same range and a deflection from 0 to
+- On input-drill load, a step beginning with a release or `Aim(1)` joins its predecessor if their events fit in 12.
+- The original file is not rewritten by loading.
+- Optional event keys include `hold` and `reacted` for releases and `stick`, `heading`, `distance` and `path` for aim travel.
+- A release may write unsigned `hold`, checked for type on reading.
+- This build records reactions using the selected On-time tolerance and writes `reacted: true` for an input-drill `LetGo` and `reacted: false` for an ordinary release.
+- A non-boolean is rejected.
+- For a legacy release without `reacted`, an owned hold under eight frames stays ungraded, while a hold of eight or more is graded in its band.
+- An unowned release remains ungraded.
+- Re-recording a drill gives it the causal rule.
+- Described hit links write both optional objects `from_shown` and `to_shown`: applicable members are `of` (a move key), `angle` (`up` or `down`) and `variant` (0–31), and `move` for a Final Smash only.
+- Both objects are needed for a described link.
+- `{}` is valid. `from` and `to` write `grab`, `throw`, `ledge_attack`, `getup_attack` and `trip_attack` by name (the 2026-11-25 decision, which reversed that day’s rule that the six kinds belong in the description, for these five).
+- It is not backward compatible: install 4 (`a945b0c1`) and earlier shipped installs refuse a file with one of the five in `from` or `to`.
+- A Final Smash still writes `other` with `move`, and the reader refuses `final_smash` straight in `from` or `to`.
+- The reader still takes the older form of the five (`other` with `move`) and reads it to the same link.
+- A file read from disk keeps its own JSON, and a crop or a new record writes the names.
+- A named `from` or `to` with a `move` member is refused.
+- Without both objects a link is compared by its endpoints: `other` stands for any move older files call other, a named endpoint for that move only.
+
+- An input drill's aim event that has a travel also writes `stick` (`{"angle": 135.0, "deflection": 100}`, only when a stick was kept), `heading`, `distance` and `path` (eight `[dx, dy]` pairs).
+- On reading, an aim event with `path` gets a travel: `path` must be eight pairs of integers from −127 to 127, `heading` a number from 0 to under 360, `distance` a number of 0 or more, and `stick`, when present, an angle in the same range and a deflection from 0 to
+
 100. Without `path` the other three keys are ignored. No schema version changes. A Special press or a C-stick event
 that keeps the special's own travel writes and reads the same four keys; such a drill stays version 2.
 
@@ -247,6 +297,11 @@ when the combo has no aim, 3 or 4 when it has one. A source-backed write retains
 selected version and name.
 
 ## Changes against the build before it
+
+```mermaid
+flowchart LR
+    n0x0["Measured movement and stick"] --> n0x1["Aim decision"] --> n0x2["Shared action description"]
+```
 
 - A special's own direction does not produce an aim mark or event.
 - An own status that never moves, or whose movement the stick never followed, produces no aim.
@@ -259,23 +314,29 @@ selected version and name.
 
 ## Limits
 
+```mermaid
+flowchart LR
+    n0x0["96-frame stick history"] --> n0x1["Up to two onset parts per special"] --> n0x2["Four stored travels per drill"]
+```
+
 - At most two onset parts per special are emitted.
 - The re-entry shortcut of rule B remembers two statuses per special.
 - The stick search of rule C reaches back no further than the tracker keeps frames (`SNAP_RING`, 96).
 - Hit-combo aim events retain eight-way direction grading.
-- A saved link stores no travel arrows. The bar and the menu show the follow-up's from its aim events. A link after
-  the first shows its first move's from the link before it, whose follow-up is the same action (`Combo::descs`). The
-  combo's first link shows only the base special and the angle for its first move, where the live strip also shows
-  its travel arrows.
+- A saved link stores no travel arrows.
+  - The bar and the menu show the follow-up's from its aim events.
+  - A link after the first shows its first move's from the link before it, whose follow-up is the same action (`Combo::descs`).
+  - The combo's first link shows only the base special and the angle for its first move, where the live strip also shows its travel arrows.
+
 - A drill keeps four travels in all, aim parts before the travels kept on presses; hit-combo links keep none.
 - A special's own travel is told apart from a steered one only beyond `STEER_FLOOR`; path points are whole units. The
-  floor and what counts as steered were set from one fighter's sampled casts (Mario's up special) and not flown.
+  floor and what counts as steered were set from one fighter's sampled casts (Mario's up special) and had no flight evidence in that design.
 - A different approach can move the path outside the wide-path tolerance even when the stick is not comparable.
   The result then reports the path, not wrong steering.
-- The entry tolerance was checked against one fighter's traced fall (Pikachu, 44 samples) and not flown. An attempt
+- The entry tolerance was checked against one fighter's traced fall (Pikachu, 44 samples) and had no flight evidence in that design. An attempt
   whose entry does not compare has its stick left ungraded, so it can pass without the recorded steer.
 - Every stored combo carries the 120-byte travel table, also where no travel can occur (four 30-byte details).
-- The numeric tolerances are defaults to tune in hand tests and a roster sweep.
+- The 2026-11-24 design proposed hand tests and a roster sweep for the numeric defaults.
 - A recording take spanning a Training reset is unchanged.
 - An origin identifies a press frame, not a button: simultaneous presses share that frame and cannot be distinguished
   by the reaction rule. Hit-combo link grading remains unchanged.
@@ -283,6 +344,11 @@ selected version and name.
 - Older drill files lack reaction evidence, so their hold-length compatibility rule cannot establish causality.
 
 ## Host checks
+
+```mermaid
+flowchart LR
+    n0x0["Capture and ownership"] --> n0x1["Grade and persist"] --> n0x2["Display the same action"]
+```
 
 - Ownership and clear: `a_cast_after_a_training_reset_is_graded`,
   `a_specials_first_aim_stays_in_its_step_however_late`, `a_second_aim_part_keeps_its_own_step`,

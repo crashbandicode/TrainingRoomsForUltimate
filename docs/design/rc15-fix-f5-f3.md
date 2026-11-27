@@ -1,23 +1,34 @@
 # The speed label's button and the recording indicator (design, 2026-11-23)
 
-## 1. F5: the speed label reads `1 Frame (Press )`
+For the shipped controls see [Game speed](../guide/game-speed.md) and [Recording](../guide/recording.md).
+
+## 1. F5 reproduction: the speed label read `1 Frame (Press )`
+
+```mermaid
+flowchart LR
+    n0x0["Pause menu unopened"] --> n0x1["Glyph style zero"] --> n0x2["Empty button label"]
+```
 
 ### Cause (confirmed in the owned 13.0.5 main ELF and on the card build in Eden)
 
 | Fact | Where |
 | --- | --- |
-| The bind writes the label with the game's own text function, `0x1bbbd30(menu, value, pane)`, as the menu setter does | `runtime/features/game_speed.rs` `training_tick`; `docs/design/rc8-binds.md` §2 |
-| For value 2 (1 Frame) that function reads the controller glyph style from the Training pause menu's `+0x30`: `ldr w8,[x22,#0x30]` | `.1bbbd78` (jump table `0x44f8a24` entry 0) |
-| It derives the button code from it (`0xc`, or `[main+0x44681a0 + 4*(style-3)]` for styles 3..6), stores the style into each text object's `+0x25c`, and sets `mel_training_speed1` (the menu row) and `mel_training_speed_control_frame` (the stopwatch) with the code as the message's one argument: `0x377a280(pane, label, 1, code)` | `.1bbbd78`–`.1bbbd94`, `.1bbbe34`–`.1bbbf78` |
-| The game writes `menu+0x30` when its own pause menu opens: the HUD's open step maps the opening controller's style `[[c+0x10]+0x9c]` (1..7) through the table `main+0x4753de0` = `1,2,3,4,5,6,6`, calls `0x1bb8b20(menu, index)` (which stores it too, `.1bb8db4`) and stores it again | `.13e4e08`–`.13e4e88` |
-| The menu's constructor leaves 0 there. The menu's code (`0x1bb0000`–`0x1bc8000`) has no other 32-bit store to `+0x30` | `.1bb16b0` `str wzr,[x19,#0x30]`; `re/peek.py find-store` |
+| The bind uses the menu setter’s native label writer. | `0x1bbbd30(menu, value, pane)`; `training_tick`; `rc8-binds.md` §2 |
+| Value 2 (1 Frame) loads the Training pause menu’s glyph style. | `.1bbbd78`: `ldr w8,[x22,#0x30]`; jump table `0x44f8a24`, entry 0 |
+| Default button code is `0xc`; styles 3–6 index a table. | `[main+0x44681a0 + 4*(style-3)]`, `.1bbbd78`–`.1bbbd94` |
+| Each text object receives the style at `+0x25c`. | `.1bbbe34`–`.1bbbf78` |
+| Menu row and stopwatch receive the button code as their sole message argument. | `mel_training_speed1`, `mel_training_speed_control_frame`; `0x377a280(pane, label, 1, code)` |
+| Opening Training pause maps controller style (1–7) to a glyph style. | `[[c+0x10]+0x9c]`, table `main+0x4753de0`: 1,2,3,4,5,6,6 |
+| Open calls the setter and stores the resulting style again. | `0x1bb8b20(menu, index)`, store `.1bb8db4`; open path `.13e4e08`–`.13e4e88` |
+| The constructor zeroes the field. | `.1bb16b0`: `str wzr,[x19,#0x30]` |
+| No other menu code stores a 32-bit value to `+0x30`. | `0x1bb0000`–`0x1bc8000`; `re/peek.py find-store` |
 | The other speeds' labels take no argument (`0x377a120(pane, label)`), so only 1 Frame shows it | `.1bbbda8`–`.1bbbe30` |
 
 So with the game's pause menu never opened in the Training session, the bind's call draws the button with glyph style 0, which is no glyph. The game never meets this: its own setter runs only with the menu open.
 
 **Eden, the card build, one boot (`rc15-docs-17060a5e-yoga-2`, eggs-offstage-sol):**
-- Pause menu never opened in the session, chord to 1 Frame: `1 Frame (Press )`. Still: `smash-training-lobby` `artifacts/phase23/fix-round-20261123/f5-f3/repro/repro-r5/1-frame-top-right-1080p.png`.
-- One open and close of the game's pause menu, then chord to x1 and back to 1 Frame: `1 Frame (Press ZL)` with the glyph. Still: `smash-training-lobby` `artifacts/phase23/fix-round-20261123/f5-f3/repro/repro-r5-native-pause/1-frame-top-right-1080p.png`.
+- Pause menu never opened in the session, chord to 1 Frame: `1 Frame (Press )`. Historical take: `repro-r5`.
+- One open and close of the game's pause menu, then chord to x1 and back to 1 Frame: `1 Frame (Press ZL)` with the glyph. Historical take: `repro-r5-native-pause`.
 
 ### Fix
 
@@ -26,14 +37,17 @@ The bind lends the text call Player 1's glyph style, the value the menu's open s
 1. Player 1's poll already reads the controller style (`chords::field::STYLE`, the same `+0x9c`). `game_speed::on_hold` keeps it in an atomic.
 2. `model::game_speed::glyph_style(style)` is the game's table (1..=6 as they are, 7 the GameCube pad 6, anything else 0).
 3. `model::game_speed::label_lend(value, style, rows)` gives `Some(glyph style)` only for 1 Frame, a style with a glyph style, and the label's rows passed at boot.
-4. `training_tick` (the UI job thread, where the menu's own code runs): read `menu+0x30`, write the lent style, call `0x1bbbd30`, write the old value back. The field stays the game's: after the call it holds what the game put there (0, or the last opener's style), and the game's next open overwrites it as always. The two text objects keep the style, as they do after the menu's own setter.
+4. `training_tick` (the UI job thread, where the menu's own code runs): read `menu+0x30`, write the lent style, call `0x1bbbd30`, write the old value back.
+  - The field stays the game's: after the call it holds what the game put there (0, or the last opener's style), and the game's next open overwrites it as always.
+  - The two text objects keep the style, as they do after the menu's own setter.
+
 5. Without a lend the call is made as before.
 
 Not changed: the stored speed, the stopwatch show and hide, the apply, the pop-up, the waiting room (it has no stopwatch).
 
 ### Guards
 
-A new data file, the 31st: `data/tables/rows_speed_label.ROWS.tsv`, written by `tools/gen_rows_speed_label.py`, group `speed_label`, all `Relied`, read-only, not per frame. The historical digests stay unchanged.
+F5 added the 31st data file, `data/tables/rows_speed_label.ROWS.tsv`, written by `tools/gen_rows_speed_label.py`, group `speed_label`, all `Relied`, read-only, not per frame. The historical digests stay unchanged.
 
 | Row | Offset | What it holds |
 | --- | --- | --- |
@@ -47,7 +61,12 @@ The gate `LABEL_ROWS` is its own: when a row fails, nothing is lent and the labe
 
 ## 2. F3: the recording indicator
 
-### Today (card build, Eden `rc15-docs-17060a5e-yoga-2`, `repro/repro-r3-*`)
+```mermaid
+flowchart LR
+    n0x0["Open take"] --> n0x1["Read role"] --> n0x2["Draw HUD chip and text"] --> n0x3["Publish drawn indicator"]
+```
+
+### Before the fix (2026-11-23 card build, Eden `rc15-docs-17060a5e-yoga-2`, `repro/repro-r3-*`)
 
 - A take for the CPU: the CPU's fighter is tinted by phase (lockout blue, standby magenta, recording red) and a one-second notice names the phase.
 - A take for Player 1: nothing on screen.
@@ -55,15 +74,16 @@ The gate `LABEL_ROWS` is its own: when a row fails, nothing is lent and the labe
 
 ### Design: the compact HUD row
 
-The top-left compact row that Break the Targets uses (`TrBtt`: a dark plate, a 32-unit picture chip, one text) shows the take:
+In the shipped build, playback can also appear between the recording label and the target line. The top-left compact row that Break the Targets uses (`TrBtt`: a dark plate, a 32-unit picture chip, one text) shows the take:
 
 | State | Text | Text and chip colour | Box |
 | --- | --- | --- | --- |
 | Player 1's take | `REC P1` | the roster's Player red `[255, 83, 92]` | 140 wide, at the row's corner |
 | The CPU's take | `REC CPU` | the roster's CPU blue `[75, 164, 255]` | the same |
-| Break the Targets' line, no take | as today | text colour as today, chip white | as today (`btt_hud_box`) |
+| Break the Targets' line, no take | existing target count | target text colour, chip white | existing dimensions (`btt_hud_box`) |
 | A take during Break the Targets | `REC P1 · ` or `REC CPU · ` and then the line | the role's colour | `btt_hud_box` of the whole text |
-| Neither | hidden | | |
+| Playback without a take | `PLAY P1`, `PLAY CPU` or `PLAY P1 + CPU` | Player red or CPU blue (both: blue) | Fits the text |
+| No take, playback or target line | hidden | | |
 
 - **Where:** 16 px from the left and 8 px from the top at 1280 × 720, the corner the notices use; in the waiting room it moves down with the notices and the strip, under the native panels. A notice stacks under the row, as it does under the Break the Targets line.
 - **The dot:** the chip is the row's own picture (the target), tinted by its vertex colours like the orbs and eggs. Red tint: an almost solid red disc. Blue tint: a blue disc with dark rings.
@@ -71,13 +91,15 @@ The top-left compact row that Break the Targets uses (`TrBtt`: a dark plate, a 3
 - **Independent of the notice queue:** Combo Display Off, a refusal or another notice does not remove it.
 - **No layout change:** no pane, texture or material is added or changed; the pane recipe guard passes unchanged.
 - **Colours:** the two role colours move from `runtime/ui/view.rs` into the model, and the roster grid and the row use the same constants.
-- **Bridge:** one line added to `tr.menu/1`, `recording.indicator` = `player`, `cpu` or empty: the role of the take the HUD's row actually drew on its last pass. The row's writer returns the take only when the row's container, chip and text panes were there to write, and the HUD stamps each pass with it (`uptime_ms << 2 | take`, the scene stamp's form). Empty when that pass drew none (no take, the menu over the HUD, a layout without the row such as the stock layout) and when no pass ran in the last 500 ms (a waiting room without the plugin's host, a scene change), so the line never names a chip that is not on screen.
+- **Bridge:** one line added to `tr.menu/1`, `recording.indicator` = `player`, `cpu` or empty: the role of the take the HUD's row actually drew on its last pass.
+  - The row's writer returns the take only when the row's container, chip and text panes were there to write, and the HUD stamps each pass with it (`uptime_ms << 2 | take`, the scene stamp's form).
+  - Empty when that pass drew none (no take, the menu over the HUD, a layout without the row such as the stock layout) and when no pass ran in the last 500 ms (a waiting room without the plugin's host, a scene change), so the line never names a chip that is not on screen.
 
 ### Design: the recorded fighter's tint
 
 While its take records, the recorded fighter has its role's hue, the scheme the chip uses: Player 1 red, the CPU blue. The CPU's two phases before its take records keep hues of their own.
 
-| Take | Phase | Fighter | Card build | Now |
+| Take | Phase | Fighter | Before | Shipped |
 | --- | --- | --- | --- | --- |
 | Player 1's | open (it has no lockout or standby) | Player 1's | no tint | red `[1, 0, 0]` |
 | The CPU's | Lockout (30 frames) | the CPU's | blue | **yellow `[1, 1, 0]`** |
@@ -87,19 +109,28 @@ While its take records, the recorded fighter has its role's hue, the scheme the 
 - **The values** are the pure hues the phases already had: the card build's recording red goes to Player 1 and its lockout blue to the CPU's recording. Lockout takes yellow, a hue none of the others has (red, blue, magenta).
 - **The phase notices** keep their tint's hue, as before: `Lockout` light yellow `[255, 224, 112]` (15.2:1 on the notice plate), `Standby` unchanged, `Recording` light blue `[148, 176, 255]` (the value Lockout had, 9.4:1). Their text, length and timing are unchanged.
 - **The CPU's tint** is written where it was (the AI hook, every frame of the phase); only `Phase::tint`'s values change.
-- **Player 1's tint** is written in Player 1's own fighter frame in a practice scene (`cpu::fighter_frame`, entry 0; Training and the waiting room) by `recorder::tint_player`: on every frame `rr_host::player_tint()` gives the tint, to entry 0's active body (never Nana, as the CPU's). It does not depend on the CPU's AI frame, which a drill, a placement or Mash Out skips, so Record drill is tinted too.
+- **Player 1's tint** is written in Player 1's own fighter frame in a practice scene (`cpu::fighter_frame`, entry 0.
+  - Training and the waiting room) by `recorder::tint_player`: on every frame `rr_host::player_tint()` gives the tint, to entry 0's active body (never Nana, as the CPU's).
+  - It does not depend on the CPU's AI frame, which a drill, a placement or Mash Out skips, so Record drill is tinted too.
+
 - **Nothing new native:** the same `ModelModule::set_color_rgb` (`model_set_color_rgb`, package 4) and colour-blend constant the CPU's tint uses; no hook, guard row or called function added.
 - **Chip and tint together:** the chip names the role for the whole take; during the CPU's take its fighter is yellow, magenta, then blue.
 
 Not changed: the phases, their notices' text and timing, the standby tint, the recording itself.
 
-### Unproven until the fix build's boot
+### Runtime checks requested on 2026-11-23
 
 - How the tinted chip and the 13-unit text read on a real screen, on a bright and a dark stage.
 - The waiting room's row (same code path; Eden only).
 - Player 1's tint on a running game: the write is the CPU's, made at a new place (Player 1's fighter frame).
 
 ## 3. Tests (host)
+
+```mermaid
+flowchart LR
+    n0x0["F5 label lending"] --> n0x1["Guard and restore checks"]
+    n1x0["F3 recording role"] --> n1x1["HUD, bridge and tint checks"]
+```
 
 F5:
 - `the_one_frame_label_is_lent_player_ones_glyph_style` (`game_speed_tests`): a table of value, controller style and rows against the lend.
@@ -108,7 +139,12 @@ F5:
 
 F3:
 - `a_take_shows_rec_in_the_roles_colour`, `no_take_and_no_line_hides_the_row`, `the_targets_line_alone_is_drawn_as_before`, `a_take_during_the_targets_run_shares_the_line`, `the_rec_row_is_short_and_holds_its_text`, `a_notice_stacks_under_the_rec_row`, `the_rec_row_keeps_clear_of_the_lobbys_panels` (`hud_row_tests`).
-- `the_hud_draw_shows_the_open_take_in_training_and_the_waiting_room` (source test over `runtime/features/hud_draw.rs`, `runtime/bridge_state.rs` and `runtime/ui/view.rs`): the draw reads the open take (`rr_host::capture_take`), builds the row for both layouts, writes text colour and chip colour, hides it under the menu, publishes what the row's writer drew (nothing without the row's container, a take only with its chip and text panes) as a stamp of that pass, and the roster uses the model's role colours. Red on `17060a5e`; the published-draw part red on `67568434`.
+- `the_hud_draw_shows_the_open_take_in_training_and_the_waiting_room` covers `runtime/features/hud_draw.rs`, `runtime/bridge_state.rs` and `runtime/ui/view.rs`.
+  - Both layouts read `rr_host::capture_take` and use role colours for chip and text. The menu hides the row. The roster uses the same colours.
+  - Each pass publishes what it drew. Without a container it publishes nothing. A take requires both chip and text panes.
+  - Red on `17060a5e`.
+  - The published-draw part red on `67568434`.
+
 - `the_open_take_is_the_capture_role` (`rr_host` tests): no take, Player 1's take and the CPU's take through the Record chord, and the bridge word equal to `recording.capture.role`'s.
 - `the_snapshot_says_which_take_the_hud_shows`, `the_indicator_is_the_take_the_hud_drew_on_a_fresh_pass` (`bridge_state` tests): the new line for player, cpu and none; the stamp read as player or cpu while fresh, empty when the pass drew no chip, when no pass ran since, and before any pass.
 - `phase_notifications` (`tests/input01.rs`, its pins changed), `a_recorded_fighter_has_its_roles_tint` (the same file): the four tints, each a different hue, the CPU's recording tint the CPU's, and each phase notice in its tint's hue. Red on `17060a5e`.
