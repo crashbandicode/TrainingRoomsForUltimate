@@ -1,8 +1,8 @@
 # Media
 
-The gameplay GIFs in [`media/`](media) use actual Eden footage. See each entry for timing, cuts and any comparison.
-Single takes are 1280×720; the 68 comparison and composite GIFs are 1280 wide and 404, 436 or 764 high. Frames were reviewed (start,
-action, result) before a clip was kept. The raw takes stay outside git with their runs.
+The gameplay GIFs in [`media/`](media) use actual Eden footage. The tables record files, dimensions and pages **at capture time**;
+they include retired takes, not just files still published. The 68 original comparison and composite GIFs were 1280 wide and
+404, 436 or 764 high. The raw takes stay outside git with their runs.
 
 The [zone-editor proof still](decisions/rc15-zone-editor-crop-proving-boot.png) omits the 28-row test banner at the top. The remaining 1280×646 pixels are unchanged.
 
@@ -508,8 +508,7 @@ gamepad overlay left out: `docs-rd6-722525a5` (Surface, 2026-11-11 09:28–09:33
 | --- | --- | --- | --- | --- | --- |
 | `media/rc7-replay-capture.gif` | `docs-rd6-722525a5`, `fx-replay-capture` | none (replaced by `rc11-replay-capture.gif`, 2026-11-13) | 5.4 s, 3.4 MB | 0.0–0.6, 10.3–11.9, 27.3–28.4, 29.3–31.4 s | Training (a leftover "Saved Slot 1" notice); Recording › Replays › Replay capture [OFF], then [ON]; Training, the Online Deluxe overlay at the top right (its network page); its plugins page, "Training Rooms › Replay capture On". The log has `[ReplayCapture] menu preference enabled=true result=Applied` and `replay_capture.ini written by the writer thread enabled=true` at the menu's close. (The row's own check looked before the close and failed; the take is complete.) |
 
-`record-refused.gif` (2026-11-05, the bar and the old input log) is no longer embedded (the file stays in `media/`) and
-was **not retaken**: on this build Record
+`record-refused.gif` (2026-11-05, the bar and the old input log) was removed, not retaken: on the rc.7 build Record
 was not refused. In `docs-rd6b-722525a5` `fx-record-refused`:
 - the overlay's CPU Pilot page turned P1 from Player to "CPU (L3)", and the HUD read "CPU Lv3";
 - the pilot moved Player 1;
@@ -522,10 +521,9 @@ evidence clips stay outside this repository): Player 1's HUD reads MARIO; the ov
 "Player" to "CPU (L3)" and the HUD from MARIO to CPU Lv3; the pilot dashes Player 1; Record shows "Input Recording ·
 Lockout", then "Recording".
 
-rc.8 fixes it (`p23/rc8-pilot-refusal` `8607526b`, merged into the rc.8 head `eca14e4b`): the Record chord now asks the
-same refusal as every other record start, so the README and DIFFERENCES-FROM-THE-FORK.md describe the refusal instead
-of a known issue. No retaken clip is in `media/`: the refusal's proof is the evidence clip `rc10-pilot-refusals.gif`
-(rc.10 section above; outside git).
+In rc.8 (`8607526b`, merged into `eca14e4b`), the Record chord began refusing an AI-driven Player 1. The rc.10
+evidence take was `rc10-pilot-refusals.gif` (outside git). That refusal was retired on 2026-11-25; see
+[recording while an AI plays](RELEASE-NOTES-rc15.md#record-works-while-an-ai-plays-player-1).
 
 Retired from the README (each carried the bar):
 - `mii-editor.gif` and `mii-editor-list.gif` (2026-11-05): `rc7-mii-editor.gif` shows the editor, the new row and the

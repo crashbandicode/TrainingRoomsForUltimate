@@ -7,7 +7,7 @@ Press R twice from the CPU page for your recordings, your combos and their playb
 ![The pop-up and the page side by side: both show the same two lists, the hot five and CONNECTIONS](../diagrams/recording-page-popup.png)<br>
 *The pop-up and the page show the same lists.*
 
-ZR + D-pad Right opens the pop-up over the match ([reading the lists](../guide/recording.md#reading-the-lists)).
+Use your [Recording pop-up chord](display-and-controls.md#button-chords) to open the library over practice.
 
 | Key | On the page | In the pop-up |
 | --- | --- | --- |
