@@ -92,7 +92,7 @@ These results describe the cancelled preview, not the [clip editor in the fixed 
 | Eden, on the release file, second boot | No crash. Snapped X, scrub poses and the settings check passed again. The fighter choice failed as above |
 | Eden, on the diagnostic build | Three chosen frames were shown exactly, and X and B let the fighters go. The slide was found there |
 | Not flown | A capture saved and read back in a game; a fighter pushed by a wall; a macro gaining its moves from one Play; the CPU side of the fighter choice; a second player in a waiting room |
-| On the console | Nothing yet |
+| On the console | The preview install was cancelled. |
 
 The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#preview-build-cc71537c).
 
@@ -213,7 +213,7 @@ both fighters stood beside their recorded points while the editor said they were
 | Installed | Yes, and read back. TrainingRooms was the only one of the 21 active plugins replaced. A rollback copy of install 5 was also saved on the card |
 | Host | Every merge passed host tests and builds |
 | Eden, on the build before the fix (`eb39d6bc`), not on this exact build | Play started no later than on install 5; a take was recorded and held at In with no preview; an old macro got its positions from one Play; Y on In made a capture previewable; and the playhead browsed a take. The same session found the defect that the fix addresses |
-| Eden, on install 6's diagnostic build (same commit) | Passed so far: record and hold, release on X and on close, the old macro, a crop, delete, a take on the CPU, the playhead rows, the snap rows up to their preview, and the menu's stack check. Found: the three issues listed under [Known issues](CURRENT-RELEASE.md#known-issues) as found in testing. No smoke boot of the installed release file, and no waiting-room pair, has flown |
+| Eden, on install 6's diagnostic build (same commit) | Passed in this run: record and hold, release on X and on close, the old macro, a crop, delete, a take on the CPU, the playhead rows, the snap rows up to their preview, and the menu's stack check. Found: the three issues listed under [Known issues](CURRENT-RELEASE.md#known-issues) as found in testing. These results cover neither a smoke boot of the installed release file nor a waiting-room pair |
 | On the console | Scrubbing moved the fighters but did not show the moves. The operator requested recorded poses and a choice of recorded or current fighter for each role; neither is in install 6. |
 
 The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc).
