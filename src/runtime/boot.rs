@@ -52,6 +52,7 @@ fn run_inner() {
     diag_log::set_tick(p1::service);
     diag_log::set_tick(mashout::service);
     diag_log::set_tick(cpu::service_tech_init);
+    diag_log::set_tick(cpu_common::drain_reports);
     diag_log::start_drain_thread();
 
     // 1. The version guard: nothing else runs on another game.

@@ -175,6 +175,13 @@ extern "C" fn sub_guard_cont_hook(fighter: usize) -> L2CValue {
 
 static WANTED: AtomicBool = AtomicBool::new(false);
 
+// A common load is rare. Only the heartbeat may open events.log (Switch std owns its path).
+static REPORTS: hos_lock::Mailbox<FixedPath<640>, 2> = hos_lock::Mailbox::new();
+
+pub(crate) fn drain_reports() {
+    REPORTS.drain(|line| install::write_text(line.as_str()));
+}
+
 /// Arm the consumer for the `common` module and return the install line's reason.
 pub fn register() -> Option<&'static str> {
     if !crate::runtime::nro_load::installed() {
@@ -249,5 +256,5 @@ fn install(name: &str, module: *mut skyline::nn::ro::Module) {
         }
     }
     let _ = write!(line, " cpu_common={}", if all { "installed" } else { "not_installed" });
-    install::write_text(line.as_str());
+    REPORTS.post(line);
 }
