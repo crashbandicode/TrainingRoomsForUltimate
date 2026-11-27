@@ -6,8 +6,12 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
 
 ## Two toolchains, by design
 
-- **Host gates** (`cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo build --no-default-features`)
-  use the pin in `rust-toolchain.toml`: rustc **1.98.1**.
+| Build | Toolchain |
+| --- | --- |
+| Host tests, Clippy and no-default-features | Rust 1.98.1 from `rust-toolchain.toml` |
+| Switch release and diagnostic | `skyline-v3`, selected by cargo-skyline |
+
+- **Host gates:** `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo build --no-default-features`.
 - **Focused integration tests** use `cargo test --test all -- module_name::`.
   - To select a single test, pass its full name and `--exact`, for example `cargo test --test all -- capabilities::print_cross_needs --exact --ignored`.
   - Register new integration modules in `tests/all/main.rs`.
@@ -19,7 +23,7 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
   `cargo test --manifest-path crates/hos-lock/Cargo.toml`; same target dir, `CARGO_INCREMENTAL=0`.
 - **Size gate** (2026-11-02): `python3 -I tools/size_gate.py` prints the implementation lines per module (the primary's sloc4 counter, `tools/sloc.py`: no blanks, comments or tests, test modules and simulator code apart; `third_party/` excluded) and fails above `size-budget.toml`, or when that file records a raise without the lead's approval.
   - It is a gate step of its own, run on every gated head beside `cargo test`; `cargo test` runs the counter's and the gate's host tests (`tests/size_budget.rs`, which needs `/usr/bin/python3` 3.11+ and has no skip switch).
-  - The budget only ratchets down; the plan is `docs/SIZE-PLAN.md`.
+  - The ceiling falls unless the lead approves a recorded increase; see [the size plan](SIZE-PLAN.md).
 - **Probe check** (rc.10 S4): `cargo check --features named-input-trace` for the Switch target, a gate of every slice
   since that probe was found not to compile. It is the `named-input-trace` row of `tools/feature_matrix.py`'s core set
   (`python3 -I tools/feature_matrix.py --run --mode switch --set core …`), or directly
@@ -38,24 +42,34 @@ The rustup home used for a Switch build must contain `skyline-v3`. The Surface's
 
 ## Commands
 
-On a build host, use `cargo skyline build --release` for the shipped plugin and
-`cargo skyline build --release --features diag` for diagnostics.
+| Output on the build host | Command |
+| --- | --- |
+| Shipped plugin | `cargo skyline build --release` |
+| Diagnostics | `cargo skyline build --release --features diag` |
 
 For campaign builds, run `remote-gate.ps1 -BuildHost auto` from the Surface to book a free build host;
 do not run Cargo on the Surface. The runner uses the `tr-yoga` alias when it selects the Yoga.
 
 ## Evidence
 
-- 2026-11-02: a detached clean checkout of `e8dbcc9`, pin unchanged, no `RUSTUP_TOOLCHAIN`, built on the Surface (script `/tmp/tr-pin-probe.ps1`): `Finished release … in 16.54s`, `libtraining_rooms.nro` sha256 `26a5fef0383d2252f44868257bd7e95ccf17c7157b4e1c00a314e377016303f9`.
+| Surface build, 2026-11-02 | Result |
+| --- | --- |
+| Source | Clean detached `e8dbcc9`, unchanged pin, no `RUSTUP_TOOLCHAIN` override |
+| Script | `/tmp/tr-pin-probe.ps1`: release finished in 16.54 s |
+| `libtraining_rooms.nro` SHA-256 | `26a5fef0383d2252f44868257bd7e95ccf17c7157b4e1c00a314e377016303f9` |
+
 - The NRO was byte-identical to the release NRO built earlier with a `RUSTUP_TOOLCHAIN=nightly-2026-02-14` override (`IMPLEMENTATION-PROGRESS.md`) (removed after v0.2.0-rc.1; see that tag), so the build is reproducible and the override is not needed.
 - Resident size: `nro_size.py` → 172,032 B.
 
 ## Layout archive recipe (package 5, host tool)
 
-- On 2026-11-02 the builder generated `assets/info_training.tra1` from the player's own stock `info_training` layout archive (451,604 B on 13.0.5).
+| Recipe generation, 2026-11-02 | Artifact |
+| --- | --- |
+| Private input | Player's stock `info_training` layout archive: 451,604 B on 13.0.5 |
+| Committed output | `assets/info_training.tra1`: copy ranges and the plugin's own bytes |
+
 - The **diag** build dumps the archive into `sd:/ultimate/TrainingRooms/stock/`; copy it under the gitignored `eden/runs/<label>/` or a scratch folder and keep the game data private.
 - `tools/layout-builder` adds the plugin panes from the runtime's shared table (`src/model/ui/panes.rs`) to `info_training.bflyt`.
-- The committed `TRA1` recipe holds copy ranges and the plugin's own bytes.
 - After decompression, `model::archive_recipe` checks the archive length and FNV-1a fingerprint before applying the recipe.
 
     cd tools/layout-builder && cargo rustc --locked --release --bin layout-builder -- --cfg test   # own CARGO_TARGET_DIR
@@ -130,7 +144,11 @@ The tool uses the operator's own MIT crate **nx-layout-toolbox** as a git depend
 
 ## Docs checks
 
-- `cargo test` runs `tests/docs_gates.rs`, which runs `python3 -I tools/docs_check.py` over `README.md` and `docs/**/*.md` and the fixtures that prove each rule fails on a seeded break (`tools/test_docs_check.py`, `tools/test_check_external_links.py`).
+| Host gate | Coverage |
+| --- | --- |
+| `cargo test` | `tests/docs_gates.rs` runs `python3 -I tools/docs_check.py` on `README.md` and `docs/**/*.md`. |
+| Seeded breaks | `tools/test_docs_check.py` and `tools/test_check_external_links.py` verify that the rules detect their failures. |
+
 - It needs `/usr/bin/python3` and has no skip switch, like the size gate.
 - It uses no network and no clock.
 - In a checkout it asks git for the tracked files and for the clips' blob ids; in a plain export it reads the files themselves.
@@ -158,8 +176,10 @@ The tool uses the operator's own MIT crate **nx-layout-toolbox** as a git depend
 
 ## Release checklist
 
-The docs steps of a release. The build, the tag, the Forgejo release and the card are in the playbook's
-`docs/CHECKLIST.md` and the operator's order.
+| Release work | Authority |
+| --- | --- |
+| Documentation | The steps below |
+| Build, tag, Forgejo release and card | The playbook's `docs/CHECKLIST.md` and the operator's order |
 
 1. Edit `docs/CURRENT-RELEASE.md`: the `Current release:` line, the status, what's new, the known issues.
 2. Name the release in the README and Getting started status links and in `docs/TECHNICAL.md` under Status.

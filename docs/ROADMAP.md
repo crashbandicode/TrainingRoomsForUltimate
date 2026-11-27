@@ -5,8 +5,6 @@ on 2026-11-05; no item was dropped.
 
 ## Done: 0.2.0-rc.6
 
-The [feature ledger](FEATURE-LEDGER.md) records the rc.6 candidate's test results; the [rc.6 notes](RELEASE-NOTES-rc6.md) describe the changes.
-
 | Item | Where | State |
 | --- | --- | --- |
 | Sequence drilling: the sequence bar, the joining link, streak and best in the file | `p23/rc6-seq-drill` | Eden `rc6-seq-diag1` 18/18, `rc6-seq-rel1` 5/5 |
@@ -30,12 +28,16 @@ The [feature ledger](FEATURE-LEDGER.md) records the rc.6 candidate's test result
 | No heap in the CPU-as-P1 fallback's hooks | `p23/rc6-integration` `6d6994e` | Eden `rc6-int-smoke2` 11/11 |
 | rc.5 features first proven in Eden: P2 L+R+A and Mii swaps, respawn, intro once, the online flag, the Lobby Items online smoke, the timer capture through sudden death, the Mii editor's interrupt and resume, combos in a local-wireless room | the lane branches | Eden `covrest-16`, `-04`, `-13`/`-15`, `covrest-pair-02`/`-03`, `rc6-int-vs3`, `covrest-pair-y3`/`-y1`. Lobby Items #62: PASS on the spawner-level proof (`rc6-int-li1` li-02/li-04, `rc6-int-lipair1`; decided 2026-11-08 23:43Z); the game spawns no item in Eden's local-wireless rooms |
 
+The [feature ledger](FEATURE-LEDGER.md) records the candidate's tests, and the [rc.6 notes](RELEASE-NOTES-rc6.md) describe the changes.
+
 The rc.6 investigation saw freezes in `covrest-yoga-05`, `rc6-bg-qp3`, `rc6-qpf1` and `rc6-qpf2`; the [later menu-close fix](RELEASE-NOTES-rc8.md#a-rare-freeze-as-the-menu-closes) removed a wait on the menu thread.
 
 ## Done: 0.2.0-rc.3 (2026-11-05)
 
-Four additions on top of rc.2 (candidate `p23/rc3-candidate` `3c8f5bc`; see
-[Differences from the fork](DIFFERENCES-FROM-THE-FORK.md#added-in-rc-3)):
+| Candidate | Changes beyond rc.2 |
+| --- | --- |
+| `p23/rc3-candidate` `3c8f5bc` | Frame strip, Change Stage, menu navigation and fighter hitbox discs |
+| Comparison | [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md#added-in-rc-3) |
 
 - **Frame strip** (decision INPUT-VIZ, option A): the input display is a strip of the last 60 frames of Player 1 and
   the CPU, with how each follow-up linked and the frame advantage. It replaces the 15-row input log.
@@ -48,8 +50,10 @@ Four additions on top of rc.2 (candidate `p23/rc3-candidate` `3c8f5bc`; see
 
 ## Done: 0.2.0-rc.2 (2026-11-05)
 
-The three operator decisions of 2026-11-05 that rc.1 did not carry (code at `p23/rc2-pause-helper` `9b28ca0`; see
-[Differences from the fork](DIFFERENCES-FROM-THE-FORK.md#added-in-rc-2)):
+| Decision date | Changes beyond rc.1 |
+| --- | --- |
+| 2026-11-05 | Pause during helper loading, Solo Popo marks and bounded Kirby hat requests |
+| Code and comparison | `p23/rc2-pause-helper` `9b28ca0`; [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md#added-in-rc-2) |
 
 - **Pause while a helper fighter loads** (decision PAUSE-HELPER, option a): when the pause opens while a preloaded
   helper entry has no actor yet, the entry is retired through the game's single-slot retire, creation waits until the
@@ -59,8 +63,6 @@ The three operator decisions of 2026-11-05 that rc.1 did not carry (code at `p23
   and a role that stops being Kirby ends its request.
 
 ## Deferred (operator decision 2026-11-03)
-
-The RC is M5q parity plus the new UI and clean MIT provenance; this list is not an RC gate.
 
 | Work deferred at rc.1 | Later outcome |
 | --- | --- |
@@ -72,6 +74,8 @@ The RC is M5q parity plus the new UI and clean MIT provenance; this list is not 
 | Further latency work (F6) | rc.6, console test of 2026-11-08 (release `1e6c6a0e`): Player 1's first switch 53 ms and hats 7–23 ms, the first included, with no hitch. The slow group switches it found became the rc.6 group-speed work (decision GROUP-SPEED). |
 | Hitbox sphere replacement | Fighter discs in rc.3; [projectile hitboxes](TECHNICAL.md#hitboxes-and-grab-boxes) followed in rc.13. |
 | Remaining feature/edge-case inventory | Kept for later planning. |
+
+The release criterion was M5q parity plus the new UI and clean MIT provenance; the deferred list was not an RC gate.
 
 **Timer-recording truncation: fixed 2026-11-05** (`p23/timer-recording`; `docs/DECISIONS.md` DEFERRED-LIST item 7).
 This reverses the earlier note that called it an observed limitation with no established M5q equivalence.
@@ -97,9 +101,11 @@ alternative was dropped by the operator.
 
 ## Deferred list of 2026-11-05 and its outcomes
 
-In this order (`docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19902`):
+| Deferred list, in priority order | Outcome |
+| --- | --- |
+| First: combo fighter switch | rc.5 `p23/combo-switch` added the named-macro Switch/Keep prompt for the combo's recorded fighter. |
+| Decision record | `docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19902` |
 
-- Combo: switch P1 to the combo's recorded fighter, with the same Switch/Keep prompt as a named macro. Done in rc.5 (`p23/combo-switch`).
 - Lobby Items (N11): now in rc.5 (`p23/lobby-items`, primary order 2026-11-05 18:58Z); see the N11 section below.
 - Ten hot fighters plus five hot hats (five while one CPU; operator decision HOT-SLOTS-CEILING): done in rc.5
   (`p23/hot-slots`). Preloading starts on entering Training. Its Eden rows first ran in rc.6 (`rc6-hot-xps3`), which
@@ -113,8 +119,11 @@ In this order (`docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19
 
 ## Phase 2 N11: Lobby Items (operator order)
 
-- TrainingRooms only.
-- A *Lobby Items* toggle on Fighters & Stages › Stages, after Stage Hazards, default On (native behaviour), saved like every setting.
+| Lobby Items in TrainingRooms | Decision |
+| --- | --- |
+| Menu location | Fighters & Stages › Stages, after Stage Hazards |
+| Default | On (native behaviour); saved like other settings |
+
 - Off stops waiting-room practice item spawning at the native scene rule and removes an existing item once through the native removal; no per-frame sweep.
 - Training, character select and online matches are untouched.
 - Acceptance: host tests for policy, scene, persistence and import; 64-byte guards; zero hook allocations; one Eden batch (Off no-spawn window, existing-item removal, On spawn return, zero Unmapped, both consoles `desync_seen` 0 in an online smoke with the row Off).

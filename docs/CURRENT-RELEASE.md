@@ -19,8 +19,6 @@ Current release: rc.15
 
 ## Which build is mine?
 
-The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
-
 | The tag ends with | Build | Installed |
 | --- | --- | --- |
 | `dc5302f1` | Fixed build | 2026-11-27 |
@@ -32,6 +30,8 @@ The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
 | `71158421` | Install 2 | 2026-11-24 |
 | `152629cd` | Install 1 | 2026-11-23 |
 | Other commit | Unlisted build | Check the release name; commit alone doesn't establish age. |
+
+The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
 
 ## What's new in rc.15
 
@@ -45,13 +45,13 @@ The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
 
 ## Installing
 
-See [Installing TrainingRooms](guide/getting-started.md#installing) for the required files and their destination.
+| Before starting Training | Reference |
+| --- | --- |
+| Required files and plugin folder | [Installing TrainingRooms](guide/getting-started.md#installing) |
 
 ## Known issues
 
-These columns record the two earlier builds, not the behavior of the fixes linked above.
-
-| Issue | On install 6 | In the preview build |
+| Earlier builds only | On install 6 | In the preview build |
 | --- | --- | --- |
 | Scrub positions stop at 20 seconds on long takes | Open | Fixed |
 | First X refused after a snap | Open; deselect the handle, then press X | Fixed |

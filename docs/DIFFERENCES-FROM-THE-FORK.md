@@ -26,7 +26,8 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 | Dropdown rows change in place with Left/Right; A opens the list. | `src/model/menu/mod.rs:1626` (`cycle`) |
 | The seven delay rows offer a checklist and a min–max range; using one greys the other, Y clears. | `src/model/menu/table.rs:281` (`delay`) |
 | A adds weight on multi-direction grids, wrapping to zero. Single-choice grids toggle one direction. | `src/model/menu/mod.rs:2039-2051` |
-| Stage and item grids show 5×8 tiles docked or 4×4 handheld. Fighter grids show 13×7 in either mode. | `src/model/menu/grid.rs:76-77` |
+| Stage and item grids use 5×8 tiles docked or 4×4 handheld. | `src/model/menu/grid.rs:82-83` |
+| Fighter grids use 13 columns and seven rows in either mode. | `src/model/menu/grid.rs:49-52,78-79` |
 | Fighter grids show the game's own stock icons, loaded at run time through the game's mod-aware loader, so modded icons show. | `src/runtime/roster/character_roster.rs:2376-2382` |
 | The DI and SDI chips show the game's own DI line and SDI streak (the streak drawn ×2.0). | `src/model/effect_chips.rs:7-16` |
 | Menu shortcuts 1 and 2 are edited in the menu with a chord editor, apply at once and are saved to `button_config.ini`. B + D-pad Up always opens the menu. | `src/model/menu/table.rs:496`, `src/model/ini_files.rs:85` |
@@ -53,7 +54,11 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 
 ## Added in rc.2
 
-Operator decisions of 2026-11-05 (`origin/review/menu-proposal` `deccd62`); the fork keeps its own behaviour.
+![Solo Popo marks above the fighter's name](decisions/solo-s-placement-rc2.png)
+
+*Red marks Player; blue marks CPU.*
+
+Operator decisions of 2026-11-05 (`origin/review/menu-proposal` `deccd62`); the fork keeps its own behaviour. The Character Cycles still is from the Player list in `tr-p23-surface-rc2d`, 2026-11-05, rc.2 diag NRO `719324b6` (final rc.2 code).
 
 | Change | Where in the code |
 | --- | --- |
@@ -62,16 +67,15 @@ Operator decisions of 2026-11-05 (`origin/review/menu-proposal` `deccd62`); the 
 | Every Kirby hat request ends: it ages each game frame and, if the hat never arrives, ends with "Kirby hat could not be loaded" (HAT-REQUEST-END, rule 1). | `src/runtime/roster/kirby_hats.rs:390` (`tick`) |
 | A swap away from Kirby ends that role's pending hat request (HAT-REQUEST-END, rule 2). | `src/runtime/roster/kirby_hats.rs:445` (`fighter_committed`) |
 
-![Solo Popo marks on the Ice Climbers icon, Player (red) and CPU (blue)](decisions/solo-s-placement-rc2.png)
-
-*Character Cycles, Player list: the red (Player) and blue (CPU) "S" marks on the Ice Climbers icon's lower corners,
-clear of the name. Eden run `tr-p23-surface-rc2d`, 2026-11-05, rc.2 diag NRO `719324b6` (the final rc.2 code).*
-
 ## Added in rc.3
 
-Operator decisions and orders of 2026-11-05: INPUT-VIZ (option A, the frame strip), SETTINGS-PERSIST (no hidden ZR
-reset) and HB-OWN-ORBS (option 1, plugin-drawn discs) in `docs/DECISIONS.md` on `origin/review/menu-proposal`
-(`5cb1a2a`), and the orders for Change Stage and the menu navigation.
+| Operator decisions, 2026-11-05 | Choice for rc.3 |
+| --- | --- |
+| INPUT-VIZ | Option A: the frame strip |
+| SETTINGS-PERSIST | No hidden ZR reset |
+| HB-OWN-ORBS | Option 1: plugin-drawn discs |
+| Other orders | Change Stage and menu navigation |
+| Source | `docs/DECISIONS.md` on `origin/review/menu-proposal` at `5cb1a2a` |
 
 | Change in rc.3 | Where in the code at the time |
 | --- | --- |
@@ -84,6 +88,10 @@ reset) and HB-OWN-ORBS (option 1, plugin-drawn discs) in `docs/DECISIONS.md` on 
 
 ## Kept from M5q
 
-These fork limitations are unchanged in rc.3: adding CPUs keeps the wrong-CPU limitation; cold fighter switches can
-hitch; recording after swaps and partial writes on power loss remain. The first-frame hitbox refusals on large
-fighters are gone for fighter spheres (the own discs above); projectiles keep the game's effect spheres.
+| In rc.3 | What remained from M5q |
+| --- | --- |
+| Additional CPUs | Wrong-CPU limitation |
+| Cold fighter switch | Could hitch |
+| Recording after swaps | The existing limitation remained. |
+| Power loss | Could leave a partial write |
+| Large fighters' first-frame hitboxes | Plugin discs removed fighter-sphere refusals; projectiles still used the game's effect spheres. |
