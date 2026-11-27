@@ -22,7 +22,7 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
   (its tests use the test-only oracle crate `crates/smash-match-data/tests/oracle`) and
   `cargo test --manifest-path crates/hos-lock/Cargo.toml`; same target dir, `CARGO_INCREMENTAL=0`.
 - **Size gate:** `python3 -I tools/size_gate.py` reports implementation lines per module and checks the rustfmt-sloc4 ceilings in `size-budget.toml`. Raw sloc4 entries remain as history. The counter excludes blanks, comments, tests, simulator code, diagnostic-only code and `third_party/`.
-  - It is a gate step of its own, run on every gated head beside `cargo test`; `cargo test` runs the counter's and the gate's host tests (`tests/size_budget.rs`, which needs `/usr/bin/python3` 3.11+ and has no skip switch).
+  - The default remote gate includes a separate `size` step. A test-only run executes the counter's and the gate's host tests (`tests/size_budget.rs`, which needs `/usr/bin/python3` 3.11+ and has no skip switch).
   - The ceiling falls unless the lead approves a recorded increase; see [the size plan](BUDGETS.md#size-plan).
 - **Probe check** (rc.10 S4): `cargo check --features named-input-trace` for the Switch target, a gate of every slice
   since that probe was found not to compile. It is the `named-input-trace` row of `tools/feature_matrix.py`'s core set
@@ -159,8 +159,7 @@ The tool uses the operator's own MIT crate **nx-layout-toolbox** as a git depend
   heading or explicit anchor (the forge's heading slugs are not GitHub's: `L+R+A Reset` is `#l-r-a-reset`). A path that starts with `/`
   or leaves the repository fails. Links inside code, code blocks and comments are not read.
 - **Orphans.** Every page under `docs/` is reached by a chain of links from `README.md` or `docs/README.md`. A link to a
-  folder does not count. The pages kept on purpose without a link (redirect stubs, the folders of project records) are
-  listed with their reason in `tools/docs_check.py` (`ORPHAN_OK`).
+  folder does not count. The checker supports documented exceptions in `ORPHAN_OK`. Its allowlist is empty.
 - **Versions.** `docs/CURRENT-RELEASE.md` holds one `Current release: rc.N` line.
   - The README's top (it must link that page), that page, `guide/getting-started.md` and the Status section of `TECHNICAL.md` must name that release.
   - A sentence with "newest", "latest", "currently", "current release/build/version" or "this release/build/version" that names another release fails.
