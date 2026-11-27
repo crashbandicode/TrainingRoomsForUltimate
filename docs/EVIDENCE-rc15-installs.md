@@ -144,8 +144,14 @@ These were two Guard the Edge runs in Eden on the XPS, not the release smoke tes
 | Setup | Releases | What the first frames showed |
 | --- | ---: | --- |
 | Idle; Player 1 jabs (`place-float-xps-03`) | 10 + 10 | No split like the one at the in-view start. |
-| Deep start (`place-float-xps-04`) | 9 | The first frames agreed in all eight rounds seen in full. |
+| Deep start (`place-float-xps-04`) | 9 | The first four frames agreed in all eight rounds seen in full. |
 | Start in view (`place-float-xps-04`) | 6 | Rounds 1, 3 and 5: the ordinary CPU pressed Guard and air-dodged up and toward the stage. Rounds 2 and 6: it fell, then used Up special. Round 4's first free frames were not captured. |
+
+**Later frames differ in every set-up.** The table above compared each round's first four frames. Compared over
+60 frames, the rounds of the three other set-ups agree for 6 to 9 frames; then the CPU's jump comes a frame or two
+earlier or later. The first row's nine releases gave seven different sequences, the earliest difference nine
+frames after the release. Command, over the same raw logs:
+`python3 -I artifacts/phase23/gte-same-start/design/rounds_all.py` (finding 2026-11-26 15:02:52Z, ruled 15:03:30Z).
 
 The camera also framed the stage differently at Ready. Screen height alone does not show that the release point
 changed. Receipts: `artifacts/phase23/place-float/eden/out-03/` and `out-04/`; report 13:36:05Z, accepted
