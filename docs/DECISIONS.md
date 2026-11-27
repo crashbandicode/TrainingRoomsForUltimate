@@ -259,16 +259,13 @@ the clean room's arrows?
 
 ### S1 · Five import details (`SPEC-core-08` §10)
 
-The storage root and the import are decided.
-
-- Five details remain; each has a numbered tag in the picture.
+The picture numbers five questions from the original import proposal. On November 1, four recommendations were accepted; the capture recommendation was reversed.
 
 - **1 · settings file name:** rename to `settings.json`, or keep the fork's name `training_modpack_menu.conf`?
   *Rename*; the loader also accepts the old name once.
 - **2 · the two INIs** (`button_config.ini`, `replay_capture.ini`): import them too? *Yes*, under the same
   rules, so shortcuts and the capture choice survive.
-- **3 · `replay_captures/`:** not imported (the Replay Window starts empty), or imported below a size cap
-  (for example 64 MiB)? *Not imported*; the README explains how to copy it by hand.
+- **3 · `replay_captures/`:** the proposal preferred manual copying and an empty Replay Window over a size-limited import (for example, 64 MiB). Neither option was chosen.
 - **4 · TOML-only cards** (the fork before its JSON port): *not converted*; the fork's
   `tools/port_save_states.py` is the documented offline path.
 - **5 · re-running the import:** by deleting `migration.json` only, or also from a menu row? *The marker only*;
@@ -279,7 +276,7 @@ The storage root and the import are decided.
 
 ![S1 import details](decisions/S1-import-details.png)
 
-- **Decided 2026-11-01: as recommended, except item 3.** `replay_captures/` holds the companions the Replay Window crops macros from (`docs/reference/named-macros.md` in the fork), so it is imported in full, with no size cap (N8).
+- **Decided 2026-11-01:** import all published captures in the background, without a size cap (N8). The Replay Window crops macros from those companions (`docs/reference/named-macros.md` in the fork). The importer skips unfinished capture staging folders.
 
 - Corrected 2026-11-02: the source is `training_modpack_menu.conf`; `training_modpack.json` is the updater record and is not imported.
 
@@ -833,9 +830,10 @@ Before this, Lobby Practice was Off until the player turned it On in Training, a
 
 | # | Decided |
 | --- | --- |
-| SP1 | Read the game's hitboxes. Label the strongest active hitbox this frame **Sweet**, weaker ones **Sour**. |
-| SP1 | A hit weaker than that move's previous strongest hit is **Late**. |
-| SP1 | Equal or unattributable hitboxes get no label. |
+| SP1 | **Late** if this frame's strongest hitbox ranks below the same move's earlier peak. |
+| SP1 | Otherwise, if strengths differ, every hitbox tied for strongest is **Sweet**; weaker ones are **Sour**. |
+| SP1 | Otherwise, equally strong hitboxes or a lone hitbox get no label. |
+| SP1 | A hit TrainingRooms cannot attribute gets no label. |
 | SP1-KB | 2026-11-15 ~02:00Z: primary relayed the requested comparison with online treatment of these cases. |
 | SP1-KB | Rank by hardest launch, following SmashWiki's sweet/sour definition and knockback formula. |
 | SP1-KB | Use each hitbox's damage, base knockback, growth and set knockback. |
