@@ -11,7 +11,7 @@
 | 3. Import it | Put it in the other card's `combos/` folder without overwriting a different combo. |
 | 4. Practise | Reopen the menu, select the combo and choose **Drill**. No restart needed. |
 | Different fighter? | Answer [Fighter Mismatch](recording.md#fighter-mismatch); keeping your fighter still lets you practise. |
-| <a id='the-format'></a>Need the file layout? | See [combo storage](../../specs/SPEC-input-07-combo-helper.md) and the [input grading rules](../design/action-model.md). |
+| <a id='the-format'></a>Need the file layout? | See [combo storage](../../specs/SPEC-input-07-combo-helper.md) and the [input grading rules](../DECISIONS.md#action-model). |
 
 ### Name the moves in a link
 
@@ -29,6 +29,6 @@ These are kinds of move, not fighter-specific move names.
 
 | When sharing | What the reader does |
 |---|---|
-| Sharing named grab, throw or getup keys | These keys are [not backward compatible with earlier shipped installs](../RELEASE-NOTES-rc15.md#combo-reader-through-a945b0c1). |
+| Sharing named grab, throw or getup keys | These keys are [not backward compatible with earlier shipped installs](../RELEASE-NOTES.md#release-notes-rc15--combo-reader-through-a945b0c1). |
 | Older file with `other` and a move description | Still reads; renaming preserves it, cropping writes the named keys. |
 | Final Smash | Use `other` with `final_smash` in the description, not directly in `from` or `to`. |
