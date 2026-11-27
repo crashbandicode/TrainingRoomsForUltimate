@@ -20,6 +20,10 @@ How TrainingRooms works in Training and waiting rooms; see [Media](MEDIA.md) for
 
 ## Install
 
+| Detail | Decision record |
+| --- | --- |
+| First-boot import | [Decision of 2026-11-01](DECISIONS.md). |
+
 ![The first-boot import, file by file: what is copied from the fork's folder, what is regenerated and what is left](decisions/S1-import-details.png)
 
 For the plugins and their install path, see [Getting started](guide/getting-started.md#installing).
@@ -328,7 +332,7 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 | Placement floors | `tech::floors` supplies traced floors for `src/model/floor_hop.rs`. |
 | Off stage | `off_stage_spot` uses the rules in `src/model/stage_geometry.rs`. |
 | Saving placement | In `rr_host.rs`, `active_placement_ids` finds the macro and start save; `commit_placement` writes the edit. |
-| Replay window | Capture loads and [fighter switches](design/toggle-load-wait/DESIGN.md) use `REPLAY_LOADING`: neutral Player 1 input, unblocked roster. |
+| Replay window | Capture loads and [fighter switches](DECISIONS.md#toggle-load-wait) use `REPLAY_LOADING`: neutral Player 1 input, unblocked roster. |
 | Replay fighter mismatch | A chain checks its first macro (`screen=mismatch ask=macro1`). |
 | Replay Mii | `src/model/mii_install.rs::installable` supplies a configuration the game can load. |
 | [Named setup actions](guide/save-states.md#using-a-setup) | `Pane::leads_to` in `src/editors/setups.rs` distinguishes opening, restoring and binding; `src/model/state/setup_transaction.rs` validates the restore. |
@@ -434,7 +438,7 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 | Topic | Details |
 | --- | --- |
 | Saving and drilling | [Recording guide](guide/recording.md#combos). |
-| Sequence card | The [corner card](design/compact-strip-layout.md) stacks up to three combos. |
+| Sequence card | The [corner card](DECISIONS.md#compact-strip-layout) stacks up to three combos. |
 | Link cells | Individual links appear below the strip. |
 
 | Topic | Details |
@@ -474,7 +478,7 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 
 | Scoring | Specification |
 | --- | --- |
-| Model | [Action model](design/action-model.md) describes scoring, reacted releases, joins and recovery. |
+| Model | [Action model](DECISIONS.md#action-model) describes scoring, reacted releases, joins and recovery. |
 | Spot | `summarize` compares spots only when matching is enabled and the reference has a spot. |
 
 ![SP4 compares a saved Sweet hit with a Sour attempt](decisions/rc14-spots-SP3-combo.png)
@@ -510,7 +514,7 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 | --- | --- |
 | Training starts | Each role starts with the fighters its preload settings allow |
 | During practice | Eligible groups build in the background within the Ready Fighters limit. |
-| Historical timing | [rc.6 Eden measurements](RELEASE-NOTES-rc6.md#fighters-load-hot) timed ready switches at 50–70 ms. |
+| Historical timing | [rc.6 Eden measurements](RELEASE-NOTES.md#release-notes-rc6--fighters-load-hot) timed ready switches at 50–70 ms. |
 | A cycle changes in Training | Preloading starts for eligible newcomers; they are not necessarily ready on that frame |
 | Fighters leave a cycle | Retired groups are freed when you next open the pause menu. |
 | Memory pressure | Newcomers needing their room force immediate release and a brief pause. |
@@ -566,7 +570,7 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 | --- | --- |
 | Saved Miis | Fighters & Stages › Extras lists Mii Brawler, Swordfighter and Gunner choices per role. |
 | Role | ZR switches between Player and CPU. |
-| Reference | [Mii fighters](MII.md). |
+| Reference | [Mii fighters](#mii). |
 
 | In the list | Result |
 | --- | --- |
@@ -817,3 +821,312 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 | --- | --- |
 | Development | This project was developed with AI assistance. |
 | Affiliation | Unofficial fan project, independent of Nintendo and without Nintendo endorsement. |
+
+<a id="mii"></a>
+
+<a id="mii--miis-what-came-over-from-the-fork"></a>
+
+## Miis: what came over from the fork
+
+| # | Behaviour | Fork | Here | Status |
+| --- | --- | --- | --- | --- |
+| 1 | [Open the native Mii editor](#mii--mii-1) | `src/mii_editor_bridge/mod.rs` `request`, `editor_origin.rs` `admit` | `src/runtime/mii/mii_editor_bridge/mod.rs:146` `request`, `editor_origin.rs:14`; `NATIVE_EDITOR_AVAILABLE = true` (`src/model/mii_root/mii_menu.rs:12`) | present |
+
+The Mii code is the fork's own (M5q stage, `parked-reuse175/refactor/stages/m5q/stage`), ported directly. The pkg6
+carry records (`docs/provenance/pkg6-carry-manifest.json`, `pkg6-carry-ledger.md`, checked by
+`python3 -I tools/carry_pkg6.py verify`) name the fork file behind every carried file and every exact-text change.
+This page is the parity checklist of 2026-11-05 (branch `p23/mii-editor`). "Fork" paths are relative to the M5q
+stage; "Here" paths to this repository.
+
+The native editor ran on the fork's builds. In this repository the rows below have host tests, and the rc.6 Eden rows
+that ran them are listed under [Eden, rc.6](#mii--eden-rc-6).
+
+<a id="mii--checklist"></a>
+
+### Checklist
+
+| # | Behaviour | Fork | Here | Status |
+| --- | --- | --- | --- | --- |
+| 1 | [Open the native Mii editor](#mii--mii-1) | `src/mii_editor_bridge/mod.rs` `request`, `editor_origin.rs` `admit` | `src/runtime/mii/mii_editor_bridge/mod.rs:146` `request`, `editor_origin.rs:14`; `NATIVE_EDITOR_AVAILABLE = true` (`src/model/mii_root/mii_menu.rs:12`) | present |
+| 2 | [Choose a starting template](#mii--mii-2) | `training_mod_tui/src/mii_menu.rs:337-352`, `native_default.rs` | `mii_menu.rs:311` `editor_seed`, `native_default.rs` | present |
+| 3 | [Open the editor after changing a role](#mii--mii-3) | `training_mod_tui/src/containers/app.rs:923-931`, `src/common/menu.rs:483-491` | `src/editors/mii.rs` `close_for`, `src/runtime/mii/menu_handoff.rs` (editor request before the catalog close) | **ported 2026-11-05** |
+| 4 | [Save a new or identical Mii](#mii--mii-4) | `src/mii_editor_bridge/mod.rs:592-645` `edit_decide` | `mii_editor_bridge/mod.rs:632` `edit_decide`; post-save check `save_ready_for_return` `:728`, `catalog_read` `:755` | present |
+| 5 | [Name a Mii](#mii--mii-5) | `src/mii_editor_bridge/name_keyboard.rs` | `mii_editor_bridge/name_keyboard.rs:153`, `src/model/mii/inline_keyboard.rs` | present |
+| 6 | [Resume an interrupted edit](#mii--mii-6) | `connected.rs`, `resume_adapter.rs`, `ui_resume.rs`, `*_resume.rs` | the same files under `src/runtime/mii/mii_editor_bridge/` (`connected.rs:298/341` → `resume_adapter.rs:413` `try_auto_return` → `mod.rs:221` `resume_checkpoint`); `src/model/mii_root/resume.rs` | present |
+| 7 | [Leave without saving](#mii--mii-7) | `mod.rs` `editor_parent`, `training_state`; `connected.rs` `owner.reenter` | `mod.rs:501` `editor_parent`, `:345` `training_state`; `connected.rs` | present |
+| 8 | Local Wireless waiting practice greys Headgear, Outfit, Colour, Voice and Random in the editor | `settings_resume.rs:128-133` | `settings_resume.rs:129-134` | present |
+| 9 | [Use a saved Mii as a template](#mii--mii-8) | `mii_menu.rs:337`, `editor_row.rs:1` | same | same (absent in both) |
+| 10 | [Restore an interrupted session](#mii--mii-9) | `resume_adapter.rs:281-311`, `connected.rs:239-246` | same | present |
+| 11 | [Import replay Miis](#mii--mii-10) | `src/live_replay.rs:339-371`, `src/mii_replay.rs:146-245` | `src/runtime/macros/live_replay.rs:514` `copy_record`, `src/runtime/mii/mii_replay.rs` | present |
+| 12 | [Match a captured Mii to the catalog](#mii--mii-11) | `training_mod_mii/src/inventory.rs:5-16`, `draft.rs:119-131,170-177` | `src/model/mii/inventory.rs`, `src/model/mii/draft.rs:122` `insert` | present |
+| 13 | [Store and list replay Miis](#mii--mii-12) | `draft_store.rs:6-7`, `inventory.rs:298-309` | `src/model/mii/draft_store.rs:9`, `src/model/mii/draft.rs:8`, `inventory.rs` | present (the folder is TrainingRooms') |
+| 14 | Each role saves a choice per class. See the reload rules below. | `mii_menu.rs`, `selection.rs:186-252` | `src/model/mii_root/mii_menu.rs`, `src/editors/mii.rs`, `src/model/mii/selection.rs` | present (one list per class, ZR switches the role: the decided menu) |
+| 15 | A portrait pick in Player/CPU Character drops that role's Mii reload from the same opening | `app.rs:522-531` | `src/editors/mii.rs` `close_for` (`picked`), `src/runtime/ui/worker.rs` `begin_close` | **ported 2026-11-05** |
+| 16 | [Recover other preferences after a bad entry](#mii--mii-13) | `training_mod_consts/src/menu_json.rs:17-37` | `src/model/compat/menu.rs` `mii_preferences_of` | **ported 2026-11-05** |
+| 17 | [Number and admit Mii cycle tiles](#mii--mii-14) | `app.rs:563-685,745-800`, `src/training/ui/roster_grid.rs:197-206,304-308` | `src/editors/roster.rs` `MiiTiles`, `roster_badges`; `src/editors/mii.rs` `tiles`; `src/model/swap/cycle_members.rs`; `src/runtime/ui/view.rs` (greyed tint) | **ported 2026-11-05**; fixed by P-CYCLE |
+| 18 | Cycles load the chosen Mii; preloaded helpers and the body bank carry it | `training_mod_consts/src/mii_cycle.rs`, `mii_managed_helper.rs` | `src/model/swap/mii_cycle.rs`, `src/runtime/mii/mii_managed_helper.rs` | present |
+| 19 | [Display the selected portrait](#mii--mii-15) | `mii_hud_portrait.rs` | `src/runtime/mii/mii_hud_portrait.rs` | present |
+| 20 | [Keep the selected Mii across transitions](#mii--mii-16) | `character_lifecycle.rs`, `mii_ordinary_*` | same files under `src/runtime/` | present |
+| 21 | With no Mii catalog for an opening the fork showed no Mii pages | `app.rs:287-301` | the pages stay and say "Mii lists open in Training and in waiting practice." (`menu_app::no_catalog`) | differs (the decided menu keeps its rows) |
+
+<a id="mii--mii-1"></a>
+
+**Open the native Mii editor**
+
+- **Add New** opens Smash's own Mii Fighter editor from Training, Quickplay or Local Wireless waiting practice
+
+<a id="mii--mii-2"></a>
+
+**Choose a starting template**
+
+- Add New starts from a copy of the role's Player choice, else the first saved Mii of the class, else the game's default
+
+<a id="mii--mii-3"></a>
+
+**Open the editor after changing a role**
+
+- Add New with a Player/CPU choice made in the same opening: the choice stays saved, its reload is dropped, the editor opens alone
+
+<a id="mii--mii-4"></a>
+
+**Save a new or identical Mii**
+
+- **Save** makes a new native Smash Mii: only a fresh draft reaches the game's allocator (a new slot); a saved ID never enters, so no saved Mii or protected original is overwritten;
+- an identical configuration reuses the saved one and says so: the notice "Same as ‹saved name›, nothing new saved" names the matched saved Mii (decision C, 2026-11-08; a rename alone is identical, row 12); refused when the catalog is incomplete or holds 99 files
+
+<a id="mii--mii-5"></a>
+
+**Name a Mii**
+
+- **Name**: the editor's Name row uses the shared inline keyboard (10 UTF-16 units; empty Enter cancels; one keyboard lease shared with the macro keyboard)
+
+<a id="mii--mii-6"></a>
+
+**Resume an interrupted edit**
+
+- **Interrupted editor**: a match starting in Quickplay/Local Wireless while editing keeps the confirmed draft and the exact screen (Settings row, Name text and caret, Headgear/Outfit/Colour/Voice cursors, Specials picks, Test), in memory only; returning to the same lobby resumes it without saving
+
+<a id="mii--mii-7"></a>
+
+**Leave without saving**
+
+- **Leaving**: B / Exit Without Saving / Cancel discards the draft and creates nothing; the copied Mii never changes; Training (or the lobby's practice fighter and Ready card) comes back
+
+<a id="mii--mii-8"></a>
+
+**Use a saved Mii as a template**
+
+- **Edit an existing Mii**: the fork has none (a saved Mii is only a template; the game's own saved-Mii page is cancelled)
+
+<a id="mii--mii-9"></a>
+
+**Restore an interrupted session**
+
+- **Restore** in the fork means resuming an interrupted editor (row 6) and re-entering practice after Exit Without Saving (row 7); there is no "revert a Mii"
+
+<a id="mii--mii-10"></a>
+
+**Import replay Miis**
+
+- **Replay Miis**: with replay capture on, Save Replay stores the match's Mii data; entering Training or waiting practice imports it
+
+<a id="mii--mii-11"></a>
+
+**Match a captured Mii to the catalog**
+
+- Matching: two Miis are the same when class, look (CharInfo without its create ID and name), the four specials, colour, voice, outfit and hat match; names never count. Identical to a saved native Mii: that one is used and nothing is stored. Otherwise added once to the modpack library as "Replay Brawler/Swordfighter/Gunner";
+- the same capture again adds no copy
+
+<a id="mii--mii-12"></a>
+
+**Store and list replay Miis**
+
+- Replay Miis are modpack-only (`sd:/ultimate/TrainingRooms/mii-presets.json`, up to 256, never written to Smash's Mii list); a replay Mii is listed after the saved ones, and one equal to a saved Mii is hidden
+
+<a id="mii--mii-13"></a>
+
+**Recover other preferences after a bad entry**
+
+- Stored Mii choices are read one by one: a bad entry or an unknown field leaves the other choices
+
+<a id="mii--mii-14"></a>
+
+**Number and admit Mii cycle tiles**
+
+- Mii tiles in Character Cycles, the portrait picks and Kirby Hats: a class with no admitted Mii for that role is greyed and refuses A ("… - unavailable"); admitted Mii tiles take their cycle number; the role's original Mii takes the grey 0 only without a numbered place.
+- **P-CYCLE (2026-11-05):** the CPU cycle's numbers are its walkers' own list (`engine::swap::cycle_members`: All and the ranks, with the Mii classes the CPU Mii owner admits; All includes them, numbered), so a greyed class never cycles and every cycled class is numbered;
+- the 0 is the runtime's slot 0 (the scene's original), not the saved pick
+
+<a id="mii--mii-15"></a>
+
+**Display the selected portrait**
+
+- HUD portraits show the chosen Mii (Training, the Local Wireless CPU icon, the Quickplay CPU); the Ready card keeps the real-match fighter
+
+<a id="mii--mii-16"></a>
+
+**Keep the selected Mii across transitions**
+
+- The exact Mii is kept across L+R+A, save-state loads, swaps, stage changes and a same-lobby return
+
+
+
+The Brawler, Swordfighter and Gunner lists grey out each role's character-select Mii.
+
+- Closing the menu reloads the active CPU or a cycled Player when the changed selection resolves to a different Mii of the live class.
+- The original Player keeps the character-select Mii until a later cycle.
+
+<a id="mii--kept-different-on-purpose-or-not-carried"></a>
+
+### Kept different on purpose, or not carried
+
+| Editor behavior | TrainingRooms difference |
+| --- | --- |
+| Trace file | Only diagnostic builds write `mii-editor-last.json`; every fork build wrote it. |
+| Menu input | The editor also waits for the game's pause and native waiting-room menus (`captures_input`). |
+
+- **Replay Window retry and exact-Mii named macros: ported 2026-11-05**, with the rest of the RC's frozen recording
+  workflows, by order: first the fork's Replay Window retry and exact-Mii named macros, then Switch CPU to
+  recorded fighter, Setup library and Edit placement. The RC flag `ADVANCED_RECORDING_WORKFLOWS` and its gates are
+  gone: the fork's code runs as it did.
+  - **Replay window** (Recording › Replays › Replay window): choosing a capture's Mii track retries a missed import (the
+    track's target is "not resolved" until the window resolves the recorded Mii,
+    `engine::macro_ui::replay_target::clip_target`), then Switch loads that exact Mii on the CPU. An ordinary track's
+    Switch loads its fighter. rc.6: the capture's import runs while the window waits for it (`Owners::REPLAY_LOADING`,
+    `src/model/input_delay.rs`); the window's own Fighter Mismatch question is drawn (cov-rest `66a9a53`, `2891eaa`).
+  - **Recorded macros:** since rc.5 every macro is a named file ([Recording guide](guide/recording.md#fighter-mismatch)). A CPU macro recorded on
+    an exact Mii asks Fighter Mismatch, and Switch loads that exact Mii (cov-rest `cbe961a`); one recorded on another
+    ordinary fighter loads that fighter. Keep plays on the current CPU.
+  - **A Mii without its own ID and name** (one from a replay keeps CharInfo bytes `0x00..0x26` zero): the CPU install
+    writes the saved native Mii with the same look (row 12), or else the Mii with an ID made from its look and the name
+    "New Mii". The game's own Mii setup binds no Mii resource for a CharInfo without them, and the body then read null
+    memory (cov-rest `f2298ee`, `src/model/mii_install.rs` `installable`).
+  - **Edit placement** and the **Setup library** returned in that port. Edit placement changed the active macro's
+    offset until [Change placement](guide/recording.md#change-placement-and-the-replay-window) replaced it on 2026-11-25.
+- **Capture commit:** a committed replay capture goes to the menu worker through a 16-slot mailbox (no heap in the
+  game's hooks); the fork wrote it directly.
+- **Not carried:** the fork's diagnostic Mii probes and observers (listed in the manifest's `not_carried`); the two
+  Lua helper tests (`lua_helpers/tests/*.lua`; they need a Lua 5.3 interpreter, not a cargo test); and the fork test
+  `training_mod_mii/tests/source_provenance.rs`, whose subjects are runtime files that a host test could only include
+  from a test module, which the size counter would then count as test code.
+- **Fork tests carried 2026-11-05:** `replay185_headgear` (`tests/mii_replay185_headgear.rs`), `ldn_backend` and
+  `quickplay_backend` (lib test modules in `src/model/mii_fork_tests/`).
+
+<a id="mii--guards"></a>
+
+### Guards
+
+| Mii editor check | Evidence or result |
+| --- | --- |
+| Functions hooked or called | Exact 64-byte rows in `src/model/seams/native_seams/rows_a2.rs`, groups `mii_editor_bridge` and Mii. |
+| Owned 13.0.5 ELF | `compared_rows_match_the_owned_elf` checks the rows. |
+| Installation | `install::run` requires every editor preflight row to pass. |
+| Colour selector on resume | The port added `mii_editor_bridge.called_376d990`; the fork had no guard there. |
+
+<a id="mii--mii-groups-and-seats-in-rc-6"></a>
+
+### Mii groups and seats in rc.6
+
+| Group | Construction in rc.6 |
+| --- | --- |
+| Mii | Task worker, like an ordinary group (`async_build_eligible`, `src/model/swap/body_bank.rs:842`). |
+| Native groups and pairs | Pokémon Trainer, Aegis and Ice Climbers retained the 2026-11-02 synchronous-build restriction. |
+
+- **Warm exit:** leaving a Mii group for the window it displaced is a warm exchange; the Mii switch's publication is
+  put back in the settle tick (`plan_mii_exit`, `src/runtime/roster/native_body_bank.rs:1677`). Mii groups are built
+  in the background too (`p23/rc6-hot-slots-mii`). On the candidate `b04856b2`, `final-yoga-i3-mii-b04856b2-r2` 19/19:
+  - P1's first switch into its background-built Mii group was `group-warm` in 72 ms, and later ones in 49–50 ms. The
+    CPU's took 47 ms.
+  - Every exit from the Mii was `warm-exit`, in 47–51 ms: to P1's original (Mario), to Fox's built group, and to the
+    CPU's original.
+  - Beside the live Mii window, `final-yoga-i3-x6-b04856b2-r2` 14/14 built Pokémon Trainer, Samus and (once Samus's
+    group slot was freed) the Ice Climbers pair in the background. Its lap left the Mii warm in 80 ms, to Link.
+- **No. of CPUs seats:** a seat member keeps its exact-Mii configuration, so a Mii seat loads through the Mii helper
+  (`seat_load`, `src/model/parked_entries.rs:272`), and the seats park at one CPU whatever the plan lists
+  (`parked_seat`, `:284`). A promoted seat parked again gets its Mii proof re-recorded only when its identity is
+  unchanged.
+- **Portrait first:** a Mii press waits while that role's HUD portrait renders on a helper, and a seat load holds back
+  while a portrait waits for one (`Blocker::Portrait`, `src/model/swap/source_load.rs:164`;
+  `seat_load_waits`, `src/model/parked_entries.rs:361`). The press runs after the render; it is not dropped.
+
+<a id="mii--eden-rc-6"></a>
+
+### Eden, rc.6
+
+| Rows above | Eden row | Run (build) | Result |
+| --- | --- | --- | --- |
+| 1, 2, 4, 7 | `cr-mii-exit`, `cr-mii-identical`, `cr-mii-changed`: no save on exit, the saved Mii reused, one new `mii_<id>.bin` | `covrest-16` (`1f6285c`) | pass |
+| 4 | [Verify rename-only Save](#mii--mii-17) | `covrest-07` (`f5a73c0`) | pass |
+| 5 | `cr-mii-name-test`: the Name keyboard and Test | `covrest-07` (`f5a73c0`) | pass |
+| 6 | [Verify an interrupted name edit](#mii--mii-18) | `covrest-pair-y3` (`8e50b22`) | pass |
+| 11, 12 | `cov-replay-window`: the capture's Mii track asks, and Switch loads the recorded Mii | `covrest-yoga-04` (`cbe961a`) | pass |
+| Recorded macros | `cov-named-mii`: a CPU macro recorded on an exact Mii, Switch loads it, 0 Unmapped | `covrest-yoga-04` (`cbe961a`) | pass |
+| 14, 17, 18 | `cr-cpu-cycle-list`, `cr-player-cycle-list`: the Mii classes load in both cycles | `covrest-16` (`1f6285c`) | pass |
+| 18, seats | [Verify CPU seats and cycle membership](#mii--mii-19) | `covrest-09` (`f98813b`), `covrest-14` (`0c4b48b`) | pass |
+| 20 | `cr-p2-lra-mii`: Player 2 controls a Mii CPU, after L+R+A too | `covrest-16` (`1f6285c`) | pass |
+| Async build, warm exit | `me-p1-lap`, `me-cpu-lap`: every press applied, one Mii build per role, the exit 50–114 ms | `rc6-hot-xps6` (`d6a485f`) | pass |
+
+<a id="mii--mii-17"></a>
+
+**Verify rename-only Save**
+
+- `cr-mii-rename-same`: a rename-only Save reuses the saved Mii and shows "Same as ‹name›, nothing new saved"
+
+<a id="mii--mii-18"></a>
+
+**Verify an interrupted name edit**
+
+- `p00`–`p07` and the resume rows: a match starts while the editor is open in a Local Wireless room; the editor comes back with the typed name
+
+<a id="mii--mii-19"></a>
+
+**Verify CPU seats and cycle membership**
+
+- `cr-f9-raise-again`, `cr-f9-mii-cycles`: a Mii seat loads the saved Mii; the classes stay in both cycles after a raise and a drop
+
+
+
+Each run above used a diagnostic build of the named commit on 2026-11-08; see `artifacts/phase23/rc6-eden/<run>/` and `artifacts/phase23/rc6-item3-re/`.
+
+The `covrest-yoga-04` and `covrest-pair-y3` builds carry cov-rest commits that reach the rc.6 candidate with the
+cov-rest merge. The final pass ran these rows again on the candidate `646a5f0d` (2026-11-09), and they passed:
+`cov-replay-window` and `cov-named-mii` in `yoga-cov` (41/41), and `p00`–`p07` with the editor and resume rows
+(`p07-guest-editor`, `p11-guest-resume`, `p12-guest-leave-editor`) in `yoga-pair` (17/17).
+
+<a id="article-hurtboxes"></a>
+
+<a id="article-hurtboxes--indexed-article-seam-2026-11-15"></a>
+
+## Indexed article seam — 2026-11-15
+
+| Contract | Value |
+| --- | --- |
+| Game | 13.0.5, main build ID `21450c647b8c5940ed5b68218ea128fd3c5d597d` |
+| Called site | `article_get_from_no` at main+`0x2092e10`. The plugin leaves its instructions intact. |
+| ABI | `extern "C" fn(usize, i32, i32) -> usize` |
+| Arguments | Live module accessor, article kind, zero-based ordinal |
+| Result | Nullable `Article*` |
+| Enumeration | Visit consecutive matching-kind entries in the current ring until the first null. |
+| Active count | Uses a different predicate from indexed lookup. |
+| Guard | 64 bytes from [the Hitbox site table](../data/tables/sites_hitbox.SITES.tsv) |
+| Guard SHA256 | `f586a4f0204ceacc5e6ac31d8ce7f08dffa773fda367e5a1fd71a698ceec0fd4` |
+| Owned ELF SHA256 | `0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2` |
+| Guard file offset | `0x2093e10` |
+
+| Runtime check | Effect |
+| --- | --- |
+| Boot | The game version and build ID must pass. |
+| Native call | `state_natives::at` checks the offset grant before calling. An unavailable getter returns zero. |
+| Callers | Hitbox and Break the Targets projectile tracking both require this site. |
+| Wrapper cost | The wrapper adds no allocation or lock. |
+
+| Evidence from 2026-11-15 | Scope |
+| --- | --- |
+| `artifacts/rc15-article-hurt/NATIVE-ABI.md` | Symbol, dispatch, pointer return and ordinal derivation |
+| Card scan | Across 19 NROs, no detected references to the thunk, concrete getter or virtual slot. |
+| Scan coverage | Constants and MOVZ/MOVK construction only. |
+| Scan limits | Other constructions and later plugins remain outside that scan. Install-time guards remain required. |
+| `core06_site_guards` | Pins the site row and Hitbox dependency. |
+| `core06_rows_match_the_owned_elf` | With the owned ELF present, compares all 64 guard bytes and checks the exported symbol. |
+| XPS gate | Both tests passed for `6def8553` on 2026-11-15. |
+| Runtime coverage | Rendering and object lifecycle were outside that gate. |
