@@ -17,7 +17,7 @@ The labelled menu key and six detail pictures in the [menu tour](../README.md#ab
 | `readme-tour-display.png` | `tut-menu-tour.mp4`, On screen list | 7.15 s |
 | `readme-tour-fighters.png` | `tut-menu-tour.mp4`, CPU Character selected | 5.20 s |
 | `readme-tour-games.png` | `rc15-practice-menu-start.gif`, opening entries of the Practice games list | frame 18 (zero-based) |
-| `readme-tour-recording.png` | `rc13-combo-library.png`, named combos | still |
+| `readme-tour-recording.png` | [Source still of the named combos](media/rc13-combo-library.png) | still |
 | `readme-tour-saves.png` | `tut-menu-tour.mp4`, damage and mirroring settings | 3.25 s |
 
 The README showcase also embeds the existing `tut-guard-edge-setup-and-score`, `tut-input-drill-record`, `tut-clip-snap`, `tut-fighter-cycle`, `tut-stage-change`, `tut-kirby-hat` and `tut-mii-pick` MP4s from the tutorial table. The three interim GIFs are `rc13-replay-capture`, `rc11-lobby-practice` and `rc11-give-item`.
@@ -167,7 +167,7 @@ The rc.13 options and drawing changes, shot by gif-nav-author-2. rc.13 is Eden-t
   README, TECHNICAL, menu/cpu and guide/cpu-behaviour; `rc13-fast-fall-delay-quarter.gif` replaces
   `rc12-fast-fall-delay.gif` in menu/cpu (rc.12 counted the delay in 60 Hz reads, not game frames, so its 1/4 clip is
   out of date); `rc13-clatter-strength.gif` replaces `rc11-cpu-clatter-strength.gif` in menu/cpu (the rc.11 clip's menu
-  set Normal, not High, and never showed the break-out). The old files stay in `media/`.
+  set Normal, not High, and never showed the break-out). The rows below preserve those earlier takes' provenance.
 - **SDI Direction and Clatter Strength:** the last two clips were added later, on rc.13 `ed0d7a35` (diag `2a667381…`),
   on the XPS, one instance, Training only, muted, GDB stub on, with the gamepad overlay; Clatter Strength at Eden
   speed 50 %. `rc13-sdi-direction.gif` is Kirby's rapid jab, not a neutral air: six neutral airs probed (Samus, Kirby,
