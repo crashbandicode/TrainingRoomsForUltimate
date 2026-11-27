@@ -3288,3 +3288,11 @@ ceiling = 209561
 date = "2026-11-27"
 reason = "B7 Tech practice wall approach: the full count on c26e4b2d is 209561, two solver lines above 61bedffb. The 77 regression-test lines are excluded."
 approved_by = "tr-primary-2 2026-11-27 09:45:39Z (+2 for c26e4b2d)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 209802
+date = "2026-11-27"
+reason = "Tech practice flies a manual start through the solver's contact test, on main 30f7f21a (209561): +241, measured by the size step of the gate on 25feebd3. The planner's candidate with the range check and its per-call bounds, the solver's contact rule and forward flight, the flight one frame at a time, and the runtime's frame-by-frame wiring. The 219 new test lines are excluded."
+approved_by = "tr-primary-2 2026-11-27 15:07:32Z (+241 lines; release NRO +4,096 B, BSS +0)."
