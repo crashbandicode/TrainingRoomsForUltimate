@@ -91,7 +91,7 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 
 
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4aa2f2e58ef1c505ac2b4e9dcc4fcf435232f904" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0eb482340dbc31c98eb5a606030d8b2311ea08e0" autoplay muted loop playsinline controls></video>
 
 *Fighter grid with cycle badges, then the cycle chord switching Player 1 in that order* [Open the clip](media/rc11-cycle-switch.mp4)
 

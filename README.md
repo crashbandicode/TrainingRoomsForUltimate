@@ -78,9 +78,9 @@ Give Kirby a [lineup of copy abilities](docs/guide/fighter-cycles.md#kirby-hats)
 
 ### Items on demand
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a5d3db481e0b20627c2a38141a43170e872b3b9d" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d2cdc08aaff564cf23335ed8f9e9755e7b96d2cd" autoplay muted loop playsinline controls></video>
 
-*Captain Falcon takes Daisy's Bob-omb from the item grid* [Open the clip](docs/media/rc11-give-item.mp4)
+*Mario takes an item from the item grid* [Open the clip](docs/media/rc11-give-item.mp4)
 
 [Choose an item for Player 1](docs/menu/fighters-and-stages.md#give-item) and close the menu to use it, without loading a save.
 
