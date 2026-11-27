@@ -4,7 +4,7 @@ Test-run footage from Eden, 2026-11-14. Untested on hardware.
 
 ## Newest takes (the rc.14 build, footer "rc14 8199c696", shot about 23:50Z)
 
-The practice-game notice now sits in a band at the top.
+In these takes, the practice-game notice occupied a band at the top.
 
 **Superseded 2026-11-17 (rc15/notice-compact):** every notice, the practice games' included, is now one compact
 box sized to its text, at the top left (16 px from the left and 8 px from the top at 1280 × 720). It wraps before it

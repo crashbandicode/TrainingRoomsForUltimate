@@ -245,6 +245,8 @@ More: [Controls › When the CPU pilot plays Player 1](guide/controls.md#when-th
 
 ### Grabs, throws and edge attacks are named in combo files
 
+<a id="combo-reader-through-a945b0c1"></a>
+
 | Combo files | Install 5 |
 | --- | --- |
 | Written by name | `grab`, `throw`, `ledge_attack`, `getup_attack` and `trip_attack`, in a link's `from` and `to` |

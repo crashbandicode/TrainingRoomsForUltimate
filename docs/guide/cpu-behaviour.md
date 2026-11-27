@@ -25,7 +25,7 @@
 | Weight one direction | Press A again to increase its weight; the sixth press clears it. |
 | Compare | Hit the CPU, switch direction, then repeat from the [same saved position](save-states.md). |
 | <a id='delay-rows'></a>Delay a response | Use a [delay row](../menu/cpu.md#ledge-delay); choose ticked values or a range, not both. |
-| <a id='the-playback-slot-actions'></a><a id='recordings-and-the-cpu-settings'></a>Use a recording instead | Assign a macro's [Playback slot](../menu/recording.md#a-file-s-own-screen), then select that action in Mash. |
+| <a id='the-playback-slot-actions'></a><a id='recordings-and-the-cpu-settings'></a>Use a recording instead | Assign a macro's [Playback slot](../menu/recording.md#playback-slot), then select that action in Mash. |
 
 | <a id='the-30-actions'></a>Build a response | Actions in the Mash, Followup and override pickers |
 |---|---|

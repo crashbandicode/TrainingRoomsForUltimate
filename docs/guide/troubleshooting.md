@@ -14,7 +14,7 @@
 | <a id='a-notice-says-no'></a>Save refused | Enable [Save States](../menu/saves.md#save-states); [make or bind a save](save-states.md) before loading. |
 | One row is grey | Read its help line; a prerequisite may be off or a load still running. |
 | Cycle Player does nothing | Check [Player Swapping](../menu/fighters-and-stages.md#player-swapping); wait for any current swap to finish. |
-| Fighters wait for memory | Check [Loading](../menu/fighters-and-stages.md#loading); reduce Ready Fighters or Ready Hats if needed. |
+| Fighters wait for memory | Open the game's pause menu so idle helpers can release memory; check [Loading](../menu/fighters-and-stages.md#loading). |
 | An input goes missing | Check [chord ownership](controls.md#online-deluxe) and [waiting-room controls](waiting-rooms.md). |
 | <a id='where-the-logs-are-and-what-to-send'></a>Still stuck? | Copy `events.log`, `practice-diagnostics.log` and `practice-diagnostics.previous.log` from `sd:/ultimate/TrainingRooms/` before starting again. |
 | With your report | Include game version, menu build tag, other plugins, steps and exact notice. |

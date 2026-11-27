@@ -32,11 +32,11 @@ A on a save state, macro or chain opens its own screen ([what each row is for](.
 | Momentum | **Keep recorded speed**, Start at rest | The speed the playing side has on its first input. |
 | Offset | Only on macros with an old offset | A clears the offset from the start position. |
 | Set active | On, Off | On: this view's Play chord plays this macro. |
-| Playback slot | None, Slot 1 to 5 | The CPU plays the macro when it picks that slot. Up to 600 frames. [Clip](../media/rc14-playback-slot.gif) |
+| <a id="playback-slot"></a>Playback slot | None, Slot 1 to 5 | The CPU plays the macro when it picks that slot. Up to 600 frames. [Clip](../media/rc14-playback-slot.gif) |
 | Trim | Start, End, Both, Off | Skips neutral frames at those sides in playback. The file is unchanged. |
 | Crop | Opens the clip editor | Saves a shorter copy; the original stays ([Crop](../guide/recording.md#crop)). |
 | Make combo | Plays once on Player 1 | Hits make a combo. A pass with no hit makes an input drill. |
-| + New chain, Edit chain | Opens the numbered picker | A numbers, R removes a number, X finishes, B cancels. |
+| + New chain, Edit chain | Opens the numbered picker | [Put macros in playback order](../guide/recording.md#chains). |
 | Duplicate, Rename, Delete | | Delete removes the file at once, without asking. [Clip](../media/rc13-save-duplicate-delete.gif) |
 
 ## Combos & Sequences
@@ -72,7 +72,7 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 | <a id="change-placement"></a>Change placement | Opens the placement picker | Places both fighters of the active macro's start save. |
 | <a id="replay-window"></a>Replay window | Opens the clip editor | Pick a saved capture, a fighter and an input window. [Clip](../media/tut-clip-snap.mp4) |
 | <a id="replay-capture"></a>Replay capture | On, Off | On: saving a replay also captures its inputs. The choice is saved automatically. |
-| <a id="fighter-toggle"></a>ZL+L, ZL+R in the clip editor | Player 1, the CPU | Switches between the recorded and original fighters for that side. B cancels early. |
+| <a id="fighter-toggle"></a>ZL+L, ZL+R in the clip editor | Player 1, CPU | Switch recorded/original fighter; cancel only while the footer says **B cancels**. |
 | <a id="moves-while-you-scrub-preview-build"></a>Scrubbing in the clip editor | The recorded fighter | Stands at its recorded spot and shows its recorded pose. |
 | Scrubbing, spot only | A different fighter, or a frame with no stored pose | Stands at the recorded spot only. ZL+L or ZL+R switches to the recorded fighter. |
 
@@ -120,7 +120,6 @@ How a macro plays back, and how the Combo helper grades.
 
 | If | Then |
 | --- | --- |
-| You press B in the numbered picker | Nothing is saved; X finishes the chain. |
 | You press X or Y on this page | X never saves your defaults here, and Y does nothing. |
 | A file was recorded on another fighter | Play asks first, unless Ask before switching fighter is Off. |
 | You reset this page | Your files, the bound save, the active macros and the drill stay. |

@@ -14,7 +14,7 @@ Build a [two-action response](../guide/cpu-behaviour.md#mash-and-followup) by ch
 | --- | --- | --- |
 | <a id="mash"></a>Mash | [30 actions](../guide/cpu-behaviour.md#the-30-actions); **none** | Picks one ticked action when a trigger fires. |
 | <a id="followup"></a>Followup | Same actions; **none** | Follows the first action as soon as the CPU can act. |
-| <a id="mash-triggers"></a>Mash Triggers | [17 triggers](../guide/cpu-behaviour.md#mash-triggers); **Hitstun, Shieldstun, Tumble, Clatter** | Chooses when Mash fires; Hitstun alone excludes tumble. |
+| <a id="mash-triggers"></a>Mash Triggers | 17 triggers; **Hitstun, Shieldstun, Tumble, Clatter** | Chooses when Mash fires; [Hitstun](../guide/cpu-behaviour.md#mash-triggers) alone excludes tumble. |
 | <a id="situation-overrides"></a>Situation overrides | 13 situations; **none set** | Replaces Mash for one situation; Shieldstun still needs its trigger. |
 
 ## Defence
@@ -42,7 +42,7 @@ On the [direction grid](../guide/cpu-behaviour.md#direction-chips), In means tow
 
 | Setting | Choices; default in bold | What it does |
 | --- | --- | --- |
-| <a id="ledge-options"></a>Ledge Options | **Neutral Getup, Roll, Jump, Getup Attack**; Wait; [Playback Slots 1-5](recording.md#a-file-s-own-screen) | Picks once per ledge grab; empty leaves the choice to the game. |
+| <a id="ledge-options"></a>Ledge Options | **Neutral Getup, Roll, Jump, Getup Attack**; Wait; [Playback Slots 1-5](recording.md#playback-slot) | Picks once per ledge grab; empty leaves the choice to the game. |
 | <a id="ledge-delay"></a>Ledge Delay | 0-300 frames, step 10; **no wait** | Waits before acting on the ledge. |
 | <a id="tech-options"></a>Tech Options | No Tech, Roll Forwards, Roll Backwards, Tech In Place; **all** | Chooses how to recover on contact with a surface. |
 | <a id="mistech-options"></a>Mistech Options | Neutral Getup, Getup Attack, Roll Forwards, Roll Backwards; **all** | Chooses a getup after a missed tech or trip. |
