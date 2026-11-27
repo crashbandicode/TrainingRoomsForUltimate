@@ -45,7 +45,7 @@ The menu tour, menu option and button-chord films come from `tut-c51f4d81-yoga-1
 They crop a 1842×1036 region at (39, 44) from the 1080p capture and scale it to 720p, removing the capture tool's
 yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows name their own source runs.
 
-- Every clip of this table is cut with that same crop, except `tut-save-load.mp4` and the six files of run `tut-dc5302f1-yoga-6`, which are whole frames.
+- Every clip of this table is cut with that same crop, except `tut-save-load.mp4` and the six files of run `tut-dc5302f1-yoga-6` and the four of run `tut-dc5302f1-yoga-7`, which are whole frames.
 - The first, middle and last frame of all 34 files then published were read on 2026-11-27: none shows the mark.
 - Ten lost content of the game's own at the top edge.
 - Two of those, `tut-input-special-direction` and `tut-spacing-grader`, were retired the same day with two other clips; the eight below remained published on November 27 and were listed for a whole-frame take:
@@ -73,6 +73,10 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 | `tut-clip-x-preview.mp4` | [Shows](#take-tut-clip-x-previewmp4) | [Film, cut](#take-tut-clip-x-previewmp4) | 5,792,564 | `6dabd909faf837e5` | [Recording](guide/recording.md#crop) |
 | `tut-loading-ready-fighter-bodies.png` | [Shows](#take-tut-loading-ready-fighter-bodiespng) | [Film, cut](#take-tut-loading-ready-fighter-bodiespng) | 650,251 | `a87297fadbf60a4b` | [menu](menu/fighters-and-stages.md) |
 | `tut-loading-swap-groups.png` | [Shows](#take-tut-loading-swap-groupspng) | [Film, cut](#take-tut-loading-swap-groupspng) | 635,146 | `1ced0acac1c5ed84` | [menu](menu/fighters-and-stages.md) |
+| `tut-gte-setup-help.png` | Guard the Edge with the cursor on Set up… and its two help lines; 1920×1080 still | `k06-gte-setup-help` of run `tut-dc5302f1-yoga-7` (release build of `dc5302f1`, 1x), frame at 12.5 s | 614,284 | `4ce7added55d8d7b` | [Guard the Edge](guide/guard-the-edge.md) |
+| `tut-btt-place-start-stop.mp4` | A target is placed, Start, the count and clock top left, Stop | `k15-break-the-targets` of the same run, 5.5–23.5 s | 7,397,617 | `a1f1b05a10bcbac7` | [Practice games](menu/practice-games.md) |
+| `tut-practice-start-stop.mp4` | The seven games, Eggs-ercise Start, a target, Stop, back to the list | `k17-practice-start-stop` of the same run, 5.5–21.5 s | 3,176,531 | `433912992002bc84` | [Practice games](menu/practice-games.md) |
+| `tut-input-display-whole.mp4` | Two jabs on the whole frame strip, each A press marked; no link verdict | `k12-input-display` of the same run, 0.5–6.5 s | 3,013,673 | `52dd9ed2dfc98dee` | [Display & Controls](menu/display-and-controls.md) |
 | `tut-juggler-setup-and-result.mp4` | [Shows](#take-tut-juggler-setup-and-resultmp4) | `t44-juggler` of run `tut-5df3d9dc-yoga-3`, 11.5–29.5 s | 6,320,217 | `1dd2fb6407149b0f` | [Juggler](guide/juggler.md) |
 | `tut-guard-edge-setup-and-score.mp4` | [Shows](#take-tut-guard-edge-setup-and-scoremp4) | `t45-guard-edge` of the same run, 18–51 s | 12,687,556 | `52df2bbb56168a07` | [Guard the Edge](guide/guard-the-edge.md) |
 | `tut-menu-list-scroll.mp4` | [Shows](#take-tut-menu-list-scrollmp4) | `t03-menu-list-scroll` of run `tut-5df3d9dc-yoga-3`, 0.5–20.0 s | 566,038 | `c0352b105b434bbc` | [Using the menu](guide/using-the-menu.md) |

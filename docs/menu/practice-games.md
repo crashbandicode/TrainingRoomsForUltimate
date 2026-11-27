@@ -4,8 +4,8 @@ On Fighters & Stages, A on a game opens its screen: Start first, then the settin
 
 ## Eggs-ercise
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d5474b717ffc3192e2eccbd9429be5c3227efd15" autoplay muted loop playsinline controls></video>
-*A opens Eggs-ercise; A on Start begins the game.* [Open the clip](../media/rc15-practice-menu-start.mp4)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d146fc36a0ab8dacc74690ea1c4e9dd700ddb96d" autoplay muted loop playsinline controls></video>
+*A opens Eggs-ercise; Start begins it, Stop ends it.* [Open the clip](../media/tut-practice-start-stop.mp4)
 
 Break the targets that appear ([guide](../guide/eggs-ercise.md)).
 
@@ -33,7 +33,7 @@ Place up to ten targets, then break them all against the clock ([guide](../guide
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| Start, Stop | | With no targets placed on this stage, Start opens the placing view. |
+| Start, Stop | | With no targets placed on this stage, Start opens the placing view. [Clip](../media/tut-btt-place-start-stop.mp4) |
 | Projectiles break targets | Off, **On** | Off: only your fighter's attacks break targets. |
 | Place targets | Opens the placing view | Stick moves, A places, B removes the last, X starts. |
 | Saved layouts | Opens this stage's layouts | The five used last come first. |
