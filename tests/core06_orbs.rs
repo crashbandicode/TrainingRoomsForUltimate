@@ -964,6 +964,11 @@ fn a_command_before_the_pass_holds_its_locks_is_applied_before_the_pass() {
 
 fn a_catch_during_the_pass_survives_the_passes_forget() {
     use model::handoff::Put;
+    fn identities(articles: &orbs::Articles) -> Vec<(u32, usize)> {
+        let mut tracked: Vec<_> = articles.tracked().into_iter().filter(|&(id, _)| id != 0).collect();
+        tracked.sort_unstable();
+        tracked
+    }
     let generations = hitbox::FighterGenerations::new();
     for case in 0..5 {
         let mut a = Box::new(hitbox::SetTable::new());
@@ -1007,7 +1012,8 @@ fn a_catch_during_the_pass_survives_the_passes_forget() {
             immediate(&mut a, &mut aa, &generations, command);
         }
         drain(&mut b, &mut ab, &generations);
-        assert_eq!(aa.tracked(), ab.tracked(), "case {case}");
+        // The article keeps its slot here while main's re-track took the lowest free one.
+        assert_eq!(identities(&aa), identities(&ab), "case {case}");
         assert!(!board_a.in_draw_order().any(|o| o.centre[0] == 16.0));
         assert!(!board_b.in_draw_order().any(|o| o.centre[0] == 16.0));
         if case == 2 {
@@ -1019,7 +1025,17 @@ fn a_catch_during_the_pass_survives_the_passes_forget() {
             assert_eq!(aa.tracked()[slot], (2, 32));
             assert_eq!(ab.tracked()[slot], (2, 32));
         }
-        parity(&mut a, &mut aa, &mut b, &mut ab, &[], &[], 10);
+        assert_eq!(identities(&aa), identities(&ab), "case {case}");
+        for (id, key) in identities(&aa) {
+            let (set_a, flag_a) = aa.track(id, key, None, false).unwrap();
+            let (set_b, flag_b) = ab.track(id, key, None, false).unwrap();
+            assert_eq!(*flag_a, *flag_b, "case {case}, article {id}");
+            assert_eq!(format!("{:?}", set_a.active_snapshot()), format!("{:?}", set_b.active_snapshot()), "case {case}, article {id}");
+            set_a.reconcile(&[], true, &mut OrbSink { status: 10 });
+            set_b.reconcile(&[], true, &mut OrbSink { status: 10 });
+            assert_eq!(set_a.handles().collect::<Vec<_>>(), set_b.handles().collect::<Vec<_>>());
+            assert_eq!(set_a.spheres().copied().collect::<Vec<_>>(), set_b.spheres().copied().collect::<Vec<_>>());
+        }
         if case == 0 || case == 1 || case == 3 {
             let (set, attacking) = ab.track(1, 16, None, false).unwrap();
             assert!(*attacking);

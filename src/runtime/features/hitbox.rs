@@ -39,7 +39,7 @@ use crate::model::guard::GuardOutcome;
 use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FighterGenerations, FighterLife, FrameFacts, Indices, SetTable, Sphere, StatusIds};
 use crate::model::panes::EggLook;
 use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
-use crate::model::handoff::{Handoff, Record};
+use crate::model::handoff::{Handoff, Put, Record};
 use crate::model::install_line::SiteReport;
 use crate::model::legend;
 use crate::model::practice_games::{self, Game};
@@ -1552,6 +1552,13 @@ fn applied(record: &Record, did: orbs::Applied, published: Option<u32>) {
     }
 }
 
+fn handed(put: Put) {
+    #[cfg(feature = "diag")]
+    stats::handed(put);
+    #[cfg(not(feature = "diag"))]
+    let _ = put;
+}
+
 /// Phase 8 applies the sets' waiting commands since its last pass.
 fn apply_commands() {
     let (Some(mut store), Some(mut articles)) = (STORE.try_lock(), ARTICLES.try_lock()) else { return };
@@ -1596,15 +1603,11 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
         Some(life) => link.catch_command(accessor, life, shape, status),
         None => link.article_command(id, accessor, grab.then_some((shape, status))),
     };
+    handed(put);
     #[cfg(feature = "diag")]
-    {
-        stats::handed(put);
-        if life.is_none() && !grab {
-            stats::command(false, false, shape.id, shape.joint, shape.size, shape.b.is_some(), 0);
-        }
+    if life.is_none() && !grab {
+        stats::command(false, false, shape.id, shape.joint, shape.size, shape.b.is_some(), 0);
     }
-    #[cfg(not(feature = "diag"))]
-    let _ = put;
 }
 
 /// `sv_animcmd::ATTACK`: the plugin part first, then the game's own command.
@@ -1641,10 +1644,7 @@ unsafe fn wind_command(lua: usize) {
     let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
     if let Some(link) = COMMANDS.get() {
         let put = link.article_command(id, accessor, None);
-        #[cfg(feature = "diag")]
-        stats::handed(put);
-        #[cfg(not(feature = "diag"))]
-        let _ = put;
+        handed(put);
     }
 }
 
@@ -1693,10 +1693,7 @@ pub unsafe fn hitbox_rebound_hook(accessor: usize, rebound: bool) {
         if FIGHTER_GENERATIONS.is_current(life) {
             if let Some(link) = COMMANDS.get() {
                 let put = link.rebound_command(accessor, life);
-                #[cfg(feature = "diag")]
-                stats::handed(put);
-                #[cfg(not(feature = "diag"))]
-                let _ = put;
+                handed(put);
             }
             clear_board(accessor, life, frame);
         }

@@ -55,15 +55,6 @@ impl Pool {
         Some(Self { words: words.into_boxed_slice(), free: free.into_boxed_slice(), available: AtomicU32::new(capacity as u32) })
     }
 
-    pub fn capacity(&self) -> usize {
-        self.words.len() / WORDS
-    }
-
-    /// The bytes `new` allocated.
-    pub fn heap_bytes(&self) -> usize {
-        std::mem::size_of_val(&*self.words) + std::mem::size_of_val(&*self.free)
-    }
-
     /// Check a buffer out: `None` when every buffer is out.
     pub fn take(&self) -> Option<u32> {
         // Claim one of the free buffers first: then a set bit is this thread's to find, whatever the others take and return.
@@ -353,21 +344,6 @@ impl Handoff {
         })
     }
 
-    /// The bytes `new` allocated.
-    pub fn heap_bytes(&self) -> usize {
-        self.pool.heap_bytes() + std::mem::size_of_val(&*self.lanes)
-    }
-
-    /// A value's words and its version.
-    fn words_of(&self, current: &AtomicU64) -> (u64, [u64; WORDS]) {
-        loop {
-            let word = current.load(Acquire);
-            let words = self.pool.read((word & INDEX) as u32);
-            // The buffer was the current one throughout, so nobody wrote to it.
-            if current.load(Acquire) == word { return (word >> INDEX_BITS, words); }
-        }
-    }
-
     /// Apply `op` to a value's words and publish the result as the next version, which `op` is given: that version. `op` runs
     /// again when another change came first. `None` when no buffer was free.
     fn change_words(&self, current: &AtomicU64, op: &mut dyn FnMut(&mut [u64; WORDS], u64)) -> Option<u64> {
@@ -396,12 +372,6 @@ impl Handoff {
         }
     }
 
-    /// The fighters' bindings and their version.
-    pub fn sets(&self) -> (u64, SetMembers) {
-        let (version, words) = self.words_of(&self.sets);
-        (version, sets_read(&words))
-    }
-
     /// Change the fighters' bindings (`change_words`).
     pub fn change_sets<R>(&self, mut op: impl FnMut(&mut SetMembers, u64) -> R) -> Option<(u64, SetMembers, R)> {
         let mut out = None;
@@ -412,12 +382,6 @@ impl Handoff {
             out = Some((members, result));
         })?;
         out.map(|(members, result)| (version, members, result))
-    }
-
-    /// The article slots and their version.
-    pub fn articles(&self) -> (u64, Members) {
-        let (version, words) = self.words_of(&self.articles);
-        (version, members_read(&words))
     }
 
     /// Change the article slots (`change_words`).
@@ -475,8 +439,40 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     impl Pool {
+        fn capacity(&self) -> usize {
+            self.words.len() / WORDS
+        }
+
+        fn heap_bytes(&self) -> usize {
+            std::mem::size_of_val(&*self.words) + std::mem::size_of_val(&*self.free)
+        }
+
         fn free_count(&self) -> usize {
             self.available.load(Acquire) as usize
+        }
+    }
+
+    impl Handoff {
+        fn heap_bytes(&self) -> usize {
+            self.pool.heap_bytes() + std::mem::size_of_val(&*self.lanes)
+        }
+
+        fn words_of(&self, current: &AtomicU64) -> (u64, [u64; WORDS]) {
+            loop {
+                let word = current.load(Acquire);
+                let words = self.pool.read((word & INDEX) as u32);
+                if current.load(Acquire) == word { return (word >> INDEX_BITS, words); }
+            }
+        }
+
+        fn sets(&self) -> (u64, SetMembers) {
+            let (version, words) = self.words_of(&self.sets);
+            (version, sets_read(&words))
+        }
+
+        fn articles(&self) -> (u64, Members) {
+            let (version, words) = self.words_of(&self.articles);
+            (version, members_read(&words))
         }
     }
 
