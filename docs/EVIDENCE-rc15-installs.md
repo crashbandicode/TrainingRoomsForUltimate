@@ -183,7 +183,7 @@ changed. Receipts: `artifacts/phase23/place-float/eden/out-03/` and `out-04/`; r
 - **Gate:** `artifacts/phase23/next-build/gate-b7a382e4/status.json`: all six steps exit 0; 3,048 tests passed, 0
   failed, 4 ignored. The installed file is that gate's release file.
 - **Later docs build:** `f55dfbbe` changed only documentation. Its release NRO embeds the later commit tag and has a
-  different SHA-256 (`0414f116…`); it was not installed. The card readback still matches `b7a382e4` (`0cb29525…`).
+  different SHA-256 (`0414f116…`); it was not installed. The install 5 readback matched `b7a382e4` (`0cb29525…`).
   Compare `artifacts/phase23/next-build/gate-f55dfbbe/SUMMARY.md` with the install gate above.
 - **Eden:** the smoke boot below, on this exact file.
 - **The operator's reports:** one, on 2026-11-25, [above](#the-operator-s-reports-from-the-console).
@@ -375,8 +375,8 @@ bridge and the same three staged old macros on both builds):
 
 ### Eden, on install 6 itself (`5df3d9dc`, merge 17)
 
-**In testing; the results so far are on the diagnostic NRO.** Merge 17's NROs are release sha256 `c1ced861…`
-(the file on the card) and diag `853964b2…` (`artifacts/phase23/next-build/gate-5df3d9dc/nro/`). Receipts:
+These two runs used merge 17's diagnostic NRO `853964b2…`, not its release NRO `c1ced861…`
+(the file installed on November 26; `artifacts/phase23/next-build/gate-5df3d9dc/nro/`). Receipts:
 `artifacts/phase23/scrub-positions/eden-session/evidence/`. Source: dup-audit, inbox 2026-11-26 12:45:51Z; the row
 files named below were read for this page.
 
@@ -400,7 +400,7 @@ files named below were read for this page.
 | S1 on the diagnostic build (third flight, 13:24:09Z) | In stepped to frame 7 and X played nothing, as wanted. Y moved In to 6. X then gave one `playing=1` line, the notice "Let the CPU settle to idle and leave the ledge before previewing", and no input frame; the CPU's status changed one frame after the check. No Replay-window preview fed a frame in that whole boot, so S2 and S3 show their snap and not a working preview. The Crop preview of a recorded macro (SP-5) did feed. On `eb39d6bc`'s release build the same steps fed 101 frames. **Treated as a regression of install 6 until the release smoke says otherwise** (13:24:36Z, tr-primary-2); whether it comes from merge 17 or from the diagnostic flavour is not separated |
 | Why X can refuse (code reading, not a fix test) | A first temporary checkpoint requires a grounded, idle CPU (`states/preview.rs:128–137`). The request can reach it before the scrub hold releases the CPU. A macro loading its own start save bypasses that checkpoint. A fix is assigned, not tested here. |
 
-- **Not flown yet:** a smoke boot of the release NRO, which is the file on the card, and a fresh waiting-room pair.
+- **Not covered by these runs:** a smoke boot of install 6's release NRO or a fresh waiting-room pair.
 - **Not shown in the two test boots:** release through a fighter swap or a scene change (SP-12, SP-13), or a
   fighter walked off stage (SP-11). No match-capture preview fed inputs in `scrub-m17b-yoga-01`. In the separate
   filming boot, the deselected-In control **did** feed inputs; it is not a pass for X with In still selected.

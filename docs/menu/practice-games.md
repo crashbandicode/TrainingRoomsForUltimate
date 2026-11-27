@@ -99,7 +99,7 @@ Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.
 | Reaction | Frame-perfect, **Human 12 f**, Custom 1 to 30 frames | The CPU's reaction delay. Greyed unless the mode is Perfect. |
 | Set up… | Opens the set-up | Place both fighters; [Juggler](../guide/juggler.md) also asks for the CPU's percent. |
 | Attempts | **10**, 20, Free | How many attempts are scored. |
-| Zoom landing window | 1 to 30 frames, **10** | How long after Hero lands a hit or grab still wins. |
+| <a id="zoom-landing-window"></a>Zoom landing window | 1 to 30 frames, **10** | Hit or grab Hero during descent or within this many frames after touchdown. |
 | Guard the Edge: Under the stage | On, **Off** | On: the CPU's start may be under the stage. |
 | Guard the Edge: CPU percent | 0 to 300%, **100%** | The CPU's damage at the start of each attempt. |
 | Guard the Edge: CPU midair jumps | **Kept**, Used | Used: the CPU starts with every midair jump already spent. |

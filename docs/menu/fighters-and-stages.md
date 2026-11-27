@@ -49,7 +49,7 @@ Change the stage now, or set up practice in the waiting room ([Stages](../guide/
 | <a id="lobby-stages"></a>Lobby Stages | **Waiting Room only**, All, or your own order | Set the rotation order. X switches to Direct for one fixed stage. [Clip](../media/rc11-lobby-stages.gif) |
 | <a id="training-stage-rotation"></a>Training Stage Rotation | On, **Off** | On: Training moves through the Lobby Stages order. [Clip](../media/rc11-stage-rotation.gif) |
 | <a id="stage-hazards"></a>Stage Hazards | On, **Off** | On: hazards are active. It applies as a stage loads. [Clip](../media/rc12-stage-hazards.gif) |
-| <a id="lobby-items"></a>Lobby Items | **On**, Off | Off: no items appear in the waiting room. [Clip](../media/rc12-lobby-items.gif) |
+| <a id="lobby-items"></a>Lobby Items | **On**, Off | Off stops automatic drops and clears existing items once. [Clip](../media/rc12-lobby-items.gif) |
 | <a id="respawn-on-platform"></a>Respawn on platform | On, **Off** | On: respawn on the revival platform, invincible. Off: instant respawn. [Clip](../media/rc7-respawn-on.gif) |
 
 ## Loading

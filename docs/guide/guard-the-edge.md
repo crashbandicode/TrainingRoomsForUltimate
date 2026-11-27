@@ -16,4 +16,4 @@
 | If you don't return | Your KO or an expired window earns no secured stock. |
 | If setup opens again | Another floor, or disabling under-stage starts for a saved under-stage spot, requires new placement. |
 | Adjust reaction | Choose Perfect mode first; stock CPU does not use Reaction. |
-| Against Hero's Zoom | Hit or grab during descent or within the chosen landing window. |
+| Against Hero's Zoom | Time the hit or grab using the [Zoom landing window](../menu/practice-games.md#zoom-landing-window). |
