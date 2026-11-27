@@ -438,6 +438,22 @@ fn a_landed_snapshot_is_published_again_once_the_bridge_is_re_enabled() {
 }
 
 #[test]
+fn both_providers_follow_the_bridges_generation_and_there_is_no_third() {
+    let runtime = include_str!("../runtime/bridge_state.rs");
+    let tick = runtime.split_once("pub fn tick(").unwrap().1.split_once("\n    fn events(").unwrap().0;
+    let told = tick.find("self.publisher.session(toggle_generation(").expect("the menu provider reads the generation");
+    assert!(told < tick.find("self.publisher.wants(").unwrap(), "before it decides whether to publish");
+    assert!(tick.contains("|practice| practice.admission_export"), "the export itself, not tr.practice's registration");
+    let practice = runtime.split_once("fn poll_practice(").unwrap().1.split_once("\n    }\n}").unwrap().0;
+    let renewed = practice.find("if admission != self.admission || activation != self.activation {").unwrap();
+    let publisher = practice.find("self.publisher = m::Publisher::default();").unwrap();
+    assert!(renewed < publisher && publisher < practice.find("self.publisher.wants(").unwrap());
+    let registered: Vec<_> = runtime.match_indices("= register(").map(|(at, _)| &runtime[at..at + 29]).collect();
+    assert_eq!(registered, ["= register(practice::NAME.as_", "= register(m::NAME.as_ptr(), "]);
+    assert_eq!((NAME, crate::model::practice_state::NAME), (&b"tr.menu"[..], &b"tr.practice"[..]));
+}
+
+#[test]
 fn scene_is_the_practice_layouts_fresh_pass_only() {
     assert_eq!(scene_name(1000 << 2 | 1, 1200, 500), "training");
     assert_eq!(scene_name(1000 << 2 | 2, 1500, 500), "lobby");
