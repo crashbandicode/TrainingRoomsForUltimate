@@ -390,10 +390,45 @@ mod tests {
         assert_eq!(saved.breaks.len(), crate::engine::macros::MAX_BREAKS);
     }
 
+    /// replay-mem, 2026-11-27: a fighter's first sample reserved all 36,000 frames, 2,736,000 B a fighter and record.
+    fn a_tracks_storage_grows_with_its_frames_and_the_limit_is_no_reservation() {
+        let minute = 60 * 60;
+        assert_eq!(std::mem::size_of::<LiveFrame>() * MAX_FRAMES, 2_736_000);
+        let held = |pool: &LiveCapturePool| {
+            pool.records.back().unwrap().live.as_ref().unwrap().session.tracks[0].frames.capacity()
+        };
+        let mut pool = LiveCapturePool::new();
+        let key = pool.start_record(0);
+        assert!(pool.push(key, 0, 0, sample(0)));
+        assert!(held(&pool) <= minute, "the first sample reserved {} frames", held(&pool));
+        for tick in 1..MAX_FRAMES as u32 {
+            assert!(pool.push(key, 0, tick, sample(tick)));
+            let (recorded, held) = (tick as usize + 1, held(&pool));
+            assert!(held < recorded + minute && held <= MAX_FRAMES, "{held} frames held for {recorded} recorded");
+        }
+        assert_eq!(held(&pool), MAX_FRAMES, "a full track holds the limit exactly");
+        assert!(!pool.push(key, 0, MAX_FRAMES as u32, sample(9)), "and the limit is still the limit");
+        let saved = pool.snapshot(key).unwrap();
+        assert!(saved.truncated);
+        assert_eq!((saved.tracks[0].frames.len(), saved.tracks[0].frames.capacity()), (MAX_FRAMES, MAX_FRAMES));
+        assert!(saved.tracks[0].frames.iter().enumerate().all(|(at, frame)| frame.input.buttons == at as u32));
+        // A short record keeps what it recorded and no more.
+        let key = pool.start_record(1);
+        for tick in 0..100 {
+            assert!(pool.push(key, 0, tick, sample(tick)) && pool.push(key, 1, tick, sample(tick + 7)));
+        }
+        let short = pool.snapshot(key).unwrap();
+        assert!(!short.truncated);
+        for (track, first) in short.tracks.iter().zip([0, 7]) {
+            assert_eq!((track.frames.len(), track.frames.capacity(), track.frames[0].input.buttons), (100, 100, first));
+        }
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_tracks_storage_grows_with_its_frames_and_the_limit_is_no_reservation", a_tracks_storage_grows_with_its_frames_and_the_limit_is_no_reservation as fn()),
             ("a_live_sample_keeps_its_pose_through_the_pool", a_live_sample_keeps_its_pose_through_the_pool as fn()),
             ("duplicates_do_not_advance_and_gaps_never_compress_time", duplicates_do_not_advance_and_gaps_never_compress_time as fn()),
             ("frame_limit_stops_one_track_without_stopping_other_fighters", frame_limit_stops_one_track_without_stopping_other_fighters as fn()),
