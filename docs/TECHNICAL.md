@@ -22,10 +22,6 @@ How TrainingRooms works in Training and waiting rooms; see [Media](MEDIA.md) for
 
 ## Install
 
-| Detail | Decision record |
-| --- | --- |
-| First-boot import | [Decision of 2026-11-01](DECISIONS.md). |
-
 ![The first-boot import, file by file: what is copied from the fork's folder, what is regenerated and what is left](decisions/S1-import-details.png)
 
 For the plugins and their install path, see [Getting started](guide/getting-started.md#installing).
