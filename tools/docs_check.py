@@ -16,6 +16,9 @@ Rules (a problem's rule name is the first word of its line):
   link-anchor      `#anchor` (alone, or after a .md file) with no heading or `<a id/name>` of that name in the target.
   link-ref         `[text][label]` or `[label][]` whose `[label]: target` is not defined in the same file.
   link-syntax      a `](` that does not form a link (the forge would print it as plain text).
+  heading-link     a heading that holds a link. The forge builds such a heading's id from the link's target as well
+                   (`## [Juggler](../guide/juggler.md)` is `juggler-guide-juggler-md`, read from its HTML on 2026-11-27),
+                   so `#juggler` from another page breaks while the rule above still accepts it.
   video-src        a `<video>` must use the forge's media blob URL with the git blob id of an .mp4 in docs/media/.
   orphan           a .md page under docs/ that no chain of links from README.md or docs/README.md reaches. A link to a
                    folder does not reach the pages in it; the folders of project records are listed in `ORPHAN_OK`.
@@ -999,6 +1002,14 @@ def check_notices(tree, config, problems, used):
             problems.append(Problem("notice-text", rel, line, f'"{quote}" is not a text in src/ (a reworded notice, or one built from pieces: NOTICE_OK)'))
 
 
+def check_heading_links(tree, problems):
+    """A heading that holds a link: the forge builds the heading's id from the link's target too, so `#name` breaks."""
+    for rel in tree.files:
+        for number, line in enumerate(mask_blocks(tree.text(rel)).split("\n"), 1):
+            if re.match(r"^#{1,6}\s.*\]\(", line):
+                problems.append(Problem("heading-link", rel, number, "a heading holds a link, so the forge gives it another id than its text: use a plain heading and put the link below it"))
+
+
 def walls(text):
     """(line, what is wrong) of each wall of text on a page: a long caption, a long paragraph, a settings bullet."""
     for line, block in blocks(text):
@@ -1156,6 +1167,7 @@ def check(root, config=None, used=None):
     check_orphans(tree, config, problems, graph, used)
     check_versions(tree, config, problems, used)
     check_notices(tree, config, problems, used)
+    check_heading_links(tree, problems)
     check_walls(tree, config, problems)
     check_budgets(tree, config, problems)
     check_allowlists(tree, config, used, problems)

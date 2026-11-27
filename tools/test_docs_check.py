@@ -235,6 +235,12 @@ class Anchors(unittest.TestCase):
         forge = dict(base, **{"README.md": CLEAN["README.md"] + "\n[a](docs/menu/c.md#l-r-a-reset) [b](docs/menu/c.md#display-controls)\n"})
         self.assertEqual(problems(forge), [])
 
+    def test_a_heading_that_holds_a_link_fails_and_a_plain_one_passes(self):
+        linked = CLEAN["docs/TECHNICAL.md"] + "\n## [Other page](README.md)\n\nText.\n"
+        self.assertEqual(rules(**{"docs/TECHNICAL.md": linked}), ["heading-link"])
+        plain = CLEAN["docs/TECHNICAL.md"] + "\n## Other page\n\n[Other page](README.md).\n\n```\n## [in code](x.md)\n```\n"
+        self.assertEqual(rules(**{"docs/TECHNICAL.md": plain}), [])
+
     def test_an_anchor_inside_a_code_block_is_not_a_heading(self):
         page = "# Page\n\n```md\n## Hidden\n```\n"
         files = {"docs/p.md": page, "docs/README.md": CLEAN["docs/README.md"] + "- [p](p.md)\n", "README.md": CLEAN["README.md"] + "\n[x](docs/p.md#hidden)\n"}
