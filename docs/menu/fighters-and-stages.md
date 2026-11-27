@@ -657,23 +657,37 @@ runs alone: starting it stops the game that was running.
   CPU during a game
 - **How:** choose **Start**. With no targets placed yet the placing view opens; with a layout it opens at Ready. The
   Place targets row below goes straight to the placing view.
-  - **Placing:** the left stick moves a crosshair (up to 2 units a frame), the D-pad moves it one unit a press (held, it
-    repeats). **A** places a target at the crosshair, and the compact box shows "3/10". A target can't go on top of
-    another, and 10 is the most. **B** removes the last target when you let go of it: B + D-pad Up still opens the menu and
-    removes nothing. **Y** twice clears them all. **X** starts, once at least one target is placed. The game doesn't see
-    these buttons while you place.
-  - **Ready:** every target is up and the clock reads 0:00.00. It starts with your first input: a button, or the stick
-    leaving its dead zone.
-  - **Running:** a small target chip, "4/10" and "0:07.12" share one line at the top-left, clear of the frame strip. Breaking the last target stops the clock and the notice reads
-    "Done! 10 in 0:18.27 (best 0:16.90)" for three seconds, then Ready again with every target back.
-  - The best time is per fighter and per layout, and lasts until the game closes.
-  - Targets stay where you put them: while it runs, Eggs-ercise's **Target speed** is greyed ("Targets stay still").
-    **Breaks on** applies to your fighter's attacks, which briefly freeze your fighter on a break. Projectile hits use
-    their native attack shapes and play the same break animation.
-  - To go again, press L+R+A in Training (with **L+R+A Reset** On), or choose **Stop** and **Start**. Opening and closing
-    the menu keeps the run and its clock going. Each stage keeps its own layout until the game closes.
-  - In the waiting room's practice it works as in Training: the camera zooms out while placing and returns on start. The
-    targets and the camera are on your own screen only.
+
+The game has three states:
+
+| State | What you see | What it waits for |
+| --- | --- | --- |
+| Placing | The zoomed-out stage, a crosshair and the compact box, for example "3/10". | X, once at least one target is placed. |
+| Ready | Every target is up and the clock reads 0:00.00. | Your first input: a button, or the stick leaving its dead zone. |
+| Running | A small target chip, "4/10" and "0:07.12" share one line at the top-left, clear of the frame strip. | The last target. |
+
+Breaking the last target stops the clock and the notice reads "Done! 10 in 0:18.27 (best 0:16.90)" for three seconds,
+then Ready again with every target back.
+
+Keys while placing (the game doesn't see these buttons while you place):
+
+| Key | What it does |
+| --- | --- |
+| Left stick | Moves the crosshair, up to 2 units a frame. |
+| D-pad | Moves it one unit a press; held, it repeats. |
+| A | Places a target at the crosshair. A target can't go on top of another, and 10 is the most. |
+| B | Removes the last target when you let go of it: B + D-pad Up still opens the menu and removes nothing. |
+| Y twice | Clears them all. |
+| X | Starts, once at least one target is placed. |
+
+- The best time is per fighter and per layout, and lasts until the game closes.
+- Targets stay where you put them: while it runs, Eggs-ercise's **Target speed** is greyed ("Targets stay still").
+- **Breaks on** applies to your fighter's attacks, which briefly freeze your fighter on a break. Projectile hits use
+  their native attack shapes and play the same break animation.
+- To go again, press L+R+A in Training (with **L+R+A Reset** On), or choose **Stop** and **Start**. Opening and closing
+  the menu keeps the run and its clock going. Each stage keeps its own layout until the game closes.
+- In the waiting room's practice it works as in Training: the camera zooms out while placing and returns on start. The
+  targets and the camera are on your own screen only.
 
 ![Break the Targets: Ready at 0:00.00, the first input starts the clock, the three targets break one after another, Done! 3 in 0:04.15, then Ready again with every target back](../media/rc14-btt-run.gif)<br>
 *A run on Battlefield: Ready reads "Targets 0/3   0:00.00" and waits; Fox's first input starts the clock; each break freezes him for a moment and plays the break animation ("Targets 1/3", "2/3"); the third break stops the clock: "Done! 3 in 0:04.15 (best 0:04.15)", then Ready again with every target back. Eden, rc.14 (untested on hardware).*
@@ -699,18 +713,34 @@ Your saved layouts, each one its own file in `ultimate/TrainingRooms/layouts/`, 
 back to it. The list shows the layouts of the stage you're on; other stages' layouts aren't listed, since their target
 positions belong to their stage.
 
-- **The list:** the five layouts you used last come first, the newest at the top, inside a green outline, with a thin
-  line after the fifth; the rest follow by name, as in the Recording lists. Saving, loading, duplicating and renaming
-  count as a use, and a sixth use pushes the oldest out of the five (its file stays). Up/Down move, **A** opens the
-  layout's own screen, **B** goes back.
-- **A layout's own screen:** **Load** puts its targets on the stage: **Start** plays them from Ready. While Break the
-  Targets runs, Load replaces the course at once and goes back to Ready with it. **Rename** opens the Switch keyboard (B keeps the old name). **Duplicate** saves a copy as a new layout, at the
-  top of the list. **Delete** asks once: Keep it or Delete it.
-- **While placing:** the Save State chords work on the layout. **Save State Save** (ZL + D-pad Down by default) saves it as
-  a new layout, named like "Layout 2 · Battlefield" (the lowest number free on that stage); a save never replaces another
-  layout. **ZL + D-pad Left / Right** steps through this stage's five (the notice shows "1/3 Layout 2 · Battlefield: 6"),
-  **Save State Load** (ZL + D-pad Up) loads the one shown, still in Placing, so you can edit it or start it with X, and
-  **ZL + Y** twice deletes it. Outside placing, the chords are the normal save states.
+**The list.** The five layouts you used last come first, the newest at the top, inside a green outline, with a thin
+line after the fifth; the rest follow by name, as in the Recording lists. Saving, loading, duplicating and renaming
+count as a use, and a sixth use pushes the oldest out of the five (its file stays).
+
+| Key in the list | What it does |
+| --- | --- |
+| Up/Down | Move. |
+| A | Opens the layout's own screen. |
+| B | Goes back. |
+
+**A layout's own screen:**
+
+| Row | What it does |
+| --- | --- |
+| Load | Puts its targets on the stage: **Start** plays them from Ready. While Break the Targets runs, Load replaces the course at once and goes back to Ready with it. |
+| Rename | Opens the Switch keyboard (B keeps the old name). |
+| Duplicate | Saves a copy as a new layout, at the top of the list. |
+| Delete | Asks once: Keep it or Delete it. |
+
+**While placing,** the Save State chords work on the layout. Outside placing, the chords are the normal save states.
+
+| Chord while placing | What it does |
+| --- | --- |
+| **Save State Save** (ZL + D-pad Down by default) | Saves it as a new layout, named like "Layout 2 · Battlefield" (the lowest number free on that stage); a save never replaces another layout. |
+| **ZL + D-pad Left / Right** | Steps through this stage's five (the notice shows "1/3 Layout 2 · Battlefield: 6"). |
+| **Save State Load** (ZL + D-pad Up) | Loads the one shown, still in Placing, so you can edit it or start it with X. |
+| **ZL + Y** twice | Deletes it. |
+
 - Editing a loaded layout doesn't change its file: save it to keep the change as a new layout.
 - A file that can't be read is skipped, and the list's help line counts it ("2 files skipped").
 
