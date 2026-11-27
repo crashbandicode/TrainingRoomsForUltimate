@@ -4,12 +4,11 @@ Notes for players. rc.15 is one release name for a line of builds. Each build's 
 `0.2.0-rc.15 · rc15` and then the commit it was made from, so the commit tells the builds apart
 ([Which build you have](guide/getting-started.md#which-build-you-have)).
 
-Six of these builds were installed on the project's test console one after another, and are called install 1 to 6.
-The preview install was cancelled; install 6 remains on the test console.
-Times are UTC.
+The first six installs are numbered. The preview was skipped; the fixed build replaced install 6. Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
+| [Fixed build](#fixed-build) | 2026-11-27 | `dc5302f1` | Clip editor, menu help and Tech practice fixes |
 | [Preview build](#preview-build) | Install cancelled 2026-11-27 | `cc71537c` | Scrubbing shows recorded poses on matching fighters; fixes to scrubbing and save placement |
 | [Install 6](#install-6) | 2026-11-26 | `5df3d9dc` | The clip editor: Y on In makes a capture previewable, a free playhead, and the fighters shown while you scrub |
 | [Install 5](#install-5) | 2026-11-25 | `b7a382e4` | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
@@ -27,6 +26,17 @@ What "tested" means in these notes:
 
 The runs, verdicts and file hashes behind every line are in [Install evidence](EVIDENCE-rc15-installs.md).
 
+## Fixed build
+
+| Area | What changed |
+| --- | --- |
+| [Clip editor](guide/recording.md#crop) | Switching fighters waits for loading; the footer says when B can still cancel. |
+| Leaving a posed frame | Both fighters return to their original spots without sliding. |
+| Menu help | Clarifies Loading, Group Swap, L+R+A and Guard the Edge's CPU-first setup. |
+| [Tech practice](guide/tech-practice.md) | Factory launches reach a surface, including walls, so attempts can be graded and counted. |
+
+[Card readback and build-specific tests](EVIDENCE-rc15-installs.md#fixed-build).
+
 ## Preview build
 
 This preview was tested in Eden. Its planned console install was cancelled; it is not the next release.
@@ -35,7 +45,7 @@ This preview was tested in Eden. Its planned console install was cancelled; it i
 | --- | --- |
 | Built from | `cc71537c` (the footer ends with it) |
 | Release file | `78db86f5…`, 5,419,008 bytes |
-| On the test console | Install 6; the preview did not replace it |
+| At cancellation | Install 6 was still on the card. |
 
 ### Scrubbing shows the recorded moves
 
