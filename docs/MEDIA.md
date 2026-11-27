@@ -28,9 +28,15 @@ The menu tour, menu option and button-chord films come from `tut-c51f4d81-yoga-1
 They crop a 1842×1036 region at (39, 44) from the 1080p capture and scale it to 720p, removing the capture tool's
 yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows name their own source runs.
 
-Every clip of this table is cut with that same crop, except `tut-save-load.mp4`, which is the whole frame. Where the
-frame strip is on screen, the crop also cuts the strip's top rows: `tut-input-delay`, `tut-input-display`,
-`tut-input-drill-record`, `tut-input-special-direction` and `tut-spacing-grader`.
+Every clip of this table is cut with that same crop, except `tut-save-load.mp4`, which is the whole frame. The first,
+middle and last frame of all 34 published files were read on 2026-11-27: none shows the mark. Ten lose content of the
+game's own at the top edge and are listed for a whole-frame take:
+
+| Cut by the crop | Clips |
+| --- | --- |
+| The frame strip's top rows (IN, "now", the ADVANTAGE heading) | `tut-menu-tour`, `tut-menu-change-option`, `tut-controls-change-chord`, `tut-input-delay`, `tut-input-display`, `tut-input-drill-record`, `tut-input-special-direction`, `tut-spacing-grader` |
+| The recording indicator ("REC P1", top left) | `tut-record-macro`, `tut-input-drill-record` |
+| Break the Targets' count and clock (top left) | `tut-break-the-targets` |
 
 | Clip | Shows | Film, cut | Bytes | SHA256 (first 16) | Embedded in |
 | --- | --- | --- | ---: | --- | --- |
