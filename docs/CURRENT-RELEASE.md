@@ -10,12 +10,12 @@ Current release: rc.15
 
 | | |
 | --- | --- |
-| Last verified console install | `dc5302f1`, installed and [read back](EVIDENCE-rc15-installs.md#fixed-build) on 2026-11-27 |
+| Last verified console install | `dc5302f1`, installed and [read back](EVIDENCE.md#evidence-rc15-installs--fixed-build) on 2026-11-27 |
 | Repository main at this audit | `30f7f21a` (2026-11-27) |
 | Shipping behavior (not a console receipt) | [Clip editor](guide/recording.md#crop), [Loading](menu/fighters-and-stages.md#loading) and [Tech practice](guide/tech-practice.md) describe the fixes. |
-| Preview install cancelled | `cc71537c` was never installed: [preview notes](RELEASE-NOTES-rc15.md#preview-build) |
-| Changes | [Release notes](RELEASE-NOTES-rc15.md) |
-| Tests | [Install evidence](EVIDENCE-rc15-installs.md) |
+| Preview install cancelled | `cc71537c` was never installed: [preview notes](RELEASE-NOTES.md#release-notes-rc15--preview-build) |
+| Changes | [Release notes](RELEASE-NOTES.md#release-notes-rc15) |
+| Tests | [Install evidence](EVIDENCE.md#evidence-rc15-installs) |
 
 ## Which build is mine?
 
@@ -37,11 +37,11 @@ The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
 
 | Build | In short | More |
 | --- | --- | --- |
-| Fixed build | Fighter switching, return after scrubbing, menu help and Tech practice launches | [Notes](RELEASE-NOTES-rc15.md#fixed-build) |
-| Preview | Scrubbing shows saved poses on matching fighters | [Notes](RELEASE-NOTES-rc15.md#preview-build) |
-| Install 6 | Y on In, a free playhead, fighters shown while you scrub | [Notes](RELEASE-NOTES-rc15.md#install-6) |
-| Install 5 | Record under an AI, Delete for captures, Change placement, Guard the Edge options | [Notes](RELEASE-NOTES-rc15.md#install-5) |
-| Install 4 | Drills read moves alike for every fighter; the clip editor; Recordings; Trim | [Notes](RELEASE-NOTES-rc15.md#install-4) |
+| Fixed build | Fighter switching, return after scrubbing, menu help and Tech practice launches | [Notes](RELEASE-NOTES.md#release-notes-rc15--fixed-build) |
+| Preview | Scrubbing shows saved poses on matching fighters | [Notes](RELEASE-NOTES.md#release-notes-rc15--preview-build) |
+| Install 6 | Y on In, a free playhead, fighters shown while you scrub | [Notes](RELEASE-NOTES.md#release-notes-rc15--install-6) |
+| Install 5 | Record under an AI, Delete for captures, Change placement, Guard the Edge options | [Notes](RELEASE-NOTES.md#release-notes-rc15--install-5) |
+| Install 4 | Drills read moves alike for every fighter; the clip editor; Recordings; Trim | [Notes](RELEASE-NOTES.md#release-notes-rc15--install-4) |
 
 ## Installing
 
@@ -62,13 +62,13 @@ The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
 | The recorded-fighter switch timed out in the preview | Not in this build | Affected preview only; the fix waits for the roster |
 | Fighters slid apart after B from a posed frame | Not in this build | Seen in preview; [leaving the editor](guide/recording.md#crop) describes the fixed behavior |
 
-Details: [release notes](RELEASE-NOTES-rc15.md#known-issues), [Install evidence](EVIDENCE-rc15-installs.md).
+Details: [release notes](RELEASE-NOTES.md#release-notes-rc15--known-issues), [Install evidence](EVIDENCE.md#evidence-rc15-installs).
 
 ## Good to know
 
 | Topic | Where |
 | --- | --- |
-| Test coverage: Eden runs and console reports, no full hardware test | [Install evidence](EVIDENCE-rc15-installs.md) |
+| Test coverage: Eden runs and console reports, no full hardware test | [Install evidence](EVIDENCE.md#evidence-rc15-installs) |
 | Waiting rooms have their own limits | [What is different, or refused](guide/waiting-rooms.md#what-is-different-or-refused) |
 | A fighter outside Ready Fighters loads when you swap to it | [Fighter cycles](guide/fighter-cycles.md) |
 | Limits kept from the Training Modpack | [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md) |
@@ -77,7 +77,7 @@ Details: [release notes](RELEASE-NOTES-rc15.md#known-issues), [Install evidence]
 
 | Release | Notes |
 | --- | --- |
-| rc.15, build by build | [rc.15 release notes](RELEASE-NOTES-rc15.md) |
-| rc.5, rc.6, rc.8, rc.9 | [rc.5](RELEASE-NOTES-rc5.md), [rc.6](RELEASE-NOTES-rc6.md), [rc.8](RELEASE-NOTES-rc8.md), [rc.9](RELEASE-NOTES-rc9.md) |
+| rc.15, build by build | [rc.15 release notes](RELEASE-NOTES.md#release-notes-rc15) |
+| rc.5, rc.6, rc.8, rc.9 | [rc.5](RELEASE-NOTES.md#release-notes-rc5), [rc.6](RELEASE-NOTES.md#release-notes-rc6), [rc.8](RELEASE-NOTES.md#release-notes-rc8), [rc.9](RELEASE-NOTES.md#release-notes-rc9) |
 | rc.12, rc.13 | [rc.12](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.12), [rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13) |
 | rc.7, rc.10, rc.11, rc.14 | No separate release notes |
