@@ -64,9 +64,11 @@ CLEAN = {
 }
 
 def cfg(**changes):
-    """A config with no allowance and no notice pages: the real lists name pages the small fixtures do not have."""
+    """A config with no allowance and no notice pages: the real lists name pages the small fixtures do not have.
+    No word budget either: the fixtures of the other rules add a sentence to a guide page (`Budgets` turns it on)."""
     base = dict(historical=[("docs/RELEASE-NOTES-rc*.md", "a past release")], orphan_ok=[], claim_ok=[], must_name=d.MUST_NAME,
-                notice_ok=[], notice_pages=[], notice_columns={})
+                notice_ok=[], notice_pages=[], notice_columns={}, wall_pending={}, budget_words=[], budget_pending={},
+                budget_visuals={})
     return d.Config(**dict(base, **changes))
 
 
@@ -233,6 +235,12 @@ class Anchors(unittest.TestCase):
         forge = dict(base, **{"README.md": CLEAN["README.md"] + "\n[a](docs/menu/c.md#l-r-a-reset) [b](docs/menu/c.md#display-controls)\n"})
         self.assertEqual(problems(forge), [])
 
+    def test_a_heading_that_holds_a_link_fails_and_a_plain_one_passes(self):
+        linked = CLEAN["docs/TECHNICAL.md"] + "\n## [Other page](README.md)\n\nText.\n"
+        self.assertEqual(rules(**{"docs/TECHNICAL.md": linked}), ["heading-link"])
+        plain = CLEAN["docs/TECHNICAL.md"] + "\n## Other page\n\n[Other page](README.md).\n\n```\n## [in code](x.md)\n```\n"
+        self.assertEqual(rules(**{"docs/TECHNICAL.md": plain}), [])
+
     def test_an_anchor_inside_a_code_block_is_not_a_heading(self):
         page = "# Page\n\n```md\n## Hidden\n```\n"
         files = {"docs/p.md": page, "docs/README.md": CLEAN["docs/README.md"] + "- [p](p.md)\n", "README.md": CLEAN["README.md"] + "\n[x](docs/p.md#hidden)\n"}
@@ -383,6 +391,168 @@ def notice_problems(page, text, sources=None, **config):
     """notice-text and allowlist problems of `page` with `text`; `sources` ({path: text}) replaces src/lib.rs's SRC."""
     files = dict(CLEAN, **(sources or {"src/lib.rs": SRC}), **{"docs/README.md": CLEAN["docs/README.md"] + f"- [p]({page[len('docs/'):]})\n", page: text})
     return [(r, p, t) for r, p, t in problems(files, config=config.pop("config", STRICT)) if r in ("notice-text", "allowlist-stale")]
+
+
+WALL_PAGE = "docs/menu/page.md"
+LONG = "word " * 30
+
+
+def wall_problems(text, page=WALL_PAGE, **config):
+    """wall and allowlist problems of `page` with `text` (linked from docs/README.md, so it is no orphan)."""
+    files = dict(CLEAN, **{"docs/README.md": CLEAN["docs/README.md"] + f"- [p]({page[len('docs/'):]})\n", page: text})
+    return [(r, p, t) for r, p, t in problems(files, config=cfg(**config)) if r in ("wall", "allowlist-stale")]
+
+
+class Walls(unittest.TestCase):
+    def test_a_long_caption_fails_and_a_short_one_passes(self):
+        got = wall_problems(f"# T\n\n*{LONG}Eden, 2026-11-27.* [Open the clip](../media/pic.gif)\n")
+        self.assertEqual([r for r, _, _ in got], ["wall"])
+        self.assertIn("a caption of", got[0][2])
+        self.assertEqual(wall_problems("# T\n\n*Mario jabs twice. Eden, 2026-11-27.* [Open the clip](../media/pic.gif)\n"), [])
+
+    def test_the_link_to_the_clip_and_the_alt_text_of_the_image_are_not_counted(self):
+        caption = "x" * 118
+        self.assertEqual(wall_problems(f"# T\n\n![{LONG}](../media/pic.gif)<br>\n*{caption}.* [Open the clip](../media/pic.gif)\n"), [])
+
+    def test_a_paragraph_of_three_sentences_fails_and_two_pass(self):
+        got = wall_problems("# T\n\nOne thing. Another thing. A third thing.\n")
+        self.assertEqual([r for r, _, _ in got], ["wall"])
+        self.assertIn("3 sentences", got[0][2])
+        self.assertEqual(wall_problems("# T\n\nOne thing. Another thing.\n"), [])
+
+    def test_a_list_item_is_read_alone_and_a_long_one_fails(self):
+        self.assertEqual(wall_problems("# T\n\n- One. Two.\n- Three. Four.\n"), [])
+        self.assertEqual([r for r, _, _ in wall_problems("# T\n\n- One. Two.\n- Three. Four. Five.\n")], ["wall"])
+
+    def test_one_very_long_sentence_fails(self):
+        got = wall_problems(f"# T\n\n{'word ' * 70}end.\n")
+        self.assertEqual([r for r, _, _ in got], ["wall"])
+        self.assertIn("characters", got[0][2])
+
+    def test_a_settings_bullet_fails(self):
+        for word in ("Values", "Default", "How"):
+            got = wall_problems(f"# T\n\n- **{word}:** On, Off\n")
+            self.assertEqual([r for r, _, _ in got], ["wall"], word)
+        self.assertEqual(wall_problems("# T\n\n- **Where:** the Saves page\n"), [])
+
+    def test_tables_headings_code_and_html_are_not_read(self):
+        text = f"# {LONG}\n\n| A | B |\n| --- | --- |\n| One. Two. Three. Four. | {LONG} |\n\n```\nOne. Two. Three. Four.\n```\n\n<video src=\"x\"></video>\n"
+        self.assertEqual([r for r, _, _ in wall_problems(text) if r == "wall"], [])
+
+    def test_only_menu_and_guide_pages_are_read(self):
+        self.assertEqual(wall_problems("# T\n\nOne. Two. Three. Four.\n", page="docs/other.md"), [])
+        self.assertEqual([r for r, _, _ in wall_problems("# T\n\nOne. Two. Three. Four.\n", page="docs/guide/other.md")], ["wall"])
+
+    def test_a_pending_page_may_keep_its_count_but_not_grow(self):
+        two = "# T\n\nOne. Two. Three.\n\nFour. Five. Six.\n"
+        self.assertEqual(wall_problems(two, wall_pending={WALL_PAGE: 2}), [])
+        got = wall_problems(two, wall_pending={WALL_PAGE: 1})
+        self.assertEqual(sorted({r for r, _, _ in got}), ["wall"])
+        self.assertEqual(len(got), 3)
+        self.assertTrue(any("pending at 1" in t for _, _, t in got))
+
+    def test_a_pending_count_that_is_too_high_or_names_no_page_is_stale(self):
+        got = wall_problems("# T\n\nOne. Two. Three.\n", wall_pending={WALL_PAGE: 2})
+        self.assertEqual([(r, "lower it to 1" in t) for r, _, t in got], [("allowlist-stale", True)])
+        got = wall_problems("# T\n\nOne.\n", wall_pending={WALL_PAGE: 1})
+        self.assertEqual([(r, "remove the entry" in t) for r, _, t in got], [("allowlist-stale", True)])
+        got = wall_problems("# T\n\nOne.\n", wall_pending={"docs/menu/gone.md": 1})
+        self.assertEqual([(r, "matches no page" in t) for r, _, t in got], [("allowlist-stale", True)])
+
+
+def budget_problems(text, page=WALL_PAGE, **config):
+    """budget and allowlist problems of `page` with `text`; walls are left to the wall rule's own tests."""
+    files = dict(CLEAN, **{"docs/README.md": CLEAN["docs/README.md"] + f"- [p]({page[len('docs/'):]})\n", page: text})
+    found = problems(files, config=cfg(budget_words=d.BUDGET_WORDS, **config))
+    return [(r, p, t) for r, p, t in found if r in ("budget", "allowlist-stale") and p in (page, "tools/docs_check.py")]
+
+
+TABLE = "| Setting | Values | What it does |\n| --- | --- | --- |\n"
+
+
+class Budgets(unittest.TestCase):
+    def test_a_short_page_of_one_sentence_and_a_table_passes(self):
+        self.assertEqual(budget_problems(f"# T\n\nOne sentence.\n\n{TABLE}| A | On, Off | Does a thing. |\n"), [])
+
+    def test_a_menu_page_over_1500_words_fails_and_a_guide_page_over_800(self):
+        long_table = TABLE + "".join(f"| Row {n} | On | x |\n" for n in range(230))
+        got = budget_problems(f"# T\n\n{long_table}")
+        self.assertEqual([r for r, _, _ in got], ["budget"])
+        self.assertIn("words (at most 1500)", got[0][2])
+        middling = TABLE + "".join(f"| Row {n} | On | x |\n" for n in range(120))
+        self.assertEqual(budget_problems(f"# T\n\n{middling}"), [])
+        got = budget_problems(f"# T\n\n{middling}", page="docs/guide/page.md")
+        self.assertIn("words (at most 800)", got[0][2])
+
+    def test_a_table_cell_over_fifteen_words_fails_and_its_link_target_is_not_counted(self):
+        got = budget_problems(f"# T\n\n{TABLE}| A | On | {'word ' * 16}|\n")
+        self.assertEqual([r for r, _, _ in got], ["budget"])
+        self.assertIn("a table cell of 16 words", got[0][2])
+        cell = "word " * 13 + "[the guide](../guide/getting-started.md)"
+        self.assertEqual(budget_problems(f"# T\n\n{TABLE}| <a id=\"a\"></a>A | On | {cell} |\n"), [])
+
+    def test_a_caption_over_sixty_characters_fails(self):
+        got = budget_problems(f"# T\n\n![alt](../media/pic.gif)<br>\n*{'x' * 61}*\n")
+        self.assertEqual([r for r, _, _ in got], ["budget"])
+        self.assertIn("a caption of 61 characters", got[0][2])
+        self.assertEqual(budget_problems(f"# T\n\n![alt](../media/pic.gif)<br>\n*{'x' * 60}* [Open the clip](../media/pic.gif)\n"), [])
+
+    def test_a_section_with_two_sentences_fails_and_each_section_is_counted_alone(self):
+        self.assertEqual(budget_problems("# T\n\nOne.\n\n## A\n\nTwo.\n\n## B\n\nThree.\n"), [])
+        got = budget_problems("# T\n\nOne.\n\n## A\n\nTwo. And more.\n")
+        self.assertEqual([r for r, _, _ in got], ["budget"])
+        self.assertIn("2 sentences of prose", got[0][2])
+        got = budget_problems("# T\n\n## A\n\n- One.\n- Two.\n")
+        self.assertEqual([r for r, _, _ in got], ["budget"])
+
+    def test_one_good_to_know_table_of_five_rows_at_most(self):
+        five = "## Good to know\n\n| If | Then |\n| --- | --- |\n" + "| a | b |\n" * 5
+        self.assertEqual(budget_problems(f"# T\n\n{five}"), [])
+        got = budget_problems(f"# T\n\n{five}| a | b |\n")
+        self.assertEqual([("6 rows" in t) for _, _, t in got], [True])
+        got = budget_problems(f"# T\n\n{five}\n{five}")
+        self.assertEqual([("second" in t) for _, _, t in got], [True])
+
+    def test_a_visual_is_not_counted_as_words(self):
+        table = TABLE + "".join(f"| Row {n} | On | x |\n" for n in range(120))
+        visual = f"![{'word ' * 400}](../media/pic.gif)<br>\n*Caption words here.*\n\n<video src=\"x y z\"></video>\n\n"
+        self.assertEqual(budget_problems(f"# T\n\n{visual}{table}", page="docs/menu/page.md"), [])
+        self.assertEqual(d.counted_words("# T\n\n![a b c](x.gif)<br>\n*d e.* [Open the clip](x.gif)\n\nOne two.\n"), 4)
+
+    def test_every_section_of_a_menu_page_opens_with_a_visual(self):
+        on = dict(budget_visuals=d.BUDGET_VISUALS)
+        good = "# T\n\nOne.\n\n## A\n\n![a](../media/pic.gif)<br>\n*Caption.*\n\nTwo.\n\n## B\n\n<video src=\"x\"></video>\n\n*Caption.* [Open the clip](../media/pic.gif)\n"
+        self.assertEqual(budget_problems(good, **on), [])
+        got = budget_problems("# T\n\n## A\n\nTwo.\n\n![a](../media/pic.gif)\n", **on)
+        self.assertEqual([("does not open with a clip or picture" in t) for _, _, t in got], [True])
+        got = budget_problems("# T\n\n## A\n\n![a](../media/pic.gif)\n\n## B\n", **on)
+        self.assertEqual(len(got), 1)
+        self.assertEqual(budget_problems("# T\n\n## A\n\n![a](../media/pic.gif)\n\n### Sub\n\nTwo.\n", **on), [])
+
+    def test_a_guide_page_has_at_least_one_visual(self):
+        on = dict(budget_visuals=d.BUDGET_VISUALS)
+        got = budget_problems("# T\n\nOne.\n\n## A\n\nTwo.\n", page="docs/guide/page.md", **on)
+        self.assertEqual([("no clip or picture" in t) for _, _, t in got], [True])
+        self.assertEqual(budget_problems("# T\n\n![a](../media/pic.gif)\n\n## A\n\nTwo.\n", page="docs/guide/page.md", **on), [])
+
+    def test_only_menu_and_guide_pages_have_a_budget(self):
+        self.assertEqual(budget_problems("# T\n\nOne. Two. Three.\n", page="docs/other.md"), [])
+
+    def test_a_pending_page_is_not_held_to_the_budget_but_may_not_grow(self):
+        text = "# T\n\nOne. Two. Three.\n"
+        words = len(text.split())
+        self.assertEqual(budget_problems(text, budget_pending={WALL_PAGE: words}), [])
+        got = budget_problems(text, budget_pending={WALL_PAGE: words - 1})
+        self.assertEqual([(r, "only falls" in t) for r, _, t in got], [("budget", True)])
+
+    def test_a_pending_entry_that_is_too_high_met_or_names_no_page_is_stale(self):
+        text = "# T\n\nOne. Two. Three.\n"
+        got = budget_problems(text, budget_pending={WALL_PAGE: 99})
+        self.assertEqual([(r, f"lower it to {len(text.split())}" in t) for r, _, t in got], [("allowlist-stale", True)])
+        got = budget_problems("# T\n\nOne.\n", budget_pending={WALL_PAGE: 99})
+        self.assertEqual([(r, "remove the entry" in t) for r, _, t in got], [("allowlist-stale", True)])
+        got = budget_problems("# T\n\nOne.\n", budget_pending={"docs/menu/gone.md": 5})
+        self.assertEqual([(r, "matches no page" in t) for r, _, t in got], [("allowlist-stale", True)])
 
 
 class NoticeTexts(unittest.TestCase):

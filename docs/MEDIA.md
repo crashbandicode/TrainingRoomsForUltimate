@@ -1,39 +1,83 @@
 # Media
 
-Every GIF in [`media/`](media) is actual Eden footage: whole screen, 1280×720, one clip per behaviour, under 10 s,
-game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
-action, result) before a clip was kept. The raw takes stay outside git with their runs.
+The gameplay GIFs in [`media/`](media) use actual Eden footage. The tables record files, dimensions and pages **at capture time**;
+they include retired takes, not just files still published. The 68 original comparison and composite GIFs were 1280 wide and
+404, 436 or 764 high. The raw takes stay outside git with their runs.
 
-## Tutorial clips (2026-11-25 and 2026-11-26)
+The [zone-editor proof still](decisions/rc15-zone-editor-crop-proving-boot.png) omits the 28-row test banner at the top. The remaining 1280×646 pixels are unchanged.
+
+## README menu tour
+
+The labelled menu key and six detail pictures in the [menu tour](../README.md#about-trainingrooms) are crops of actual menu frames, not mock-ups.
+
+| Picture (`docs/media/`) | Source | Frame or time |
+| --- | --- | --- |
+| `readme-tour-key.png` | `tut-menu-tour.mp4`, CPU tab; navigation labels added outside the rows | 1.30 s |
+| `readme-tour-cpu.png` | `tut-menu-tour.mp4`, Reactions list | 1.30 s |
+| `readme-tour-display.png` | `tut-menu-tour.mp4`, On screen list | 7.15 s |
+| `readme-tour-fighters.png` | `tut-menu-tour.mp4`, CPU Character selected | 5.20 s |
+| `readme-tour-games.png` | `rc15-practice-menu-start.gif`, opening entries of the Practice games list | frame 18 (zero-based) |
+| `readme-tour-recording.png` | [Source still of the named combos](media/rc13-combo-library.png) | still |
+| `readme-tour-saves.png` | `tut-menu-tour.mp4`, damage and mirroring settings | 3.25 s |
+
+The README showcase also embeds the existing `tut-guard-edge-setup-and-score`, `tut-input-drill-record`, `tut-clip-snap`, `tut-fighter-cycle`, `tut-stage-change`, `tut-kirby-hat` and `tut-mii-pick` MP4s from the tutorial table. The three interim GIFs are `rc13-replay-capture`, `rc11-lobby-practice` and `rc11-give-item`.
+
+## Tutorial clips (2026-11-25 through 2026-11-27)
+
+The [clip editor legend](diagrams/clip-editor-legend.svg) labels the strip at 4.5 s in `tut-clip-scrub-moves.mp4`, with In selected.
 
 The menu tour, menu option and button-chord films come from `tut-c51f4d81-yoga-1` on release build `c51f4d81`.
 They crop a 1842×1036 region at (39, 44) from the 1080p capture and scale it to 720p, removing the capture tool's
 yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows name their own source runs.
 
-| Clip | Shows | Film, cut | Bytes | SHA256 (first 16) | Embedded in |
+Every clip of this table is cut with that same crop, except `tut-save-load.mp4`, which is the whole frame. The first,
+middle and last frame of all 34 files then published were read on 2026-11-27: none shows the mark. Ten lost content
+of the game's own at the top edge. Two of those, `tut-input-special-direction` and `tut-spacing-grader`, were retired
+the same day with two other clips; the eight below are still published and are listed for a whole-frame take:
+
+| Cut by the crop | Clips |
+| --- | --- |
+| The frame strip's top rows (IN, "now", the ADVANTAGE heading) | `tut-menu-tour`, `tut-menu-change-option`, `tut-controls-change-chord`, `tut-input-delay`, `tut-input-display`, `tut-input-drill-record` |
+| The recording indicator ("REC P1", top left) | `tut-record-macro`, `tut-input-drill-record` |
+| Break the Targets' count and clock (top left) | `tut-break-the-targets` |
+
+| Clip | Shows | Film, cut | Bytes | SHA256 (first 16) | Pages at capture time |
 | --- | --- | --- | ---: | --- | --- |
 | `tut-menu-tour.mp4` | B + D-pad Up opens the menu, R turns through the five pages, B closes it, Mario walks | `t01-menu-tour`, 0.3–9.8 s | 1,301,566 | `866d3984b6c2c2cc` | [Getting started](guide/getting-started.md) |
+| `readme-menu-tour.gif` | The same film as an image preview: 1280×720, 10 fps, 128 colours, no dithering | cut from `tut-menu-tour.mp4` (build `c51f4d81`), its whole 9.5 s | 6,353,868 | `a107cbf0955c5f56` | Former README opening |
 | `tut-menu-change-option.mp4` | CPU › Crouch flips On with D-pad Right, the menu closes, the CPU crouches | `t02-menu-change-option`, 1.6–8.6 s | 1,514,380 | `9ef6bc2ccd65da7c` | [Using the menu](guide/using-the-menu.md) |
 | `tut-controls-change-chord.mp4` | Button chords: Save State Save is changed to ZL + D-pad Left, which then saves | `t04-controls-change-chord`, 0.2–7.8 s | 1,867,343 | `4b49a4cb454bea75` | [Controls](guide/controls.md) |
 | `tut-save-load.mp4` | ZL + D-pad Down saves, two jabs hit the CPU, ZL + D-pad Up puts both fighters back at 0% | `t06-save-load` of run `tut-c51f4d81-yoga-2` (the diagnostic build of `c51f4d81`), 0.5–7.5 s, whole frame: the capture tool was switched off during the take, so nothing is cropped | 3,748,140 | `435f35b4f8e24e1c` | [Save states](guide/save-states.md) |
 | `tut-clip-scrub.mp4` | Crop on a macro: L, Right moves the start and the fighters stand where the recording had them; R, Left moves the end; R releases them. No preview | `t41-clip-scrub` of run `tut-5df3d9dc-yoga-3` (the diagnostic build of `5df3d9dc`), 0.6–10.8 s | 2,866,172 | `0aafcffcbbcd865d` | [Recording](guide/recording.md#crop), [menu](menu/recording.md#replay-window) |
 | `tut-clip-playhead.mp4` | Right browses to 64, Y takes it to the start of the nearest move, at 66, L sets In there; R later keeps frame 100 (Out 101) | `t42-clip-playhead` of the same run, 0.6–12.0 s | 3,376,060 | `24744f80377dec3e` | [Recording](guide/recording.md#crop), [menu](menu/recording.md#replay-window) |
+| `tut-clip-scrub-moves.mp4` | Crop on a macro recorded on the preview build: with In, then Out, selected and moved, both fighters take the take's pose on that frame; with no handle they stand again. No preview | `t41-clip-scrub` of run `tut-cc71537c-yoga-4` (the diagnostic file of preview build `cc71537c`, 2026-11-27), 0.8–12.0 s | 3,199,071 | `4144b9be50b9797d` | [menu](menu/recording.md#moves-while-you-scrub-preview-build) |
+| `tut-clip-snap.mp4` | Replay window on a King K. Rool capture: X refused with In mid-action, Y snaps In to the aerial's start, X previews on the CPU | `t43-clip-snap` of the same run, 0.6–10.6 s | 3,190,826 | `9d9b2403110f13df` | [menu](menu/recording.md#moves-while-you-scrub-preview-build) |
 | `tut-juggler-setup-and-result.mp4` | Juggler: Set up… (CPU spot, percent, Player 1's start, Preview), Start; the CPU lands unhit and the result notice shows | `t44-juggler` of run `tut-5df3d9dc-yoga-3`, 11.5–29.5 s | 6,320,217 | `1dd2fb6407149b0f` | [Juggler](guide/juggler.md) |
 | `tut-guard-edge-setup-and-score.mp4` | Guard the Edge: Set up… (CPU start off stage, Player 1's start, Preview), Start, three attempts, “Secured 1/3” | `t45-guard-edge` of the same run, 18–51 s | 12,687,556 | `52df2bbb56168a07` | [Guard the Edge](guide/guard-the-edge.md) |
 | `tut-menu-list-scroll.mp4` | Held Down and Up on the CPU page, then ZL + Down between the Recording page's lists | `t03-menu-list-scroll` of run `tut-5df3d9dc-yoga-3`, 0.5–20.0 s | 566,038 | `c0352b105b434bbc` | [Using the menu](guide/using-the-menu.md) |
 | `tut-notice-save-states-off.mp4` | The save chord refused with Save States Off; Save States On; the chord saves | `t05-notice-save-states-off` of the same run, 0.3–9.0 s | 2,463,368 | `911d7fd9435aff39` | [Troubleshooting](guide/troubleshooting.md) |
 | `tut-record-macro.mp4` | Player 1 turns red while recording; Mario's forward smash hits Link for 18.5%; the tint clears | `t08-record-macro` of the same run, 0.3–7.5 s | 3,349,706 | `9e94692216f4955e` | [Recording](guide/recording.md) |
-| `tut-mash-out.mp4` | Mash out from Start: repeated grabs, unmashed, with the result line | `t14-mash-out` of the same run, 2.5–21.0 s | 8,011,379 | `a61ddcd58ab732dc` | [Mash out](guide/mash-out.md) |
-| `tut-break-the-targets.mp4` | Break the Targets: Place targets, one target placed; no target broken | `t15-break-the-targets` of the same run, 11.5–24.0 s | 4,045,828 | `8ea4ea2be13ecd99` | [Break the Targets](guide/break-the-targets.md) |
-| `tut-tech-practice.mp4` | Tech practice from Start: launches at 72% and untech'd landings | `t16-tech-practice` of the same run, 13.5–30.0 s | 7,511,366 | `b5a88dc8254878ed` | [Tech practice](guide/tech-practice.md) |
+| `tut-mash-out.mp4` | Mash out: a mashed hold reads Good · 30f, the next one Poor · 90f | `t14-mash-out` of run `tut-cc71537c-yoga-4`, 7.5–15.0 s | 3,873,860 | `053d7299efc52285` | [Mash out](guide/mash-out.md), [Practice games](menu/fighters-and-stages.md#practice-games) |
+| `tut-break-the-targets.mp4` | Mario misses the target, then punches it; it flashes and disappears | `t15-break-the-targets` of run `tut-cc71537c-yoga-4`, 14.5–25.5 s | 4,896,200 | `3571a7f96cafadc2` | [Break the Targets](guide/break-the-targets.md) |
+| `tut-tech-practice.mp4` | Missed at 3/20; the final frame reports no solution for the next launch | `t16-tech-practice` of run `tut-5df3d9dc-yoga-3`, 13.5–30.0 s | 7,511,366 | `b5a88dc8254878ed` | [Tech practice](guide/tech-practice.md) |
 | `tut-hitbox-visualization.mp4` | Hurtbox pills on both fighters; a jab and a grab with their boxes drawn | `t18-hitbox-visualization` of the same run, 0.3–6.0 s | 2,508,502 | `3506e99fdcd8da32` | [Display & Controls](menu/display-and-controls.md#hitbox-visualization) |
 | `tut-hitbox-colour-legend.mp4` | The Hitbox Visualization checklist and its Colour legend | `t20-hitbox-colour-legend` of the same run, 0.3–5.0 s | 130,141 | `1d90ab63bde904b0` | [Display & Controls](menu/display-and-controls.md#hitbox-visualization) |
 | `tut-cpu-mash.mp4` | CPU Mash: Link answers a jab out of hitstun | `t26-cpu-mash` of the same run, 0.3–8.5 s | 4,249,903 | `00e5cd16878ebc16` | [CPU behaviour](guide/cpu-behaviour.md#mash-and-followup) |
 | `tut-cpu-shield.mp4` | CPU Shield held through three jabs | `t27-cpu-shield` of the same run, 0.3–6.0 s | 2,369,048 | `4d834abd0cc27050` | [CPU behaviour](guide/cpu-behaviour.md) |
 | `tut-cpu-di.mp4` | DI Direction Left, then Right: the same smash at 80% sends Link along two lines | `t28-cpu-di` of the same run, 0.5–16.0 s | 9,503,476 | `ea876d6c9fcb0271` | [CPU behaviour](guide/cpu-behaviour.md#direction-chips) |
 | `tut-cpu-hide.mp4` | Hide CPU On, the CPU gone; Off, the CPU back | `t30-cpu-hide` of the same run, 0.5–11.0 s | 2,693,222 | `29c7aa26b49d119f` | [CPU](menu/cpu.md#hide-cpu) |
-| `tut-fighter-cycle.mp4` | Cycle Player: Mario becomes Donkey Kong in place | `t31-fighter-cycle` of the same run, 0.3–6.0 s | 2,499,823 | `a629bd963f6b3bd0` | [Fighter cycles](guide/fighter-cycles.md) |
-| `tut-game-speed.mp4` | The speed label stepping 2/3, 1/2, 1/4, 1 Frame (Press ZL) | `t35-game-speed` of the same run, 0.5–12.0 s | 1,530,032 | `23059a650a842c3a` | [Game speed](guide/game-speed.md) |
+| `tut-fighter-cycle.mp4` | Cycle Player: Mario becomes Donkey Kong in place | `t31-fighter-cycle` of the same run, 0.3–6.0 s | 2,499,823 | `a629bd963f6b3bd0` | [Fighter cycles](guide/fighter-cycles.md), [Fighters & Stages](menu/fighters-and-stages.md) |
+| `tut-game-speed.mp4` | The same forward smash at normal speed and at 1/4, with the speed label | `t35-game-speed` of run `tut-cc71537c-yoga-4` (the diagnostic file of preview build `cc71537c`), 0.5–10.0 s | 4,099,078 | `fe364b3f1c192320` | [README](../README.md), [Game speed](guide/game-speed.md) |
+| `tut-input-display.mp4` | Frame strip on: two jabs hit, the lanes fill, the link line reads TRUE -6 Jab > Jab | `t21-input-display` of run `tut-cc71537c-yoga-4` (the diagnostic file of preview build `cc71537c`), 0.3–6.3 s | 2,592,316 | `0f412a197ed9e93c` | [Frame strip](guide/frame-strip.md) |
+| `tut-input-special-direction.mp4` | A neutral, a side and an up special in a row with the frame strip on | `t22-input-special-direction` of the same run, 0.5–9.0 s | 4,439,496 | `9aa72ee27664cb3c` | [Frame strip](guide/frame-strip.md) |
+| `tut-input-delay.mp4` | A jab at Input Delay 0, the setting moved to 10, the same jab again | `t24-input-delay` of the same run, 0.5–14.0 s | 2,552,981 | `898728fd56ca087e` | [Display & Controls](menu/display-and-controls.md#input-delay) |
+| `tut-spacing-grader.mp4` | Spacing grader on: one jab hits and the strip tags it Good | `t25-spacing-grader` of the same run, 0.3–6.0 s | 2,182,109 | `45c52d205a7a3589` | [Display & Controls](menu/display-and-controls.md#spacing-grader) |
+| `tut-kirby-hat.mp4` | Kirby as Player 1 gets Mario's cap from hold B + left-stick click; one hat | `t32-kirby-hat` of the same run, 0.8–10.0 s | 3,793,315 | `7771d3b17eea8633` | [Fighter cycles](guide/fighter-cycles.md), [Extras](menu/fighters-and-stages.md#extras) |
+| `tut-stage-change.mp4` | Change Stage grid, Y for Ω, A on Battlefield; the stage swaps with both fighters on it | `t33-stage-change` of the same run, 0.3–12.0 s | 6,532,251 | `2ef8e6dc3f63a8d6` | [README](../README.md), [Stages](guide/stages.md), [Stages menu](menu/fighters-and-stages.md#stages) |
+| `tut-input-drill-record.mp4` | Player 1 red while a drill is recorded; DRILLS lists Drill 1; a try follows | `t10-input-drill-record` of the same run, 14–30 s | 4,072,178 | `c8272b9b40882c26` | [Recording](guide/recording.md#input-drills) |
+| `tut-one-frame.mp4` | The 1 Frame label, small changes in Mario's stance, then normal speed | `t36-one-frame` of the same run, 0.3–14.0 s | 2,311,554 | `595a432f3380c8e5` | [Game speed](guide/game-speed.md) |
+| `tut-hitbox-windboxes.mp4` | Only Windboxes ticked, the legend, then F.L.U.D.D. at 1/4 speed pushing the CPU off with no damage | `t19-hitbox-windboxes` of the same run, 8.5–20.5 s | 4,854,247 | `fec8c3c7867e1ba0` | [Display & Controls](menu/display-and-controls.md#hitbox-visualization) |
+| `tut-mii-pick.mp4` | The saved Brawler confirmed again in the Player list; Cycle Player brings it in as Player 1 | `t34-mii-pick` of the same run, 6–22 s | 4,670,765 | `eb1a5e950691f406` | [Mii Fighters](guide/mii.md) |
 
 ### Earlier waiting-room example
 
@@ -43,7 +87,7 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 
 ## rc.15 install 4 clips (2026-11-25)
 
-19 MP4 clips of install 4's features, embedded in the [rc.15 release notes](RELEASE-NOTES-rc15.md#install-4).
+Nineteen clips were recorded for install 4; the [release notes](RELEASE-NOTES-rc15.md#install-4) show the nine clean takes and describe the ten whose recordings carried a test banner.
 
 - **Run/build:** Eden runs `i4-media-qp-yoga-01` (the Quick Play capture) and `i4-media-yoga-01` (Training), the
   installed build `a945b0c1` with the card's 21 plugins; Eden only, not checked on the console.
@@ -56,35 +100,36 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
   Some captured frames also repeat: `i4-cpu-damage-range.mp4` has three repeats.
 - **Not here:** the ledge attack was not filmed. The 1080p evidence clips, GIFs and trip-attack clips are retained
   with the ledger under `artifacts/phase23/install4-media/20261125-1352Z/`. The raw films were removed after encoding.
-- **Total:** 27,393,733 bytes.
+- **Total:** 27,393,733 bytes for the nineteen.
+- **Removed on 2026-11-27:** the ten files marked "removed" below carried the test banner and are no longer
+  in the tree. Their rows record what was filmed; the files are in the history before `ff562fbc`.
 
 | File | Shows | Picture | Bytes | sha256 |
 | --- | --- | --- | ---: | --- |
-| `media/i4-replay-editor-timeline.mp4` | The clip editor over the game | 1280×720 | 1,177,939 | `48a92a57` |
-| `media/i4-replay-editor-preview.mp4` | Preview on Player 1, then on the CPU | 1280×720 | 2,934,762 | `272ee935` |
-| `media/i4-vault-recordings-menu.mp4` | Recordings | 1280×720 | 297,714 | `f64f6358` |
-| `media/i4-vault-playback.mp4` | Playing a capture back | 1280×720 | 4,121,266 | `0bf55623` |
+| `media/i4-replay-editor-timeline.mp4` (removed) | The clip editor over the game | 1280×720 | 1,177,939 | `48a92a57` |
+| `media/i4-replay-editor-preview.mp4` (removed) | Preview on Player 1, then on the CPU | 1280×720 | 2,934,762 | `272ee935` |
+| `media/i4-vault-recordings-menu.mp4` (removed) | Recordings | 1280×720 | 297,714 | `f64f6358` |
+| `media/i4-vault-playback.mp4` (removed) | Playing a capture back | 1280×720 | 4,121,266 | `0bf55623` |
 | `media/i4-trim-modes.mp4` | Trim: Off, Start, End and Both | 1280×720 | 3,240,017 | `a338f21d` |
 | `media/i4-playback-indicator-zoom.mp4` | The playback indicator | close-up | 864,615 | `67674e67` |
-| `media/i4-drill-step-names.mp4` | Drill steps are listed by move | 1280×720 | 435,263 | `21999d69` |
-| `media/i4-move-names-toggle.mp4` | Move names Off and On | 1280×720 | 1,436,743 | `80b44cca` |
+| `media/i4-drill-step-names.mp4` (removed) | Drill steps are listed by move | 1280×720 | 435,263 | `21999d69` |
+| `media/i4-move-names-toggle.mp4` (removed) | Move names Off and On | 1280×720 | 1,436,743 | `80b44cca` |
 | `media/i4-action-off-147-zoom.mp4` | Match angle and deflection, Off | close-up | 790,213 | `2656134a` |
 | `media/i4-action-on-147-zoom.mp4` | Match angle and deflection, On, another angle | close-up | 810,794 | `c5ca99d5` |
 | `media/i4-action-on-135-zoom.mp4` | Match angle and deflection, On, the recorded angle | close-up | 751,403 | `2e095875` |
 | `media/i4-steer-steered-zoom.mp4` | A steered special, steered | close-up | 731,983 | `1db9271b` |
 | `media/i4-steer-straight-zoom.mp4` | A steered special, not steered | close-up | 695,066 | `6614162c` |
-| `media/i4-edge-getup-record.mp4` | A get-up attack, recorded | 1280×720 | 2,706,716 | `f851b8c7` |
-| `media/i4-edge-getup-play.mp4` | A get-up attack, played back | 1280×720 | 1,715,756 | `64ec18c4` |
+| `media/i4-edge-getup-record.mp4` (removed) | A get-up attack, recorded | 1280×720 | 2,706,716 | `f851b8c7` |
+| `media/i4-edge-getup-play.mp4` (removed) | A get-up attack, played back | 1280×720 | 1,715,756 | `64ec18c4` |
 | `media/i4-reset-chord-alone-zoom.mp4` | L + R + A by itself | close-up | 1,386,307 | `c010352d` |
 | `media/i4-reset-after-fail-zoom.mp4` | L + R + A after a failed attempt | close-up | 1,134,887 | `8fb0b3cc` |
-| `media/i4-scrollback-zoom.mp4` | Scrolling the input display back | close-up | 1,750,067 | `ccd31142` |
-| `media/i4-cpu-damage-range.mp4` | Damage range sliders | 1280×720 | 412,222 | `053af66e` |
+| `media/i4-scrollback-zoom.mp4` (removed) | Scrolling the input display back | close-up | 1,750,067 | `ccd31142` |
+| `media/i4-cpu-damage-range.mp4` (removed) | Damage range sliders | 1280×720 | 412,222 | `053af66e` |
 
 ## rc.15 Stage tech practice (2026-11-17)
 
 `media/rc15-stage-tech.gif` shows the crosshair on a floor spot, the launch, shield input on the frame strip,
-then "Perfect · timing unavailable · In place · 1/10 · streak 1". It is embedded in
-[Fighters & Stages](menu/fighters-and-stages.md#stage-tech-practice).
+then "Perfect · timing unavailable · In place · 1/10 · streak 1". For the current procedure see [Tech practice](guide/tech-practice.md).
 
 - **Run/build:** `rc15-tech-ui-55b20f59-reset-v2-boot1`, rc.15 `55b20f59`; Eden, untested on hardware.
 - **Size:** 1280×720, 22 frames, 3.32 s, 4,396,682 bytes.
@@ -99,8 +144,7 @@ The smaller evidence GIF was not enlarged. The raw take and review receipt stay 
 This shared preview does not show the session-choice list, Random surface selection, variable edits,
 Set / Random / Auto changes or the completed summary; dedicated per-option clips remain a capture gap.
 
-Since 2026-11-13 the README shows one GIF per menu page; the [menu docs](menu/) and [guides](guide/) embed the rest.
-The "Embedded in" column of the older sections records where a clip was placed when it was made.
+The [README](../README.md) now pairs feature clips with a menu tour of stills. “Embedded in” entries below record the placements at the time of capture, not a current link index.
 
 ## rc.13 clips (2026-11-14, untested on hardware)
 
@@ -124,7 +168,7 @@ The rc.13 options and drawing changes, shot by gif-nav-author-2. rc.13 is Eden-t
   README, TECHNICAL, menu/cpu and guide/cpu-behaviour; `rc13-fast-fall-delay-quarter.gif` replaces
   `rc12-fast-fall-delay.gif` in menu/cpu (rc.12 counted the delay in 60 Hz reads, not game frames, so its 1/4 clip is
   out of date); `rc13-clatter-strength.gif` replaces `rc11-cpu-clatter-strength.gif` in menu/cpu (the rc.11 clip's menu
-  set Normal, not High, and never showed the break-out). The old files stay in `media/`.
+  set Normal, not High, and never showed the break-out). The rows below preserve those earlier takes' provenance.
 - **SDI Direction and Clatter Strength:** the last two clips were added later, on rc.13 `ed0d7a35` (diag `2a667381…`),
   on the XPS, one instance, Training only, muted, GDB stub on, with the gamepad overlay; Clatter Strength at Eden
   speed 50 %. `rc13-sdi-direction.gif` is Kirby's rapid jab, not a neutral air: six neutral airs probed (Samus, Kirby,
@@ -452,12 +496,11 @@ reviewed take by take (batches L and M): the reshoots of the clips that had been
 
 Kept from rc.5 but cut down to leave out the bar (primary 04:40Z, rule c: the retake from rd1 fell short, and the clip
 is clean outside the bar). The crops keep every frame and its time; the trims keep the menu part only.
-- The eight frame-strip crops and the play-chord crop (`<name>-crop.gif`, 2026-11-11 morning) are no longer
-  embedded: the retakes above replace them.
+- The eight frame-strip crops and the play-chord crop (`<name>-crop.gif`, 2026-11-11 morning) were removed from the
+  tree on 2026-11-27: the retakes above replace them. The files are in the history before `64496a81`.
 - Trimmed: `rc5-popup-trim.gif` (0.45–3.95 s, the pop-up only; the bar shows once it closes, so the close is not
   shown) and `rc5-recording-page-trim.gif` (from 0.5 s; the first 0.47 s in Training had the bar).
-- Removed: `rc5-record-start-save.gif` (guide/recording.md). `rc7-record-macro.gif`, embedded right after it, shows the
-  same record and start save without the bar.
+- The rc.7 recording guide replaced the marked `rc5-record-start-save` take with `rc7-record-macro`.
 
 With Online Deluxe 0.10.1 and the CPU pilot 0.2.1 (the card's own install, `switch-mtp-v0101-v021`) staged and the
 gamepad overlay left out: `docs-rd6-722525a5` (Surface, 2026-11-11 09:28–09:33Z) and `docs-rd6b-722525a5`
@@ -467,8 +510,7 @@ gamepad overlay left out: `docs-rd6-722525a5` (Surface, 2026-11-11 09:28–09:33
 | --- | --- | --- | --- | --- | --- |
 | `media/rc7-replay-capture.gif` | `docs-rd6-722525a5`, `fx-replay-capture` | none (replaced by `rc11-replay-capture.gif`, 2026-11-13) | 5.4 s, 3.4 MB | 0.0–0.6, 10.3–11.9, 27.3–28.4, 29.3–31.4 s | Training (a leftover "Saved Slot 1" notice); Recording › Replays › Replay capture [OFF], then [ON]; Training, the Online Deluxe overlay at the top right (its network page); its plugins page, "Training Rooms › Replay capture On". The log has `[ReplayCapture] menu preference enabled=true result=Applied` and `replay_capture.ini written by the writer thread enabled=true` at the menu's close. (The row's own check looked before the close and failed; the take is complete.) |
 
-`record-refused.gif` (2026-11-05, the bar and the old input log) is no longer embedded (the file stays in `media/`) and
-was **not retaken**: on this build Record
+`record-refused.gif` (2026-11-05, the bar and the old input log) was removed, not retaken: on the rc.7 build Record
 was not refused. In `docs-rd6b-722525a5` `fx-record-refused`:
 - the overlay's CPU Pilot page turned P1 from Player to "CPU (L3)", and the HUD read "CPU Lv3";
 - the pilot moved Player 1;
@@ -481,10 +523,9 @@ evidence clips stay outside this repository): Player 1's HUD reads MARIO; the ov
 "Player" to "CPU (L3)" and the HUD from MARIO to CPU Lv3; the pilot dashes Player 1; Record shows "Input Recording ·
 Lockout", then "Recording".
 
-rc.8 fixes it (`p23/rc8-pilot-refusal` `8607526b`, merged into the rc.8 head `eca14e4b`): the Record chord now asks the
-same refusal as every other record start, so the README and DIFFERENCES-FROM-THE-FORK.md describe the refusal instead
-of a known issue. No retaken clip is in `media/`: the refusal's proof is the evidence clip `rc10-pilot-refusals.gif`
-(rc.10 section above; outside git).
+In rc.8 (`8607526b`, merged into `eca14e4b`), the Record chord began refusing an AI-driven Player 1. The rc.10
+evidence take was `rc10-pilot-refusals.gif` (outside git). That refusal was retired on 2026-11-25; see
+[recording while an AI plays](RELEASE-NOTES-rc15.md#record-works-while-an-ai-plays-player-1).
 
 Retired from the README (each carried the bar):
 - `mii-editor.gif` and `mii-editor-list.gif` (2026-11-05): `rc7-mii-editor.gif` shows the editor, the new row and the
@@ -573,7 +614,7 @@ evidence clips stay outside git, in `artifacts/phase23/feature-gifs/evidence/`.
 
 ## rc.5 clips
 
-23 of the rows below are in [`media/`](media), and the player docs embed them. Three more were there until
+The rc.5 player docs embedded 23 takes from [`media/`](media). Three more were there until
 2026-11-10, when clips that show the result replaced them (rc.6 docs clips above); they remain in the history up to
 `da26d632`. They are Eden footage of
 `p23/rc5-wire-fix` diag builds, and for the last three of `p23/rc6-hot-slots` diag builds, which add log lines only (the
@@ -594,10 +635,10 @@ screen draws the same):
   `688c478`), booted on cov-rec's pre-library card. The row first checked the card the way cov-rec's #37 row does:
   two dated saves, Slot 2 bound, `oldjab` active, one migrate line. The take's first 0.9 s (a leftover notice) are
   trimmed. It was re-encoded with ffmpeg, one shared palette and no dither: 3.9 MB, 8.1 s.
-  - guide/recording.md now embeds `rc5-migration-crop.gif` (2026-11-11): the same frames and times, cropped to the top 436
+  - The recording guide used `rc5-migration-crop.gif` on 2026-11-11: the same frames and times, cropped to the top 436
     rows to leave out the gamepad overlay plugin's input bar. The two lists and the notices are whole; the fighters
     are cut at the waist.
-- `rc5-save-warp.gif` (Surface `out-confirm-2116Z`, above): guide/recording.md now embeds `rc5-save-warp-crop.gif`
+- `rc5-save-warp.gif` (Surface `out-confirm-2116Z`, above): the recording guide used `rc5-save-warp-crop.gif`
   (2026-11-11), cropped the same way; the fighters are cut at the knees.
 - `rc5-make-combo.gif`: run `rc6-docs-gifs-xps7` on the XPS, 2026-11-08 17:46Z, the same diag NRO, fixture `mk6` (the
   rc.5 `mk` fixture with its start save moved into reach, `make_mk6.py`). After the clip the row checked the card:
@@ -608,7 +649,7 @@ screen draws the same):
   `TRUE 0` (input +4), attempt 1 `+1 DROP` (input +5), attempt 2 up tilt into up smash (input +4). The take is trimmed
   at 0.8 s. It was re-encoded with one shared palette of 96 colours and no dither, keeping every second frame with the
   time of both: 9.9 MB, 7.1 s.
-  - guide/recording.md now embeds `rc5-grade-not-true-crop.gif` (2026-11-11): the same frames and times, cropped to the top
+  - The recording guide used `rc5-grade-not-true-crop.gif` on 2026-11-11: the same frames and times, cropped to the top
     436 rows to leave out the gamepad overlay plugin's input bar (y 443–452). The frame strip and helper bar are
     whole; the fighters are cut at the knees in the last 2 s.
 
@@ -618,9 +659,8 @@ palette of 96 colours and no dither: `rc5-popup.gif` and `rc5-save-warp.gif` kee
 `rc5-loop-no-warp.gif` and `rc5-chain-play.gif` keep every second
 frame with the time of both, so they still play at game speed.
 
-The other rows are not captured yet, and their doc sections have no picture. Capture each one in the Eden session that
-boots the build named on the row. Do not keep a take where the "Must be visible" line is missing. Full screen,
-1280×720, one behaviour, game speed, under 10 s. Trim only the ends.
+The remaining rows record the rc.5 capture plan, not missing visuals in today's guides. Each take called for one
+visible behaviour at game speed: full screen, 1280×720, under 10 s, trimmed only at the ends.
 
 Shared start, unless a row says otherwise:
 
@@ -884,7 +924,7 @@ their own claim: each half is read on the diag log, and both halves run against 
 | `media/rc14-btt-run.gif` | `g5-rc14-yoga-3`, `t-p2-btt-run` (gif-lane-5; Yoga; hide-cpu-tag diag a1cd4099, footer "0.2.0-rc.14 · rc14 a1cd4099") | menu/fighters-and-stages (Break the Targets) | 9.2 s, 6.8 MB | marks `ready`, `go`, `b1`..`b3`, `done`, `ready2`; windows in the cut json | Ready ("Targets 0/3   0:00.00", the clock waits), the first input starts the clock, Fox breaks the three targets one after another (jab, jab, short-hop neutral air), "Done! 3 in 0:04.15 (best 0:04.15)", then Ready again with every target back. The CPU is hidden: no tag, no panel. |
 | `media/rc14-btt-place.gif` | `g5-rc14-yoga-3`, `t-p2-btt-place` (gif-lane-5; Yoga; hide-cpu-tag diag a1cd4099, footer "0.2.0-rc.14 · rc14 a1cd4099") | menu/fighters-and-stages (Place targets) | 9.7 s, 6.8 MB | marks `menu`, `a_row`, `placing`, `p1`..`p3`, `undo`, `undone`, `startx`, `ready`; windows in the cut json | The menu on Place targets, A: the zoomed-out placing view; the crosshair moves and A places three targets ("Place targets 3/10"), B removes the last ("2/10"), X starts: "Targets 0/2   0:00.00". Each press named in a box. The CPU is hidden: no tag, no panel. Ran first in a fresh boot (TR keeps its layout list in memory, and saved layouts add the step line to the placing notice). |
 | `media/rc14-windbox-krool-vacuum.gif` | `g5-rc14-xps-7`, `t-p2-wb-krool` (gif-lane-5; XPS; wind-articles diag 4726d867) | menu/display-and-controls (Windboxes) | 5.0 s, 4.1 MB | marks `vac` (the press), window 8-13 s after it | King K. Rool (P1) holds B at 10 % speed with Hitbox Visualization on Windboxes only: the Blunderbuss fires its cannonball (Mario 0 to 16.3 %), then the vacuum's deep-blue windbox pulls Mario in without any change to his damage until he is caught. `[Hitbox] orbs drawn n=1`; Player 1 checked as K. Rool by the position dump. Approved as is (no clean-pull variant). |
-| `media/rc14-menu-tour.gif` | `g5-rc14-xps-10`, `t-p2-hbp-tour` (gif-lane-5; the XPS; diag 17e50cd0, footer 0.2.0-rc.14 · rc14 17e50cd0) | README (top); guide/getting-started; guide/using-the-menu; DIFFERENCES-FROM-THE-FORK; TECHNICAL | 9.6 s, 4.3 MB | 3.81–4.31, 7.89–8.54, 9.49–10.14, 11.09–11.74, 12.69–13.34, 14.29–14.94, 21.76–22.86, 26.01–26.61, 28.91–29.71, 30.95–31.85, 34.56–35.26, 41.69–43.39 s | Mario vs Palutena in Training, nothing drawn. The menu opens on CPU; R steps Saves, Recording, Fighters & Stages, Display & Controls (the five pages in order); Hitbox Visualization on Display & Controls opens a six-row checklist (Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles, Windboxes); A ticks Hitboxes, then Grab boxes, then Hurtboxes, Down moves between them; the row reads 3 of 6, the menu closes, and both fighters' hurtboxes are yellow pills (Mario's limbs, Palutena's torso, one pill each); at 1/4 speed Mario's short-hop neutral air shows its red hitbox. The footer of the menu pages reads 0.2.0-rc.14 · rc14 17e50cd0; the checklist's help line reads Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends. The take's `hitbox_vis_after` is [1, 1, 1, 0, 0, 0]; the log has `[GameSpeed] step … speed=1/4`. Replaces `rc11-menu-tour.gif` (rc.11 build 0c628724: the hurtboxes of the original were rows of discs). |
+| `media/rc14-menu-tour.gif` | `g5-rc14-xps-10`, `t-p2-hbp-tour` (gif-lane-5; the XPS; diag 17e50cd0, footer 0.2.0-rc.14 · rc14 17e50cd0) | guide/getting-started; guide/using-the-menu; DIFFERENCES-FROM-THE-FORK; TECHNICAL (the README's top until 2026-11-27) | 9.6 s, 4.3 MB | 3.81–4.31, 7.89–8.54, 9.49–10.14, 11.09–11.74, 12.69–13.34, 14.29–14.94, 21.76–22.86, 26.01–26.61, 28.91–29.71, 30.95–31.85, 34.56–35.26, 41.69–43.39 s | Mario vs Palutena in Training, nothing drawn. The menu opens on CPU; R steps Saves, Recording, Fighters & Stages, Display & Controls (the five pages in order); Hitbox Visualization on Display & Controls opens a six-row checklist (Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles, Windboxes); A ticks Hitboxes, then Grab boxes, then Hurtboxes, Down moves between them; the row reads 3 of 6, the menu closes, and both fighters' hurtboxes are yellow pills (Mario's limbs, Palutena's torso, one pill each); at 1/4 speed Mario's short-hop neutral air shows its red hitbox. The footer of the menu pages reads 0.2.0-rc.14 · rc14 17e50cd0; the checklist's help line reads Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends. The take's `hitbox_vis_after` is [1, 1, 1, 0, 0, 0]; the log has `[GameSpeed] step … speed=1/4`. Replaces `rc11-menu-tour.gif` (rc.11 build 0c628724: the hurtboxes of the original were rows of discs). |
 | `media/rc14-hitbox.gif` | `g5-rc14-xps-10`, `t-p2-hbp-tour` (gif-lane-5; the XPS; diag 17e50cd0, footer 0.2.0-rc.14 · rc14 17e50cd0) | README (Display & Controls); menu/display-and-controls; TECHNICAL | 8.0 s, 4.7 MB | 3.81–4.31, 21.46–21.96, 22.46–23.36, 26.01–26.61, 28.91–29.71, 30.95–31.85, 34.56–35.36, 35.24–35.84, 38.64–39.14, 41.64–43.54 s | The same take, the hitbox part, with a title strip: Training with nothing drawn; the Display & Controls row, the checklist, A ticks Hitboxes, then Grab boxes, then Hurtboxes; the menu closes; the yellow hurtbox pills on both fighters; the Game speed pop-up at x1, then at 1/4; Mario's short hop and neutral air, its red hitbox held for over a second while the strip's lane turns red. Replaces `rc11-hitbox.gif`. |
 | `media/rc14-waiting-menu.gif` | `final400-waiting-pill` (Sol's room pass, `ldn-final/final-400e2c69`; the Ally guest's first practice on the boot; diag 400e2c69 `99feb831`, footer 0.2.0-rc.14 · rc14 400e2c69; clip `rc14-waiting-menu-pills-400e2c69.gif`, sha256 `9461ff2d…`) | README, Waiting rooms; TECHNICAL | 6.6 s, 7.2 MB | 0–1.0 s of the CPU-page recording, then 0–5.6 s of the Display & Controls recording (a hard cut between two recordings; the last 1.4 s of the second is left out) | A Local Wireless waiting room, the guest's first practice. The menu on the CPU page (Reactions), cut to Display & Controls with Hitbox Visualization 0 of 6; its checklist opens with nothing ticked; Hurtboxes is ticked and the row reads 1 of 6; the menu closes and both practice fighters show yellow hurtbox pills, with the Waiting and P1/P2 Ready signs on screen. Hurtboxes only: no Hitboxes or Grab boxes are ticked. No host, desync or hardware claim. Replaces `rc11-waiting-menu.gif` (rc.11 build 0c628724: the hurtboxes of the original were rows of discs). |
 
@@ -893,4 +933,4 @@ their own claim: each half is read on the diag log, and both halves run against 
 
 `rc15-input-drill.gif` is the byte-identical media restored from `3d36ca7d`, shot on rc.15 feature source `2eb3903e`, not the final integrated build. Full frame1280×720,3.78s, nine encoded frames from19 native frames at a5fps request; SHA256 `a7f8a550de084758ed076c81b4dff39bc4503b2eacc80a8b7c9bb317b4fa9ccc`. It shows Drill1's Crop range4→3→4→3. It does not show Record drill, Make combo, grading or save-as-new. The early build's helper overlaps the editor; the integrated build corrected that issue. The [dated evidence](EVIDENCE-rc15-input-drill.md) keeps the original limitations and separate runtime checks. Embedded in README, Recording guide and Recording menu.
 
-Remaining media gaps: no dedicated GIF for combo link Crop, Record drill, no-hit Make combo, drill grading or the colour legend. Macro and drill GIFs show range selection rather than the full preview/save flow; the article hurtbox GIF shows Pikmin, not every supported item. Colour legend has both native scheme stills. These are capture gaps, not claims of missing runtime functionality.
+At the time, the macro and drill GIFs showed range selection, not the full preview/save flow. The [article hurtbox take](media/rc15-article-hurtboxes.gif) showed Pikmin, not every supported item. For later Record drill and colour legend footage, see [Tutorial clips](#tutorial-clips-2026-11-25-through-2026-11-27).

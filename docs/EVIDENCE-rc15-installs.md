@@ -399,13 +399,13 @@ files named below were read for this page.
 
 ## Preview build (`cc71537c`)
 
-Staged for the card on 2026-11-27 and **not installed**. Nothing here ran on a console.
+Staged on 2026-11-27, then removed when the install was cancelled. None of these preview runs used a console.
 
 | Fact | Value | Where |
 | --- | --- | --- |
 | Commit | `cc71537c`, the head of the next build's branch with every part in | — |
-| Release file | sha256 `78db86f5378635a8ce6820b6cdace6feb3d9d1c73ef126aa4475da1e4f03e77a`, 5,419,008 bytes | `artifacts/phase23/card-install/20261127-0046Z-preview-cc71537c/` |
-| It would replace | install 6's file, `c1ced861…` | `operator-approval.json` in that folder |
+| Release file | sha256 `78db86f5378635a8ce6820b6cdace6feb3d9d1c73ef126aa4475da1e4f03e77a`, 5,419,008 bytes | `artifacts/phase23/next-build/gate-cc71537c/nro/` |
+| After cancellation | The card still held install 6's `c1ced861…` | Card readback, 2026-11-27 04:04Z |
 | Host gate | Six steps exited 0. The six top-level suites reported 3,182 passed, 0 failed, 4 ignored. The summary also counted 15 nested passes and missed a sixteenth whose output was interleaved. | `artifacts/phase23/next-build/gate-cc71537c/`, `logs/test.log:359` |
 
 ### Smoke tests on the release file

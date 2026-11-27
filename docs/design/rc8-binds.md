@@ -111,7 +111,7 @@ Where a choice is the operator's, this takes the sensible default and states it.
    - It's updated on each step and cleared on release. A notice it covered comes back with the time it had left.
 5. **The speeds and their order:**
    - **Training:** the five speeds Training offers: 1/4, 1/2, 2/3, x1, x1.5 (values 5, 4, 3, 1, 6).
-     - **1 Frame is left to the native menu.** It's a pause-and-step mode with its own button, not a speed.
+     - **In rc.8, 1 Frame stayed in the native menu.** The [later frame-step design](rc15-speed-frame.md) added it to the bind.
      - When Training is on 1 Frame, the pop-up shows "1 Frame", and the first step goes from x1's place.
    - **Waiting-room practice:** ~~1/4, 1/2, x1~~. **Superseded 2026-11-11 (rc.8 R2, `TASK-rc8.md` "SCOPE REOPENED"):**
      the same five as Training. 2/3 is a paced slot and x1.5 an extra world step, both local
@@ -203,20 +203,20 @@ Where a choice is the operator's, this takes the sensible default and states it.
 
 ## 4. Requirement trace
 
-| Operator clause | Design | Test |
+| Requirement clause | Design | Test |
 | --- | --- | --- |
-| "I would like to be able to bind bringing up the input display" | §3.1–3.2: the chord row `input_display_toggle`; its request flips `input_display_strip` through the menu worker | `the_ten_chords_keep_todays_defaults_and_add_two`, `input_display_chord_raises_its_request`, `display_toggle_flips_the_strip_row` |
-| "and also a bind to decrease the speed" | §3.1, 3.3: the chord row `game_speed`, a hold that opens the speed pop-up; §3.6: the speed applied at once in Training (the game's own apply writes, done by the bind on P1's poll) | `the_ten_chords_keep_todays_defaults_and_add_two`, `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release`, `mode_apply_does_the_speed_codes_writes`, `registry_find_walks_the_games_map`, `game_speed_rows_decode_the_training_apply` |
-| "(basically trace how the training mode does it as it has 3/4 1x etc)" | §2, §3.5–3.6: the native values 1..6 at `PauseMenu+0xb54` and its labels; there is no 3/4 (the slow speeds are 2/3, 1/2, 1/4) | `speeds_are_the_native_values_and_labels`, `game_speed_rows_decode_the_native_offsets` |
-| "the idea is to be able to quickly change the speed perhaps if you want to practice it quickly" | §3.3: one combo, Left/Right while held, no menu | `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release` |
-| "it would have a small menu pop up showing the speed" | §3.4: the standing notice "Game speed" with the speed between the D-pad glyphs | `popup_body_shows_the_speed_between_the_dpad_glyphs` |
-| "you go left or right while holding the combo" | §3.3: newly pressed D-pad Left/Right steps, clamped; other chords blocked; the step buttons hidden | `training_steps_walk_the_speeds_and_stop_at_the_ends`, `hold_hides_the_chord_and_step_buttons_and_blocks_other_chords` |
-| "and then it goes away" | §3.3: closes on the poll no chord button is held; the speed stays | `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release` |
-| "in training it'll reflect in the training menu" | §3.6: `+0xb54` stored, then `0x1bbbd30(menu, value, menu+0x538)`, the setter's own unchanged-value path | `training_write_is_the_native_store_then_text`, `game_speed_rows_decode_the_native_offsets` |
-| R1 defect (the primary 2026-11-11 18:20Z): "The HUD stopwatch staying on \"x1.5\" after the chord steps back to x1" | §3.6: after the store and text, the UI tick runs the game's indicator refresh (`hud_icon`): `out_speed` and the flag cleared at x1, `in_speed` and the flag set away from it | `hud_icon_shows_away_from_x1_and_hides_back_at_x1`, `hud_icon_matches_the_speed_after_every_step_from_either_flag`, `game_speed_rows_decode_the_hud_icon` |
-| Chord overlap (the primary 2026-11-11 20:01Z, option 2): "the two rc.8 Training binds (Input display R + D-pad Down, and the speed hold's R + D-pad Up/Left/Right) don't pass while L is held" | §3.1: `chords::passes_without_l` for the two rows; an open hold takes no step with L held | `input_display_chord_raises_its_request`, `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release`, `only_the_rc8_rows_mind_l` |
-| "and the lobby it will just work" | §3.7–3.8: a plugin slot `{1, N}` in the BattleObjectSlow table, the native take and free steps, released before any round | `slot_take_and_free_match_the_native_steps`, `lobby_offers_the_training_speeds`, `lobby_slot_is_released_outside_the_practice_and_never_written_elsewhere` |
-| "can you make the speed up local too?" (§2b, owned by QCF) | §3.5, superseded by `docs/design/rc8-lobby-speed.md` (rc.8 R2): the lobby offers all five, 2/3 and x1.5 local | `lobby_offers_the_training_speeds` |
+| A bind brings up the input display | §3.1–3.2: the chord row `input_display_toggle`; its request flips `input_display_strip` through the menu worker | `the_ten_chords_keep_todays_defaults_and_add_two`, `input_display_chord_raises_its_request`, `display_toggle_flips_the_strip_row` |
+| A bind lowers the game speed | §3.1, 3.3: the chord row `game_speed`, a hold that opens the speed pop-up; §3.6: the speed applied at once in Training (the game's own apply writes, done by the bind on P1's poll) | `the_ten_chords_keep_todays_defaults_and_add_two`, `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release`, `mode_apply_does_the_speed_codes_writes`, `registry_find_walks_the_games_map`, `game_speed_rows_decode_the_training_apply` |
+| It follows Training mode's own speed setting and its values | §2, §3.5–3.6: the native values 1..6 at `PauseMenu+0xb54` and its labels; there is no 3/4 (the slow speeds are 2/3, 1/2, 1/4) | `speeds_are_the_native_values_and_labels`, `game_speed_rows_decode_the_native_offsets` |
+| The speed can be changed quickly while practising | §3.3: one combo, Left/Right while held, no menu | `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release` |
+| A small pop-up shows the speed | §3.4: the standing notice "Game speed" with the speed between the D-pad glyphs | `popup_body_shows_the_speed_between_the_dpad_glyphs` |
+| Left or Right steps the speed while the combo is held | §3.3: newly pressed D-pad Left/Right steps, clamped; other chords blocked; the step buttons hidden | `training_steps_walk_the_speeds_and_stop_at_the_ends`, `hold_hides_the_chord_and_step_buttons_and_blocks_other_chords` |
+| The pop-up goes away on release | §3.3: closes on the poll no chord button is held; the speed stays | `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release` |
+| In Training the change shows in the Training menu | §3.6: `+0xb54` stored, then `0x1bbbd30(menu, value, menu+0x538)`, the setter's own unchanged-value path | `training_write_is_the_native_store_then_text`, `game_speed_rows_decode_the_native_offsets` |
+| R1 defect (2026-11-11 18:20Z): the HUD stopwatch stayed on x1.5 after the chord stepped back to x1 | §3.6: after the store and text, the UI tick runs the game's indicator refresh (`hud_icon`): `out_speed` and the flag cleared at x1, `in_speed` and the flag set away from it | `hud_icon_shows_away_from_x1_and_hides_back_at_x1`, `hud_icon_matches_the_speed_after_every_step_from_either_flag`, `game_speed_rows_decode_the_hud_icon` |
+| Chord overlap (2026-11-11 20:01Z, option 2): the two rc.8 Training binds (Input display R + D-pad Down, and the speed hold's R + D-pad Up/Left/Right) do not pass while L is held | §3.1: `chords::passes_without_l` for the two rows; an open hold takes no step with L held | `input_display_chord_raises_its_request`, `hold_opens_on_the_chord_steps_on_left_right_and_closes_on_release`, `only_the_rc8_rows_mind_l` |
+| The bind works in the waiting room | §3.7–3.8: a plugin slot `{1, N}` in the BattleObjectSlow table, the native take and free steps, released before any round | `slot_take_and_free_match_the_native_steps`, `lobby_offers_the_training_speeds`, `lobby_slot_is_released_outside_the_practice_and_never_written_elsewhere` |
+| The speed-up is local too (§2b, owned by QCF) | §3.5, superseded by `docs/design/rc8-lobby-speed.md` (rc.8 R2): the lobby offers all five, 2/3 and x1.5 local | `lobby_offers_the_training_speeds` |
 
 ## 5. Code shape
 
@@ -235,7 +235,7 @@ Where a choice is the operator's, this takes the sensible default and states it.
   - the lobby step from `lobby::frame`;
   - the pop-up through `notices`.
 - **The menu worker** applies the display toggle (an atomic count from the poll) as a change of `input_display_strip`.
-- **Size:** measured at the end and raised in its own commit, `approved_by` the operator's "raise as needed".
+- **Size:** measured at the end and raised in its own commit. Raising it as needed was approved beforehand.
 
 ## 6. Eden proof (integration schedules it on the integrated build)
 

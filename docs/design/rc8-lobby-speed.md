@@ -65,12 +65,12 @@ FUN_0135ca00 (the battle task entry, every update, main thread)
 
 ## 4. Requirement trace
 
-| Operator clause | Design | Test |
+| Requirement clause | Design | Test |
 | --- | --- | --- |
-| "and the lobby it will just work" | §3.1–3.5: every speed of the bind works in the waiting-room practice, with the same list as Training | `lobby_offers_the_training_speeds`, `each_lobby_speed_has_its_plan_and_none_raises_the_update_rate` |
-| "can you make the speed up local too?" | §3.4: x1.5 is an extra world step that leaves the room and mode objects at x1 | `the_walk_follows_the_scheduler_and_leaves_out_the_walker_and_masked_groups`, `the_extra_pass_needs_the_live_practice_unpaused_with_no_slow_and_between_passes`, `the_extra_pass_runs_on_every_other_update_and_restarts_after_a_reset`, `the_skipped_tick_is_the_registry_walker`, `the_pass_ticks_every_task_in_the_schedulers_order_and_is_whole`, `each_phase_is_read_again_right_before_its_ticks`, `counting_and_listing_walks_agree_and_a_phase_wider_than_the_buffer_is_not_run` |
-| "i said I want the speed changes etc in rc8 not another release after that" | §3.1, 3.3, 3.4: 2/3 and x1.5 in the lobby in this release | `lobby_offers_the_training_speeds`, `two_thirds_paces_periods_of_one_and_two_updates`, `half_and_quarter_are_not_paced_and_two_thirds_yields_to_a_longer_slow` |
-| "why are you deferring to rc9? I never approved that." | §3.5: the teardown row R9 (1/4 match found) is proven with R2's pair, not deferred | `match_found_at_two_thirds_frees_the_paced_slot_before_the_drop`, `match_found_with_no_busy_edge_frees_the_slot_before_the_drop`, `the_paced_slot_is_kept_through_its_divisors_and_freed_with_the_one_it_holds`, `the_pass_stops_between_ticks_once_the_practice_is_no_longer_live` |
+| The speed bind works in the waiting room | §3.1–3.5: every speed of the bind works in the waiting-room practice, with the same list as Training | `lobby_offers_the_training_speeds`, `each_lobby_speed_has_its_plan_and_none_raises_the_update_rate` |
+| The speed-up is local too | §3.4: x1.5 is an extra world step that leaves the room and mode objects at x1 | `the_walk_follows_the_scheduler_and_leaves_out_the_walker_and_masked_groups`, `the_extra_pass_needs_the_live_practice_unpaused_with_no_slow_and_between_passes`, `the_extra_pass_runs_on_every_other_update_and_restarts_after_a_reset`, `the_skipped_tick_is_the_registry_walker`, `the_pass_ticks_every_task_in_the_schedulers_order_and_is_whole`, `each_phase_is_read_again_right_before_its_ticks`, `counting_and_listing_walks_agree_and_a_phase_wider_than_the_buffer_is_not_run` |
+| The speed changes ship in rc.8, not in a later release | §3.1, 3.3, 3.4: 2/3 and x1.5 in the lobby in this release | `lobby_offers_the_training_speeds`, `two_thirds_paces_periods_of_one_and_two_updates`, `half_and_quarter_are_not_paced_and_two_thirds_yields_to_a_longer_slow` |
+| None of it is deferred to rc.9 | §3.5: the teardown row R9 (1/4 match found) is proven with R2's pair, not deferred | `match_found_at_two_thirds_frees_the_paced_slot_before_the_drop`, `match_found_with_no_busy_edge_frees_the_slot_before_the_drop`, `the_paced_slot_is_kept_through_its_divisors_and_freed_with_the_one_it_holds`, `the_pass_stops_between_ticks_once_the_practice_is_no_longer_live` |
 
 ## 5. Eden proof (planned)
 

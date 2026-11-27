@@ -150,9 +150,8 @@ leaves the game's own level everywhere.
   Auto-load does nothing.
 - **CONNECTIONS.** A combo's connections list its links with their moves and input events. In rc.5 they were empty. A
   shared combo file with any allowed name now stays the drill.
-- **Make combo** stores the macro's input events, and it saves only the exchange its own playback made. With no hit it
-  writes nothing, where rc.5 saved the exchange before it. TODO-PROOF: the candidate's `yoga-cov` row
-  `cov-make-combo-no-hit` (it passed on `e39479df` in `covrec-nohit1`; the menu worker it runs through changed since).
+- **Make combo** in rc.6 stored only the exchange its own playback made. With no hit it wrote nothing, where rc.5 saved
+  the previous exchange (`covrec-nohit1`, `e39479df`). For the newer no-hit behavior, see [input drills](guide/recording.md#input-drills).
 - **Mash interrupts playback** stops the CPU's macro, including a macro from the library. The CPU's mash does not stop
   Player 1's macro. In rc.5 the mash never stopped a library macro.
 - **A setup restore** only moves the fighters. It writes no save file, and the next Load goes back to the bound save.
@@ -188,7 +187,7 @@ leaves the game's own level everywhere.
   plugin. rc.5 allocated there.
 - **P1 CPU Control in an online match.** Without the standalone pilot plugin, P1 CPU Control now plays Player 1 in an
   online match. Before, it worked only in Training: in a Quickplay match Player 1 stood still, and the game dropped the
-  console for inactivity. TODO-PROOF: the merged candidate's final Quickplay boot (branch proof `rc6-bg-qp6`).
+  console for inactivity. The [feature ledger, row 77](FEATURE-LEDGER.md) records both branch and candidate Quickplay runs.
 - **Lobby Items Off in Quickplay's waiting area.** Off now also stops the waiting room's timed item drops. In rc.5 they
   kept coming with the row Off, one every 10–13 s. Items already out are still removed once when you turn it Off, and
   On brings items back. In local-wireless rooms the game spawns no items at all.
@@ -199,7 +198,7 @@ leaves the game's own level everywhere.
   diagnostic CPU-cycle reload with Cycle Preload Off, and three times in Quickplay's waiting area while paging through
   the menu (in the two longest loops, after 36 and 38 clean closes in a row). Other loops of the same steps closed the
   menu cleanly. While the game was frozen, none of this mod's code was running; the game's own code was busy. The
-  cause isn't found yet. The macro-naming freeze fixed above is a different problem.
+  rc.6 investigation did not establish the cause. See the [later menu-close fix](RELEASE-NOTES-rc8.md#a-rare-freeze-as-the-menu-closes); the macro-naming freeze was separate.
 - **Waiting for memory.** When memory is short, a group or a CPU seat can stay "waiting for memory". The Fighters
   notice says so, for example "Loaded 9/10 (1 waiting for memory)". That fighter still loads when you switch to it,
   the normal (slower) way.
@@ -210,7 +209,7 @@ leaves the game's own level everywhere.
   second is built in the background only after that player leaves the first Mii.
 - **A Training reset can pause for a moment.** Now and then a Training reset pauses the game for 0.14–0.23 s (seen in
   Eden). The pause is in the game's own reset, not in this mod's loading.
-- **Known issue: when the standalone CPU pilot controls Player 1, Record isn't refused yet (fix planned).**
+- **Record under a pilot:** rc.6 did not refuse it. [Waiting-room controls](guide/waiting-rooms.md#what-is-different-or-refused) describes the current behavior.
 
 ## Corrections to the rc.5 notes
 

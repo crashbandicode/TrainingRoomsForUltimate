@@ -16,7 +16,7 @@ that ran them are listed under [Eden, rc.6](#eden-rc-6).
 | 1 | **Add New** opens Smash's own Mii Fighter editor from Training, Quickplay or Local Wireless waiting practice | `src/mii_editor_bridge/mod.rs` `request`, `editor_origin.rs` `admit` | `src/runtime/mii/mii_editor_bridge/mod.rs:146` `request`, `editor_origin.rs:14`; `NATIVE_EDITOR_AVAILABLE = true` (`src/model/mii_root/mii_menu.rs:12`) | present |
 | 2 | Add New starts from a copy of the role's Player choice, else the first saved Mii of the class, else the game's default | `training_mod_tui/src/mii_menu.rs:337-352`, `native_default.rs` | `mii_menu.rs:367` `editor_seed`, `native_default.rs` | present |
 | 3 | Add New with a Player/CPU choice made in the same opening: the choice stays saved, its reload is dropped, the editor opens alone | `training_mod_tui/src/containers/app.rs:923-931`, `src/common/menu.rs:483-491` | `src/editors/mii.rs` `close_for`, `src/runtime/mii/menu_handoff.rs` (editor request before the catalog close) | **ported 2026-11-05** |
-| 4 | **Save** makes a new native Smash Mii: only a fresh draft reaches the game's allocator (a new slot); a saved ID never enters, so no saved Mii or protected original is overwritten; an identical configuration reuses the saved one and says so: the notice "Same as ‹saved name›, nothing new saved" names the matched saved Mii (operator decision C, 2026-11-08; a rename alone is identical, row 12); refused when the catalog is incomplete or holds 99 files | `src/mii_editor_bridge/mod.rs:592-645` `edit_decide` | `mii_editor_bridge/mod.rs:634` `edit_decide`; post-save check `save_ready_for_return` `:723`, `catalog_read` `:747` | present |
+| 4 | **Save** makes a new native Smash Mii: only a fresh draft reaches the game's allocator (a new slot); a saved ID never enters, so no saved Mii or protected original is overwritten; an identical configuration reuses the saved one and says so: the notice "Same as ‹saved name›, nothing new saved" names the matched saved Mii (decision C, 2026-11-08; a rename alone is identical, row 12); refused when the catalog is incomplete or holds 99 files | `src/mii_editor_bridge/mod.rs:592-645` `edit_decide` | `mii_editor_bridge/mod.rs:634` `edit_decide`; post-save check `save_ready_for_return` `:723`, `catalog_read` `:747` | present |
 | 5 | **Name**: the editor's Name row uses the shared inline keyboard (10 UTF-16 units; empty Enter cancels; one keyboard lease shared with the macro keyboard) | `src/mii_editor_bridge/name_keyboard.rs` | `mii_editor_bridge/name_keyboard.rs:153`, `src/model/mii/inline_keyboard.rs` | present |
 | 6 | **Interrupted editor**: a match starting in Quickplay/Local Wireless while editing keeps the confirmed draft and the exact screen (Settings row, Name text and caret, Headgear/Outfit/Colour/Voice cursors, Specials picks, Test), in memory only; returning to the same lobby resumes it without saving | `connected.rs`, `resume_adapter.rs`, `ui_resume.rs`, `*_resume.rs` | the same files under `src/runtime/mii/mii_editor_bridge/` (`connected.rs:298/341` → `resume_adapter.rs:413` `try_auto_return` → `mod.rs:221` `resume_checkpoint`); `src/model/mii_root/resume.rs` | present |
 | 7 | **Leaving**: B / Exit Without Saving / Cancel discards the draft and creates nothing; the copied Mii never changes; Training (or the lobby's practice fighter and Ready card) comes back | `mod.rs` `editor_parent`, `training_state`; `connected.rs` `owner.reenter` | `mod.rs:503` `editor_parent`, `:345` `training_state`; `connected.rs` | present |
@@ -38,8 +38,8 @@ that ran them are listed under [Eden, rc.6](#eden-rc-6).
 ## Kept different on purpose, or not carried
 
 - **Replay Window retry and exact-Mii named macros: ported 2026-11-05**, with the rest of the RC's frozen recording
-  workflows (operator: "yes port enable the fork's Replay Window retry / exact-Mii named macros", then "Switch CPU to
-  recorded fighter, Setup library, Edit placement"). The RC flag `ADVANCED_RECORDING_WORKFLOWS` and its gates are
+  workflows, by order: first the fork's Replay Window retry and exact-Mii named macros, then Switch CPU to
+  recorded fighter, Setup library and Edit placement. The RC flag `ADVANCED_RECORDING_WORKFLOWS` and its gates are
   gone: the fork's code runs as it did.
   - **Replay window** (Recording › Replays › Replay window): choosing a capture's Mii track retries a missed import (the
     track's target is "not resolved" until the window resolves the recorded Mii,
@@ -53,9 +53,8 @@ that ran them are listed under [Eden, rc.6](#eden-rc-6).
     writes the saved native Mii with the same look (row 12), or else the Mii with an ID made from its look and the name
     "New Mii". The game's own Mii setup binds no Mii resource for a CharInfo without them, and the body then read null
     memory (cov-rest `f2298ee`, `src/model/mii_install.rs` `installable`).
-  - **Edit placement** and the **Setup library** (Saves › Setup library) are back. Edit placement edits the active
-    macro of the role in view. (2026-11-25: Edit placement became Change placement, which edits the save itself;
-    [Recording guide](guide/recording.md#change-placement-and-the-replay-window).)
+  - **Edit placement** and the **Setup library** returned in that port. Edit placement changed the active macro's
+    offset until [Change placement](guide/recording.md#change-placement-and-the-replay-window) replaced it on 2026-11-25.
 - **Editor trace file** (`mii-editor-last.json`): diagnostic builds only; the fork wrote it in every build.
 - **Menu input gate:** the editor also waits while the game's pause or the native waiting-room menu is open (the
   shared `captures_input`), not only for the plugin menu.

@@ -1,14 +1,15 @@
 # Parry practice
 
-<!-- CLIP: tut-parry-practice.mp4 | Parry practice starts → the CPU attacks → a parry and its grade -->
-*Clip coming.*
+## Practise against a recorded attack
 
-Works in Training and in the [waiting room](waiting-rooms.md). Record a CPU attack with [Recording](recording.md), then choose **Start** in [Practice games](../menu/practice-games.md#parry-practice) and play the recording. Release shield to parry each hit: the display shows the grade, streak and totals. **10 attempts** shows a summary after each set; **Free practice** keeps counting.
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35e8edb3e156f65dc2b9cc87b450a10d83e2f8d9" autoplay muted loop playsinline controls></video>
 
-Use **Save this parry practice** to save the active CPU recording and its Loop setting. **Saved parry practices** lets you return to one; it cannot start if its recording or starting save has been deleted.
+*Record a forward smash to use as the CPU's attack.* [Open the clip](../media/tut-record-macro.mp4)
 
-| Button | What it does |
-| --- | --- |
-| A | Start or Stop, or open a saved practice. |
-| ZR + Up | Play the CPU recording with the default shortcut. |
-| Shield release | Attempt a parry as the attack reaches you. |
+| Step | What to do |
+|---|---|
+| 1. Prepare | [Record an attack](recording.md), then set that macro active for the CPU. |
+| 2. Start | Open Parry practice in [Practice games](../menu/practice-games.md); choose Start. |
+| 3. Attempt | Play the CPU recording; release shield just before the attack connects. |
+| 4. Compare | Read your grade and streak; ten-attempt sets also give a summary. |
+| Return later | Choose **Save this parry practice**; keep the linked recording and its starting save. |

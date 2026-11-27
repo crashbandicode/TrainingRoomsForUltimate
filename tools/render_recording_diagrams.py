@@ -307,13 +307,14 @@ def page_popup():
     c.rect(12, 12, mid - 8, 480, fill=PANEL, outline=LINE, radius=8)
     c.text(26, 22, "The pop-up (ZR + D-pad Right)", "h", FG)
     c.text(32, 60, "Recording", "h", FG)
-    d.tabs(c, 200, 58, ["L Player", "CPU R"], 0, "xs")
+    d.tabs(c, 200, 58, ["Player", "CPU"], 0, "xs")
+    c.text(380, 62, "ZR role", "xxs", MUTED)
     px = 32
     c.rect(px, 98, px + 180, 122, outline=GREEN, width=2, radius=3)
     c.text(px + 90, 103, "Save states & Macros", "xxs", FG, "m")
     c.rect(px + 190, 98, px + 340, 122, outline=LINE, width=1, radius=3)
     c.text(px + 265, 103, "Combos & Sequences", "xxs", MUTED, "m")
-    c.text(px + 350, 103, "ZL / ZR", "xxs", MUTED)
+    c.text(px + 350, 103, "ZL / L / R", "xxs", MUTED)
     # the lists
     lx0, lx1 = 32, 340
     y = 138
@@ -328,7 +329,7 @@ def page_popup():
             c.text(lx1 - 8, y + 5, "bound", "xxs", GREEN, "r")
         y += 28
     y += 14
-    d.tag(c, lx0, y, "MACROS (3)", MACRO_C)
+    d.tag(c, lx0, y, "MACROS (2)", MACRO_C)
     y += 28
     c.rect(lx0 - 4, y - 4, lx1 + 4, y + 28 + 28, outline=GREEN, width=2, radius=4)
     for i, (t, col) in enumerate([("Macro 2", GREEN), ("Chain 1   (2)", FG), ("+ New chain", MUTED)]):
@@ -352,7 +353,7 @@ def page_popup():
     c.rect(mid + 8, 12, W - 12, 480, fill=PANEL, outline=LINE, radius=8)
     c.text(mid + 22, 22, "The page (menu, Recording)", "h", FG)
     gx = mid + 22
-    groups = [("Save states & Macros (7)", True), ("Combos & Sequences (4)", False), ("Replays", False), ("Options", False),
+    groups = [("Save states & Macros", True), ("Combos & Sequences", False), ("Replays", False), ("Options", False),
               ("Reset page to defaults", False)]
     y = 60
     for t, sel in groups:
@@ -372,6 +373,8 @@ def page_popup():
     y += 12
     d.tag(c, lx0, y, "MACROS", MACRO_C)
     y += 26
+    c.text(lx0 + 8, y + 4, "RECORDINGS >", "xxs", FG)
+    y += 26
     c.rect(lx0 - 4, y - 3, lx1 + 4, y + 26 + 22, outline=GREEN, width=2, radius=4)
     for i, (t, col) in enumerate((("Macro 2", GREEN), ("Chain 1   (2)", FG), ("+ New chain", MUTED))):
         c.rect(lx0, y, lx1, y + 22, fill=TILE, outline=LINE, radius=3)
@@ -379,20 +382,19 @@ def page_popup():
         y += 26
         if i == 1:
             y += 6
-    c.rect(gx, 316, W - 30, 396, fill=TILE, outline=LINE, radius=4)
-    c.text(gx + 10, 322, "CONNECTIONS", "b", MUTED)
-    c.text(gx + 10, 344, "Macro 2: starts from Macro 2 · start", "xxs", FG)
-    c.text(gx + 10, 364, "in chain: Chain 1   recorded on Mario", "xxs", FG)
-    c.text(gx, 448, "A open   X loop in MACROS   ZR role   L/R page   B close", "xxs", MUTED)
+    c.rect(gx, 334, W - 30, 414, fill=TILE, outline=LINE, radius=4)
+    c.text(gx + 10, 340, "CONNECTIONS", "b", MUTED)
+    c.text(gx + 10, 362, "Macro 2: starts from Macro 2 · start", "xxs", FG)
+    c.text(gx + 10, 382, "in chain: Chain 1   recorded on Mario", "xxs", FG)
+    c.text(gx, 440, "A open   X loop in MACROS   ZL+Up/Down section", "xxs", MUTED)
+    c.text(gx, 458, "ZR role   L/R page   B close", "xxs", MUTED)
     # ---- the notes
     c.text(24, 496, "A acts at once: it binds a save, sets a macro active,", "xs", FG)
     c.text(24, 516, "or drills a combo. No file screens: rename, crop and", "xs", FG)
-    c.text(24, 536, "delete are on the page. L Player / CPU R choose the side", "xs", FG)
-    c.text(24, 556, "that Record and Edit placement use.", "xs", FG)
+    c.text(24, 536, "delete are on the page. ZR chooses the side to record.", "xs", FG)
     c.text(mid + 22, 496, "A opens the file's own screen (rename, crop, delete ...).", "xs", FG)
     c.text(mid + 22, 516, "ZR switches the Player and CPU views (CPU hides", "xs", FG)
-    c.text(mid + 22, 536, "Combos & Sequences). The left column lists the groups,", "xs", FG)
-    c.text(mid + 22, 556, "with how many files each holds.", "xs", FG)
+    c.text(mid + 22, 536, "Combos & Sequences). RECORDINGS opens match captures.", "xs", FG)
     c.text(W / 2, 590, "Same in both: the two lists, the hot five in a green outline, green rows (bound, active, drill), CONNECTIONS.",
            "xs", GREEN, "m")
     c.save("recording-page-popup")

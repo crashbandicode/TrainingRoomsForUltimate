@@ -50,13 +50,13 @@
 
 ## 3. Requirement trace
 
-| Operator clause | Design | Test |
+| Requirement clause | Design | Test |
 | --- | --- | --- |
-| "add the ability to disable taunt" | the `taunts` toggle row, appended, default On | `taunts_row_defaults_on_and_reads_off` |
-| "disable taunt" (every D-pad taunt) | `denied_mask` denies Up, Side and Down while Off in practice | `off_denies_every_appeal_in_practice` |
-| "with a special exception for d-up for Kirby when he has a hat" | Up stays allowed for Kirby with `FLAG_COPY` set | `kirby_with_a_hat_keeps_up_only` |
-| "for Kirby when he has a hat" (not without one) | Kirby without the flag is denied like anyone | `kirby_without_a_hat_is_denied` |
-| "during training or lobby" | only `role_scene()` Training or Lobby; online and every other scene answer the original | `outside_practice_nothing_is_denied` |
+| Taunts can be turned off | the `taunts` toggle row, appended, default On | `taunts_row_defaults_on_and_reads_off` |
+| Off disables every D-pad taunt | `denied_mask` denies Up, Side and Down while Off in practice | `off_denies_every_appeal_in_practice` |
+| Kirby with a hat keeps the up taunt | Up stays allowed for Kirby with `FLAG_COPY` set | `kirby_with_a_hat_keeps_up_only` |
+| Kirby without a hat has no exception | Kirby without the flag is denied like anyone | `kirby_without_a_hat_is_denied` |
+| It applies in Training and in the waiting room only | only `role_scene()` Training or Lobby; online and every other scene answer the original | `outside_practice_nothing_is_denied` |
 | (On is today's behaviour) | On allows all three everywhere | `on_allows_every_appeal` |
 | (only the game's taunt is touched) | only the three appeal terms are ever denied | `only_appeal_terms_are_denied` |
 

@@ -22,7 +22,7 @@ A start write that finds Player 1 idle is not watched and follows the existing p
 
 ## Requirement trace
 
-| Operator clause | Design | Test |
+| Requirement clause | Design | Test |
 | --- | --- | --- |
 | Player 1 starts where the wizard shows it, also when the previous attempt ended with a hit | A start written during a hit is watched and written again, on every placement update, until Player 1 stands idle on it | `hit_player_start_is_rewritten_until_it_holds`, `player_start_is_judged_on_every_update_before_ready`, `edge_juggle_settles_a_hit_player_before_ready` |
 | Player 1's own movement before the release stays the player's; no hold through Ready | Only hit freeze, or Wait observed off the start, is rewritten; an unreadable floor shows nothing; the Ready hold still covers the CPU only | `hit_player_start_is_rewritten_until_it_holds`, `player_start_is_judged_on_every_update_before_ready`, `edge_juggle_settles_a_hit_player_before_ready` |

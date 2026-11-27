@@ -45,7 +45,7 @@ This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`
 | Change | Where in the code |
 | --- | --- |
 | Air dodge and shield tilt *In*/*Out* are relative to the opponent on both sides. | `src/model/cpu/defence.rs:64-71` |
-| *Respawn on platform* is a toggle on Fighters & Stages › Stages; Off (default) is the fork's instant respawn. It is greyed while *Auto-load on death* (Saves) is On. | `src/model/factory.rs:143`, `src/model/menu/table.rs`, `src/model/menu/mod.rs` (`respawn_invincibility`) |
+| The fork's instant respawn is the default; [Respawn on platform](menu/fighters-and-stages.md#respawn-on-platform) offers the alternative and lists when it is greyed out. | `src/model/menu/mod.rs` (`respawn_invincibility`) |
 | Changing ledge or throw options in the menu re-rolls them at once, even for a CPU already on the ledge. | `src/model/cpu/state.rs:178-183` |
 | During input playback the recording wins over DI, SDI, air dodge, tech and throw. *Settings override playback* (default Off) restores the fork's rule. | `src/model/cpu/playback.rs:29-31` |
 | Ice Climbers keep one CPU state each for Popo and Nana. | `src/model/cpu/role.rs:32-52` |
@@ -72,10 +72,10 @@ clear of the name. Eden run `tr-p23-surface-rc2d`, 2026-11-05, rc.2 diag NRO `71
 ## Added in rc.3
 
 Operator decisions and orders of 2026-11-05: INPUT-VIZ (option A, the frame strip), SETTINGS-PERSIST (no hidden ZR
-reset) and HB-OWN-ORBS (option 1, "go with discs for all") in `docs/DECISIONS.md` on `origin/review/menu-proposal`
+reset) and HB-OWN-ORBS (option 1, plugin-drawn discs) in `docs/DECISIONS.md` on `origin/review/menu-proposal`
 (`5cb1a2a`), and the orders for Change Stage and the menu navigation.
 
-| Change | Where in the code |
+| Change in rc.3 | Where in the code at the time |
 | --- | --- |
 | The input display is a **frame strip** (Display & Controls › *Input Display*: Off or Frame strip, default Frame strip) instead of the fork's 15-row input log. At the top of the screen it shows the last 60 frames of Player 1 and the CPU (startup, active, recovery, hitlag, hitstun, shieldstun), each new press, how the last follow-up linked (a true combo by N frames, or dropped by N, with the window it had to be pressed in and how late it was) and the frame advantage. A settings file with the old input-log row takes Off or Frame strip from it. | `src/model/frame_strip.rs:276` (`Tracker`), `src/model/frame_strip.rs:216` (`Link`), `src/runtime/features/input_display.rs:142` (`sample_frame`), `src/model/menu/table.rs:421`, `src/model/settings.rs:463` |
 | **Change Stage** (Fighters & Stages › Stages): a stage grid without the All tile; A goes to that stage when the menu closes, Y picks its form first, in Training and in waiting-room practice. The fork's stage request is used as it is; rc.2's Direct pick did nothing because the lobby stage hook was installed before the practice stage observer checked its instructions, and the fork's order is restored. | `src/model/menu/table.rs:393`, `src/editors/stages.rs:132` (`change`), `src/runtime/lobby/mod.rs:31-32`, `src/runtime/ui/worker.rs:500` |

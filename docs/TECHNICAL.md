@@ -1,13 +1,6 @@
 # Technical notes
 
-The detail behind the [README](../README.md): how TrainingRooms is installed and built, how each feature behaves, and
-where every clip in the README was recorded (build, commit and what the run checked). Release notes are the
-`RELEASE-NOTES-rc*.md` files in this folder: rc.5, rc.6, rc.8, rc.9 and [rc.15](RELEASE-NOTES-rc15.md)
-(rc.7, rc.10 and rc.11 have none); rc.12's,
-rc.13's and rc.14's are on their Forgejo release pages, linked from [CURRENT-RELEASE.md](CURRENT-RELEASE.md) and
-[Status](#status).
-
-Practice tools for Training mode and the online waiting rooms of Super Smash Bros. Ultimate 13.0.5, as a Skyline plugin.
+How TrainingRooms works in Training and waiting rooms; see [Media](MEDIA.md) for clip provenance and [release history](CURRENT-RELEASE.md#earlier-releases) for earlier builds.
 
 **Clip** [`rc14-menu-tour.gif`](media/rc14-menu-tour.gif): The TrainingRooms menu: the five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, and a neutral air's hitbox
 
@@ -17,15 +10,9 @@ both fighters' hurtboxes are yellow pills; at 1/4 speed Mario's neutral air show
 
 ## Install
 
-| Install | Where and what |
-| --- | --- |
-| Put the NRO at | `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/libtraining_rooms.nro` |
-| Next to | `libnro_hook.nro`, which it needs (`libparam_hook.nro` is the usual companion; this build doesn't call it) |
-| **Never install it together with** | `libtraining_modpack.nro` |
-| Settings and saves live in | `sd:/ultimate/TrainingRooms/` |
-| On first boot | Settings, save states and recordings from the Training Modpack fork's `sd:/ultimate/TrainingModpack/` are imported once by copying |
-
 ![The first-boot import, file by file: what is copied from the fork's folder, what is regenerated and what is left](decisions/S1-import-details.png)
+
+For the plugins and their install path, see [Getting started](guide/getting-started.md#installing).
 
 *The first-boot import decision of 2026-11-01. Published replay captures are copied in the background with no size
 cap; unfinished capture staging folders are skipped. Files in the blocking part are skipped if larger than 8 MiB.
@@ -44,44 +31,7 @@ flowchart LR
 
 ## Controls
 
-| Action | Default chord |
-| --- | --- |
-| Open the menu | B + D-pad Up (always), or Minus (menu shortcut 1, editable) |
-| Save state / load state | ZL + D-pad Down / ZL + D-pad Up |
-| Record / Play on CPU | ZR + D-pad Down / ZR + D-pad Up |
-| Play on Player 1 / recording pop-up | ZR + D-pad Left / ZR + D-pad Right |
-| Cycle the CPU / Player 1 fighter | ZL + D-pad Left / ZL + D-pad Right |
-| Input display on / off | R + D-pad Down |
-| Game speed: hold, then D-pad Left / Right; release to close | R + D-pad Up |
-| Kirby hat: Player 1 / CPU | Special + L3 / Special + R3 |
-| Reset the training room | L + R + A |
-
-R is Z on a GameCube controller.
-
-Game speed shows a small pop-up while the chord is held. In Training it changes the game's Speed setting; in the
-waiting room it changes only your practice. A match always starts at normal speed. See [Game speed](#game-speed)
-for the speeds and how to step one frame.
-
-The first time Training or a waiting room's practice opens on a new install, TrainingRooms also shows six reminders:
-Welcome, Open Menu, Save State, Load State, Input Record and Input Playback. A later launch leaves those reminders off.
-The chords in the table stay available.
-
-| In the menu | Key |
-| --- | --- |
-| Change page | L/R |
-| Jumps to the previous or next section | ZL + Up/Down |
-| Edits | A |
-| Resets a row | Y |
-| Saves the current values as defaults | X |
-| Goes back | B |
-
-Each page ends with *Reset page to defaults*, which asks first. The menu reopens where you left it. The chords are
-edited on Display & Controls › Button chords.
-
-The key hints at the foot of every page end with the build tag: the version, then the build name and the commit the NRO
-was built from, for example `0.2.0-rc.14 · rc14 1a2b3c4d`. Builds before rc.14 kept the version `0.2.0-rc.6` and told
-themselves apart by the build name: rc.13 read `0.2.0-rc.6 · rc13 ed0d7a35`, rc.8 to rc.12 read `rc8` to `rc12` (the clip
-below is rc.11's). A build from uncommitted changes adds `-dirty`.
+See [menu navigation](guide/using-the-menu.md), [factory chords](menu/display-and-controls.md#button-chords), [fixed controls](guide/controls.md#fixed-buttons) and [build identification](CURRENT-RELEASE.md#which-build-is-mine).
 
 **Clip** [`rc11-footer-tag.gif`](media/rc11-footer-tag.gif): the menu opens on two pages whose key hints end with `0.2.0-rc.6 · rc11 0c628724`
 
@@ -102,24 +52,23 @@ their own build; see [MEDIA.md](MEDIA.md).
 (its help line: Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends.), A ticks Hitboxes, Grab boxes and Hurtboxes, B goes back; in Training the yellow hurtbox pills cover both fighters; R + D-pad Up steps the speed to 1/4, and Mario's short-hop
 neutral air keeps its red hitbox on screen for over a second (the frame strip's lane turns red with it). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-Hitbox Visualization (Display & Controls) draws the fighters' hurtboxes, hitboxes and grab boxes. A normal hurtbox
-is grey; yellow means it cannot be hit, and green means it takes no damage. Since rc.3
-every fighter sphere is the plugin's own disc, so none is ever missing, even with two large fighters; projectiles keep
-the game's effect spheres, and the discs trail the camera by one to two frames while it pans. Since rc.13 a long box
-is drawn as one pill.
+TrainingRooms draws fighter and projectile hitboxes with its own panes, projects them with the game camera at layout time, and draws capsules as single pills; see the [colour legend](menu/display-and-controls.md#colour-legend).
 
 ![Ridley's hurtboxes three ways: the real Eden frame with rows of discs, the same discs redrawn from a dump, and the same capsules as pills](decisions/rc13-hitbox-pills.png)
 
 *The mock-up behind the rc.13 decision (2026-11-14): the left and middle panels are a capsule as a row of discs, the
 right panel is the same capsules as one pill each. [Decisions](DECISIONS.md)*
 
+| Strength and spot | Mechanism |
+| --- | --- |
+| Rank | `src/model/spots.rs::knockback` ranks launch; damage breaks ties, not angle. |
+| Current frame | `classify` marks weaker active hitboxes Sour and stronger ones Sweet. |
+| Earlier peak | `classify` marks a weaker phase Late; indistinguishable hitboxes have no label. |
+| Attribution | `attribute` checks the game's recorded slot against received damage and knockback. |
+
 ### Frame strip
 
-The input display (Display & Controls › Input Display) is a strip at the top of the screen: the last second of
-Player 1 and the CPU, a chip for each new button, and ADVANTAGE, LINK, and INPUT for the last exchange. ADVANTAGE is
-the CPU's first actionable frame minus yours. Plus means you act first. [FRAME-STRIP.md](guide/frame-strip.md)
-is how to read the lanes, the stick row, and the readouts. The rc.5 clips are listed in
-[MEDIA.md](MEDIA.md).
+See the [frame strip guide](guide/frame-strip.md) for the lanes and readouts, and [Media](MEDIA.md) for the rc.5 clips.
 
 **Clip** [`rc8-input-display-chord.gif`](media/rc8-input-display-chord.gif): R + D-pad Down hides the frame strip, then shows it again
 
@@ -127,11 +76,17 @@ is how to read the lanes, the stick row, and the readouts. The rc.5 clips are li
 strip; R + D-pad Down, "Input display · Off", and the next jab draws no strip; R + D-pad Down again, "Input display ·
 On", and the jab draws on it. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-R + D-pad Down turns the input display on and off without opening the menu, in Training and in the waiting-room
-practice. A notice says "Input display" and On or Off. The menu's Input Display row shows the same value, and the
-choice is saved.
+The [Input display binding](menu/display-and-controls.md#button-chords) and [menu row](menu/display-and-controls.md#input-display) share one saved setting.
 
 Where the frame strip code is (moved here from the [Frame strip](guide/frame-strip.md) guide): the lanes, chips, freeze, readouts, the stick row, the C-stick arrow and the 20-frame rule are what `src/model/frame_strip.rs` draws, as specified in `specs/SPEC-input-06-frame-strip.md`.
+
+| Strip detail | Mechanism |
+| --- | --- |
+| Link | `Tracker::on_hit`: follow-up hit minus CPU free frame; unknown if no free frame is available. |
+| Input | `Tracker::on_hit` subtracts Player 1's first actionable frame from the follow-up press. |
+| Step | `src/model/strip_scroll.rs::stepped` moves 15 columns per step. |
+| Repeat | `Scroll::poll` repeats after 18 held polls, then every six. |
+| Ownership | An open scroll hides its hold and direction buttons from the game. |
 
 ### Game speed
 
@@ -142,9 +97,7 @@ walks in and forward-smashes Ridley at x1; R + D-pad Up held, the pop-up steps x
 the HUD's stopwatch reads 1/4; the same walk-in and smash play about four times slower. The log has
 `[GameSpeed] … speed=1/4`. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-Hold R + D-pad Up and a small "Game speed" pop-up shows the current speed between two D-pad arrows. While you hold
-it, D-pad Left and Right step one speed at a time; the steps stop at the slowest and fastest speeds instead of wrapping
-around. Let go and the pop-up closes; the speed stays.
+The [speed control](guide/game-speed.md) stops at either end of the list rather than wrapping.
 
 | Where | What the chord does |
 | --- | --- |
@@ -154,7 +107,11 @@ around. Let go and the pop-up closes; the speed stays.
 | A Quickplay or online match | It never changes one: a match always starts at normal speed. |
 | **With the standalone CPU pilot** driving Player 1 | The chord works the same way. In the waiting-room practice the pilot still gets one input per game update at every speed, x1.5 included, so its inputs are never doubled. |
 
-<!-- R14 (worker B's r14bc-eca14e4b pair): keep this line only if R14 passes on the final head. -->
+| Frame step | Mechanism |
+| --- | --- |
+| Hold | `src/model/lobby_speed.rs::FrameStep::poll` runs waiting-room practice continuously after 18 held polls. |
+| Priority | The speed chord, another input owner, or busy room UI blocks stepping. |
+| Hook | `src/runtime/features/game_speed.rs::frame_step_poll` publishes requests for the waiting-area task. |
 
 **Clip** [`rc8-speed-hud-fixed.gif`](media/rc8-speed-hud-fixed.gif): Hold R + D-pad Up, Right: the stopwatch reads x1.5; Left back to x1: it goes away
 
@@ -182,13 +139,12 @@ Options, Plugins or a plugin's own page) if Deluxe uses its D-pad there.
 | A Save or Load press that doesn't happen | Says why in a notice (Saves › Save States) |
 | On a GameCube controller | Deluxe's L + R is both triggers: the ZL/ZR chords and the two chords above don't fire while both triggers are held, and one trigger works as before |
 
-### Combos
+### Combos, in short
 
 *+ Save last combo…* (Recording › Combos & Sequences) saves a combo you landed, and the combo helper grades your next
 attempts against it, link by link. A sequence of combos is drilled the same way, one combo after another. Each saved
 combo is a small JSON file in `sd:/ultimate/TrainingRooms/combos/`. You can edit it, copy it to another card or share
-it, and any fighter can practise it; [COMBOS.md](guide/combos.md) describes the format. The clip is under Combos
-below.
+it, and any fighter can practise it; see the [sharing guide](guide/combos.md) or the [file format and clip](#combos-the-clip-and-the-files).
 
 ### CPU reactions
 
@@ -218,8 +174,7 @@ relative to you, on either side of the CPU.
 of Down. The last four panels are from Eden. The thinner, dimmer lines are the look kept for rc.13.
 [DI chip decision](DECISIONS.md#rc13-di-lines-di-chips-like-the-game-s-blue-di-indicator-rc-13-item-2-e1-x1)*
 
-*CPU Level* (CPU › Level: Off, or Lv 1–9) replaces Training's own CPU level. When the two differ as Training starts, a
-notice says so once.
+If you choose a [CPU Level](menu/cpu.md#cpu-level) that differs from Training's own level, a notice shows both once per Training session.
 
 **Clip** [`rc11-cpu-level.gif`](media/rc11-cpu-level.gif): CPU Level set from Off to Lv 7; the CPU card at Lv. 3; the notice names both levels; the CPU fights at Lv 7
 
@@ -246,6 +201,11 @@ platform at the top. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 Named save states (one bound to Save and Load at a time), mirroring and damage on load (Saves page). *Respawn on platform* (Fighters & Stages ›
 Stages) chooses between the game's respawn platform (above) and the instant respawn.
 
+![The Respawn on platform row and its help text; what happened after a KO with Save States On and Off; choice A keep the link, choice B work with Save States Off](decisions/TR5-respawn.png)
+
+*Design picture of decision TR5 (2026-11-13), not footage. Its middle panel shows rc.11, where the row was ignored
+with Save States Off. B was decided: since rc.12 the row works whatever Save States says. [Decisions](DECISIONS.md)*
+
 ### Recording and playback
 
 A save state only warps, and Load starts nothing. Each role has one active macro, a recording or a chain, and
@@ -254,6 +214,15 @@ nothing. X cycles the selected role's loop count in MACROS. On a drill with a sa
 a preview on Player 1. It does not interrupt a Play already queued or running for Player 1.
 The [Recording guide](guide/recording.md) is how to use it. The pop-up and the Recording page are in that doc.
 What rc.6 changes is [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
+
+While a macro plays on the CPU, the recording wins over the CPU's DI, SDI, air-dodge, tech and throw settings.
+The advanced row [Settings override playback](menu/recording.md#settings-override-playback), Off by default, turns
+that round.
+
+![A recorded air dodge Down In with the Airdodge Direction setting on Up: under A the setting changes it to Up, under B the CPU air-dodges Down In as recorded](decisions/B5-playback-vs-settings.png)
+
+*Design picture of decision B5 (2026-11-01), not footage: B, the recording wins, with the advanced row for A.
+[Decisions](DECISIONS.md)*
 
 Where the recording code is (moved here from the Recording guide; named by function, not line, because the lines move):
 
@@ -270,10 +239,60 @@ Where the recording code is (moved here from the Recording guide; named by funct
 | Saving and applying placement | In `rr_host.rs`, `commit_placement` writes the edited fields, `active_placement_ids` finds the active macro and its start save, and `warp_pair` applies the macro's offset. |
 | Replay window | `Owners::REPLAY_LOADING` in `src/model/input_delay.rs` lets a capture load without blocking its own request. It is not the visible editor's fighter-switch gate. |
 | Replay fighter mismatch | A chain checks its first macro (`screen=mismatch ask=macro1`). For a replay Mii, `installable` in `src/model/mii_install.rs` supplies a configuration the game can load. |
-| Restoring or binding a setup | A restores the fighters; Y binds without moving them. Neither writes the bound save. See `setup_restored` and `setup_bound` in `rr_host.rs`; `src/model/state/setup_transaction.rs` checks the restore. |
+| [Named setup actions](guide/save-states.md#using-a-setup) | `Pane::leads_to` in `src/editors/setups.rs` distinguishes opening, restoring and binding; `src/model/state/setup_transaction.rs` validates the restore. |
 | Setup files | `src/model/state/setup.rs` defines the format. Saving creates a new file; renaming updates the existing file and keeps its ID (`save_name` in `src/editors/setups.rs`). |
 | Setup menus | `src/runtime/ui/setups.rs` and `src/editors/setups.rs` handle the library screens; `src/runtime/features/states/setups.rs` takes the snapshot. |
 | Pop-up layout | `src/model/ui/panes.rs` defines the layout. `section_view` in `src/model/recording_menu.rs` puts the divider after the fifth file when more than five are listed, except in RECORDINGS. Leading action rows do not count as files. |
+
+| Scrub data | Mechanism |
+| --- | --- |
+| Positions | `src/model/macros/positions.rs` stores both fighters in `<id>.pos`, bound to macro ID and inputs. |
+| Playback sampling | `rr_host.rs::open_play_track` samples matching fighters from frame zero, excluding chains. |
+| Backfill | `PlayTrack::write_wanted` can replace a shorter recorded track with a longer partial playback. |
+| Pose upgrade | A full playback can add poses without replacing complete, move-less recorded positions. |
+| Crop | `ClipEditor::export_selection` retains the selected macro frames and their tracked positions. |
+| Origin | `scrub_track.rs::deltas` subtracts the selected fighter's position at the anchor frame from both tracks. |
+| Poses | `scrub_pose.rs::{asked_of,decide}` needs an available animation, matching fighter kind and held body. |
+| Marks | `src/model/macros/recording.rs::ActionMark` stores move, variant and side-attack angle. |
+| Naming | `clip_panel.rs::saved_namer` uses recorded fighter identity, including saved Mii specials. |
+| Older takes | `clip_marks.rs::Marks::from_recording` falls back to input marks without valid saved actions. |
+
+| Playback detail | Mechanism |
+| --- | --- |
+| Trim | `src/model/trim.rs::Trim::window`: global trim affects recording; file trim selects playback frames. |
+| Delay | `rr_host.rs::owe_delay` waits once before first input, not on loop passes. |
+| Preview | Editor previews and CPU Playback slots do not use the Play delay. |
+| Tolerance | `src/model/combo.rs::Grade::worst` applies the selected tolerance and held-input band. |
+| Clip window | `src/model/macros/window.rs::Window` bounds handles; `clip_panel.rs::export_selection` applies the selection. |
+| Legacy slots | `src/model/library/migrate.rs::migrate` converts nonempty live slots once, separately from card import. |
+
+![PC5 shows editing the shared save or copying it for one macro](decisions/placement-crosshair/place-next-PC5-shared-start.png)
+
+*PC5: change the shared save or copy it. Design, not footage.*
+
+| Shared placement | Mechanism |
+| --- | --- |
+| Copy from a macro | `rr_host.rs::copy_placed` copies the save and relinks only the requesting macro. |
+| Copy from the save | The new save is unlinked; existing macros keep the original. |
+
+![PC6 shows the same macro offset after its start save moves](decisions/placement-crosshair/place-next-PC6-old-offsets.png)
+
+*PC6: moving the save preserves the offset. Design diagram.*
+
+| Start save | Mechanism |
+| --- | --- |
+| Warp | `rr_host.rs::warp_pair` applies the macro offset to its role before restoring the pair. |
+| Momentum | `play_start_speed` supplies recorded or zero speed after the warp, before first input. |
+
+![Q7 compares a shared menu toggle with INI and Deluxe alone](decisions/07-replay-capture.png)
+
+*Q7: the menu shares the replay setting. Design, not footage.*
+
+| Replay capture | Mechanism |
+| --- | --- |
+| Archive | `src/runtime/macros/replay_store.rs::archive` uses `sd:/ultimate/TrainingRooms/replay_captures/`. |
+| Miis | `SharedCaptureArchive::save_with_miis` stores available replay Mii data with the capture. |
+| Preference | `replay_capture.ini` seeds the preference shared by the menu and Online Deluxe. |
 
 Earlier replay checks: `cov-replay-window` passed on `646a5f0d`; the Mii install checks were `cov-named-mii` and
 `int-named-mii-twice`. These are historical checks, not preview-build results.
@@ -299,7 +318,7 @@ Player 1's inputs as the game receives them, the AI's included, and TrainingRoom
 through the take. Play on Player 1 and the waiting room's Quick Reset are refused ("P1 is controlled by an AI: Play
 on Player 1 is off", "… Quick Reset is off"), and Player 1's input is left to the pilot.
 
-### Combos
+### Combos: the clip and the files
 
 **Clip** [`rc7-combo-helper.gif`](media/rc7-combo-helper.gif): The combo helper grading a drilled combo: Combo 1, jab → jab, TRUE −5, on time
 
@@ -307,16 +326,51 @@ on Player 1 is off", "… Quick Reset is off"), and Player 1's input is left to 
 (jab → jab) drilled; the jabs; the bar under the frame strip grades the attempt: TRUE −5, on time. Cuts inside are
 listed in [MEDIA.md](MEDIA.md).*
 
-*+ Save last combo…*, the first row of COMBOS on the Recording page and in the recording pop-up, keeps your last combo
-as a file and makes it the drill. With *Combo helper* On, a bar under the frame strip grades each attempt link by link:
-whether the recorded inputs came, in order and on time, and whether the same move came out. A true combo is shown,
-not required. Drilling a sequence adds a header and a row of its combos to that bar.
+The [Recording guide](guide/recording.md#combos) covers saving and drilling a combo. In a sequence, the
+[corner card](design/compact-strip-layout.md) stacks up to three combos; the cells beneath the strip show individual links.
 
 Where the combo code is (moved here from the [Combo files](guide/combos.md) guide): the spec is
 [SPEC-input-07](../specs/SPEC-input-07-combo-helper.md). The drill is kept in `recording-index.json`, the recording
 index (`src/model/library/hot.rs`). The menu re-reads the combo folder each time it opens, so a copied-in file needs no
 restart (`src/model/recording_menu.rs`). A combo drill's Fighter Mismatch question is `ask_drill` in
 `src/model/rr_host.rs`.
+
+| Combo file | Format | Rules |
+| --- | --- | --- |
+| Codec | `src/model/combo_record.rs::{from_value,to_value}` reads and writes JSON objects. | Maximum 64 KiB. |
+| Location | `sd:/ultimate/TrainingRooms/combos/<id>.json`; filename is the persistent ID. | `shareable_id`: 1–64 characters; no leading dot, surrounding spaces, controls or FAT-invalid characters. |
+| Name | Up to 48 characters; missing or blank names use the filename. | Optional `recorded_on` names the fighter and can trigger the mismatch prompt. |
+| Versions | 1: hit combo; 2: drill; 3: hit with aims; 4: drill with aims. | Missing `schema_version` means 1. |
+| Root | Hit combos have `links`; drills have `kind: input_drill` and `input_steps`. | 1–16 links or steps. |
+| Identity | Optional `recorded_fighter`: nonzero `ui_chara` (1–10 hex digits) and four `specials`. | Each special is 0–2; invalid identity becomes absent. |
+| Source | Optional `made_from`, `take` and drill `trim`. | `take` names the owned macro; trim is `start`, `end`, `both` or `off`. |
+| Hit link | `from`, `to`, `verdict`, and `steps` or `events`; optional `window`, `spot`, `drift`. | Window is a pair of frame numbers. |
+| Verdict | `kind` is `true` or `drop`. | `link` is nullable only for `true`. |
+| Endpoints 1 | `jab`, `dash_attack`, `side_tilt`, `up_tilt`, `down_tilt`. | `side_smash`, `up_smash`, `down_smash`, `aerial`, `other`. |
+| Endpoints 2 | `neutral_special`, `side_special`, `up_special`, `down_special`. | `grab`, `throw`, `ledge_attack`, `getup_attack`, `trip_attack`. |
+| Descriptions | `from_shown`, `to_shown`: optional `of`, `angle`, `variant`, `move`. | Both describe a hit link; angle is `up`/`down`, variant 0–31. |
+| Exact move | A hit description's `move` extends an `other` endpoint. | Final Smash uses `other` plus `move: final_smash`, never a bare endpoint. |
+| Steps | At most four `button`, `aim`, `offset` objects; required without `events`. | Buttons: `attack`, `special`, `jump`, `shield`, `grab`; aims: `neutral`, `up`, `down`, `side`. |
+| Hit offsets | Frames from Player 1's first actionable frame after this link's first hit. | Negative offsets mean buffered inputs; `events` takes precedence over `steps`. |
+| Events | At most 12 per link; each has `kind`, `dir`, `offset`. | Kinds: `press`, `release`, `cstick`, `flick`; `aim` requires version 3 or 4. |
+| Event fields | Press/release use `button`; flick uses `flick`; aim uses `part` 1 or 2. | Flick values: `fast_fall`, `dash`, `tap_jump`. |
+| Directions | `neutral`, `forward`, `forward_up`, `up`, `back_up`. | `back`, `back_down`, `down`, `forward_down`; relative to facing. |
+| Spot and drift | `spot` is `sweet`, `sour` or `late`; `drift` uses a direction. | Unknown spot becomes absent; drift is display-only. |
+| Drill steps | Each has 1–12 events; descriptions require `move`. | Offsets start at zero and never decrease across steps. |
+| Release | Optional `hold` is nonnegative; drill releases may contain boolean `reacted`. | Without `reacted`, older held releases use the legacy hold-band rule. |
+| Travel | Drill aim, special press and C-stick events can carry `path`. | Eight integer coordinate pairs, each component −127 to 127. |
+| With a path | `heading` and `distance` are required; optional `stick` requires `angle` and `deflection`. | Angles: 0 to below 360 degrees; distance nonnegative; deflection 0–100 percent. |
+| Entry | Optional `entry_x`, `entry_y`, `entry_change` describe travel entry velocity. | Both coordinates are required together. |
+| Compatibility | An unsupported version or unrecognized endpoint skips the entire file, not just the link. | Rename preserves unknown top-level, link, step and event fields. |
+
+| Scoring | Specification |
+| --- | --- |
+| Model | [Action model](design/action-model.md) describes scoring, reacted releases, joins and recovery. |
+| Spot | `summarize` compares spots only when matching is enabled and the reference has a spot. |
+
+![SP4 compares a saved Sweet hit with a Sour attempt](decisions/rc14-spots-SP3-combo.png)
+
+*SP4: a saved spot can affect the grade. Design, not footage.*
 
 **Clip** [`rc7-sequence-drill.gif`](media/rc7-sequence-drill.gif): Drill a sequence: combo 1, then combo 2, then a drop back at combo 1
 
@@ -353,6 +407,34 @@ With Cycle Preload Off, the fighter loads when you switch instead.
 
 `background_build_eligible` in `src/model/swap/body_bank.rs` also checks the target group's identity and the
 support needed for paired fighters. `live_kirby_gate` in `src/runtime/roster/native_body_bank.rs` supplies the Kirby check.
+
+| Loading | Mechanism |
+| --- | --- |
+| Items | `src/runtime/roster/character_items.rs::on_frame` prepares fighter resources before granting non-common items. |
+| Common items | `common_item` exempts Bob-ombs, Mr. Saturns and bananas from that preparation. |
+| Ready Fighters | `src/model/swap/body_bank.rs::GroupBudget` includes both active fighters in the shared body budget. |
+| Admission | `body_bank/memory.rs::admit` reserves estimated load costs and headroom before discretionary loads. |
+| Cold targets | One-body cold targets load over budget and `cold_left` releases them after departure. |
+| Cold transition | A cold-to-cold switch can temporarily load two bodies over budget. |
+| Shrink | `shrink_release` frees the farthest group first, CPU first on ties. |
+| Hats | `src/model/preload/hat_slots.rs::budgeted` budgets hat-only targets separately; matching fighter targets share. |
+
+| Swap group | Keeps ready | Greyed when |
+| --- | --- | --- |
+| Ice Climbers pair bank | Pair and one additional fighter in the role's window. | Ready Fighter Bodies is not 3. |
+| Original fighter bank | Eligible starting fighter; Miis and Solo Popo reload. | Never. |
+| Solo Popo groups | Solo Popo in detached groups. | Group Swap is Off. |
+| Ice Climbers pair groups | Detached groups while the pair leads the window. | Group Swap or pair bank is Off. |
+| PT / Aegis groups | Pokémon Trainer and Pyra / Mythra as complete groups. | Group Swap is Off. |
+| Ice Climbers pair group | The pair as its own detached group. | Group Swap or pair bank is Off. |
+| Mii groups | One Mii group per role. | Group Swap is Off. |
+
+| Group policy | Mechanism |
+| --- | --- |
+| Capacity | Pokémon Trainer needs three bodies; Aegis needs two, allocated whole. |
+| Original eligibility | `original_form_bankable`: paired Climbers need pair bank; PT and Aegis need native groups. |
+| Menu gates | `src/model/menu/mod.rs::swap_entry_grey` checks the conditions above. |
+| Defaults | `src/model/preload/cycle_preload_config.rs` enables all seven entries. |
 
 **Clip** [`rc7-kirby-hats.gif`](media/rc7-kirby-hats.gif): Player 1's Kirby: the hat chord twice, two hats in turn
 
@@ -412,6 +494,26 @@ Lobby Stages; the grid with 1. Big Battlefield; the cursor to Battlefield, A, an
 Lobby Stages ranks 1. Big Battlefield and 2. Battlefield; Fighters & Stages › Training Stage Rotation from Off to On;
 back through the character select (the same two fighters), Training opens on Big Battlefield, held with no notice. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
+![Open air and ledges on the Training stage](decisions/training-stage-offstage/training-04-off-stage-proposed.png)
+
+*Design picture of decision T3, not footage. [Decisions](DECISIONS.md)*
+
+| Practice geometry | Mechanism |
+| --- | --- |
+| Drill floor | `src/model/edge_juggle.rs::start_stage` uses the floor run under Player 1. |
+| Guard ledges | The drill requires at least one run end with open air. |
+| Egg floors | `eggs.rs::Run::spawn` weights usable floor spans by horizontal width. |
+| Egg height | An airborne start adds up to 25 units above that target's grounded height. |
+| Egg zones | `src/model/egg_zone.rs::Stage::read` uses the run under camera center. |
+| Zone boxes | `Zone::rect` insets each side's rectangle by the target radius. |
+| Zone clipping | `Stage::contains` rejects solids and checks underside, other floors and outline clearance. |
+| Off-stage bounds | Open air stops at another solid or the blast boundary; `Stage::contains` validates points. |
+| Hidden CPU | `eggs.rs::choices` selects the disc when CPU page Hide CPU is On. |
+| Training CPU behavior | `cpu_level.rs::step_drill_panel` can briefly open stock pause for Control or non-CPU transitions. |
+| Waiting-room opponent | `step_drill_partner` changes only the first partner's behavior, restoring it on Stop without pausing. |
+| Tech Auto start | `tech::solver::Aim` plans zero-stick flight; early collisions or out-of-bounds paths reject candidates. |
+| Ceiling contact | `Aim::at` rejects ceiling contact unless the predicted vertical velocity is upward. |
+
 ### Waiting rooms
 
 **Clip** [`rc6-waiting-partners.gif`](media/rc6-waiting-partners.gif): Training Partners 1 to 2 in a Quickplay waiting room: a second partner drops in
@@ -463,9 +565,7 @@ fighters show their hurtboxes as pills. The first second (the CPU page) is a sep
 
 *Eden, 2026-11-05, `p23/menu-nav` diag NRO `1273c29f`, the navigation code rc.3 merged.*
 
-- **ZL + Up/Down** jumps between a page's sections; in popup lists, a screenful.
-- **Reopening:** the menu reopens on the page and row you left.
-- **Resetting a page:** each page ends with *Reset page to defaults*, which asks first. ZR no longer resets a page.
+For section jumps, reopening and page resets, see [Using the menu](guide/using-the-menu.md#open-change-and-close).
 
 ### The Developer page
 
@@ -476,7 +576,7 @@ else keeps it hidden, decision N1). While it's hidden its rows do nothing. All t
 | Row | What it does |
 | --- | --- |
 | Preload Samples | Writes sparse timing and memory samples of preloads to the diagnostics file. |
-| Reload developer config | While On, holding L + R + A on Player 1 re-reads the developer config file every frame. |
+| Reload developer config | In Training, each P1 poll holding L + R + A queues a worker read of `dev.json`. |
 | Debug hooks | Turns on the debug watch on the Kirby backshield work float. |
 
 ### Menu shortcuts and replay capture
@@ -516,54 +616,11 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-The current release is **rc.15**. Its newest build is install 6 (`5df3d9dc`, on the test console's card since
-2026-11-26): **installed and read back; its own Eden checks are in progress**. A preview build (`cc71537c`) is
-staged for the card and not installed ([release notes](RELEASE-NOTES-rc15.md#preview-build)). The
-[console reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console) distinguish a title-screen
-crash with no TrainingRooms frame from issues reported in TrainingRooms.
-[Current release](CURRENT-RELEASE.md) says what it adds, how to install it and what is known not to work;
-[the rc.15 release notes](RELEASE-NOTES-rc15.md) list installs 1 to 6, and [Install evidence](EVIDENCE-rc15-installs.md)
-names the runs behind each claim. The menu footer reads `0.2.0-rc.15 · rc15` and then the commit it was built from, so
-the commit tells the rc.15 builds apart: from rc.14 the version number is the release's own name, the same as its tag.
-Builds before it kept the version `0.2.0-rc.6` from rc.6 on, and the build name after it (rc8 to rc13) told them apart.
-
-[rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13) (`ed0d7a35`,
-2026-11-14, Eden-tested and untested on hardware; footer `0.2.0-rc.6 · rc13 ed0d7a35`) adds Aerial Drift,
-Taunts, Wario's bike in Give item, Training opening on the stage you pick, and Left / Right on On/Off rows; its delay
-rows and Input Delay count game frames at every Game speed; Hitbox Visualization draws long boxes as pills, gives
-projectiles and thrown items their own orbs and shows grab boxes in magenta; and a CPU on Mash Triggers Always no longer
-gets stuck in its first dodge. [rc.12](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.12)
-(`83b72d7d`, 2026-11-13, also Eden-tested and untested on hardware) changes CPU options, Saves and Recording; its
-release notes list them. rc.11 (`0c628724`) moves TrainingRooms' own threads off core 0 and hides the frame strip while
-a waiting room's own menu is open; rc.10 is a code reduction with no change in behaviour.
-
-0.2.0-rc.6 follows 0.2.0-rc.3.1: 0.2.0-rc.5 was withdrawn before players ran it, and there is no separate 0.2.0-rc.4. What it changes is
-[RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md), on top of [RELEASE-NOTES-rc5.md](RELEASE-NOTES-rc5.md).
-The builds after it, rc.8 and rc.9, are in [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md) and
-[RELEASE-NOTES-rc9.md](RELEASE-NOTES-rc9.md): rc.9 fixes the shortcut conflicts with Online Deluxe, the CPU
-pilot and imgui_smash.
-
-**0.2.0-rc.3** (2026-11-05) is the previous console test build. It adds to rc.2:
-- the **frame strip** input display, replacing the 15-row input log;
-- **Change Stage**: a row that switches the stage now, in Training and in waiting rooms;
-- **menu navigation**: ZL + Up/Down jumps sections, the menu reopens where you left it, ZR no longer resets a page by
-  accident, and *Reset page to defaults* asks first;
-- **own hitbox discs** for every fighter sphere, never refused (projectiles keep the effect spheres; the discs trail
-  the camera by one to two frames, a known limit).
-
-rc.2 added the pause-helper fix, the Solo Popo mark placement and the Kirby hat-request endings. Limitations kept from
-the fork are listed in [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md); planned work is in the
-[ROADMAP](ROADMAP.md). 0.1.0 crashes at console boot; use a newer build: the current release is [rc.15](CURRENT-RELEASE.md) (installed, with its own Eden checks in testing; see the [install evidence](EVIDENCE-rc15-installs.md)).
+See [Current release](CURRENT-RELEASE.md) for the installed build, changes and known issues in rc.15.
 
 ## Build
 
-```powershell
-cargo test --all-targets
-cargo skyline build --release
-```
-
-The NRO is `target/aarch64-skyline-switch/release/libtraining_rooms.nro`. Toolchains, the diagnostic build and the
-layout recipe: [BUILD.md](BUILD.md). Current acceptance state: [HANDOFF.md](../HANDOFF.md).
+See [Building TrainingRooms](BUILD.md) for the host checks, toolchains and Switch builds, or the [handoff](../HANDOFF.md) for acceptance results.
 
 ## License and provenance
 

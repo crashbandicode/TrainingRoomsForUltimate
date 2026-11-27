@@ -1,178 +1,95 @@
 # TrainingRooms for Ultimate
+Practise matchups, edit recordings and play training games in Super Smash Bros. Ultimate.<br>
+[Download a published release](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases) · [Player guide](docs/README.md) · [rc.15 status](docs/CURRENT-RELEASE.md)
 
-TrainingRooms adds practice tools to Super Smash Bros. Ultimate's Training mode and to the waiting rooms of online and
-local play: hitboxes, save states, recordings, combo drills, game speed and more, all from one menu.
+## Notable features
 
-**Current release: [rc.15](docs/CURRENT-RELEASE.md).** Its newest build, install 6 (`5df3d9dc`, 2026-11-26), is
-installed and read back. Its Eden checks are in progress. A preview build (`cc71537c`) is staged for the card and
-not installed. What's new, how to install it and what is known not to work
-are on that page; each build's changes are in the [release notes](docs/RELEASE-NOTES-rc15.md). New here? Start with [Getting started](docs/guide/getting-started.md). Something not
-working? See [Troubleshooting](docs/guide/troubleshooting.md).
+### Practice games
 
-![The menu's five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, both fighters' hurtbox pills and a neutral air's red hitbox](docs/media/rc14-menu-tour.gif)<br>
-*The menu's five pages, then Hitbox Visualization: A ticks Hitboxes, Grab boxes and Hurtboxes, and both fighters are drawn as hurtbox pills (yellow in this clip; grey in the current colours). Eden, rc.14 (untested on hardware).*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3609165db1d1675f019de9a7f3b7d1b6f7b8ebf0" autoplay muted loop playsinline controls></video>
 
-[Stage tech practice](docs/menu/fighters-and-stages.md#stage-tech-practice): pick a spot and practise techs with launch settings, grades and sessions.
+*Guard the Edge counts one secured attempt out of three.* [Open the clip](docs/media/tut-guard-edge-setup-and-score.mp4)
 
-Every option is documented in the [docs](docs/README.md), one page per menu page.
+Pick a spot offstage and practise denying the recovery; [Guard the Edge](docs/guide/guard-the-edge.md) keeps score when you make it back, too.
 
-## Install
+### Recordings you can drill
 
-Tested on: Super Smash Bros. Ultimate 13.0.5 · Switch firmware 23.5.0 · Atmosphère 1.12.2
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b635893c4df02daaae5535f19b5b3f5c2346245b" autoplay muted loop playsinline controls></video>
 
-1. Set up Skyline for Smash Ultimate 13.0.5 on your Switch.
-2. Copy `libtraining_rooms.nro` and `libnro_hook.nro` into
-   `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/` on the SD card.
-   The hook enables CPU DI, tech and out-of-shield options; its usual companion `libparam_hook.nro` is optional for TrainingRooms.
-3. If `libtraining_modpack.nro` is there, remove it: the two can't run together.
-4. Start the game and open Training. Settings from the Training Modpack are copied over the first time.
-5. Press B + D-pad Up (or Minus) to open the menu.
+*Kirby's recording becomes a drill in the library.* [Open the clip](docs/media/tut-input-drill-record.mp4)
 
-## Controls
+Record a dash-back or a string of short hops, then [try to match your timing](docs/guide/recording.md#input-drills) without needing to hit an opponent.
 
-Use chords in Training and waiting-room practice. Open **Display & Controls › Button chords**, press A on a chord,
-then X. Hold and release the new chord; A keeps it.
+### Replay clip editor
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3a68fe9e37b78333c5a0ca217f7349b12124fe89" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7c00d97bf3abf99b2191b84d54bf130ffe0620ed" autoplay muted loop playsinline controls></video>
 
-*Button chords: Save State Save reads ZL + D-pad Down; X, then holding ZL + D-pad Left sets the new chord, and that chord saves. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](docs/media/tut-controls-change-chord.mp4)
+*Snap to the aerial's start, then preview it on the CPU.* [Open the clip](docs/media/tut-clip-snap.mp4)
 
-The clip's new chord is also Cycle CPU by default; change or clear Cycle CPU if you want it to do only one thing.
+[Scrub through a take](docs/guide/recording.md#crop) to see a matching fighter's recorded pose, then snap the start or end of the clip to a move.
 
-| Action | Default | Change it at |
-| --- | --- | --- |
-| Save State Save | ZL + D-pad Down | Button chords |
-| Save State Load | ZL + D-pad Up | Button chords |
-| Record | ZR + D-pad Down | Button chords |
-| Play on CPU | ZR + D-pad Up | Button chords |
-| Play on Player 1 | ZR + D-pad Left | Button chords |
-| Recording pop-up | ZR + D-pad Right | Button chords |
-| Cycle Player | ZL + D-pad Right | Button chords |
-| Cycle CPU | ZL + D-pad Left | Button chords |
-| Input display | R + D-pad Down | Button chords |
-| Game speed | Hold R + D-pad Up, then Left / Right | Button chords |
-| Open the menu | Minus | Menu shortcut 1 |
-| Open the menu | Disabled | Menu shortcut 2 |
+### Match recordings in practice
 
-B + D-pad Up opens the menu and cannot be changed. L + R + A can reset, and holding B and clicking the left / right stick
-cycles your / the CPU's Kirby hat (left stick at rest); these buttons are fixed. Cycle Player needs **Player Swapping**
-On. See [Controls](docs/guide/controls.md) for GameCube and Online Deluxe.
+![The results screen confirms that the replay was saved](docs/media/rc13-replay-capture.gif)
 
-### Game speed
+With Replay capture on, save the replay and [choose a fighter's recorded inputs](docs/menu/recording.md#recordings) to practise against.
 
-Hold R + D-pad Up, then tap Left for slower or Right for faster. Release R to keep the speed. See [Game speed](docs/guide/game-speed.md), including 1 Frame.
-
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35ffa4077d05c46d16bd34ef5b7bf93c4ac2fba2" autoplay muted loop playsinline controls></video>
-
-*Hold R + D-pad Up and tap Left: the label steps through 2/3, 1/2 and 1/4 to “1 Frame (Press ZL)”. This clip shows the label only, not a move played slowly. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-game-speed.mp4)
-
-## The menu
-
-Open with B + D-pad Up. L / R turn pages, Up / Down choose a row, A opens or changes it, and B goes back or closes the
-menu. Changes apply when it closes; see [Using the menu](docs/guide/using-the-menu.md).
-
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5c59ac60ffc033815119d657b463e73f2fadb636" autoplay muted loop playsinline controls></video>
-
-*B + D-pad Up opens the menu, R turns through the five pages, B closes it and practice goes on. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](docs/media/tut-menu-tour.mp4)
-
-### CPU
-
-Choose how the [CPU responds](docs/guide/cpu-behaviour.md): open **CPU › Mash** with A and tick an action, then choose
-when it fires in **Mash Triggers**.
-
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/67d92f30104dd21a740499e4b780336754029284" autoplay muted loop playsinline controls></video>
-
-*With CPU › Mash set to an attack, Mario jabs Link and Link hits back. Link ends at 2.7%, Mario at 3.7%. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-cpu-mash.mp4)
-
-### Saves
-
-With Save States On, save both fighters' positions with ZL + D-pad Down; ZL + D-pad Up loads them again.
-[Save states](docs/guide/save-states.md) also covers damage, mirroring and buffs on load.
-
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2f0394ea36fb533c09e157925c016b4e369ab2a6" autoplay muted loop playsinline controls></video>
-
-*ZL + D-pad Down saves beside the CPU; two jabs take it to 4.9%; ZL + D-pad Up puts both fighters back at 0%. Eden, 2026-11-25, build `c51f4d81`.* [Open the clip](docs/media/tut-save-load.mp4)
-
-### Recording
-
-Record a macro: select Player 1 or CPU in the Recording pop-up, press ZR + D-pad Down, do the moves, then press it
-again to stop.
-
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35e8edb3e156f65dc2b9cc87b450a10d83e2f8d9" autoplay muted loop playsinline controls></video>
-
-*ZR + D-pad Down starts Record. Mario is tinted red as his forward smash sends Link to 18.5%. The tint clears when recording stops. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-record-macro.mp4)
-
-To drill a combo, land it, then choose **Recording › Combos & Sequences › + Save last combo…**. The link cells grade
-your next attempts.
-
-<!-- CLIP: tut-combo-save-drill.mp4 | Kirby lands jab into side tilt → Recording › Combos & Sequences › + Save last combo… → the next try is graded on the link cells -->
-*Clip coming.*
-
-Cut a macro, combo or drill into a new file with [Crop](docs/guide/recording.md#crop).
-
-Practise movement without a hit with [Input drills](docs/guide/recording.md#input-drills).
-
-More: [Recording](docs/guide/recording.md) and [playback options](docs/menu/recording.md).
-
-### Fighters & Stages
-
-Switch fighters without leaving practice: choose the order in **Character Cycles**, then press ZL + D-pad Left to
-cycle the CPU. See [Fighter cycles](docs/guide/fighter-cycles.md).
+### Fighter swaps and cycles
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6d08f7457ab8d11ca30c8d7ed1140dd4611397e9" autoplay muted loop playsinline controls></video>
 
-*The Cycle Player chord, ZL + D-pad Right, swaps Mario for Donkey Kong where he stands. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-fighter-cycle.mp4)
+*Donkey Kong takes Mario's place on stage.* [Open the clip](docs/media/tut-fighter-cycle.mp4)
 
-To change stage, open **Change Stage** with A, choose a stage and form, then press A. See [Stages](docs/guide/stages.md).
+Stay on stage between matchups: pick a different fighter or [set a rotation](docs/guide/fighter-cycles.md) for yourself and your opponent.
 
-<!-- CLIP: tut-stage-change.mp4 | Fighters & Stages › Change Stage → the grid → Battlefield in its Ω form loads with both fighters -->
-*Clip coming.*
+### Waiting-room practice
 
-Choose and start a game under [Practice games](docs/menu/practice-games.md).
+![Lobby Practice on the menu in a local wireless room](docs/media/rc11-lobby-practice.gif)
 
-### Display & Controls
+While you wait in Quickplay or local wireless, [practise against the first partner](docs/guide/waiting-rooms.md) with your training settings.
 
-See attacks and hurtboxes: press A on [Hitbox Visualization](docs/menu/display-and-controls.md#hitbox-visualization),
-then A to tick Hitboxes, Grab boxes and Hurtboxes. The Colour legend appears beside the checklist.
+### Stage changes and rotations
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b5760c58e2de36d18ee1fc677043ffb7c7376dce" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e0de6dbeba09dd60aa5dc2ec3c5fbde73470d79a" autoplay muted loop playsinline controls></video>
 
-*With Hitboxes, Grab boxes and Hurtboxes ticked, both fighters show their hurtboxes as see-through pills. Look for the pink hitbox on Mario's jab and the purple box when he grabs. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-hitbox-visualization.mp4)
+*The fighters move to the Omega form of Battlefield.* [Open the clip](docs/media/tut-stage-change.mp4)
 
-See hittable objects with [Article hurtboxes](docs/menu/display-and-controls.md#hitbox-visualization).
+Try the same matchup on a different stage without leaving Training, or [choose a rotation](docs/guide/stages.md) for future visits.
 
-## Waiting rooms
+### Choose Kirby's hat lineup
 
-Practise while waiting for a local wireless or Quickplay match. With **Fighters & Stages › Lobby Practice** On,
-open the room menu with B + D-pad Up. See [Waiting rooms](docs/guide/waiting-rooms.md).
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0858b8e26cf6db1c8d16f3d935c486380ffa303f" autoplay muted loop playsinline controls></video>
 
-<!-- CLIP: tut-lobby-practice-menu.mp4 | A Local Wireless waiting room (one member): B + D-pad Up opens the room menu, Hurtboxes ticked, both practice fighters drawn as pills -->
-*Clip coming.*
+*Kirby puts on Mario's cap without inhaling Mario.* [Open the clip](docs/media/tut-kirby-hat.mp4)
 
-## License
+Give Kirby a [lineup of copy abilities](docs/guide/fighter-cycles.md#kirby-hats) to practise without changing the opposing fighter.
 
-MIT License: see [LICENSE](LICENSE).
+### Saved Mii fighters
 
-This project was developed with the assistance of AI. It is an unofficial fan project, not affiliated with or
-endorsed by Nintendo.
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/cc2afdd8e4395fc04dd9a9d05b72a78b3f3462d8" autoplay muted loop playsinline controls></video>
 
-## More
+*A saved Mii Brawler cycles into Player 1's spot.* [Open the clip](docs/media/tut-mii-pick.mp4)
 
-[The docs](docs/README.md): every menu page and guide. The current release is [rc.15](docs/CURRENT-RELEASE.md),
-**installed, with its own Eden checks in progress** (see [Status](docs/TECHNICAL.md#status)): what's new, how
-to install it and its known issues.
-The rc.15 builds are in [their release notes](docs/RELEASE-NOTES-rc15.md). Release notes for rc.12, rc.13 and rc.14
-are on their
-[release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases); the ones in the docs folder
-(rc.5, rc.6, rc.8 and rc.9) are listed on [the docs page](docs/README.md#reference). [Technical notes](docs/TECHNICAL.md).
+[Choose the saved Mii](docs/guide/mii.md) you want for either side instead of settling for a default Brawler, Swordfighter or Gunner.
 
-## Build
+### Items on demand
 
-Build the plugin with cargo-skyline; the toolchains and the rest of the gates are in [Building TrainingRooms](docs/BUILD.md).
+![Captain Falcon takes Daisy's Bob-omb from the item grid](docs/media/rc11-give-item.gif)
 
-```powershell
-cargo skyline build --release
-cargo test
-cargo clippy --all-targets -- -D warnings
-cargo build --no-default-features
-```
+[Choose an item for Player 1](docs/menu/fighters-and-stages.md#give-item) and close the menu to use it, without loading a save.
+
+## About TrainingRooms
+
+![Menu key: B + D-pad Up opens; L/R switches tabs](docs/media/readme-tour-key.png)
+
+| In the menu | Where to go |
+| --- | --- |
+| ![Mash selected in Reactions](docs/media/readme-tour-cpu.png) | [CPU](docs/menu/cpu.md) · Choose what your opponent does between hits. |
+| ![HUD selected above the visual overlays](docs/media/readme-tour-display.png) | [Display & Controls](docs/menu/display-and-controls.md) · See hitboxes, read frame timing or change a chord. |
+| ![CPU Character selected beside the player options](docs/media/readme-tour-fighters.png) | [Fighters & Stages](docs/menu/fighters-and-stages.md) · Pick both sides of a matchup and where to play. |
+| ![Eggs-ercise selected in the games list](docs/media/readme-tour-games.png) | [Practice games](docs/menu/practice-games.md) · Open a game inside Fighters & Stages and set a challenge. |
+| ![Saved combos in the recording library](docs/media/readme-tour-recording.png) | [Recording](docs/menu/recording.md) · Keep a combo, edit a take or practise a sequence. |
+| ![Mirroring and damage beneath Save States](docs/media/readme-tour-saves.png) | [Saves](docs/menu/saves.md) · Set the damage and positions you return to. |
+
+Smash Ultimate 13.0.5 on Switch or emulator: [Downloads](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases) · [Install guide](docs/guide/getting-started.md#installing) · [Release notes](docs/RELEASE-NOTES-rc15.md)<br>
+[MIT License](LICENSE) · Made with the assistance of AI · [Technical notes](docs/TECHNICAL.md) · [Build from source](docs/BUILD.md) (`cargo skyline build --release`)

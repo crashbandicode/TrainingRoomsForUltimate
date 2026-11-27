@@ -14,8 +14,8 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
   Skyline UI shim and uses the system allocator so the direct hook heap-meter test can measure
   exact byte deltas. The `parry_start_fresh_set` target substitutes the practice runtime's engine
   and diagnostic services at the crate root.
-- **Vendored crates' own tests** (2026-11-02): the root package has no workspace, so `cargo test` does not run
-  `crates/*/tests`. Each gate run adds one call per crate: `cargo test --manifest-path crates/smash-match-data/Cargo.toml`
+- **Vendored crates' own tests:** the root package has no workspace, so the root test gate does not run
+  `crates/*/tests`. To check these separately, run `cargo test --manifest-path crates/smash-match-data/Cargo.toml`
   (its tests use the test-only oracle crate `crates/smash-match-data/tests/oracle`) and
   `cargo test --manifest-path crates/hos-lock/Cargo.toml`; same target dir, `CARGO_INCREMENTAL=0`.
 - **Size gate** (2026-11-02): `python3 -I tools/size_gate.py` prints the implementation lines per module (the
@@ -141,11 +141,13 @@ Item pictures: the builder reads the 39 PNGs from assets/item-icons (the 38 appr
 
 `cargo test` runs `tests/docs_gates.rs`, which runs `python3 -I tools/docs_check.py` over `README.md` and `docs/**/*.md`
 and the fixtures that prove each rule fails on a seeded break (`tools/test_docs_check.py`,
-`tools/test_check_external_links.py`). It needs `/usr/bin/python3` and has no skip switch, like the size gate. No network,
-no clock and no git are used, so every host gives the same answer. The rules are:
+`tools/test_check_external_links.py`). It needs `/usr/bin/python3` and has no skip switch, like the size gate. It uses no
+network and no clock. In a checkout it asks git for the tracked files and for the clips' blob ids; in a plain export
+it reads the files themselves. [The checker](../tools/docs_check.py) lists every rule, including video blob IDs,
+headings with links, and the menu and guide budgets. These checks also apply:
 
 - **Links.** Every relative link and image resolves to a file or folder (with the exact case), and every `#anchor` to a
-  heading, by the forge's slug rules (they are not GitHub's: `L+R+A Reset` is `#l-r-a-reset`). A path that starts with `/`
+  heading or explicit anchor (the forge's heading slugs are not GitHub's: `L+R+A Reset` is `#l-r-a-reset`). A path that starts with `/`
   or leaves the repository fails. Links inside code, code blocks and comments are not read.
 - **Orphans.** Every page under `docs/` is reached by a chain of links from `README.md` or `docs/README.md`. A link to a
   folder does not count. The pages kept on purpose without a link (redirect stubs, the folders of project records) are
@@ -173,9 +175,8 @@ The docs steps of a release. The build, the tag, the Forgejo release and the car
 `docs/CHECKLIST.md` and the operator's order.
 
 1. Edit `docs/CURRENT-RELEASE.md`: the `Current release:` line, the status, what's new, the known issues.
-2. Make the README's top and the Status section of `docs/TECHNICAL.md` name that release. `cargo test` fails until they
-   do (`tools/docs_check.py`, rule `version-name`), and also on any "newest" or "latest" sentence that still names the
-   old one (`version-stale`).
+2. Name the release in the README and Getting started status links and in `docs/TECHNICAL.md` under Status.
+   `version-name` checks all three; `version-stale` rejects "newest" or "latest" claims about an older release.
 3. Put the release in the crate version in the release's name commit (`Cargo.toml` `version = "0.2.0-rc.N"` and
    `Cargo.lock`'s `training_rooms` entry, with `build.rs` `BUILD_NAME`, `tests/build_tag.rs` and the frame.rs build-tag
    test): the footer reads `0.2.0-rc.N · rcN <commit>`. Not before: `cargo test` fails (`version-cargo`) while the crate
