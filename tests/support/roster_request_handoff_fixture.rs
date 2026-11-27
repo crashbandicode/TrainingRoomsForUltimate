@@ -167,6 +167,7 @@ fn scope(_: Role) -> Option<RequestScope> {
 static NOTICES: Lock<Vec<String>> = Lock::new(Vec::new());
 static SAVED_RESULT: Lock<Option<bool>> = Lock::new(None);
 fn notify(_: Role, message: String) { NOTICES.lock().push(message); }
+fn clip_dropped<S>(_: Role, _: S, _: bool) {}
 fn preload_targets(
     _: &TrainingModpackMenu,
     _: usize,

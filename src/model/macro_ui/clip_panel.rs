@@ -392,7 +392,8 @@ pub struct ClipEditor {
     seen_fighters: [Option<i32>; 2],
     wanted_fighter: Option<(usize, i32)>,
     loading_fighter: Option<(usize, i32)>,
-    fighter_load_passes: u16,
+    /// B no longer takes the asked switch back: its withdraw was posted, or the roster began the load.
+    fighter_past_cancel: bool,
     poses: [&'static str; 2],
 }
 
@@ -445,7 +446,7 @@ impl ClipEditor {
         let mut cleared = false;
         if settled && self.loading_fighter.is_some_and(|(slot, kind)| self.seen_fighters[slot] == Some(kind)) {
             self.loading_fighter = None;
-            self.fighter_load_passes = 0;
+            self.fighter_past_cancel = false;
             // The line that asked to wait for this swap goes with it.
             if self.error.as_deref() == Some(FIGHTER_SWAP_WAIT) {
                 self.error = None;
@@ -473,7 +474,8 @@ impl ClipEditor {
 
     fn fighter_line(&self) -> String {
         if let Some((_, kind)) = self.wanted_fighter.or(self.loading_fighter) {
-            return format!("Loading {}… B cancels", crate::engine::rr_runtime::fighter_name(kind));
+            let name = crate::engine::rr_runtime::fighter_name(kind);
+            return if self.fighter_past_cancel { format!("Loading {name}…") } else { format!("Loading {name}… B cancels") };
         }
         for slot in 0..2 {
             if let (Some(seen), Some(recorded)) = (self.seen_fighters[slot], self.recorded_kind(slot)) {
@@ -491,17 +493,20 @@ impl ClipEditor {
     pub fn take_wanted_fighter(&mut self) -> Option<(bool, i32)> {
         let (slot, kind) = self.wanted_fighter.take()?;
         self.loading_fighter = Some((slot, kind));
-        self.fighter_load_passes = 0;
+        self.fighter_past_cancel = false;
         Some((slot == 0, kind))
     }
 
     pub fn fighter_loading(&self) -> Option<(usize, i32)> { self.loading_fighter }
 
+    /// B. A wanted switch is dropped here: the roster never heard of it (false). An asked one stays "loading" until
+    /// the roster answers; true once, for the worker to post the withdraw.
     pub fn cancel_fighter(&mut self) -> bool {
-        let changed = self.wanted_fighter.take().is_some() | self.loading_fighter.take().is_some();
-        self.fighter_load_passes = 0;
-        if changed && self.error.as_deref() == Some(FIGHTER_SWAP_WAIT) { self.error = None; }
-        changed
+        if self.wanted_fighter.take().is_some() {
+            if self.error.as_deref() == Some(FIGHTER_SWAP_WAIT) { self.error = None; }
+            return false;
+        }
+        self.loading_fighter.is_some() && !std::mem::replace(&mut self.fighter_past_cancel, true)
     }
 
     /// A switch is wanted, asked or loading.
@@ -509,16 +514,20 @@ impl ClipEditor {
         self.wanted_fighter.is_some() || self.loading_fighter.is_some()
     }
 
-    /// Every worker pass while a switch is asked: what the roster says. True when the strip changed.
+    /// Every worker pass while a switch is asked: what the roster says. No pass is counted: the load ends on the
+    /// roster's word here, or in `note_fighters` when the game has the asked fighter. True when the strip changed.
     pub fn note_fighter_outcome(&mut self, outcome: FighterOutcome) -> bool {
-        let _ = outcome;
-        self.tick_fighter_load()
-    }
-
-    pub fn tick_fighter_load(&mut self) -> bool {
         if self.loading_fighter.is_none() { return false; }
-        self.fighter_load_passes = self.fighter_load_passes.saturating_add(1);
-        self.fighter_load_passes > 600 && self.cancel_fighter()
+        match outcome {
+            FighterOutcome::Loading => false,
+            FighterOutcome::Committed => !std::mem::replace(&mut self.fighter_past_cancel, true),
+            FighterOutcome::Refused | FighterOutcome::Withdrawn => {
+                self.loading_fighter = None;
+                self.fighter_past_cancel = false;
+                if self.error.as_deref() == Some(FIGHTER_SWAP_WAIT) { self.error = None; }
+                true
+            }
+        }
     }
     /// The same take or capture with its marks named by `namer` instead of the published toggle and fighter.
     pub fn with_namer(mut self, namer: crate::model::move_names::Namer<'static>) -> Self {
@@ -542,7 +551,7 @@ impl ClipEditor {
             source_name: "Latest Vault capture".into(), previous_name: "Previous Vault capture".into(),
             open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor, noted: Pos::Held, wanted: None,
             opened_fighters: [None; 2], seen_fighters: [None; 2], wanted_fighter: None, loading_fighter: None,
-            fighter_load_passes: 0, poses: ["none"; 2] })
+            fighter_past_cancel: false, poses: ["none"; 2] })
     }
 
     /// Saved files have one side and one start context. A combo has link units,
@@ -576,7 +585,7 @@ impl ClipEditor {
             clean_statuses: Vec::new(), move_rules: None, move_start: None,
             source_name, previous_name: String::new(), open_guard, error: None, marks, replay_player: false, watch_base: 0, anchor: 0, noted: Pos::Held, wanted: None,
             opened_fighters: [None; 2], seen_fighters: [None; 2], wanted_fighter: None, loading_fighter: None,
-            fighter_load_passes: 0, poses: ["none"; 2] })
+            fighter_past_cancel: false, poses: ["none"; 2] })
     }
 
     /// Where X previews: a saved macro's play role, a capture's play target, nothing for a combo or a drill.
@@ -1216,7 +1225,7 @@ mod tests {
         let take = service.find("take_wanted_fighter()").expect("take wanted fighter");
         assert!(release < take);
         assert!(service.contains("roster_requests::request_clip_kind(player, kind as u32)"));
-        assert!(service.contains("tick_fighter_load()"));
+        assert!(service.contains("roster_requests::clip_outcome()"));
         let worker = source.split("fn worker_preview_notices(").nth(1).unwrap();
         let play = worker.find("service_wanted_play();").expect("wanted play");
         let fighter = worker.find("service_wanted_fighter();").expect("wanted fighter");
@@ -1251,18 +1260,18 @@ mod tests {
         }
         e.on_action(ClipAction::Nudge(1));
         assert_eq!(e.wanted_fighter(), Some((0, 6)));
-        assert!(e.cancel_fighter());
+        assert!(!e.cancel_fighter(), "a wanted switch is dropped here; the roster never heard of it");
         assert_eq!(e.wanted_fighter(), None);
         e.on_action(ClipAction::ToggleFighter { player: true });
         assert_eq!(e.take_wanted_fighter(), Some((true, 6)));
         assert!(matches!(e.on_action(ClipAction::TogglePlay), ClipEffect::Error(message) if message == FIGHTER_SWAP_WAIT));
-        for _ in 0..600 { assert!(!e.tick_fighter_load()); }
-        assert_eq!(e.fighter_loading(), Some((0, 6)));
-        assert!(e.tick_fighter_load());
+        // The roster refuses: the wait is over and the next toggle is taken.
+        assert!(e.note_fighter_outcome(FighterOutcome::Refused));
         assert_eq!(e.fighter_loading(), None);
         e.on_action(ClipAction::ToggleFighter { player: true });
         assert_eq!(e.take_wanted_fighter(), Some((true, 6)));
         assert!(e.cancel_fighter());
+        assert!(e.note_fighter_outcome(FighterOutcome::Withdrawn));
         assert_eq!(e.fighter_loading(), None);
         // The wait line goes when the swap it spoke of has settled, without another press.
         e.on_action(ClipAction::ToggleFighter { player: true });
@@ -1365,7 +1374,7 @@ mod tests {
         }
         let worker = include_str!("../../runtime/macros/replay_capture.rs");
         assert!(!worker.contains("The fighter did not load"), "the count's line is gone");
-        assert!(!worker.contains("tick_fighter_load") && !include_str!("clip_panel.rs").contains("fighter_load_passes: u16"), "no pass count");
+        assert!(!worker.contains("tick_fighter_load") && !include_str!("clip_panel.rs").contains(concat!("fighter_load", "_passes")), "no pass count");
     }
 
     /// ZL+R and the way back, each through the same shapes.

@@ -345,7 +345,7 @@ mod tests {
         let input = include_str!("../runtime/ui/input.rs");
         assert!(input.contains("INPUT_OWNERS.fetch_or(Owners::MENU.bits()"));
         let macros = include_str!("../runtime/macros/mod.rs");
-        assert!(macros.contains("let held = replay_capture::panel_visible() || replay_capture::browser_visible();"));
+        assert!(macros.contains("let held = (replay_capture::panel_visible() && !replay_capture::fighter_load()) || replay_capture::browser_visible();"));
         assert!(macros.contains("(Owners::REPLAY_EDITOR, held)"));
         assert!(macros.contains("published::INPUT_OWNERS.fetch_or(owner.bits()"));
         assert!(include_str!("../runtime/macros/port.rs").contains("super::sync_owner();"));
@@ -426,7 +426,7 @@ mod tests {
         let common = include_str!("../runtime/compat/common.rs");
         assert!(common.contains("published::input_owners().holds_gameplay()"));
         let macros = include_str!("../runtime/macros/mod.rs");
-        assert!(macros.contains("let loading = replay_capture::loading();"));
+        assert!(macros.contains("let loading = replay_capture::loading() || replay_capture::fighter_load();"));
         assert!(macros.contains("Owners::REPLAY_LOADING"));
         let recorder = include_str!("../runtime/features/recorder.rs");
         assert!(recorder.contains("owners.contains(Owners::REPLAY_LOADING)"), "the chords stay modal while it loads");

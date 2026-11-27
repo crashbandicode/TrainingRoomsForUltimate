@@ -813,6 +813,10 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
         notify(role, crate::engine::swap::cycle_members::FIGHTER_STILL_LOADING.into());
         return admission;
     }
+    // A newer request takes the place of one still waiting.
+    if let Some(replaced) = state.pending {
+        clip_dropped(role, replaced.selection, replaced.restoring);
+    }
     state.pending = Some(Request {
         scope,
         epoch: state.epoch,
@@ -925,6 +929,27 @@ pub fn request_player_kind(kind: u32) -> bool {
     matches!(queue_admitted(Role::Player, Selection::Direct(fighter), false, true), Admission::Accepted | Admission::Superseded)
 }
 
+/// The clip editor's B (`roster_requests`): a user's direct request for `kind` that still waits, with no load begun for
+/// it, is removed. False when there is none: the roster has begun, dropped or never held it.
+pub(crate) fn withdraw_direct(player: bool, kind: u32) -> bool {
+    let mut state = state_for(if player { Role::Player } else { Role::Cpu }).lock();
+    let waits = state.pending.is_some_and(|request| !request.restoring
+        && matches!(request.selection, Selection::Direct(fighter) if fighter.kind() == kind));
+    if waits {
+        state.pending = None;
+    }
+    waits
+}
+
+/// The roster gives up a request after admission: the clip editor's switch is told (`roster_requests::note_drop`).
+/// The request's two facts by value: a reference would put the whole request on the caller's stack.
+#[inline(never)]
+fn clip_dropped(role: Role, selection: Selection, restoring: bool) {
+    if let (Selection::Direct(fighter), false) = (selection, restoring) {
+        super::roster_requests::note_drop(role == Role::Player, Some(fighter.kind()));
+    }
+}
+
 /// Runs before the delay queue. Consume only our request, giving conflicting
 /// save/record/menu requests precedence. Preserve suppression through a held
 /// chord so it cannot turn into a delayed taunt or a player trio request.
@@ -1024,6 +1049,8 @@ pub fn scene_changed(mode: game_mode::Mode) {
     for role in [Role::Player, Role::Cpu] {
         ORIGINAL_KINDS[role as usize].store(u32::MAX, Ordering::Release);
         SOLO_ACTIVE[role as usize].store(false, Ordering::Release);
+        // Whatever load the role had, the Mii owners' included, goes with the scene.
+        super::roster_requests::note_drop(role == Role::Player, None);
         let mut state = state_for(role).lock();
         state.epoch = state.epoch.wrapping_add(1);
         state.pending = None;
@@ -1445,6 +1472,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     let refresh = matches!(request.selection, Selection::RefreshPartners);
     if request.epoch != state.epoch || scope(role) != Some(request.scope) || !admitted(role.enabled(), request.once, refresh) {
         state.pending = None;
+        clip_dropped(role, request.selection, request.restoring);
         trace!("[CharacterRoster] dropped stale request at native boundary");
         return;
     }
@@ -1470,6 +1498,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             );
             notify(role, "Character swap unavailable during this action".into());
         }
+        clip_dropped(role, request.selection, request.restoring);
         return;
     }
     let current = current.unwrap();
@@ -1516,6 +1545,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     let Some(pose) = capture_reload_pose(entry, owner) else {
         drop(state);
         notify(role, "Character swap unavailable: current position not ready".into());
+        clip_dropped(role, request.selection, request.restoring);
         return;
     };
     let Some(install_token) = INSTALL.try_begin(true) else {
@@ -1601,6 +1631,13 @@ pub unsafe fn on_destroy(entry: *const u8) {
             }))
     {
         WAITING_MEMORY.lock().player_departed();
+    }
+    if state.pending.is_some_and(|r| r.entry == entry as usize)
+        || state.observed.is_some_and(|(identity, _)| identity == entry as usize)
+        || state.active.is_some_and(|a| a.entry == entry as usize)
+    {
+        // The role's entry goes, and any load of the role with it.
+        super::roster_requests::note_drop(role == Role::Player, None);
     }
     if state.pending.is_some_and(|r| r.entry == entry as usize) {
         trace!(

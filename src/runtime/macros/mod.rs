@@ -150,10 +150,11 @@ pub(crate) fn after_layout_draw() {
 /// The replay editor holds the input while its panel (or the capture browser) is up: the owner bit the input stages read.
 pub(crate) fn sync_owner() {
     use crate::model::input_delay::Owners;
-    let held = replay_capture::panel_visible() || replay_capture::browser_visible();
+    // A fighter switch asked from the open editor is a load as well: the roster's gates must not wait for the editor.
+    let held = (replay_capture::panel_visible() && !replay_capture::fighter_load()) || replay_capture::browser_visible();
     // The editor parked on its own load (a recorded Mii's import, then the CPU's install) keeps P1 neutral but must
     // not hold the gates that load waits on (#68).
-    let loading = replay_capture::loading();
+    let loading = replay_capture::loading() || replay_capture::fighter_load();
     for (owner, on) in [(Owners::REPLAY_EDITOR, held), (Owners::REPLAY_LOADING, loading)] {
         if on {
             published::INPUT_OWNERS.fetch_or(owner.bits(), std::sync::atomic::Ordering::AcqRel);

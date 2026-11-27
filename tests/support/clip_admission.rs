@@ -43,13 +43,14 @@ mod character_roster {
         pending[role] = None;
         true
     }
+    pub fn notice_blocked() -> bool { PENDING.lock().unwrap().iter().any(Option::is_some) }
     pub fn reset() { *PENDING.lock().unwrap() = [None; 2]; *BEGUN.lock().unwrap() = [false; 2]; }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FighterOutcome { Loading, Committed, Refused, Withdrawn }
 const FIGHTER_REFUSED: &str = "The roster refused the fighter switch";
 #[derive(Default)]
-struct Editor { wanted: Option<(usize, i32)>, loading: Option<(usize, i32)>, notice: String, committed: bool }
+struct Editor { wanted: Option<(usize, i32)>, loading: Option<(usize, i32)>, notice: String, committed: bool, withdrawing: bool }
 impl Editor {
     fn note_fighter_outcome(&mut self, outcome: FighterOutcome) -> bool {
         match outcome {
@@ -64,8 +65,10 @@ impl Editor {
         self.loading.map(|(role, kind)| (role == 0, kind))
     }
     fn fighter_loading(&self) -> Option<(usize, i32)> { self.loading }
-    fn tick_fighter_load(&mut self) -> bool { false }
-    fn cancel_fighter(&mut self) -> bool { self.loading.take().is_some() }
+    fn cancel_fighter(&mut self) -> bool {
+        if self.wanted.take().is_some() { return false; }
+        self.loading.is_some() && !std::mem::replace(&mut self.withdrawing, true)
+    }
 }
 static EDITOR: Mutex<Option<Editor>> = Mutex::new(None);
 fn notify(message: String) { EDITOR.lock().unwrap().as_mut().unwrap().notice = message; }
@@ -76,7 +79,8 @@ fn ask(role: usize, kind: i32) {
 }
 /// B in the editor while a switch is asked, as `replay_capture::on_input` does it.
 fn press_b() {
-    EDITOR.lock().unwrap().as_mut().unwrap().cancel_fighter();
+    let asked = EDITOR.lock().unwrap().as_mut().unwrap().cancel_fighter();
+    if asked { roster_requests::withdraw_clip(); }
 }
 fn loading() -> Option<(usize, i32)> { EDITOR.lock().unwrap().as_ref().unwrap().loading }
 fn notice() -> String { EDITOR.lock().unwrap().as_ref().unwrap().notice.clone() }
@@ -91,8 +95,12 @@ fn toggle_cases(role: usize, kind: i32, failed: &mut Vec<String>) {
     check("2,000 passes: still loading, no line", loading() == Some((role, kind)) && notice().is_empty());
     // The roster gives the request up and says so.
     admitted();
+    // Another fighter's request given up for this role is not this switch's.
+    roster_requests::note_drop(role == 0, Some(kind as u32 + 1));
+    service_wanted_fighter();
+    check("another fighter's drop is not this switch's", loading() == Some((role, kind)) && notice().is_empty());
     character_roster::PENDING.lock().unwrap()[role] = None;
-    roster_requests::note_drop(role == 0);
+    roster_requests::note_drop(role == 0, Some(kind as u32));
     service_wanted_fighter();
     check("a dropped switch ends the load", loading().is_none());
     check("a dropped switch shows the refusal", notice() == FIGHTER_REFUSED);
@@ -123,12 +131,12 @@ fn toggle_cases(role: usize, kind: i32, failed: &mut Vec<String>) {
     check("B after the roster began: the request stays", pending(role) == Some(kind as u32));
     // A scene change or the entry's destruction after that: a marked drop ends it.
     character_roster::PENDING.lock().unwrap()[role] = None;
-    roster_requests::note_drop(role == 0);
+    roster_requests::note_drop(role == 0, None);
     service_wanted_fighter();
     check("a scene change or a destroyed entry ends a committed load", loading().is_none() && notice() == FIGHTER_REFUSED);
     // A drop of the other role's request is not this ticket's.
     admitted();
-    roster_requests::note_drop(role != 0);
+    roster_requests::note_drop(role != 0, None);
     service_wanted_fighter();
     check("the other role's drop is not this switch's", loading() == Some((role, kind)) && notice().is_empty());
     character_roster::reset();
@@ -150,7 +158,7 @@ fn main() {
         assert_eq!(roster_requests::take_reply(), None, "clip answer leaked into combo replies");
         character_roster::reset();
         ask(role, refused);
-        EDITOR.lock().unwrap().as_mut().unwrap().cancel_fighter();
+        press_b();
         roster_requests::service();
         service_wanted_fighter();
         assert!(EDITOR.lock().unwrap().as_ref().unwrap().notice.is_empty(), "B-cancel received a stale refusal");
