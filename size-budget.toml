@@ -3272,3 +3272,11 @@ ceiling = 209156
 date = "2026-11-27"
 reason = "The staggered release (place-t1a's trace C 2026-11-27 02:53Z, rows a3 and u1: the editor's worker published the release between the two fighters' callbacks of one frame, the CPU was put back a frame before Player 1, and the game's test of the two pushed the CPU 0.33), on fix/release-pose-root ad3ff7ca (209116): +40, measured by the size step of the gate on 8f362874. The role whose callback reads the release first lets its partner go in the same callback: no state, no count of frames, no push switch."
 approved_by = "tr-primary-2 2026-11-27 03:28:58Z (+40 lines granted for fix/release-same-tick, the release part plus the hold start; the release NRO is unchanged and raw .bss is +0)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 209167
+date = "2026-11-27"
+reason = "A release published inside one fighter callback (rv-preview-vis's review of 355afa48, 2026-11-27 03:42Z and 03:49Z: the callback read the editor's request more than once, so a release published between two reads put one fighter back alone), on 355afa48 (209156): +11, measured by the size step of the gate on 1aec9cc5 (XPS, bid 5c4e8bea; the Yoga gate of the same commit agrees). A callback reads the request once and uses that one value for both fighters (Block::frame_ask, Block::point_for). Written by rv-preview-vis, lead-reviewed by tile-fix-g4."
+approved_by = "tr-primary-2 2026-11-27 03:57:26Z (+11 lines granted for the one-read-per-callback fix; the ceiling becomes 209167; the release NRO size and raw .bss are unchanged)."
