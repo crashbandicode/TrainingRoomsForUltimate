@@ -509,6 +509,10 @@ When it differs from the level in Training's own menu, a notice says so each tim
 
 ### Hide CPU
 
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7998f407ba2350b1fdda8bdefd090162e1015a00" autoplay muted loop playsinline controls></video>
+
+*CPU › Hide CPU On: Link is gone when the menu closes. Off: he is back where he stood. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-cpu-hide.mp4)
+
 Takes the CPU out of the fight without changing any of its settings.
 
 - On: the CPU is invisible and has no shadow or effects. Your attacks, grabs and projectiles pass through it, it
@@ -522,9 +526,6 @@ Takes the CPU out of the fight without changing any of its settings.
 - **Values:** On, Off.
 - **Default:** Off.
 - **How:** Left/Right or A.
-
-<!-- CLIP: tut-cpu-hide.mp4 | Hide CPU On → the CPU vanishes → Off brings it back at its spot -->
-*Clip coming.*
 
 ![Hide CPU: Mario jabs the CPU (Hero), Hide CPU On makes the CPU vanish with its tag and its panel, Off brings it back with both and the next jab hits it](../media/rc14-hide-cpu.gif)<br>
 *CPU > Level > Hide CPU: Mario jabs the CPU, Hero (2.7%); D-pad Right turns Hide CPU On and the CPU is gone, and its "CPU" tag and its panel at the bottom go with it, leaving only Mario's panel, and Mario's jab hits nothing; D-pad Left turns it Off, Hero is back with its tag and panel and takes the next jab. The input is named in a box. Eden, rc.14 (untested on hardware).*
