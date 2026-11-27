@@ -530,44 +530,8 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-The current release is **rc.15**. Its newest build is install 6 (`5df3d9dc`, on the test console's card since
-2026-11-26): **installed and read back; its own Eden checks are in progress**. A preview build (`cc71537c`) is
-staged for the card and not installed ([release notes](RELEASE-NOTES-rc15.md#preview-build)). The
-[console reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console) distinguish a title-screen
-crash with no TrainingRooms frame from issues reported in TrainingRooms.
-[Current release](CURRENT-RELEASE.md) says what it adds, how to install it and what is known not to work;
-[the rc.15 release notes](RELEASE-NOTES-rc15.md) list installs 1 to 6, and [Install evidence](EVIDENCE-rc15-installs.md)
-names the runs behind each claim. The menu footer reads `0.2.0-rc.15 · rc15` and then the commit it was built from, so
-the commit tells the rc.15 builds apart: from rc.14 the version number is the release's own name, the same as its tag.
-Builds before it kept the version `0.2.0-rc.6` from rc.6 on, and the build name after it (rc8 to rc13) told them apart.
-
-[rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13) (`ed0d7a35`,
-2026-11-14, Eden-tested and untested on hardware; footer `0.2.0-rc.6 · rc13 ed0d7a35`) adds Aerial Drift,
-Taunts, Wario's bike in Give item, Training opening on the stage you pick, and Left / Right on On/Off rows; its delay
-rows and Input Delay count game frames at every Game speed; Hitbox Visualization draws long boxes as pills, gives
-projectiles and thrown items their own orbs and shows grab boxes in magenta; and a CPU on Mash Triggers Always no longer
-gets stuck in its first dodge. [rc.12](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.12)
-(`83b72d7d`, 2026-11-13, also Eden-tested and untested on hardware) changes CPU options, Saves and Recording; its
-release notes list them. rc.11 (`0c628724`) moves TrainingRooms' own threads off core 0 and hides the frame strip while
-a waiting room's own menu is open; rc.10 is a code reduction with no change in behaviour.
-
-0.2.0-rc.6 follows 0.2.0-rc.3.1: 0.2.0-rc.5 was withdrawn before players ran it, and there is no separate 0.2.0-rc.4. What it changes is
-[RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md), on top of [RELEASE-NOTES-rc5.md](RELEASE-NOTES-rc5.md).
-The builds after it, rc.8 and rc.9, are in [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md) and
-[RELEASE-NOTES-rc9.md](RELEASE-NOTES-rc9.md): rc.9 fixes the shortcut conflicts with Online Deluxe, the CPU
-pilot and imgui_smash.
-
-**0.2.0-rc.3** (2026-11-05) is the previous console test build. It adds to rc.2:
-- the **frame strip** input display, replacing the 15-row input log;
-- **Change Stage**: a row that switches the stage now, in Training and in waiting rooms;
-- **menu navigation**: ZL + Up/Down jumps sections, the menu reopens where you left it, ZR no longer resets a page by
-  accident, and *Reset page to defaults* asks first;
-- **own hitbox discs** for every fighter sphere, never refused (projectiles keep the effect spheres; the discs trail
-  the camera by one to two frames, a known limit).
-
-rc.2 added the pause-helper fix, the Solo Popo mark placement and the Kirby hat-request endings. Limitations kept from
-the fork are listed in [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md); planned work is in the
-[ROADMAP](ROADMAP.md). 0.1.0 crashes at console boot; use a newer build: the current release is [rc.15](CURRENT-RELEASE.md) (installed, with its own Eden checks in testing; see the [install evidence](EVIDENCE-rc15-installs.md)).
+The current release is **rc.15**: what is installed, what is new and what is known not to work are on
+[Current release](CURRENT-RELEASE.md).
 
 ## Build
 

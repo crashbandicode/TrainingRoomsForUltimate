@@ -4,6 +4,10 @@
 
 Current release: rc.15
 
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5c59ac60ffc033815119d657b463e73f2fadb636" autoplay muted loop playsinline controls></video>
+
+*The menu, over Training. Eden, rc.15.* [Open the clip](media/tut-menu-tour.mp4)
+
 | | |
 | --- | --- |
 | On the test console | Install 6, built from `5df3d9dc`, installed 2026-11-26 and read back |
@@ -70,4 +74,4 @@ Details: [release notes](RELEASE-NOTES-rc15.md#known-issues), [Install evidence]
 | rc.15, build by build | [rc.15 release notes](RELEASE-NOTES-rc15.md) |
 | rc.5, rc.6, rc.8, rc.9 | [rc.5](RELEASE-NOTES-rc5.md), [rc.6](RELEASE-NOTES-rc6.md), [rc.8](RELEASE-NOTES-rc8.md), [rc.9](RELEASE-NOTES-rc9.md) |
 | rc.12, rc.13, rc.14 | [rc.12](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.12), [rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13), [rc.14](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.14) |
-| rc.7, rc.10, rc.11 | No notes: see [Status](TECHNICAL.md#status) |
+| rc.7, rc.10, rc.11 | No notes |
