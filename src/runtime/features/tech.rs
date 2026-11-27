@@ -1039,7 +1039,7 @@ pub unsafe fn frame(fighter: usize) {
                             return Err(Ended::Rebuild);
                         }
                         view.picker.selected.ok_or(Ended::Choose)?
-                    } else if search.running() {
+                    } else if search.under_way() {
                         view.picker.selected.filter(|s| s.current(&mut source)).ok_or(Ended::Rebuild)?
                     } else {
                         picker::random_spot(

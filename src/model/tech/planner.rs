@@ -51,7 +51,7 @@ pub struct Search {
     pub refused: u8,
 }
 impl Search {
-    pub fn running(&self) -> bool {
+    pub fn under_way(&self) -> bool {
         self.count != 0
     }
 }
@@ -145,7 +145,7 @@ pub fn plan_frame(
             .saturating_add(u32::from(super::session::ABANDON));
         let mut candidates = 0u32;
         let mut frames = 0u32;
-        if !search.running() {
+        if !search.under_way() {
             let mut values = Values { draw: &mut *draw, index: None, count: 1, flown: 0 };
             let result = candidate(config, context, &mut values);
             candidates += 1;
