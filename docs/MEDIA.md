@@ -45,7 +45,7 @@ The menu tour, menu option and button-chord films come from `tut-c51f4d81-yoga-1
 They crop a 1842×1036 region at (39, 44) from the 1080p capture and scale it to 720p, removing the capture tool's
 yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows name their own source runs.
 
-- Every clip of this table is cut with that same crop, except `tut-save-load.mp4` and the six files of run `tut-61bedffb-xps-5`, which are whole frames.
+- Every clip of this table is cut with that same crop, except `tut-save-load.mp4` and the six files of run `tut-dc5302f1-yoga-6`, which are whole frames.
 - The first, middle and last frame of all 34 files then published were read on 2026-11-27: none shows the mark.
 - Ten lost content of the game's own at the top edge.
 - Two of those, `tut-input-special-direction` and `tut-spacing-grader`, were retired the same day with two other clips; the eight below remained published on November 27 and were listed for a whole-frame take:
@@ -67,12 +67,12 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 | `tut-clip-playhead.mp4` | [Shows](#take-tut-clip-playheadmp4) | `t42-clip-playhead` of the same run, 0.6–12.0 s | 3,376,060 | `24744f80377dec3e` | [Recording](guide/recording.md#crop), [menu](menu/recording.md#replay-window) |
 | `tut-clip-scrub-moves.mp4` | [Shows](#take-tut-clip-scrub-movesmp4) | `t41-clip-scrub` of run `tut-cc71537c-yoga-4` (the diagnostic file of preview build `cc71537c`, 2026-11-27), 0.8–12.0 s | 3,199,071 | `4144b9be50b9797d` | [menu](menu/recording.md#moves-while-you-scrub-preview-build) |
 | `tut-clip-snap.mp4` | [Shows](#take-tut-clip-snapmp4) | `t43-clip-snap` of the same run, 0.6–10.6 s | 3,190,826 | `9d9b2403110f13df` | [menu](menu/recording.md#moves-while-you-scrub-preview-build) |
-| `tut-toggle-p1.mp4` | [Shows](#take-tut-toggle-p1mp4) | [Film, cut](#take-tut-toggle-p1mp4) | 5,123,704 | `7a2c301476b331d2` | [menu](menu/recording.md#fighter-toggle) |
-| `tut-toggle-cpu.mp4` | [Shows](#take-tut-toggle-cpump4) | [Film, cut](#take-tut-toggle-cpump4) | 6,043,581 | `e755859711e923a3` | [menu](menu/recording.md#fighter-toggle) |
-| `tut-clip-scrub-home.mp4` | [Shows](#take-tut-clip-scrub-homemp4) | [Film, cut](#take-tut-clip-scrub-homemp4) | 5,965,639 | `24aa93ef609ef54f` | [menu](menu/recording.md#moves-while-you-scrub-preview-build) |
-| `tut-clip-x-preview.mp4` | [Shows](#take-tut-clip-x-previewmp4) | [Film, cut](#take-tut-clip-x-previewmp4) | 5,030,240 | `9446dcc314fbe298` | [Recording](guide/recording.md#crop) |
-| `tut-loading-ready-fighter-bodies.png` | [Shows](#take-tut-loading-ready-fighter-bodiespng) | [Film, cut](#take-tut-loading-ready-fighter-bodiespng) | 587,265 | `2138fd7eae8418b2` | [menu](menu/fighters-and-stages.md) |
-| `tut-loading-swap-groups.png` | [Shows](#take-tut-loading-swap-groupspng) | [Film, cut](#take-tut-loading-swap-groupspng) | 563,838 | `93eab811d3b72a2b` | [menu](menu/fighters-and-stages.md) |
+| `tut-toggle-p1.mp4` | [Shows](#take-tut-toggle-p1mp4) | [Film, cut](#take-tut-toggle-p1mp4) | 7,712,561 | `2490a45569a7451f` | [menu](menu/recording.md#fighter-toggle) |
+| `tut-toggle-cpu.mp4` | [Shows](#take-tut-toggle-cpump4) | [Film, cut](#take-tut-toggle-cpump4) | 9,104,856 | `658362bcfa521968` | [menu](menu/recording.md#fighter-toggle) |
+| `tut-clip-scrub-home.mp4` | [Shows](#take-tut-clip-scrub-homemp4) | [Film, cut](#take-tut-clip-scrub-homemp4) | 6,713,883 | `7b0c4a55203f46a1` | [menu](menu/recording.md#moves-while-you-scrub-preview-build) |
+| `tut-clip-x-preview.mp4` | [Shows](#take-tut-clip-x-previewmp4) | [Film, cut](#take-tut-clip-x-previewmp4) | 5,792,564 | `6dabd909faf837e5` | [Recording](guide/recording.md#crop) |
+| `tut-loading-ready-fighter-bodies.png` | [Shows](#take-tut-loading-ready-fighter-bodiespng) | [Film, cut](#take-tut-loading-ready-fighter-bodiespng) | 650,251 | `a87297fadbf60a4b` | [menu](menu/fighters-and-stages.md) |
+| `tut-loading-swap-groups.png` | [Shows](#take-tut-loading-swap-groupspng) | [Film, cut](#take-tut-loading-swap-groupspng) | 635,146 | `1ced0acac1c5ed84` | [menu](menu/fighters-and-stages.md) |
 | `tut-juggler-setup-and-result.mp4` | [Shows](#take-tut-juggler-setup-and-resultmp4) | `t44-juggler` of run `tut-5df3d9dc-yoga-3`, 11.5–29.5 s | 6,320,217 | `1dd2fb6407149b0f` | [Juggler](guide/juggler.md) |
 | `tut-guard-edge-setup-and-score.mp4` | [Shows](#take-tut-guard-edge-setup-and-scoremp4) | `t45-guard-edge` of the same run, 18–51 s | 12,687,556 | `52df2bbb56168a07` | [Guard the Edge](guide/guard-the-edge.md) |
 | `tut-menu-list-scroll.mp4` | [Shows](#take-tut-menu-list-scrollmp4) | `t03-menu-list-scroll` of run `tut-5df3d9dc-yoga-3`, 0.5–20.0 s | 566,038 | `c0352b105b434bbc` | [Using the menu](guide/using-the-menu.md) |
@@ -146,15 +146,15 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 
 - **Shows** · ZL+L loads King K. Rool as Player 1 in the replay window for his capture.
   - ZL+L again brings Mario back; B closes the editor.
-- **Film, cut** · `k01-toggle-p1` of run `tut-61bedffb-xps-5` (the release build of `61bedffb`, 2026-11-27), 1.5–19.5 s, whole frame, the capture tool off during the take
+- **Film, cut** · `k01-toggle-p1` of run `tut-dc5302f1-yoga-6` (the release build of `dc5302f1`, 2026-11-27, at 1x), 1.5–21.8 s, whole frame, the capture tool off during the take
 
 <a id="take-tut-toggle-cpump4"></a>
 
 **tut-toggle-cpu.mp4**
 
 - **Shows** · In the same capture, ZL+R loads King K. Rool as the CPU; ZL+R again brings Link back.
-  - The cut ends with the editor open
-- **Film, cut** · `k02-toggle-cpu` (first attempt) of the same run, 1.5–22.5 s, whole frame, the capture tool off during the take
+  - B closes the editor at the end
+- **Film, cut** · `k02-toggle-cpu` of the same run, 1.5–26.5 s, whole frame, the capture tool off during the take
 
 <a id="take-tut-clip-scrub-homemp4"></a>
 
@@ -182,7 +182,7 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 **tut-loading-swap-groups.png**
 
 - **Shows** · The same section with the cursor on Swap groups and its two help lines; 1920×1080 still
-- **Film, cut** · `k05-loading-help` of the same run, the frame at 12.5 s, whole frame, the capture tool off during the take
+- **Film, cut** · `k05-loading-help` of the same run, the frame at 13.0 s, whole frame, the capture tool off during the take
 
 <a id="take-tut-juggler-setup-and-resultmp4"></a>
 
