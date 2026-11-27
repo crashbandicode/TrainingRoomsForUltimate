@@ -6,11 +6,12 @@ Current release: rc.15
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5c59ac60ffc033815119d657b463e73f2fadb636" autoplay muted loop playsinline controls></video>
 
-*The menu, over Training. Eden, rc.15.* [Open the clip](media/tut-menu-tour.mp4)
+*The menu over Training.* [Open the clip](media/tut-menu-tour.mp4)
 
 | | |
 | --- | --- |
 | Last verified console install | `dc5302f1`, installed and [read back](EVIDENCE-rc15-installs.md#fixed-build) on 2026-11-27 |
+| Repository main at this audit | `30f7f21a` (2026-11-27) |
 | Shipping behavior (not a console receipt) | [Clip editor](guide/recording.md#crop), [Loading](menu/fighters-and-stages.md#loading) and [Tech practice](guide/tech-practice.md) describe the fixes. |
 | Preview install cancelled | `cc71537c` was never installed: [preview notes](RELEASE-NOTES-rc15.md#preview-build) |
 | Changes | [Release notes](RELEASE-NOTES-rc15.md) |

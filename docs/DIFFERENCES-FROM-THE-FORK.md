@@ -2,8 +2,8 @@
 
 TrainingRooms re-specifies the features of this project's earlier Training Modpack fork (stage M5q) and keeps its
 behaviour unless an operator decision changed it ([DECISIONS.md](DECISIONS.md), [MENU-DRAFT.md](../MENU-DRAFT.md)).
-This page lists only the changes, each checked against the code of 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`,
-2026-11-05). Clips are Eden footage of the rc.1 release NRO unless a caption names another build; see
+This historical comparison records changes through 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`,
+2026-11-05). The illustrations also include later releases, identified by their media filenames in
 [MEDIA.md](MEDIA.md).
 
 ## Install and files

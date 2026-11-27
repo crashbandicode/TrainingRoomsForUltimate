@@ -95,7 +95,7 @@ The named-macro library and preview extensions (F8 design C) are done in rc.5 (`
 Edit placement, Replay window, and a named macro recorded on another fighter with Switch/Keep). The state-destructor
 alternative was dropped by the operator.
 
-## Next (operator 2026-11-05, DEFERRED-LIST)
+## Deferred list of 2026-11-05 and its outcomes
 
 In this order (`docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19902`):
 
@@ -113,14 +113,13 @@ In this order (`docs/DECISIONS.md` DEFERRED-LIST on `review/menu-proposal` `6d19
 
 ## Phase 2 N11: Lobby Items (operator order)
 
-TrainingRooms only. A *Lobby Items* toggle on Fighters & Stages › Stages, after Stage Hazards, default On (native
-behaviour), saved like every setting. Off stops waiting-room practice item spawning at the native scene rule and
-removes an existing item once through the native removal; no per-frame sweep. Training, character select and online
-matches are untouched. Acceptance: host tests for policy, scene, persistence and import; 64-byte guards; zero hook
-allocations; one Eden batch (Off no-spawn window, existing-item removal, On spawn return, zero Unmapped, both consoles
-`desync_seen` 0 in an online smoke with the row Off).
+- TrainingRooms only.
+- A *Lobby Items* toggle on Fighters & Stages › Stages, after Stage Hazards, default On (native behaviour), saved like every setting.
+- Off stops waiting-room practice item spawning at the native scene rule and removes an existing item once through the native removal; no per-frame sweep.
+- Training, character select and online matches are untouched.
+- Acceptance: host tests for policy, scene, persistence and import; 64-byte guards; zero hook allocations; one Eden batch (Off no-spawn window, existing-item removal, On spawn return, zero Unmapped, both consoles `desync_seen` 0 in an online smoke with the row Off).
 
-**Implemented 2026-11-05 (`p23/lobby-items`), in 0.2.0-rc.5; its Eden rows run in the rc.5 grouped session.**
+**Implemented 2026-11-05 (`p23/lobby-items`) and shipped in 0.2.0-rc.5. The rc.5 plan grouped its Eden rows in one session.**
 
 - **Spawning:** one inline hook on the item spawner's own switch test (`main+0x15d9a80`, the `cbz` after
   `ldrb w8,[c,#0x30]`). In a qualified waiting scene with the row Off, the native takes its own off path; elsewhere the
