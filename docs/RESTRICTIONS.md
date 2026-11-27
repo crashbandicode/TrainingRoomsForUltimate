@@ -3,7 +3,7 @@
 Every user-facing refusal a branch adds cites one approved row here with `// restriction: <ID>` on its line or one of
 the 3 above it (playbook `docs/CHECKLIST.md`, the "cites an approved restriction" row; `compliance.py --base`).
 
-The table is one list, in the order the rows were approved. By subsystem:
+Find a restriction by subsystem, then look up its ID in the table.
 
 - **Placing fighters:** `record-place-practice`, `record-place-start`, `record-place-load`, `place-save-write`
 - **Clip editor and replays:** `clip-cut-here-order`, `clip-no-second-fighter`, `clip-fighter-swap-wait`, `clip-fighter-refused`, `clip-fighter-by-kind`, `scrub-point-not-standable`, `replay-preview-fighter`, `replay-mii-metadata`, `replay-mii-loader-build`
