@@ -16,9 +16,9 @@ Use [save states](../guide/save-states.md) to retry a position, or keep named se
 
 ## Damage on load
 
-![Load at zero damage or restore the saved percentages](../media/rc11-damage-on-load.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/704f03f4d59c49e8351802d510df72dfc5eea9f5" autoplay muted loop playsinline controls></video>
 
-*Load at zero damage or restore the saved percentages.*
+*Load at zero damage or restore the saved percentages.* [Open the clip](../media/rc11-damage-on-load.mp4)
 
 Choose damage separately for each fighter; a range is editable only with Random Value selected.
 
@@ -31,9 +31,9 @@ Choose damage separately for each fighter; a range is editable only with Random 
 
 ## Character buffs
 
-![Loading with Arsene ticked fills Joker's gauge](../media/rc11-buffs-on-load.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/04687c818ecd4c08db8cdf628883f00f273ab5a8" autoplay muted loop playsinline controls></video>
 
-*Loading with Arsene ticked fills Joker's gauge.*
+*Loading with Arsene ticked fills Joker's gauge.* [Open the clip](../media/rc11-buffs-on-load.mp4)
 
 | Setting | Choices; default in bold | What it does |
 | --- | --- | --- |
@@ -50,9 +50,9 @@ Choose damage separately for each fighter; a range is editable only with Random 
 
 ## Setup library
 
-![Corner trap joins the library without changing Load](../media/rc14-save-setup-here.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bd203d096cf07018ba024ec0e56c90eedf8ecb94" autoplay muted loop playsinline controls></video>
 
-*Corner trap joins the library without changing Load.*
+*Corner trap joins the library without changing Load.* [Open the clip](../media/rc14-save-setup-here.mp4)
 
 Keep a [named setup](../guide/save-states.md#making-a-setup) from the fighters' current positions or the positions Load would restore.
 
@@ -64,9 +64,9 @@ Keep a [named setup](../guide/save-states.md#making-a-setup) from the fighters' 
 
 ## A setup's own screen
 
-![Choosing the setup changes the next Load, not this spot](../media/rc14-setup-load-target.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6e8758ca241dbc8d09cc524cf7427b2bb47a224a" autoplay muted loop playsinline controls></video>
 
-*Choosing the setup changes the next Load, not this spot.*
+*Choosing the setup changes the next Load, not this spot.* [Open the clip](../media/rc14-setup-load-target.mp4)
 
 | Action | Result |
 | --- | --- |

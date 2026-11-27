@@ -2,7 +2,9 @@
 
 How TrainingRooms works in Training and waiting rooms; see [Media](MEDIA.md) for clip provenance and [release history](CURRENT-RELEASE.md#earlier-releases) for earlier builds.
 
-[Menu tour and hitbox checklist](media/rc14-menu-tour.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4ec5bff51d1c512e252fbb8e6788fc6adc32cdcc" autoplay muted loop playsinline controls></video>
+
+*Menu tour and hitbox checklist* [Open the clip](media/rc14-menu-tour.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -54,7 +56,7 @@ flowchart LR
 | Find a control that cannot be rebound | [Fixed controls](guide/controls.md#fixed-buttons) |
 | Identify the running build | [Read the menu footer](CURRENT-RELEASE.md#which-build-is-mine) |
 
-[Build tag in the menu footer](media/rc11-footer-tag.gif) · [Capture record, 2026-11-12](MEDIA.md)
+Build tag in the menu footer <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f35a747760aa9795cefaa3aef17e370d05655af9" autoplay muted loop playsinline controls></video> [Open the clip](media/rc11-footer-tag.mp4) · [Capture record, 2026-11-12](MEDIA.md)
 
 ## Features in detail
 
@@ -66,7 +68,9 @@ flowchart LR
 
 ### Hitboxes and grab boxes
 
-[Hitboxes and hurtboxes during a neutral air](media/rc14-hitbox.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5d5806e6352e36af05081590daa383c688c2f98f" autoplay muted loop playsinline controls></video>
+
+*Hitboxes and hurtboxes during a neutral air* [Open the clip](media/rc14-hitbox.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -105,9 +109,9 @@ TrainingRooms draws fighter and projectile hitboxes with its own panes, projects
 
 See the [frame strip guide](guide/frame-strip.md) for the lanes and readouts, and [Media](MEDIA.md) for the rc.5 clips.
 
-[Hide and restore the frame strip](media/rc8-input-display-chord.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/8bc5c548137a4ab83ddf533d683ccf7ebb2d7ae6" autoplay muted loop playsinline controls></video>
 
-*2026-11-11 · [Capture record](MEDIA.md)*
+*2026-11-11 · [Capture record](MEDIA.md)* [Open the clip](media/rc8-input-display-chord.mp4)
 
 | Topic | Details |
 | --- | --- |
@@ -129,7 +133,9 @@ See the [frame strip guide](guide/frame-strip.md) for the lanes and readouts, an
 
 ### Game speed
 
-[Compare the same forward smash at x1 and 1/4 speed](media/rc11-game-speed.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/86bc241d83bc39b2ac5a1aee96b2f9e15f23b665" autoplay muted loop playsinline controls></video>
+
+*Compare the same forward smash at x1 and 1/4 speed* [Open the clip](media/rc11-game-speed.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -163,9 +169,9 @@ The [speed control](guide/game-speed.md) stops at either end of the list rather 
 | Priority | The speed chord, another input owner, or busy room UI blocks stepping. |
 | Hook | `src/runtime/features/game_speed.rs::frame_step_poll` publishes requests for the waiting-area task. |
 
-[Speed indicator at x1.5 and x1](media/rc8-speed-hud-fixed.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b8908852fc9c93984c0a88a9076d2a394f260fa8" autoplay muted loop playsinline controls></video>
 
-*2026-11-11 · [Capture record](MEDIA.md)*
+*2026-11-11 · [Capture record](MEDIA.md)* [Open the clip](media/rc8-speed-hud-fixed.mp4)
 
 | Topic | Details |
 | --- | --- |
@@ -207,7 +213,9 @@ The [speed control](guide/game-speed.md) stops at either end of the list rather 
 
 ### CPU reactions
 
-[Compare downward and upward DI](media/rc13-di.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f78ea125d955343759eb6e721ae3b74e5cb03358" autoplay muted loop playsinline controls></video>
+
+*Compare downward and upward DI* [Open the clip](media/rc13-di.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -225,7 +233,9 @@ The [speed control](guide/game-speed.md) stops at either end of the list rather 
 | CPU reactions | DI, SDI, air dodge, shield tilt, mash, ledge, tech and throw. |
 | DI comparison | The same hit launches along different paths with Down and Up. |
 
-[Select DI and SDI directions](media/rc13-di-sdi-chips.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/070bd785610ec2f84383985757f699021f9ba217" autoplay muted loop playsinline controls></video>
+
+*Select DI and SDI directions* [Open the clip](media/rc13-di-sdi-chips.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -254,7 +264,9 @@ The [speed control](guide/game-speed.md) stops at either end of the list rather 
 
 If you choose a [CPU Level](menu/cpu.md#cpu-level) that differs from Training's own level, a notice shows both once per Training session.
 
-[Set CPU Level and compare the Training menu](media/rc11-cpu-level.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/1d5dbf5953e66f662b5b81f074d6f2ccea6ac16d" autoplay muted loop playsinline controls></video>
+
+*Set CPU Level and compare the Training menu* [Open the clip](media/rc11-cpu-level.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -269,7 +281,9 @@ If you choose a [CPU Level](menu/cpu.md#cpu-level) that differs from Training's 
 
 ### Save states and respawn
 
-[Save and restore both fighters](media/rc10-save-load.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0ead466c8fee675bdbef80d4f47a36745e236dfc" autoplay muted loop playsinline controls></video>
+
+*Save and restore both fighters* [Open the clip](media/rc10-save-load.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -282,9 +296,9 @@ If you choose a [CPU Level](menu/cpu.md#cpu-level) that differs from Training's 
 | Log | `state saved slot=1`, `state load_request`, `state placed`. No playback line. |
 | Edits | [Capture and cut details](MEDIA.md). |
 
-[Respawn on the platform after a KO](media/rc7-respawn-on.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/44549e6a2c358d081df483fba1df8f9edd2350ba" autoplay muted loop playsinline controls></video>
 
-*2026-11-11 · [Capture record](MEDIA.md)*
+*2026-11-11 · [Capture record](MEDIA.md)* [Open the clip](media/rc7-respawn-on.mp4)
 
 | Topic | Details |
 | --- | --- |
@@ -398,7 +412,9 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 | Earlier replay window check | `cov-replay-window` passed on `646a5f0d`. |
 | Earlier Mii install checks | `cov-named-mii` and `int-named-mii-twice`. |
 
-[Record Player 1 and play the take on CPU](media/rc10-record-play-cpu.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/657f7f6a4c04fb4385fe5bb88f245e868fb08293" autoplay muted loop playsinline controls></video>
+
+*Record Player 1 and play the take on CPU* [Open the clip](media/rc10-record-play-cpu.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -415,9 +431,9 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 | Playback log | `screen=playback role=cpu warp=1`, `[RecordingHost] start_observed slot=1`, then CPU status changes. |
 | Edits | [Capture and cut details](MEDIA.md). |
 
-[Record two jabs into a new macro](media/rc7-record.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/1d69754bebe29138b080af5a98ef5b760db35de2" autoplay muted loop playsinline controls></video>
 
-*2026-11-11 · [Capture record](MEDIA.md) · [Recording guide](guide/recording.md)*
+*2026-11-11 · [Capture record](MEDIA.md) · [Recording guide](guide/recording.md)* [Open the clip](media/rc7-record.mp4)
 
 <a id="recording-with-an-ai"></a>
 
@@ -431,9 +447,9 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 
 ### Combos: the clip and the files
 
-[Grade a two-jab combo](media/rc7-combo-helper.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/13d21b6ded5d72996a6763a6dabb66bc2d267a7c" autoplay muted loop playsinline controls></video>
 
-*2026-11-11 · [Capture record](MEDIA.md)*
+*2026-11-11 · [Capture record](MEDIA.md)* [Open the clip](media/rc7-combo-helper.mp4)
 
 | Topic | Details |
 | --- | --- |
@@ -485,13 +501,15 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 
 *SP4: a saved spot can affect the grade. Design, not footage.*
 
-[Drill two combos in sequence](media/rc7-sequence-drill.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/42a8345eed3afe5d5842008cd1ed4fb229d18c7f" autoplay muted loop playsinline controls></video>
 
-*2026-11-11 · [Capture record](MEDIA.md)*
+*2026-11-11 · [Capture record](MEDIA.md)* [Open the clip](media/rc7-sequence-drill.mp4)
 
 ### Fighters, cycles and Kirby hats
 
-[Cycle Player 1 through three fighters](media/rc11-cycle-switch.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4aa2f2e58ef1c505ac2b4e9dcc4fcf435232f904" autoplay muted loop playsinline controls></video>
+
+*Cycle Player 1 through three fighters* [Open the clip](media/rc11-cycle-switch.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -558,9 +576,9 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 | Menu gates | `src/model/menu/mod.rs::swap_entry_grey` checks the conditions above. |
 | Defaults | `src/model/preload/cycle_preload_config.rs` enables all seven entries. |
 
-[Change Kirby’s copy hat twice](media/rc7-kirby-hats.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e68d8706eafc7ca46f542bddb55837747a11dd4e" autoplay muted loop playsinline controls></video>
 
-*2026-11-11 · [Capture record](MEDIA.md)*
+*2026-11-11 · [Capture record](MEDIA.md)* [Open the clip](media/rc7-kirby-hats.mp4)
 
 Kirby hats change with a chord, for Player 1 or the CPU.
 
@@ -579,7 +597,9 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 | Leave without saving | Creates nothing |
 | Save a Mii you already have | Saves nothing new and says "Same as ‹saved name›, nothing new saved" |
 
-[Save an unchanged Mii](media/rc6-mii-same.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/c3d4734b71405db3708eb4835042c920b251ef41" autoplay muted loop playsinline controls></video>
+
+*Save an unchanged Mii* [Open the clip](media/rc6-mii-same.mp4)
 
 | Capture | Dated observation |
 | --- | --- |
@@ -587,7 +607,9 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 | Save | Saving immediately showed the notice "Same as 格斗, nothing new saved". |
 | Files | Every Mii file stayed byte-identical. |
 
-[Create a Mii with two new specials](media/rc7-mii-editor.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e0ef3a3d9d5e8db0ee927ffbac0b17bf241bb373" autoplay muted loop playsinline controls></video>
+
+*Create a Mii with two new specials* [Open the clip](media/rc7-mii-editor.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -603,9 +625,9 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 
 ### Stages
 
-[Change to Battlefield Ω](media/rc11-change-stage.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bf22a53f788666f54bfc9e43f9ac2becfda8a701" autoplay muted loop playsinline controls></video>
 
-*2026-11-13 · [Capture record](MEDIA.md)*
+*2026-11-13 · [Capture record](MEDIA.md)* [Open the clip](media/rc11-change-stage.mp4)
 
 | Row (Fighters & Stages › Stages) | What it does |
 | --- | --- |
@@ -614,11 +636,13 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 | Training Stage Rotation | Factory Off. When enabled, Training opens on the selected stage. |
 | Subsequent entries | Returning through character select advances Rotation, including when Lobby Stages uses Direct. |
 
-[Add Battlefield to the lobby rotation](media/rc11-lobby-stages.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b9a9b3a226281ea66f6f806bf46a8d26958ca330" autoplay muted loop playsinline controls></video>
 
-*2026-11-13 · [Capture record](MEDIA.md)*
+*2026-11-13 · [Capture record](MEDIA.md)* [Open the clip](media/rc11-lobby-stages.mp4)
 
-[Enter Training on the first rotation stage](media/rc11-stage-rotation.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d8f15216496edf205e35751151489d6519a9144f" autoplay muted loop playsinline controls></video>
+
+*Enter Training on the first rotation stage* [Open the clip](media/rc11-stage-rotation.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -652,11 +676,13 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 
 ### Waiting rooms
 
-[Add a waiting-room training partner](media/rc6-waiting-partners.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/30189becdf072b0e392036b7b9b64f97404d43e2" autoplay muted loop playsinline controls></video>
 
-*2026-11-10 · [Capture record](MEDIA.md)*
+*2026-11-10 · [Capture record](MEDIA.md)* [Open the clip](media/rc6-waiting-partners.mp4)
 
-[Restore two waiting-room partners on re-entry](media/rc11-waiting-reentry.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/630b8a0b33bdb11a316671bc895b8dfdffca1dfe" autoplay muted loop playsinline controls></video>
+
+*Restore two waiting-room partners on re-entry* [Open the clip](media/rc11-waiting-reentry.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -688,7 +714,9 @@ The following observations are from Quickplay waiting-room checks with CPU Pilot
 | Record, Play and Quick Reset | See [recording with an AI](#recording-with-an-ai). |
 | Game speed | The pilot does not disable the practice speed chord. [Waiting-room speed and frame step](guide/game-speed.md#in-the-waiting-rooms) |
 
-[Save and drill a waiting-room combo](media/rc11-lobby-combos.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/cdf3c9da3f21117f9aed081e3f833faf96725e64" autoplay muted loop playsinline controls></video>
+
+*Save and drill a waiting-room combo* [Open the clip](media/rc11-lobby-combos.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -702,7 +730,9 @@ The following observations are from Quickplay waiting-room checks with CPU Pilot
 | Framing | The strip was enlarged along the bottom and the result held. |
 | Edits | [Capture and cut details](MEDIA.md). |
 
-[Enable hurtboxes during waiting-room practice](media/rc14-waiting-menu.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a4614fb22ff749a71bdd4382d3e94fb8a917a45c" autoplay muted loop playsinline controls></video>
+
+*Enable hurtboxes during waiting-room practice* [Open the clip](media/rc14-waiting-menu.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -718,9 +748,9 @@ The following observations are from Quickplay waiting-room checks with CPU Pilot
 
 ### Menu navigation
 
-[Jump between CPU menu sections](media/menu-section-jump.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/61b027dcd056674641fb86ceeed5a1a217319a59" autoplay muted loop playsinline controls></video>
 
-*2026-11-05 · [Capture record](MEDIA.md)*
+*2026-11-05 · [Capture record](MEDIA.md)* [Open the clip](media/menu-section-jump.mp4)
 
 For section jumps, reopening and page resets, see [Using the menu](guide/using-the-menu.md#open-change-and-close).
 
@@ -742,7 +772,9 @@ For section jumps, reopening and page resets, see [Using the menu](guide/using-t
 
 ### Menu shortcuts and replay capture
 
-[Rebind and use a menu shortcut](media/rc11-menu-shortcut.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/29fadaf711f22a5ea361c3aaebe670a04c07bdc1" autoplay muted loop playsinline controls></video>
+
+*Rebind and use a menu shortcut* [Open the clip](media/rc11-menu-shortcut.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -766,7 +798,9 @@ See [Menu shortcuts](menu/display-and-controls.md#menu-shortcuts) for the editab
 | Left | Rejected read-only design, marked “recommended” in the mock-up. |
 | Right | Confirming a rebound shortcut applies it immediately and writes `button_config.ini`. |
 
-[Crop a replay and play its Mii Gunner track](media/rc11-replay-window.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/25c1b8af31c55a11d91e6868c5fb0099d08a24c2" autoplay muted loop playsinline controls></video>
+
+*Crop a replay and play its Mii Gunner track* [Open the clip](media/rc11-replay-window.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -780,7 +814,9 @@ See [Menu shortcuts](menu/display-and-controls.md#menu-shortcuts) for the editab
 | Result | “Saved Mii applied”. The Gunner played the cropped inputs; the CPU lane filled. |
 | Edits | [Capture and cut details](MEDIA.md). |
 
-[Check replay capture in TrainingRooms and Online Deluxe](media/rc11-replay-capture.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4ab4a9371e63dc0f67d259186a1ecc3e44ca1277" autoplay muted loop playsinline controls></video>
+
+*Check replay capture in TrainingRooms and Online Deluxe* [Open the clip](media/rc11-replay-capture.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |

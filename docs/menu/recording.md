@@ -32,12 +32,12 @@ A on a save state, macro or chain opens its own screen ([what each row is for](.
 | Momentum | **Keep recorded speed**, Start at rest | The speed the playing side has on its first input. |
 | Offset | Only on macros with an old offset | A clears the offset from the start position. |
 | Set active | On, Off | On: this view's Play chord plays this macro. |
-| <a id="playback-slot"></a>Playback slot | None, Slot 1 to 5 | The CPU plays the macro when it picks that slot. Up to 600 frames. [Clip](../media/rc14-playback-slot.gif) |
+| <a id="playback-slot"></a>Playback slot | None, Slot 1 to 5 | When CPU picks this slot, it plays its macro (600 frames maximum). <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b2aab5ee61a4097dd38ab7fdc1d1ef28df4fd864" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc14-playback-slot.mp4) |
 | Trim | Start, End, Both, Off | Skips neutral frames at those sides in playback. The file is unchanged. |
 | Crop | Opens the clip editor | Saves a shorter copy; the original stays ([Crop](../guide/recording.md#crop)). |
 | Make combo | Plays once on Player 1 | [What the take can save](../guide/recording.md#practise-a-combo-or-input-drill). |
 | + New chain, Edit chain | Opens the numbered picker | [Put macros in playback order](../guide/recording.md#chains). |
-| Duplicate, Rename, Delete | | Delete removes the file at once, without asking. [Clip](../media/rc13-save-duplicate-delete.gif) |
+| Duplicate, Rename, Delete | | Delete removes the file at once, without asking. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/c03fa6ac1f34b176b612ebf960b84b8f4ded74b2" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc13-save-duplicate-delete.mp4) |
 
 ## Combos & Sequences
 
@@ -55,7 +55,7 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 | <a id="input-drills"></a>DRILLS > + Record drill… | | Arms a Player 1 take that needs no hit. Record starts and stops it. |
 | + New sequence | Opens the numbered picker | A sequence is combos drilled one after another. |
 | Drill, Drill sequence | A selects | Makes this the file the helper grades, replacing the previous choice. |
-| Crop | Opens the clip editor | Whole links for a combo, whole steps for a drill. [Clip](../media/rc15-input-drill.gif) |
+| Crop | Opens the clip editor | Whole links for a combo, whole steps for a drill. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b01d3788d21072c6f728edd38e2ba35aa3a89f94" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc15-input-drill.mp4) |
 | X on an input drill | A recorded take is required | Previews the inputs on Player 1. B or X stops it. |
 
 ## Replays
@@ -81,8 +81,8 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 
 ## Options
 
-![Loop is set from 1 to 3 in the menu, and the macro plays three times](../media/rc12-loop.gif)<br>
-*Loop at 3 plays the macro three times.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/290448eb4f0df99be8dd578410f0ed32594febce" autoplay muted loop playsinline controls></video>
+*Loop at 3 plays the macro three times.* [Open the clip](../media/rc12-loop.mp4)
 
 How a macro plays back, and how the Combo helper grades.
 
@@ -90,8 +90,8 @@ How a macro plays back, and how the Combo helper grades.
 | --- | --- | --- |
 | <a id="trim-trailing-neutral"></a>Trim trailing neutral | Start, **End**, Both, Off | Removes idle frames from those sides of a new take. |
 | <a id="place-fighters-before-record"></a>Place fighters before Record | On, **Off** | On: Record first opens the placement picker. |
-| <a id="hitstun-timing"></a>Hitstun timing | **As Hitstun Ends**, As Hitstop Ends, As Hitstop Begins | When playback starts after the CPU is hit. [Clip](../media/rc12-hitstun-timing.gif) |
-| <a id="mash-interrupts-playback"></a>Mash interrupts playback | **On**, Off | On: Mash stops CPU playback, except during [Parry practice](../guide/parry-practice.md). [Clip](../media/rc11-mash-interrupts.gif) |
+| <a id="hitstun-timing"></a>Hitstun timing | **As Hitstun Ends**, As Hitstop Ends, As Hitstop Begins | When playback starts after the CPU is hit. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/90c372d1da1d4a97f6403f94bbcfc985678aceec" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-hitstun-timing.mp4) |
+| <a id="mash-interrupts-playback"></a>Mash interrupts playback | **On**, Off | On: Mash stops CPU playback, except during [Parry practice](../guide/parry-practice.md). <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2af5cb699f793423755a53b4f52cef141cc6d29c" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-mash-interrupts.mp4) |
 | <a id="loop"></a>Loop | ∞, **1**, 2, 3, 5, 10 | How many times the active macro plays. X cycles it in MACROS. |
 | <a id="settings-override-playback"></a>Settings override playback | On, **Off** | Off: a playing recording wins over the DI, SDI, air-dodge, tech and throw settings. |
 | <a id="shared-start-save"></a>Shared start save | **Prompt**, Always change, Always copy | Applies when at least one macro starts from the save you're editing. |
@@ -106,8 +106,8 @@ How a macro plays back, and how the Combo helper grades.
 
 ## Reset page to defaults
 
-![Recording > Options with seven values changed and Loop at 3: Reset page to defaults, A asks, A resets](../media/rc13-reset-page-recording.gif)<br>
-*A opens the reset question; A again confirms.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/86dc476dd4a6065467ff4b1fba402925b0af2ea1" autoplay muted loop playsinline controls></video>
+*A opens the reset question; A again confirms.* [Open the clip](../media/rc13-reset-page-recording.mp4)
 
 | Setting | Values | What it does |
 | --- | --- | --- |

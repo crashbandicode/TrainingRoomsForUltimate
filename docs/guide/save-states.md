@@ -17,7 +17,9 @@
 
 ## Keep a named setup
 
-![Restore here moves both fighters after the menu closes.](../media/rc14-setup-library.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/8df159a85f8ba1b10ed355096b24964a92f0cd57" autoplay muted loop playsinline controls></video>
+
+*Restore here moves both fighters after the menu closes.* [Open the clip](../media/rc14-setup-library.mp4)
 
 | Goal | On the Saves page |
 |---|---|

@@ -30,7 +30,9 @@ Record a dash-back or a string of short hops, then [try to match your timing](do
 
 ### Match recordings in practice
 
-![The results screen confirms that the replay was saved](docs/media/rc13-replay-capture.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/fdd83db7e6f5104ee74f21eb1bcbb0036f69e776" autoplay muted loop playsinline controls></video>
+
+*The results screen confirms that the replay was saved* [Open the clip](docs/media/rc13-replay-capture.mp4)
 
 With Replay capture on, save the replay and [choose a fighter's recorded inputs](docs/menu/recording.md#recordings) to practise against.
 
@@ -44,7 +46,9 @@ Stay on stage between matchups: pick a different fighter or [set a rotation](doc
 
 ### Waiting-room practice
 
-![Lobby Practice on the menu in a local wireless room](docs/media/rc11-lobby-practice.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/21ebbad818e76b74c6860dbe8c64351e6f378fd1" autoplay muted loop playsinline controls></video>
+
+*Lobby Practice on the menu in a local wireless room* [Open the clip](docs/media/rc11-lobby-practice.mp4)
 
 While you wait in Quickplay or local wireless, [practise against the first partner](docs/guide/waiting-rooms.md) with your training settings.
 
@@ -74,7 +78,9 @@ Give Kirby a [lineup of copy abilities](docs/guide/fighter-cycles.md#kirby-hats)
 
 ### Items on demand
 
-![Captain Falcon takes Daisy's Bob-omb from the item grid](docs/media/rc11-give-item.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a5d3db481e0b20627c2a38141a43170e872b3b9d" autoplay muted loop playsinline controls></video>
+
+*Captain Falcon takes Daisy's Bob-omb from the item grid* [Open the clip](docs/media/rc11-give-item.mp4)
 
 [Choose an item for Player 1](docs/menu/fighters-and-stages.md#give-item) and close the menu to use it, without loading a save.
 

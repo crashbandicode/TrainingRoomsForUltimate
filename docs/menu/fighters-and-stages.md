@@ -13,10 +13,10 @@ Pick both fighters and the order the cycle chords step through ([Fighter cycles]
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
 | <a id="player-swapping"></a>Player Swapping | On, **Off** | Enables Cycle Player. Manual fighter picks work either way. |
-| Player Character | Any fighter | Pick Player 1's fighter on the grid. Close the menu to load it. [Clip](../media/rc12-player-character.gif) |
-| CPU Character | Any fighter | The same grid for the CPU. [Clip](../media/rc11-cpu-character.gif) |
-| <a id="character-cycles"></a>Character Cycles | **All**, or your own order | The order the cycle chords step through, per role. ZR switches role. [Clip](../media/rc11-cycle-switch.gif) |
-| <a id="solo-popo-original-ice-climbers"></a>Solo Popo (original Ice Climbers) | On, **Off** | On: Player 1's Ice Climbers from the character select are Popo alone. [Clip](../media/rc11-solo-popo.gif) |
+| Player Character | Any fighter | Pick Player 1's fighter on the grid. Close the menu to load. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d713417105bbe6a9a75a423b4905d415a13c1705" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-player-character.mp4) |
+| CPU Character | Any fighter | The same grid for the CPU. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/397ab874cc08b5c13eeb0af106a88294055a6c62" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-cpu-character.mp4) |
+| <a id="character-cycles"></a>Character Cycles | **All**, or your own order | The order the cycle chords step through, per role. ZR switches role. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4aa2f2e58ef1c505ac2b4e9dcc4fcf435232f904" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-cycle-switch.mp4) |
+| <a id="solo-popo-original-ice-climbers"></a>Solo Popo (original Ice Climbers) | On, **Off** | On: Player 1's Ice Climbers from the character select are Popo alone. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a1da5255615e7fc1de2cb4a15248180eb67b3577" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-solo-popo.mp4) |
 
 ## Extras
 
@@ -28,11 +28,11 @@ Kirby's hats, an item for Player 1, and the Mii of each class ([Mii fighters](..
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| <a id="kirby-hats"></a>Kirby Hats | **Mario**, All, or your own order | The hat order Kirby copies, for each role. [Clip](../media/rc7-kirby-hats.gif) |
-| <a id="give-item"></a>Give item | 39 items | A picks an item for Player 1. It arrives when the menu closes. [Clip](../media/rc11-give-item.gif) |
-| <a id="mii-brawler"></a>Mii Brawler | A saved, replay or new Mii | The Mii used for the Brawler. [Clip](../media/rc7-mii-editor.gif) |
-| <a id="mii-swordfighter"></a>Mii Swordfighter | A saved, replay or new Mii | The Mii used for the Swordfighter. [Clip](../media/rc11-mii-swordfighter.gif) |
-| <a id="mii-gunner"></a>Mii Gunner | A saved, replay or new Mii | The Mii used for the Gunner. [Clip](../media/rc11-mii-gunner.gif) |
+| <a id="kirby-hats"></a>Kirby Hats | **Mario**, All, or your own order | The hat order Kirby copies, for each role. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e68d8706eafc7ca46f542bddb55837747a11dd4e" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc7-kirby-hats.mp4) |
+| <a id="give-item"></a>Give item | 39 items | A picks Player 1's item. Closing the menu delivers it. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a5d3db481e0b20627c2a38141a43170e872b3b9d" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-give-item.mp4) |
+| <a id="mii-brawler"></a>Mii Brawler | A saved, replay or new Mii | The Mii used for the Brawler. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e0ef3a3d9d5e8db0ee927ffbac0b17bf241bb373" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc7-mii-editor.mp4) |
+| <a id="mii-swordfighter"></a>Mii Swordfighter | A saved, replay or new Mii | The Mii used for the Swordfighter. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a14c4edb30a3e04116df019658d1dc1495774709" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-mii-swordfighter.mp4) |
+| <a id="mii-gunner"></a>Mii Gunner | A saved, replay or new Mii | The Mii used for the Gunner. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bba97eeca90bb1d2a6b11f1ad8972f13bfc9886a" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-mii-gunner.mp4) |
 
 ## Stages
 
@@ -44,30 +44,30 @@ Change the stage now, or set up practice in the waiting room ([Stages](../guide/
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| <a id="change-stage"></a>Change Stage | 117 game stages, plus Stage Builder stages | Y cycles available forms. A changes stage and closes the menu. [Clip](../media/rc11-change-stage.gif) |
-| <a id="lobby-practice"></a>Lobby Practice | **On**, Off | On: practice runs in the waiting room too. Off: only in Training. [Clip](../media/rc11-lobby-practice.gif) |
-| <a id="lobby-stages"></a>Lobby Stages | **Waiting Room only**, All, or your own order | Set the rotation order. X switches to Direct for one fixed stage. [Clip](../media/rc11-lobby-stages.gif) |
-| <a id="training-stage-rotation"></a>Training Stage Rotation | On, **Off** | On: Training moves through the Lobby Stages order. [Clip](../media/rc11-stage-rotation.gif) |
-| <a id="stage-hazards"></a>Stage Hazards | On, **Off** | On: hazards are active. It applies as a stage loads. [Clip](../media/rc12-stage-hazards.gif) |
-| <a id="lobby-items"></a>Lobby Items | **On**, Off | Off stops automatic drops and clears existing items once. [Clip](../media/rc12-lobby-items.gif) |
-| <a id="respawn-on-platform"></a>Respawn on platform | On, **Off** | On: respawn on the revival platform, invincible. Off: instant respawn. [Clip](../media/rc7-respawn-on.gif) |
+| <a id="change-stage"></a>Change Stage | 117 game stages, plus Stage Builder stages | Y cycles available forms. A changes stage and closes the menu. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bf22a53f788666f54bfc9e43f9ac2becfda8a701" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-change-stage.mp4) |
+| <a id="lobby-practice"></a>Lobby Practice | **On**, Off | On: practice runs in the waiting room too. Off: only in Training. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/21ebbad818e76b74c6860dbe8c64351e6f378fd1" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-lobby-practice.mp4) |
+| <a id="lobby-stages"></a>Lobby Stages | **Waiting Room only**, All, or your own order | Set the rotation order. X switches to Direct for one fixed stage. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b9a9b3a226281ea66f6f806bf46a8d26958ca330" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-lobby-stages.mp4) |
+| <a id="training-stage-rotation"></a>Training Stage Rotation | On, **Off** | On: Training moves through the Lobby Stages order. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d8f15216496edf205e35751151489d6519a9144f" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-stage-rotation.mp4) |
+| <a id="stage-hazards"></a>Stage Hazards | On, **Off** | On: hazards are active. It applies as a stage loads. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7ad30bb5fb419745a20871a5cbfc833cd0a1c9ee" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-stage-hazards.mp4) |
+| <a id="lobby-items"></a>Lobby Items | **On**, Off | Off stops automatic drops and clears existing items once. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/73cc620eb04a0f983b8480e6a47be37a59f16209" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-lobby-items.mp4) |
+| <a id="respawn-on-platform"></a>Respawn on platform | On, **Off** | On: respawn on the revival platform, invincible. Off: instant respawn. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/44549e6a2c358d081df483fba1df8f9edd2350ba" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc7-respawn-on.mp4) |
 
 ## Loading
 
-![The Link to Kirby swap with Ready Fighters at 4 and at 10](../media/rc12-ready-fighters.gif)<br>
-*The same swap with Ready Fighters at 4 and at 10.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/eeeeea71bd9aac787fde227b2d86f691970f9ae1" autoplay muted loop playsinline controls></video>
+*The same swap with Ready Fighters at 4 and at 10.* [Open the clip](../media/rc12-ready-fighters.mp4)
 
 Keep fighters and hats ready to shorten swap times ([Fighter cycles](../guide/fighter-cycles.md#what-the-loading-rows-do)).
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| Cycle Preload | Off, 1 to **5** | How many fighters per role are kept ready for swaps. [Clip](../media/rc12-cycle-preload.gif) |
-| Preload | Fighters, Hats, **Both** | What is kept ready. [Clip](../media/rc12-preload.gif) |
+| Cycle Preload | Off, 1 to **5** | How many fighters per role are kept ready for swaps. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e23299bd1915968fae54516043f6b4b4f16224fd" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-cycle-preload.mp4) |
+| Preload | Fighters, Hats, **Both** | What is kept ready. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/c67e864e7a54b66e64ef23e49bc687e036d19b03" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-preload.mp4) |
 | Ready Fighters | 2 to 12, **10** | The total kept ready across both roles, the two on screen included. |
-| Ready Hats | 0 to **5** | How many Kirby hats are kept ready. [Clip](../media/rc12-preload-hats.gif) |
-| Ready Fighter Bodies | Off, 2, **3** | Bodies in each role's own slot, including its active fighter. Off disables groups. [Clip](../media/rc12-ready-fighter-bodies.gif) [Still](../media/tut-loading-ready-fighter-bodies.png) |
-| Group Swap | **On**, Off | Allow extra groups beyond each slot. Off: no extras; both bank settings stay. [Clip](../media/rc12-group-swap.gif) |
-| Swap groups | Seven entries, **all On** | Which swaps are done as a group. A greyed entry says why. [Clip](../media/rc12-swap-groups.gif) [Help line](../media/tut-loading-swap-groups.png) |
+| Ready Hats | 0 to **5** | How many Kirby hats are kept ready. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a92918d1dbe76942a8dab6f4933d6f0f4046d1f4" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-preload-hats.mp4) |
+| Ready Fighter Bodies | Off, 2, **3** | Bodies per role slot, including its active fighter. Off disables groups. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/43cde78b7dc65fe2de5f0a27833f403aa08ae650" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-ready-fighter-bodies.mp4) [Still](../media/tut-loading-ready-fighter-bodies.png) |
+| Group Swap | **On**, Off | Allow extra groups per slot. Off keeps both banks without extras. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6d54bb1802fbf771396be41ea9837bee2c9a8174" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-group-swap.mp4) |
+| Swap groups | Seven entries, **all On** | Choose which swaps happen together. Greyed entries explain why. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0d7c6640552a16ca73b18641f84db9221e8367bf" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-swap-groups.mp4) [Help line](../media/tut-loading-swap-groups.png) |
 
 ## Practice games
 
@@ -89,8 +89,8 @@ A on a game opens its screen: Start first, then its settings ([Practice games](p
 
 ## Reset page to defaults
 
-![Confirming the reset restores the two switches and the CPU fighter](../media/rc13-reset-page-fighters-stages.gif)<br>
-*Reset restores this page's saved defaults.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/8b90063eae0a0113097841af0cf5fde8651cac1c" autoplay muted loop playsinline controls></video>
+*Reset restores this page's saved defaults.* [Open the clip](../media/rc13-reset-page-fighters-stages.mp4)
 
 | Setting | Values | What it does |
 | --- | --- | --- |
@@ -98,8 +98,8 @@ A on a game opens its screen: Start first, then its settings ([Practice games](p
 
 ## Good to know
 
-![Player Swapping Off: the Cycle Player chord changes nothing; A turns the row On; the same chord replaces Mario with Donkey Kong](../media/rc13-player-swapping-gate.gif)<br>
-*Cycle Player works after Player Swapping is turned on.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/c98528b21355fcd7f1db8c8c534f8d331bc344d6" autoplay muted loop playsinline controls></video>
+*Cycle Player works after Player Swapping is turned on.* [Open the clip](../media/rc13-player-swapping-gate.mp4)
 
 | If | Then |
 | --- | --- |

@@ -36,9 +36,9 @@ On the [direction grid](../guide/cpu-behaviour.md#direction-chips), In means tow
 
 ## Ledge & Tech
 
-![The CPU climbs from the ledge, then jumps instead](../media/rc11-cpu-ledge-options.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3874e4debafd570e91d240a121406cc4ad6a8c5b" autoplay muted loop playsinline controls></video>
 
-*The CPU climbs from the ledge, then jumps instead.*
+*The CPU climbs from the ledge, then jumps instead.* [Open the clip](../media/rc11-cpu-ledge-options.mp4)
 
 | Setting | Choices; default in bold | What it does |
 | --- | --- | --- |
@@ -63,9 +63,9 @@ On the [direction grid](../guide/cpu-behaviour.md#direction-chips), In means tow
 
 ## Attacks & Movement
 
-![Compare the CPU's full hop with its short hop](../media/rc11-cpu-full-hop.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a2ad1b8e6db3bbacf0b595fdaf1c9c017d75dc9b" autoplay muted loop playsinline controls></video>
 
-*Compare the CPU's full hop with its short hop.*
+*Compare the CPU's full hop with its short hop.* [Open the clip](../media/rc11-cpu-full-hop.mp4)
 
 Use [delay rows](../guide/cpu-behaviour.md#delay-rows) to select individual values or a range.
 

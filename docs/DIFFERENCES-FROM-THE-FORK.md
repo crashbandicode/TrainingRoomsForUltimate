@@ -42,8 +42,8 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 
 ## Menu
 
-![The five pages, then Hitbox Visualization's checklist and the hurtboxes as pills](media/rc14-menu-tour.gif)<br>
-*The five pages of the menu, then Hitbox Visualization with three rows ticked. Eden, rc.14 (untested on hardware).*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4ec5bff51d1c512e252fbb8e6788fc6adc32cdcc" autoplay muted loop playsinline controls></video>
+*The five pages of the menu, then Hitbox Visualization with three rows ticked. Eden, rc.14 (untested on hardware).* [Open the clip](media/rc14-menu-tour.mp4)
 
 | Change | Where in the code |
 | --- | --- |
@@ -91,11 +91,17 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 
 
 
-![Fighter grid with cycle badges, then the cycle chord switching Player 1 in that order](media/rc11-cycle-switch.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4aa2f2e58ef1c505ac2b4e9dcc4fcf435232f904" autoplay muted loop playsinline controls></video>
 
-![A new menu shortcut applies at once](media/rc11-menu-shortcut.gif)
+*Fighter grid with cycle badges, then the cycle chord switching Player 1 in that order* [Open the clip](media/rc11-cycle-switch.mp4)
 
-![Replay capture, menu and Deluxe overlay](media/rc11-replay-capture.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/29fadaf711f22a5ea361c3aaebe670a04c07bdc1" autoplay muted loop playsinline controls></video>
+
+*A new menu shortcut applies at once* [Open the clip](media/rc11-menu-shortcut.mp4)
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4ab4a9371e63dc0f67d259186a1ecc3e44ca1277" autoplay muted loop playsinline controls></video>
+
+*Replay capture, menu and Deluxe overlay* [Open the clip](media/rc11-replay-capture.mp4)
 
 ## CPU and practice behaviour
 
@@ -134,7 +140,9 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 
 
 
-![Respawn on platform Off: instant respawn](media/rc7-respawn-off.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/1c8c4bb88a88283db3fd0c40634610cefb0e9eb1" autoplay muted loop playsinline controls></video>
+
+*Respawn on platform Off: instant respawn* [Open the clip](media/rc7-respawn-off.mp4)
 
 ## Added in rc.2
 

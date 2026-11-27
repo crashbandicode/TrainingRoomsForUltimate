@@ -971,7 +971,9 @@ These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer
 
 #### Input display chord: R + D-pad Down
 
-![R + D-pad Down hides the frame strip, then shows it again](media/rc8-input-display-chord.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/8bc5c548137a4ab83ddf533d683ccf7ebb2d7ae6" autoplay muted loop playsinline controls></video>
+
+*R + D-pad Down hides the frame strip, then shows it again* [Open the clip](media/rc8-input-display-chord.mp4)
 
 - Turns the input display (the frame strip) on and off without opening the menu, in Training and in the waiting-room
   practice.
@@ -983,7 +985,9 @@ These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer
 
 #### Game speed chord: hold R + D-pad Up
 
-![The Game speed pop-up steps to 1/2, then 1/4; the jabs slow down; the pause menu shows Speed 1/4](media/rc8-game-speed-chord.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0f02cbc3879c9295bbfa358cbfa8a7d907eeaac3" autoplay muted loop playsinline controls></video>
+
+*The Game speed pop-up steps to 1/2, then 1/4; the jabs slow down; the pause menu shows Speed 1/4* [Open the clip](media/rc8-game-speed-chord.mp4)
 
 - Hold the chord and a small "Game speed" pop-up shows the current speed between two D-pad arrows.
 - While you hold it, D-pad Left and Right step one speed at a time, slowest on the left. The steps stop at the slowest
@@ -998,7 +1002,9 @@ These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer
   - The stopwatch appears as soon as you step away from x1 and goes away when you step back to x1, as it does when you
     set the speed in the pause menu.
 
-![Hold R + D-pad Up, Right: the stopwatch reads x1.5; Left back to x1: it goes away](media/rc8-speed-hud-fixed.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b8908852fc9c93984c0a88a9076d2a394f260fa8" autoplay muted loop playsinline controls></video>
+
+*Hold R + D-pad Up, Right: the stopwatch reads x1.5; Left back to x1: it goes away* [Open the clip](media/rc8-speed-hud-fixed.mp4)
   - 1 Frame stays in the pause menu. While Training is on 1 Frame, the pop-up shows "1 Frame", and the first step goes
     from x1.
 - **In the waiting-room practice:** 1/4, 1/2, 2/3, x1 and x1.5, local only.
@@ -1023,7 +1029,9 @@ These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer
 
 #### The build in the menu footer
 
-![Two menu pages: the key hints end with 0.2.0-rc.6 · rc8 3f9d61dd](media/rc8-footer-tag.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bdce4e2f0ba4681509a24cf720e1f9d5948dd818" autoplay muted loop playsinline controls></video>
+
+*Two menu pages: the key hints end with 0.2.0-rc.6 · rc8 3f9d61dd* [Open the clip](media/rc8-footer-tag.mp4)
 
 - The rc.8 key hints at the foot of every menu page ended with the build tag: the version, then `rc8` and the commit the NRO
   was built from, for example `0.2.0-rc.6 · rc8 3f9d61dd`.
@@ -1122,9 +1130,9 @@ rc.5 let you build and edit sequences, but not drill them. rc.6 drills them.
 - A deleted combo is skipped. An empty sequence drills nothing. Every combo of a sequence is drilled, however many it
   has.
 
-![Drill a sequence: combo 1, then combo 2, then a drop back at combo 1](media/rc7-sequence-drill.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/42a8345eed3afe5d5842008cd1ed4fb229d18c7f" autoplay muted loop playsinline controls></video>
 
-*Shown on rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only), 2026-11-11; the rc.6 clip carried another plugin's input bar.*
+*Shown on rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only), 2026-11-11; the rc.6 clip carried another plugin's input bar.* [Open the clip](media/rc7-sequence-drill.mp4)
 
 The sequence bar is taller than the combo bar, so notices sit 56 layout units (about 37 pixels at 1280×720) lower
 than in rc.5, under either bar.

@@ -2,7 +2,9 @@
 
 ## Break a flying target
 
-![Choose Start; the first target appears at 0/10.](../media/rc15-practice-menu-start.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d5474b717ffc3192e2eccbd9429be5c3227efd15" autoplay muted loop playsinline controls></video>
+
+*Choose Start; the first target appears at 0/10.* [Open the clip](../media/rc15-practice-menu-start.mp4)
 
 | Step | What to do |
 |---|---|

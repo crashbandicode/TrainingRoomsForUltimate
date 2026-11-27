@@ -2414,7 +2414,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-input-delay-sbs.gif](media/rc13-input-delay-sbs.gif) ([Input Delay](menu/display-and-controls.md#input-delay)): Game speed 1/4, the gamepad overlay, Input Delay 0 and 18 side by side; A lights at the same moment on both; 0 jabs at 0.9 s, 18 at about 2.0 s (`gna-r13a-yoga-1`, `7d7b74c9`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e3229df0f1ba6692b81d84362e0eefda9b0bf2ba" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-input-delay-sbs.mp4) ([Input Delay](menu/display-and-controls.md#input-delay)): Game speed 1/4, the gamepad overlay, Input Delay 0 and 18 side by side; A lights at the same moment on both; 0 jabs at 0.9 s, 18 at about 2.0 s (`gna-r13a-yoga-1`, `7d7b74c9`)
 
 ### 94. The CPU's delay rows count game frames at every Game speed (CPU › Fast Fall Delay measured at 1/4)
 
@@ -2433,7 +2433,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-fast-fall-delay-quarter.gif](media/rc13-fast-fall-delay-quarter.gif) ([Fast Fall Delay](menu/cpu.md#fast-fall-delay)): Game speed 1/4, the same CPU full hop side by side; Delay 0 sparks at the top and drops, Delay 20 falls first and sparks 1.25 s later (18.8 game frames) (`gna-r13d-yoga-1`, `7d7b74c9`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/08d3cb6b3f990fe4e90db07a884da5d173e550c2" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-fast-fall-delay-quarter.mp4) ([Fast Fall Delay](menu/cpu.md#fast-fall-delay)): Game speed 1/4, the same CPU full hop side by side; Delay 0 sparks at the top and drops, Delay 20 falls first and sparks 1.25 s later (18.8 game frames) (`gna-r13d-yoga-1`, `7d7b74c9`)
 
 ### 95. Training opens on the stage picked before the character select; a return through the character select rotates (Fighters & Stages › Training Stage Rotation)
 
@@ -2452,7 +2452,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-stage-pick.gif](media/rc13-stage-pick.gif) ([Training Stage Rotation](menu/fighters-and-stages.md#training-stage-rotation)): the rotation On, Small Battlefield picked at the stage select, Training opens on it; back through the character select, Big Battlefield (`gna-r13c-yoga-3`, `7d7b74c9`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b048d86d5c0b169f7c0213e3fc5a37c99f6b7bc9" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-stage-pick.mp4) ([Training Stage Rotation](menu/fighters-and-stages.md#training-stage-rotation)): the rotation On, Small Battlefield picked at the stage select, Training opens on it; back through the character select, Big Battlefield (`gna-r13c-yoga-3`, `7d7b74c9`)
 
 ### 96. Mash Spot Dodge and Mash Roll on Mash Triggers Always: the CPU dodges again after each dodge (CPU › Mash Triggers)
 
@@ -2471,7 +2471,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-mash-dodge-always.gif](media/rc13-mash-dodge-always.gif) ([Mash Triggers](menu/cpu.md#mash-triggers)): Always ticked, Mash Spot Dodge (left) and Mash Roll Forwards (right) dodge, stand, dodge again (`gna-r13a-yoga-2`, `7d7b74c9`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a96a3db0a45acad8c95fd408eb63620305c6afd8" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-mash-dodge-always.mp4) ([Mash Triggers](menu/cpu.md#mash-triggers)): Always ticked, Mash Spot Dodge (left) and Mash Roll Forwards (right) dodge, stand, dodge again (`gna-r13a-yoga-2`, `7d7b74c9`)
 
 ### 97. Dodge Staling Off holds after a Training reset (L+R+A): the CPU's dodges stay fresh (CPU › Defence › Dodge Staling)
 
@@ -2491,7 +2491,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-dodge-staling.gif](media/rc13-dodge-staling.gif) ([Dodge Staling](menu/cpu.md#dodge-staling)): the standing CPU on Mash Spot Dodge, Always, from the same reset; Off (left) dodges every 546 ms, On (right) every 704 ms (`gna-r13a-yoga-2`, `7d7b74c9`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7b783f06e78c740a1dea758fb0329358a49ff939" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-dodge-staling.mp4) ([Dodge Staling](menu/cpu.md#dodge-staling)): the standing CPU on Mash Spot Dodge, Always, from the same reset; Off (left) dodges every 546 ms, On (right) every 704 ms (`gna-r13a-yoga-2`, `7d7b74c9`)
 
 ### 98. DI and SDI Direction chips show the game's own blue DI effect (CPU › Defence › DI Direction, SDI Direction)
 
@@ -2510,7 +2510,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-di.gif](media/rc13-di.gif) ([DI Direction](menu/cpu.md#di-direction)): DI Down, the grid with Down at full tint, Y clears it, Up picked, DI Up; the same smash launches Donkey Kong low, then high; [rc13-di-sdi-chips.gif](media/rc13-di-sdi-chips.gif): the DI and SDI grids from nothing picked to Up x1 (`gna-r13b-yoga-1`, `7d7b74c9`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f78ea125d955343759eb6e721ae3b74e5cb03358" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-di.mp4) ([DI Direction](menu/cpu.md#di-direction)): DI Down, the grid with Down at full tint, Y clears it, Up picked, DI Up; the same smash launches Donkey Kong low, then high; <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/070bd785610ec2f84383985757f699021f9ba217" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-di-sdi-chips.mp4): the DI and SDI grids from nothing picked to Up x1 (`gna-r13b-yoga-1`, `7d7b74c9`)
 
 ### 99. Left / Right flip an On/Off row, as the footer says, not only A (Menu)
 
@@ -2529,7 +2529,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-left-right-toggle.gif](media/rc13-left-right-toggle.gif) ([Taunts](menu/display-and-controls.md#taunts)): the menu on Taunts [ON]; D-pad Right, [OFF]; D-pad Left, [ON] again; no A (`gna-lr-1`, `ed0d7a35`; each close logs `changed=true`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/c3ed0ceab8391d6b89927ced1ea32db49e39800a" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-left-right-toggle.mp4) ([Taunts](menu/display-and-controls.md#taunts)): the menu on Taunts [ON]; D-pad Right, [OFF]; D-pad Left, [ON] again; no A (`gna-lr-1`, `ed0d7a35`; each close logs `changed=true`)
 
 ### 100. Hitbox Visualization draws a long hitbox or hurtbox as one pill, not a row of discs (Display & Controls › Hitbox Visualization)
 
@@ -2548,7 +2548,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-pills.gif](media/rc13-pills.gif): at 25 % speed, Ridley's yellow hurtbox pills; his forward tilt as a red pill along the tail; the down tilt's sweep (`gna-hb-2`, `40446661`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/77d6dc96d4aaf2d27ca9facb0244148b6310bd6e" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-pills.mp4): at 25 % speed, Ridley's yellow hurtbox pills; his forward tilt as a red pill along the tail; the down tilt's sweep (`gna-hb-2`, `40446661`)
 
 ### 101. Projectiles and thrown items get their own orbs, drawn while their attack lasts (Hitbox Visualization)
 
@@ -2567,7 +2567,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-projectile-hitboxes.gif](media/rc13-projectile-hitboxes.gif): at 25 % speed, a red disc on Ridley's fireball, on Link's arrow and on Link's thrown bomb while each is in flight (`gna-hb-2`, `40446661`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/51fae387a7fcd1c4b947c0533d68068b7b6bd629" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-projectile-hitboxes.mp4): at 25 % speed, a red disc on Ridley's fireball, on Link's arrow and on Link's thrown bomb while each is in flight (`gna-hb-2`, `40446661`)
 
 ### 102. Grab boxes are magenta and show only in their active frames (Hitbox Visualization)
 
@@ -2587,7 +2587,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-grab-boxes.gif](media/rc13-grab-boxes.gif): at 25 % speed, Mario's standing grab box in magenta in front of him as the CPU is caught; each grab held 0.5 s on its captured frame with the most magenta (`gna-final-2`, `ed0d7a35`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/118050c4a9182e9f15908be176c8d8d9887d7061" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-grab-boxes.mp4): at 25 % speed, Mario's standing grab box in magenta in front of him as the CPU is caught; each grab held 0.5 s on its captured frame with the most magenta (`gna-final-2`, `ed0d7a35`)
 
 ### 103. Samus's tether grab box is drawn once, not through the whole pull
 
@@ -2608,7 +2608,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-grab-boxes.gif](media/rc13-grab-boxes.gif): Samus's tether as a magenta pill along the beam (`gna-samus-2`, `ed0d7a35`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/118050c4a9182e9f15908be176c8d8d9887d7061" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-grab-boxes.mp4): Samus's tether as a magenta pill along the beam (`gna-samus-2`, `ed0d7a35`)
 
 ### 104. Olimar's Pikmin show their grab box
 
@@ -2627,7 +2627,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-grab-boxes.gif](media/rc13-grab-boxes.gif): the magenta disc on the Pikmin Olimar throws (`gna-final-2`, `ed0d7a35`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/118050c4a9182e9f15908be176c8d8d9887d7061" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-grab-boxes.mp4): the magenta disc on the Pikmin Olimar throws (`gna-final-2`, `ed0d7a35`)
 
 ### 105. A fighter who is grabbing keeps drawing its hurtboxes during the grab
 
@@ -2647,7 +2647,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-grab-boxes.gif](media/rc13-grab-boxes.gif): each grabber (Mario, Samus, Olimar) keeps its yellow hurtboxes through the grab, reshot on `ed0d7a35` (`gna-final-2`, `gna-samus-2`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/118050c4a9182e9f15908be176c8d8d9887d7061" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-grab-boxes.mp4): each grabber (Mario, Samus, Olimar) keeps its yellow hurtboxes through the grab, reshot on `ed0d7a35` (`gna-final-2`, `gna-samus-2`)
 
 ### 106. Give item: Wario's bike, the grid's 39th tile with its own icon; Player 1 holds it and A throws it (Fighters & Stages › Give item)
 
@@ -2668,7 +2668,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-wario-bike.gif](media/rc13-wario-bike.gif) ([Give item](menu/fighters-and-stages.md#give-item)): the grid's cursor onto the bike tile, A, Mario holds the bike, the throw hits the CPU, the bike stays on the floor (`gna-bike-2`, `7a6ba197`; `granted choice=38 kind=124`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2522cd5e824e9259f34fd8b548cee5ebd5a35dca" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-wario-bike.mp4) ([Give item](menu/fighters-and-stages.md#give-item)): the grid's cursor onto the bike tile, A, Mario holds the bike, the throw hits the CPU, the bike stays on the floor (`gna-bike-2`, `7a6ba197`; `granted choice=38 kind=124`)
 
 ### 107. Aerial Drift: the CPU holds the stick In, Out, Forward or Back during a mashed aerial until it lands (CPU › Attacks & Movement)
 
@@ -2687,7 +2687,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-aerial-drift.gif](media/rc13-aerial-drift.gif) ([Aerial Drift](menu/cpu.md#aerial-drift)): at 25 % speed, the CPU's mashed forward air from the same reset; None (left) lands in place, In (right) drifts toward Player 1 (`gna-g10-1`, `f4f058e2`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b0d16217eaaa9a912a8a8f81e73803cb03c860e0" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-aerial-drift.mp4) ([Aerial Drift](menu/cpu.md#aerial-drift)): at 25 % speed, the CPU's mashed forward air from the same reset; None (left) lands in place, In (right) drifts toward Player 1 (`gna-g10-1`, `f4f058e2`)
 
 ### 108. Taunts On/Off: Off stops Player 1's D-pad taunts in Training; Kirby with a copy hat keeps Up, which drops the hat (Display & Controls › Controls › Taunts)
 
@@ -2707,7 +2707,7 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** [rc13-taunts-off.gif](media/rc13-taunts-off.gif) ([Taunts](menu/display-and-controls.md#taunts)): the same D-pad Up, Side and Down from the same reset, Off (left) Mario stands, On (right) three taunts; [rc13-taunts-kirby-hat.gif](media/rc13-taunts-kirby-hat.gif): Taunts Off, Kirby, no hat Up does nothing, Falco's hat, Side and Down nothing, Up drops the hat (`gna-g10-1`, `f4f058e2`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/8972634edc5cc82df2002fc535df43b0652b0cd4" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-taunts-off.mp4) ([Taunts](menu/display-and-controls.md#taunts)): the same D-pad Up, Side and Down from the same reset, Off (left) Mario stands, On (right) three taunts; <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e904804037ffeba739d85fe6c2674665501c604c" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-taunts-kirby-hat.mp4): Taunts Off, Kirby, no hat Up does nothing, Falco's hat, Side and Down nothing, Up drops the hat (`gna-g10-1`, `f4f058e2`)
 
 ### 109. Swap group hints for Pokémon Trainer and Aegis
 
@@ -2767,7 +2767,7 @@ rc.13 showed the same three-slot hint for both. See [Loading](menu/fighters-and-
 
 **Clip observations**
 
-- docs only: the existing [rc11-solo-popo.gif](media/rc11-solo-popo.gif) shows Solo Popo turned On; no rc.13 clip
+- docs only: the existing <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a1da5255615e7fc1de2cb4a15248180eb67b3577" autoplay muted loop playsinline controls></video> [Open the clip](media/rc11-solo-popo.mp4) shows Solo Popo turned On; no rc.13 clip
 
 
 ## Install 4 additions

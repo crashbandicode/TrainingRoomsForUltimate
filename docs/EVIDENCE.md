@@ -138,9 +138,9 @@ The table records the November 15 observations. Its paths name the original capt
 - Peaks were5804122112B and5513334784B.
 - `run.json`, `memory.peak`, configs, dry-run receipts, Down receipts and ledger snapshot are retained in `runtime-metadata/`.
 
-![A macro start handle moves from0 to180, keeping134 of314 frames](media/rc15-crop-editor.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6c4e54f1a6ff824e0533926e25d16fae9eab36ed" autoplay muted loop playsinline controls></video>
 
-*Eden,2026-11-15,rc.15 d520d325; hardware untested. Real crop selection,1280×720,5fps,4.6s. First/action/end frames reviewed. The final actual frame is held for readability. This GIF shows range selection; preview/save/play/exit use the separate evidence above. Source hashes and review are in gif-source-map.json and gif-review/REVIEW.md. GIF SHA256115e7f4562dc9f057c26258ee06756c09c83ba503280e3f95a31a3dd8dad0e2e.*
+*Eden,2026-11-15,rc.15 d520d325; hardware untested. Real crop selection,1280×720,5fps,4.6s. First/action/end frames reviewed. The final actual frame is held for readability. This GIF shows range selection; preview/save/play/exit use the separate evidence above. Source hashes and review are in gif-source-map.json and gif-review/REVIEW.md. GIF SHA256115e7f4562dc9f057c26258ee06756c09c83ba503280e3f95a31a3dd8dad0e2e.* [Open the clip](media/rc15-crop-editor.mp4)
 
 - Archived hooks, manifests, fixtures and recorded segments: `eden/rc15-crop-editor/`.
 - They use the unchanged shared runner/lifecycle; they are evidence for these owned runs, not permission to drive another owner's paths.
@@ -202,9 +202,9 @@ The original late-before still already had streak0 after source selection, so th
 - R3 records both host timestamps and observes request→receipt about0.405s.
 - The original decisive frames already contained completion and the initial late fault.
 
-![A four-step input drill is cropped to three whole steps](media/rc15-input-drill.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b01d3788d21072c6f728edd38e2ba35aa3a89f94" autoplay muted loop playsinline controls></video>
 
-*Eden,2026-11-15,rc.15 source2eb3903e; hardware untested. Real Drill1 range selection4→3→4→3,1280×720,3.78s,5fps request, nine encoded frames from19 captured frames. Start/middle/end and contact sheet reviewed. GIF SHA256 `a7f8a550de084758ed076c81b4dff39bc4503b2eacc80a8b7c9bb317b4fa9ccc`.*
+*Eden,2026-11-15,rc.15 source2eb3903e; hardware untested. Real Drill1 range selection4→3→4→3,1280×720,3.78s,5fps request, nine encoded frames from19 captured frames. Start/middle/end and contact sheet reviewed. GIF SHA256 `a7f8a550de084758ed076c81b4dff39bc4503b2eacc80a8b7c9bb317b4fa9ccc`.* [Open the clip](media/rc15-input-drill.mp4)
 
 Visual issue in this take: after the first handle action, the helper HUD redraws over the editor's upper centre. The range and handle result remain readable. This capture preserves that overlap; it is reported to the editor/integration owner, not called a clean editor-layout pass. Native grading/step interfaces and save-as-new are established separately above.
 

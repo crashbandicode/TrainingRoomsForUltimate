@@ -745,17 +745,17 @@ The primary (12:32Z): a root fix, not a removed check.
 
 ### Eggs-ercise
 
-![Eggs-ercise, 1 minute: the targets launch, Fox breaks them with aerials, and the count and clock run](decisions/rc14-preview-eggs-1-minute.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/02e39f54547da1f2ece5fbdf93795738b0498564" autoplay muted loop playsinline controls></video>
 
-*Break as many targets as possible in one minute.*
+*Break as many targets as possible in one minute.* [Open the clip](media/rc14-preview-eggs-1-minute.mp4)
 
-![Eggs-ercise, 10 targets: Fox breaks ten in a row; Done! 10 in 0:17.25 (best 0:17.25)](decisions/rc14-preview-eggs-n-targets.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5015eca5396ee7de078c104a31cb08b51ebac1b0" autoplay muted loop playsinline controls></video>
 
-*10 targets: a timed run to ten breaks, with your best kept.*
+*10 targets: a timed run to ten breaks, with your best kept.* [Open the clip](media/rc14-preview-eggs-n-targets.mp4)
 
-![Eggs-ercise with the CPU as the target: Fox hits the CPU, the count goes up and the CPU moves to a new spot](decisions/rc14-preview-eggs-cpu-target.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867785f05794d57fcb7e75b7f2603d05c5d787e8" autoplay muted loop playsinline controls></video>
 
-*Each CPU hit counts; it resets to 0% at a new spot.*
+*Each CPU hit counts; it resets to 0% at a new spot.* [Open the clip](media/rc14-preview-eggs-cpu-target.mp4)
 
 ### Break the Targets
 
@@ -764,15 +764,15 @@ The primary (12:32Z): a root fix, not a removed check.
 - The notice band moves once more (below the frame strip when Input Display is On), and the docs GIFs are shot on the final rc.14 build.
 - Untested on hardware.
 
-![Break the Targets: Practice games › Place targets; the zoomed-out view; three targets placed with A (Place targets 3/10)](decisions/rc14-preview-btt-place.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/c8fceff0d6950f7ad688e1cd9dedce4cccfe2c09" autoplay muted loop playsinline controls></video>
 
-*Press A to place targets at the cursor.*
+*Press A to place targets at the cursor.* [Open the clip](media/rc14-preview-btt-place.mp4)
 
 The preview opened Practice games › Place targets and placed three targets.
 
-![Break the Targets: a run of three targets; the clock starts on the first input, and Done shows the time and the best](decisions/rc14-preview-btt-run.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7ab7168ab0564e9e2dcf570d083b61ae10b7302f" autoplay muted loop playsinline controls></video>
 
-*Three targets in 0:04.08 (best 0:04.06).*
+*Three targets in 0:04.08 (best 0:04.06).* [Open the clip](media/rc14-preview-btt-run.mp4)
 
 - The readout went from Targets 0/3 0:00.00 through 2/3 to Done!
 
@@ -1362,7 +1362,9 @@ Opened 2026-11-14 with the question whether pill shapes are used where they shou
 
 #### rc14-eggs · Eggs-ercise mode (rc.14): nine decisions
 
-![rc14-eggs preview: the menu set to 1 minute, an egg with the counting notice, a jab that doesn't break it, and a neutral air that does, with the next egg in view (hits at 25 % speed)](decisions/rc14-eggs-demo.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/17726eb104066a56c6d3fdb7be88614e5e01ec5f" autoplay muted loop playsinline controls></video>
+
+*rc14-eggs preview: the menu set to 1 minute, an egg with the counting notice, a jab that doesn't break it, and a neutral air that does, with the next egg in view (hits at 25 % speed)* [Open the clip](media/rc14-eggs-demo.mp4)
 
 Draft built at the recommended defaults; watch for the egg's look (D1), the notice size (D5) and the rise (D2).
 - **One Eden run, no splice** (Training, P1 Fox, CPU Mario, draft `5b8c3fd0`). The egg before each hit was placed by
@@ -2589,7 +2591,9 @@ The 2026-11-25 proposal used the Break the Targets crosshair to edit a save dire
 
 ### Newest takes (the rc.14 build, footer "rc14 8199c696", shot about 23:50Z)
 
-![Save two layouts and reload the first](decisions/rc14-preview-btt-layouts.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/ca02937736c0df8348aa67185cf2d371ce7d5277" autoplay muted loop playsinline controls></video>
+
+*Save two layouts and reload the first* [Open the clip](media/rc14-preview-btt-layouts.mp4)
 
 - The preview used a full-width top band.
 - On 2026-11-17, rc15/notice-compact replaced the band and earlier centred plates. All notices, including practice games, used a compact box sized to the text.
@@ -2605,38 +2609,52 @@ The 2026-11-25 proposal used the Break the Targets crosshair to edit a save dire
 - A opened Load, Rename, Duplicate and Delete for the selected layout. Load enabled Break the Targets and restored three targets.
 - The reshoot on list-padding build `rc14 4f810d34` showed names clear of the selection box and green outline. “3 targets” cleared the right edge.
 
-![Saved layouts, layout actions and Load](decisions/rc14-preview-btt-layouts-list.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/38af5dc0d8cdba0d96a9329b1c563fbb77276913" autoplay muted loop playsinline controls></video>
+
+*Saved layouts, layout actions and Load* [Open the clip](media/rc14-preview-btt-layouts-list.mp4)
 
 - **Eggs-ercise, 1 minute:** the menu sets Eggs-ercise to 1 minute. A neutral air breaks the target, and the count goes
 from 0 to 1.
 
-![Eggs-ercise, 1 minute, on the rc.14 build](decisions/rc14-preview-eggs-1-minute-v2.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d5983121c6f363eadd4a26af43d1047bf7b84ec8" autoplay muted loop playsinline controls></video>
+
+*Eggs-ercise, 1 minute, on the rc.14 build* [Open the clip](media/rc14-preview-eggs-1-minute-v2.mp4)
 
 - **Target speed (new):** the same run side by side, with Target speed set to Slow and to Fast. A Slow target drifts down
 for about three seconds. A Fast one settles in about half a second.
 
-![Eggs-ercise target speed, Slow beside Fast](decisions/rc14-preview-eggs-speed.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/9f49c41bb19c9f259b580d99f84200990da805d5" autoplay muted loop playsinline controls></video>
+
+*Eggs-ercise target speed, Slow beside Fast* [Open the clip](media/rc14-preview-eggs-speed.mp4)
 
 - **Target: CPU:** on 10 targets, the Target row is switched from Disc to CPU. Fox jabs the CPU three times and the notice
 counts 1/10, 2/10, 3/10. After each counted hit the CPU is put back at a fresh spot at 0 %. No disc appears.
 
-![Eggs-ercise with the CPU as the target, on the rc.14 build](decisions/rc14-preview-eggs-cpu-target-v2.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/12a490d710ed93dd0b4bca347e411e3ddc0c0e81" autoplay muted loop playsinline controls></video>
+
+*Eggs-ercise with the CPU as the target, on the rc.14 build* [Open the clip](media/rc14-preview-eggs-cpu-target-v2.mp4)
 
 - **10 targets:** Eggs-ercise goes from Off to 10 targets, and the clock counts up as Fox breaks them one by one (0/10, 3/10,
 7/10, 9/10). The tenth stops it: "Done! 10 in 0:15.53 (best 0:15.53)". Shot on the list-padding build ("rc14 4f810d34").
 
-![Eggs-ercise, 10 targets, on the rc.14 build](decisions/rc14-preview-eggs-n-targets-v2.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/938f3af3f8cd439173b7460a59d6b3f1c17a1921" autoplay muted loop playsinline controls></video>
+
+*Eggs-ercise, 10 targets, on the rc.14 build* [Open the clip](media/rc14-preview-eggs-n-targets-v2.mp4)
 
 - **Break the Targets, placing:** Practice games › Place targets closes the menu into the zoomed-out placing view. The
 crosshair moves, and A places three targets ("Place targets 3/10"). B removes the last one, and X starts at Ready with
 the two left ("Targets 0/2 0:00.00").
 
-![Place three targets, remove one and start](decisions/rc14-preview-btt-place-v2.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7616f5e7297e85160734e4a2e4c8bef79dec5324" autoplay muted loop playsinline controls></video>
+
+*Place three targets, remove one and start* [Open the clip](media/rc14-preview-btt-place-v2.mp4)
 
 - **Break the Targets, a run:** at Ready the clock reads 0:00.00 and starts on the first input. Three breaks later it stops:
 "Done! 3 in 0:04.73 (best 0:04.73)". Then it's Ready again, with every target back.
 
-![Break the Targets: a full run to Done! and back to Ready](decisions/rc14-preview-btt-run-v2.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/fa9530c8b37b0e6ee1835c255fbfdf522ed67e38" autoplay muted loop playsinline controls></video>
+
+*Break the Targets: a full run to Done! and back to Ready* [Open the clip](media/rc14-preview-btt-run-v2.mp4)
 
 - **After the preview.** On 2026-11-15 the CPU target adopted disc flight. The shipped hide setting also hides the floating CPU tag and HUD panel with the body. These clips remain the original takes.
 
@@ -2644,7 +2662,9 @@ the two left ("Targets 0/2 0:00.00").
 
 ### CPU tag at the top of a flight
 
-![CPU tag passing behind the old notice band](decisions/rc14-preview-cpu-tag-apex.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/20d7e8d2b76b2b116c88a9ff2ebcb6d45a7470b9" autoplay muted loop playsinline controls></video>
+
+*CPU tag passing behind the old notice band* [Open the clip](media/rc14-preview-cpu-tag-apex.mp4)
 
 - **Source.** Eden, 2026-11-15, diagnostic build `fa04daab` with CPU flight. The lower-right inset magnifies the band 2×. The clip came from the existing take.
 - **Short hop.** Fox launched the CPU beside him. The tag was visible above the standing and rising CPU, then passed behind the band for about 0.9 s. It returned on the hit (Eggs 1) and stayed visible as the CPU fell to its next spot.
@@ -2658,30 +2678,40 @@ the two left ("Targets 0/2 0:00.00").
 
 ### Break the Targets
 
-![Break the Targets: placing three targets](decisions/rc14-preview-btt-place.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/c8fceff0d6950f7ad688e1cd9dedce4cccfe2c09" autoplay muted loop playsinline controls></video>
+
+*Break the Targets: placing three targets* [Open the clip](media/rc14-preview-btt-place.mp4)
 
 - **Placing:** Fighters & Stages › Practice games › Place targets. The stage zooms out, and A places a target where the
 cursor is (three placed here).
 
 - **A run:** the clock starts on your first input. Break all three: "Done! 3 in 0:04.08 (best 0:04.06)".
 
-![Three-target run with the clock and best time](decisions/rc14-preview-btt-run.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7ab7168ab0564e9e2dcf570d083b61ae10b7302f" autoplay muted loop playsinline controls></video>
+
+*Three-target run with the clock and best time* [Open the clip](media/rc14-preview-btt-run.mp4)
 
 <a id="rc14-targets-preview--eggs-ercise"></a>
 
 ### Eggs-ercise
 
-![Eggs-ercise, 1 minute](decisions/rc14-preview-eggs-1-minute.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/02e39f54547da1f2ece5fbdf93795738b0498564" autoplay muted loop playsinline controls></video>
+
+*Eggs-ercise, 1 minute* [Open the clip](media/rc14-preview-eggs-1-minute.mp4)
 
 - **1 minute:** break as many targets as you can before the clock runs out.
 
 - **10 targets:** a timed run to ten breaks, with your best kept: "Done! 10 in 0:17.25 (best 0:17.25)".
 
-![Eggs-ercise, 10 targets](decisions/rc14-preview-eggs-n-targets.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5015eca5396ee7de078c104a31cb08b51ebac1b0" autoplay muted loop playsinline controls></video>
+
+*Eggs-ercise, 10 targets* [Open the clip](media/rc14-preview-eggs-n-targets.mp4)
 
 - **Target: CPU:** the CPU is the target. Each hit counts, and the CPU resets to 0 % at a new spot.
 
-![Eggs-ercise with the CPU as the target](decisions/rc14-preview-eggs-cpu-target.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867785f05794d57fcb7e75b7f2603d05c5d787e8" autoplay muted loop playsinline controls></video>
+
+*Eggs-ercise with the CPU as the target* [Open the clip](media/rc14-preview-eggs-cpu-target.mp4)
 
 <a id="training-stage-offstage"></a>
 

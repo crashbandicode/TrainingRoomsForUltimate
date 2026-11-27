@@ -84,9 +84,9 @@ Use the [chord editor](../guide/controls.md#changing-a-chord) to replace or disa
 
 ## Menu shortcuts
 
-![A new shortcut opens the menu](../media/rc11-menu-shortcut.gif)
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/29fadaf711f22a5ea361c3aaebe670a04c07bdc1" autoplay muted loop playsinline controls></video>
 
-*A new shortcut opens the menu.*
+*A new shortcut opens the menu.* [Open the clip](../media/rc11-menu-shortcut.mp4)
 
 | Setting | Choices; default in bold | What it does |
 | --- | --- | --- |

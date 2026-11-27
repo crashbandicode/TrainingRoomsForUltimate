@@ -4,8 +4,8 @@ On Fighters & Stages, A on a game opens its screen: Start first, then the settin
 
 ## Eggs-ercise
 
-![Practice games: A on Eggs-ercise opens its screen with Start first; A on Start closes the menu and the run begins](../media/rc15-practice-menu-start.gif)<br>
-*A opens Eggs-ercise; A on Start begins the game.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d5474b717ffc3192e2eccbd9429be5c3227efd15" autoplay muted loop playsinline controls></video>
+*A opens Eggs-ercise; A on Start begins the game.* [Open the clip](../media/rc15-practice-menu-start.mp4)
 
 Break the targets that appear ([guide](../guide/eggs-ercise.md)).
 
@@ -106,8 +106,8 @@ Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.
 
 ## Good to know
 
-![While Eggs-ercise runs: its screen's first row reads Stop with Running in green; A stops it and the row reads Start, the menu still open](../media/rc15-practice-menu-stop.gif)<br>
-*Stopping Eggs-ercise changes its first row back to Start.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7f393b9a162d1df9f1262b327902cc0ce9827c04" autoplay muted loop playsinline controls></video>
+*Stopping Eggs-ercise changes its first row back to Start.* [Open the clip](../media/rc15-practice-menu-stop.mp4)
 
 | If | Then |
 | --- | --- |
