@@ -52,8 +52,7 @@ Copy `libtraining_rooms.nro` and `libnro_hook.nro` into the Skyline plugins fold
 | The recorded-fighter switch times out in the editor | Not in this build | Open; fix in work |
 | Fighters slide apart after B from a posed frame | Not in this build | Open; fix in work |
 
-What happens in each, and the runs behind them: [release notes](RELEASE-NOTES-rc15.md#known-issues) and
-[Install evidence](EVIDENCE-rc15-installs.md).
+Details: [release notes](RELEASE-NOTES-rc15.md#known-issues), [Install evidence](EVIDENCE-rc15-installs.md).
 
 ## Good to know
 
@@ -63,7 +62,6 @@ What happens in each, and the runs behind them: [release notes](RELEASE-NOTES-rc
 | Waiting rooms have their own limits | [What is different, or refused](guide/waiting-rooms.md#what-is-different-or-refused) |
 | A fighter outside Ready Fighters loads when you swap to it | [Fighter cycles](guide/fighter-cycles.md) |
 | Limits kept from the Training Modpack | [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md) |
-| Something else | [Troubleshooting](guide/troubleshooting.md) |
 
 ## Earlier releases
 
