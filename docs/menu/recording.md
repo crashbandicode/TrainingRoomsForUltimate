@@ -434,6 +434,32 @@ What was seen in Eden, and on which build:
 | `eb39d6bc`, the build before install 6's last fix | Positions from one Play, and at once after X. |
 | Not seen yet | The waiting room, a fighter swap or a scene change while a fighter is held, and the installed release file itself. |
 
+#### Moves while you scrub (preview build)
+
+2026-11-27. This part describes the preview build `cc71537c`. It is staged for the card and **not installed**;
+install 6 behaves as the part above says. The [release notes](../RELEASE-NOTES-rc15.md) list what else it changes.
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/23b4e00d007427260ccff3ee35d14c0f976f2e50" autoplay muted loop playsinline controls></video>
+
+*Crop on a 154-frame macro recorded on the preview build. With In selected and moved, then Out, both fighters take the pose the take had on that frame, and the strip names Player 1's move there: "27 frames into Flick", "End of Side smash", "6 frames into Side smash". With no handle selected they stand again. Eden, the diagnostic file of `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-clip-scrub-moves.mp4)
+
+On install 6 a scrubbed fighter is moved to its recorded place and keeps the pose it had. On the preview build it
+also shows the move it was doing on that frame:
+
+| Take | While you scrub |
+| --- | --- |
+| A macro recorded on the preview build | Both fighters are shown in the take's place and move. Seen in the clip above. |
+| A macro without recorded moves | Positions only. The key line reads "Play it once to see the moves while scrubbing.". Not seen in Eden for this page. |
+| A capture made before the preview build | Positions only. Seen in the clip below: the CPU keeps the pose it had. |
+| Projectiles, items and damage | Not shown, as before. |
+
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7c00d97bf3abf99b2191b84d54bf130ffe0620ed" autoplay muted loop playsinline controls></video>
+
+*The Replay window on a capture of King K. Rool. In sits 3 frames into an aerial, so X is refused: "In is mid-action. Snap to a move start before previewing or saving." Y moves In to the start of that aerial. X then plays the kept part on the CPU; the key line reads `B stop preview`, then `B back`. Eden, the diagnostic file of `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-clip-snap.mp4)
+
+The preview build also has ZL + L and ZL + R in the editor, which choose the take's fighter or the one on stage for
+each side. They have a known defect and are not described here until it is fixed.
+
 #### Move marks
 
 A tick on the timeline is where a move starts; a thin band runs to where it ends, when that is known.
