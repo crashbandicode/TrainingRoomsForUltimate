@@ -1,6 +1,237 @@
-# rc.15: what was installed and what was tested
+# Evidence
 
-Through 2026-11-27. The receipts behind [the rc.15 release notes](RELEASE-NOTES-rc15.md) and the status on
+<a id="asset-reproduction-r15"></a>
+
+<a id="asset-reproduction-r15--asset-recipe-reproduction-at-ab13a0f"></a>
+
+## Asset recipe reproduction at ab13a0f
+
+| Output | Stock SHA-256 | Recipe SHA-256 | Target SHA-256 |
+| --- | --- | --- | --- |
+| training | 90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c | 06f2c6b44d931d44ca7d2e797f21a8a6d35688664f872d6ee29f31679e2feac0 | 2362939b8a6978cfab4025a9c7fec0a484d9029c2429355c120bc1d49419f1fa |
+
+On 2026-11-03 the host checks reproduced the recipes at `ab13a0f`; they did not verify native pixels or the whole release. For the current recipes, see [Building TrainingRooms](BUILD.md#layout-archive-recipe-package-5-host-tool).
+
+- The lead executed the retained UI19 builder binary in two fresh processes, one Training and one Waiting, without Cargo or a compiler.
+- Its SHA-256 is a14622ca015460da41efddf0b6941b510aca54f99567d83626e07459f3916375.
+- All 51 original frozen inputs were rehashed before and after.
+- Builder source/manifests, pane and recipe models, and all approved item files match r15 exactly.
+- Private stock inputs were verified against the original UI19 receipt before execution; no live profile was read or changed.
+
+The run used a 512 MiB scope, 20% CPU quota and 60-second total timeout. Actual interval: 07:18:41.541001–07:18:48.725486 UTC. Both processes exited zero. Each generated recipe and complete target archive matches the retained UI19 target; each recipe also matches the frozen r15 asset. This is new execution evidence, not a repeat compilation or inferred reproducibility.
+
+| Output | Stock SHA-256 | Recipe SHA-256 | Target SHA-256 |
+| --- | --- | --- | --- |
+| training | 90a8dc81751efa9d4521f836be9ccf8a134cb24af9fb5b195211e58203f9317c | 06f2c6b44d931d44ca7d2e797f21a8a6d35688664f872d6ee29f31679e2feac0 | 2362939b8a6978cfab4025a9c7fec0a484d9029c2429355c120bc1d49419f1fa |
+| waiting | 7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64 | 014eb1685143d4e66f58681c1d865019ae581f2eeedcaa3cdd30c9079f69ffcb | 02dc5796b6c5210774940add80b684c012ecc2221504f761b5c75561f5de5eb7 |
+
+At that revision the clean-room builder used 38 item images; portraits and stage thumbnails came from the game at runtime. This was the pipeline verified for core07.5, not the old `reproduce.py` command.
+
+- The raw reports deliberately retain untouched_roundtrip_identical=false: Training serialization is451476 versus451604 original bytes; Waiting1283972 versus1284116.
+- Exact target/recipe reproduction does not establish byte-identical reverse serialization of the original SARC.
+- Existing stock member/pane/material/texture preservation evidence is separate, and core07.3 was still open at 07:18 UTC for its complete reversal contract.
+- No failure or warning is suppressed by this reproduction result.
+- The earlier builder dependency future-incompatibility warning also remains disclosed in UI18-UI-BOUNDARIES.md (removed after v0.2.0-rc.1; see that tag); this binary execution makes no new compiler-warning claim.
+
+Private evidence: ../artifacts/trainingrooms-lead-astra4/main-r15/asset-reproduction/receipt.json, both raw stdout/stderr files and generated private targets. Receipt SHA-256: ce6c44a5d80cf27e692bf92b4d5a47d001b7b626126d1db11635f92d07823789.
+
+<a id="asset-reproduction-r15--exact-layout-reversal-07-38-utc"></a>
+
+### Exact layout reversal, 07:38 UTC
+
+| Stock BFLYT reproduced byte for byte | Bytes | Inverse SHA-256 |
+| --- | ---: | --- |
+| Training | 43,204 | `42fc96ea79d148ca4bde0a3f687f1cc4f1056886f4e5054ce152ca95b4308046` |
+| Waiting | 16,136 | `6f4ee9b4e2709ab2b894ff691403582f7075f8d93965821e0d25145aa821ce1d` |
+
+The inverse removed only the added `TrMod`/`tr_` pane subtrees, item materials, waiting text material and item texture
+references from each generated layout. It recomputed section offsets and counts without copying original layout bytes.
+
+Neither stock layout has a pane-name collision with the owned prefixes. Mutating an original pane alpha in each target causes the inverse comparison to fail. The173 Training and182 Waiting members other than the modified layout and appended BNTX remain byte-identical to stock. Private scripts, original independent parser and reversed layouts are retained at main-r15/layout-reversal; receipt SHA25695fa7c25314628bcc1d9f4cb38fab3b6debc84bcce589e687c2c0c3429cac684.
+
+- At 07:38, exact layout reversal passed. Whole BNTX-file reversal and original SARC padding were unproved, so core07.3 stayed open.
+- The pinned SARC writer explicitly guarantees member preservation rather than original serialization; its untouched-roundtrip differences are not a claim of changed stock payloads. No compiler, native build, live profile change or runtime acceptance is associated with this audit.
+
+<a id="asset-reproduction-r15--required-preservation-contract-reconciled-08-08-utc"></a>
+
+### Required preservation contract reconciled, 08:08 UTC
+
+| Preservation check | 08:08 UTC result |
+| --- | --- |
+| Stock textures | 43 Training and 91 Waiting textures preserved |
+| Layouts | Both stock layouts recovered byte for byte |
+| Original SARC padding | Not required by the contract |
+
+- SPEC-core-07 section4.2 requires stock texture metadata, pixels, mip offset arrays and4KiB pool alignment to survive.
+- Section4.4 specifies byte-for-byte reversal of the original layout.
+- It does not require reproducing original SARC padding or an identical whole BNTX container after removing additions.
+- The earlier complete-container inverse hold was broader than this contract.
+- Its raw serialization differences remain recorded; they are not a failure of stock-member preservation.
+- No requirement or runtime failure was waived.
+
+- A fresh independent raw-byte audit verifies all43Training and91Waiting stock textures: metadata spans, every pixel byte and every relative mip offset match.
+- Each target adds exactly38owned item textures.
+- All173/182untouched SARC members match byte-for-byte; the previously proved inverse restores both stock BFLYT files exactly.
+- BNTX relocations, each texture alignment,4KiB pool size and relocation/data-section boundaries pass.
+- A mutated stock pixel is rejected by the comparison.
+- Both combined BNTX members also start on4KiB archive offsets.
+- The small stock bushvt member is not4KiB aligned; an initial extra assertion incorrectly applied the texture-pool requirement to every shader member and was removed.
+- Its unchanged bytes remain verified.
+
+Private evidence: main-r15/stock-texture-preservation.json, SHA256
+8f558fcd3c5c117cdf48a7eac097d50f47161af145bd007c11f5b985d9f126fb;
+verifier tmp-lead-astra4/audit-stock-textures.py. This supplies the missing
+host evidence for core07.3. Re-run the scoped checks on the next generated
+assets and final candidate; no final RC row is closed by this development
+result. No compiler, native build or live profile was used.
+
+<a id="evidence-rc15-crop-editor"></a>
+
+<a id="evidence-rc15-crop-editor--crop-editor-acceptance-2026-11-15"></a>
+
+## Crop editor acceptance — 2026-11-15
+
+| Check | Observed result | Raw evidence under the artifact directory |
+| --- | --- | --- |
+| Macro Crop opens shared editor; handle redraw | P1 Macro1,314 frames. Start moved0→180 with explicit L and 40 ms taps; screen shows134 frames kept. | `runtime1/crop-macro/*macro-resume-full-range.png`, `*macro-resume-kept-range.png`, `macro-frame-publish.log` |
+
+Tested source: **d520d325aa2fe82de61e690fa01cb88f77de8c35**, base `400e2c69`. The following docs/evidence commit changes no Rust source. Release NRO SHA256 `d35f0f7497a679cc8a7de69b69062c44a93a39ae8560c4925f51f8f4c2bc128d`; tested diagnostic NRO SHA256 `aea5f904b0bb7ab6db40b23268053846776bb84cca3cb229cc8e23c7bb44f973`. All six XPS gates passed: release, diag, test, clippy, no-default-features and size. Tests: 2,193 passed, zero failed, four ignored across 102 binaries. Size 147,731/147,921, 190 spare. Artifacts: `/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gate-d520d325/status.json`.
+
+- Yoga ran the November 15 Eden AppImage SHA256 `2f315fc4b7d9658afef84f4ba3cb80a3d0b33292eaef66a802ef837222a247b9`, with the diagnostic NRO above and the pinned 21-plugin set recorded in each run config.
+- Both runs used one owned profile copy, display 72, GDB 6572 enabled before game.load, persisted volume 0 and memory_layout_mode 0.
+- Start/main-menu stills were visually checked out of attract mode.
+- No Surface or card used.
+- Existing setup helper receipts call the CPU Mario; the actual readable CPU was Bayonetta in boot 1 and Ridley in boot 2.
+- The existing Fighter Mismatch choice kept that current CPU.
+
+The table records the November 15 observations. Its paths name the original captures. The shared workspace retains the build gate and the completion report in the integration inbox (entry for final head `3549ee3f`), but the raw row files were unavailable for the November 27 audit.
+
+| Check | Observed result | Raw evidence under the artifact directory |
+| --- | --- | --- |
+| Macro Crop opens shared editor; handle redraw | P1 Macro1,314 frames. Start moved0→180 with explicit L and 40 ms taps; screen shows134 frames kept. | `runtime1/crop-macro/*macro-resume-full-range.png`, `*macro-resume-kept-range.png`, `macro-frame-publish.log` |
+| Macro X CPU preview and B exit | Preview inputs complete; HideClip seq272. Editor-closed still shows gameplay. | `runtime1/crop-macro/*preview-started.png`, `*preview-complete.png`, `*editor-closed.png`; frame log |
+| Macro save-as-new and playback | Native keyboard named kept-jab-2;134 frames equal source[180:]; original bytes unchanged. New macro set active on CPU and played with existing chord after existing mismatch choice. | `runtime1/crop-macro/{source-macro.json,kept-macro.json,macro-crop.json}` and new-macro-played still |
+| Combo units, no X, empty name | Two-link fixture cropped to first link. No X help; after-X frame pixel-identical to selected frame. Native keyboard true-empty confirmation produced Combo2; original unchanged. | `runtime1/crop-combo/` source/kept JSON, before/selected/after-X/saved stills and combo receipt |
+| Replay entry handle redraw | Shared standalone editor range0..180→1..180, publish seq69→71. | `runtime2-continuation/crop-replay-continuation/` before/handle-redrawn stills and replay-frame-publish.log |
+| Replay X CPU preview and B exit | Publish seq72 playing; inputs_complete revision7 frames179; hidden seq251, editor visibly gone. | Same directory preview-started/preview-complete/editor-closed stills; `runtime2-continuation/crop-replay-continuation.json` PASS4.5s |
+| Drill integration | Shared Step units, labels, default Drill N and save-same-kind adapter covered by host tests. | `drill_units_share_clip_editor_and_save_same_kind` in the green gate. Full drill recording/runtime belongs to the input-drill lane. |
+
+- The first boot label was `rc15-crop-editor-d520d325`: final tally 6 PASS / 1 FAILED (Replay stopped before entry).
+- The explicitly authorized fresh boot was `rc15-crop-replay-d520d325`: setup 4 PASS, first Replay probe FAILED at the visible existing mismatch choice because its log assertion did not recognize that screen.
+- The same boot continued from the visually observed Keep current fighter choice in a separate row/output directory and passed.
+- No third boot.
+- Both original failed Replay receipts/stills remain; failed macro probes remain as raw STOP timestamp receipts, FAIL stills and logs.
+- The shared runner overwrites the prior per-row JSON on retry; its generated RESULTS summary counts zero archived JSON failures.
+- Earlier JSON receipts are therefore not all retained, and this report does not claim they are.
+
+- Initial macro probes used 150 ms taps, which triggered documented held acceleration and saved an unintended14-frame copy.
+- Another probe omitted handle reselection after preview/save and did not move the handle.
+- Successful continuation used explicit L/R selection and 40 ms taps, asserting each range.
+- A later probe assumed a nonexistent Play on CPU file row; the successful continuation used Set active and the existing CPU playback chord.
+- These were probe/setup failures; no product failure is established by them.
+- Failed receipts and outputs were kept.
+- Existing handle deselection after preview/save was stated in the docs table.
+
+- Both runs completed Down with cleanup_failures=[], full profile restored and separately verified, owned processes stopped, and copies pruned (2.6GB unique per run; no leftovers).
+- The ledger records RELEASED, including second run16:00:31.941Z. game.stop reached its shutdown deadline and lifecycle used owned SIGKILL, explicitly recorded as a forced stop, not a crash.
+- Retained console logs contain zero matches for `panic|abort|crash|unmapped|fault`; console hashes, pattern and memory peaks are in `console-scan.json`.
+- Peaks were5804122112B and5513334784B.
+- `run.json`, `memory.peak`, configs, dry-run receipts, Down receipts and ledger snapshot are retained in `runtime-metadata/`.
+
+![A macro start handle moves from0 to180, keeping134 of314 frames](media/rc15-crop-editor.gif)
+
+*Eden,2026-11-15,rc.15 d520d325; hardware untested. Real crop selection,1280×720,5fps,4.6s. First/action/end frames reviewed. The final actual frame is held for readability. This GIF shows range selection; preview/save/play/exit use the separate evidence above. Source hashes and review are in gif-source-map.json and gif-review/REVIEW.md. GIF SHA256115e7f4562dc9f057c26258ee06756c09c83ba503280e3f95a31a3dd8dad0e2e.*
+
+- Archived hooks, manifests, fixtures and recorded segments: `eden/rc15-crop-editor/`.
+- They use the unchanged shared runner/lifecycle; they are evidence for these owned runs, not permission to drive another owner's paths.
+- No push, tag, release or card write.
+- Manual compliance limitation: not every local inspection command in this delegated session used the playbook's memory/time guard wrapper.
+- This cannot be retroactively proven; it is reported as a failed process requirement to the primary.
+- Build and runtime jobs did use bounded remote gate/lifecycle admission.
+- No claim of full process compliance is made.
+
+<a id="evidence-rc15-input-drill"></a>
+
+<a id="evidence-rc15-input-drill--input-drill-acceptance-2026-11-15"></a>
+
+## Input drill acceptance — 2026-11-15
+
+| Check | Observed result | Evidence under `artifacts/rc15-input-drill/runtime-2eb3903e/` |
+| --- | --- | --- |
+| Direct input drill, strip Off | Real +Record drill and Record chord saved Drill1 with exactly four dash steps, no Jump; schema2, no intermediate macro, no Made from; selected as the grading target. | `drill-direct-crop/direct-source.json`, row receipt and strip-Off stills. Native saved IDdrill-1, steps 4. |
+
+Tested source: **2eb3903e6eb66aedafc3e4dff6d802e9b856fdd7**, base `400e2c69`. This evidence commit changes no Rust source. Release NRO SHA256 `d694d5e1a2d040062197deb8a32a356d8ef5f1b12935d1107a7ae943ba8ab95f`; tested diagnostic NRO SHA256 `181a6518c7f7b896e0a8519f6035fb49b33cbd1014cdab70f01653d9631624ea`.
+
+- All six Yoga gate steps ran. Release, diag, clippy and no-default-features passed, with zero clippy warnings.
+- Host tests: 2,202 passed, one failed (size only), four ignored across 102 binaries.
+- Standalone size 148,141 was 220 over 147,921 and 66 over 148,075; no ceiling was changed in this lane. Net 410 versus imported crop3549ee3f. The integration owner took responsibility for the combined size.
+- Gate receipts: `/home/intpa/smash-training-lobby/artifacts/rc15-input-drill/gate-2eb3903e/`.
+
+- The first native boot, `rc15-input-drill-1b134e51`, exposed an idle input flag incorrectly becoming Jump: an empty take saved a phantom Jump and the four-dash take saved five steps.
+- Both files and the failing host regression remain.
+- The repair normalizes that flag only in InputCapture below the existing jump-stick threshold; real Jump/release and tap-jump remain covered.
+- Full host library 302/0 passes.
+- Hit-link event capture, tolerances, guards and file schemas were not changed by the repair.
+
+- The authorized replacement was `rc15-input-drill-2eb3903e` on Yoga, one copied profile from g, display 72.
+- Eden AppImage SHA256 `2f315fc4b7d9658afef84f4ba3cb80a3d0b33292eaef66a802ef837222a247b9`, actual game 13.0.5, muted volume 0, memory_layout_mode 0 and GDB stub enabled before game.load.
+- Start reached the actual main menu, visually checked. The real CPU was Min Min despite the inherited setup helper calling it Mario. No waiting-room pair or hardware test was performed.
+
+The table records the November 15 observations. Its paths name the original captures. The shared workspace retains the build gate and the final run summary in `artifacts/rc15-input-drill/HANDOFF.md`. The raw drill JSON and grading stills were unavailable for the November 27 audit.
+
+| Check | Observed result | Evidence under `artifacts/rc15-input-drill/runtime-2eb3903e/` |
+| --- | --- | --- |
+| Direct input drill, strip Off | Real +Record drill and Record chord saved Drill1 with exactly four dash steps, no Jump; schema2, no intermediate macro, no Made from; selected as the grading target. | `drill-direct-crop/direct-source.json`, row receipt and strip-Off stills. Native saved IDdrill-1, steps 4. |
+| Whole-step Crop | Shared editor range0..4→0..3; native keyboard empty name saved Drill2 with exactly the first three steps; original drill and schema1 combo bytes unchanged. X never previewed. | `drill-direct-crop/cropped-drill.json`, `clip-frames.log`, before/after-X stills and row receipt. |
+| No-hit Make combo | Ordinary P1 recordingmacro-1 made Drill3, exactly four steps, Made frommacro-1. The macro, target and legacy combo were unchanged. | `drill-make-nohit/` source/made JSON and actual saved-ID/count diagnostics. |
+| Clean grading | Frame 128 at 4.280 s: four on-time cells, “clean, 4 of 4”, streak1, Best4/4; before frame showed0/0. TRUE has no verdict. | Original clean GIF SHA256 `4065d727567f0e33cb8df62d6cac78c64b0093e8728d6894b5c1713690e53952`; `grade-review-frames/clean-detail-f0128-t4.280.png`. |
+| Late grading, initial attempt | Only 12 neutral frames added before the second dash; first event/source untouched. Frame 80 at 2.650 s shows Step1 on time, Step2 red “dash missing”, “1 of 4 counted”, “S2 dash missing”, streak0, Best4/4. Frames 78/82/86 bracket the initial result before suffix attempts. | Original late GIF SHA256 `6e7d730b2816de6558f49f9d3c740353ffb152327e52a4dcec8846f800fd1a0d`; `grade-review-frames/late-candidate-f0080-t2.650.png`. |
+| More than four steps | A separate real six-dash recording made Drill4. Four cells follow Step2–5, thenStep3–6. Frame 172 at 5.690 s shows “clean, 6 of 6”, streak1, Best6/6 and no TRUE verdict. | Original six GIF SHA256 `ef0573e22dd374d897587609f36d66be9ce132f7d8fa77c583ad2ad17f1b0f3b`; `grade-review-frames/six-detail-f0135-t4.470.png`, `six-detail-f0148-t4.890.png`, `six-detail-f0172-t5.690.png`. |
+
+The original late-before still already had streak0 after source selection, so this native take does not prove a1→0 transition. The host tests cover streak reset; the live frames separately prove clean0→1 and late0. The schema1 fixture stayed byte-identical, SHA256 `27e5549c53cfd104dfab8143b69ecb7a0940e540996a371d1b9a8514bf01a75d`.
+
+- Initial setup retained four passing boot rows and one failed optional register snapshot: the inherited direct GDB kick had already ended its holding helper, so no helper served the dump request.
+- That root-added step was removed under fresh prepare labeldrill-prepare-r2 on the same boot.
+- Five product/setup rows passed.
+- Original manifest, failure, STOP and runner log are retained.
+- Guest tracing remains unverified; no second debugger client or trace boot was added.
+
+- Two additional fresh re-grade rows passed on the same boot with the approved55s recorder cap, a full source allowance after the actual playback receipt, and unchanged20s finalization checks.
+- All first captures/source bytes remain.
+- The earlier claim of a12.8s warp eating the capture is retracted: native diagnostic prefixes use Switch GetSystemTick, while Python uses host monotonic time; the clocks were not calibrated.
+- R3 records both host timestamps and observes request→receipt about0.405s.
+- The original decisive frames already contained completion and the initial late fault.
+
+![A four-step input drill is cropped to three whole steps](media/rc15-input-drill.gif)
+
+*Eden,2026-11-15,rc.15 source2eb3903e; hardware untested. Real Drill1 range selection4→3→4→3,1280×720,3.78s,5fps request, nine encoded frames from19 captured frames. Start/middle/end and contact sheet reviewed. GIF SHA256 `a7f8a550de084758ed076c81b4dff39bc4503b2eacc80a8b7c9bb317b4fa9ccc`.*
+
+Visual issue in this take: after the first handle action, the helper HUD redraws over the editor's upper centre. The range and handle result remain readable. This capture preserves that overlap; it is reported to the editor/integration owner, not called a clean editor-layout pass. Native grading/step interfaces and save-as-new are established separately above.
+
+- Shared Down RELEASED at17:57:26Z, lifecycleec37282ac71a495c9ee6481c1e32ec8a.
+- Cleanup failures were empty; restoration independently verified equal and snapshot_equal across2,016 entries; owned Eden PIDs1072946/1072952 were absent.
+- All three owned copies were pruned after58 written files were harvested, freeing2,616,865,297 unique bytes.
+- A terminal game.stop deadline required lifecycle SIGKILL; this is a forced cleanup, not a crash.
+- Console patterns panic/abort/crash/fatal/segmentation had zero matches; memory.peak was6,616,621,056B.
+- The verified raw archive SHA256 is `cd206eb8c15c685e3103f44295140bba512786cb723602d69d411d5f559c743c`.
+- All retained unique receipts total11 PASS and one failed optional setup snapshot; the generated final-run summary counts only the last two rows.
+- Separate GRADE-REVIEW.md and frame/hash manifests retain the independent visual review.
+- No push, tag, release or card write.
+- Historical process exceptions remain disclosed: not every inspection command before16:11Z used the required memory/time guard, and the failed first boot reused row labels despite preserving attempt files.
+- Replacement continuations use fresh row labels.
+- No claim of full process compliance or paired waiting-room acceptance is made.
+
+<a id="evidence-rc15-installs"></a>
+
+<a id="evidence-rc15-installs--rc-15-what-was-installed-and-what-was-tested"></a>
+
+## rc.15: what was installed and what was tested
+
+| Check | Result | Source |
+| --- | --- | --- |
+| Card readback, 2026-11-27 10:36 UTC | `dc5302f1`, release SHA-256 `1bc8e7b87780a9f4801679c9bb25db43223ac6f27110d9c2fa67a6478a66a8b7`; replaced install 6. | `artifacts/phase23/card-install/20261127-1036Z-card-dc5302f1/verify.json` |
+
+Through 2026-11-27. The receipts behind [the rc.15 release notes](RELEASE-NOTES.md#release-notes-rc15) and the status on
 [Current release](CURRENT-RELEASE.md). Three claims are kept apart:
 
 - **Installed:** the plugin file on the card was read back and matched the build. This is a deployment check.
@@ -12,7 +243,9 @@ Paths starting with `artifacts/` are in the shared workspace (`/home/intpa/smash
 repository. "Inbox" is `artifacts/phase23/INBOX-opus-rc6-integration.md`; an entry is named by its time (UTC) and
 author. Times are UTC.
 
-## Fixed build
+<a id="evidence-rc15-installs--fixed-build"></a>
+
+### Fixed build
 
 | Check | Result | Source |
 | --- | --- | --- |
@@ -21,7 +254,9 @@ author. Times are UTC.
 
 The card readback verifies the installed file, not play on the console.
 
-## Summary
+<a id="evidence-rc15-installs--summary"></a>
+
+### Summary
 
 | | Install 1 | Install 2 | Install 3 | Install 4 | Install 5 | Install 6 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -43,7 +278,9 @@ The host-test count falls between install 1 and install 2 because three test bin
 184 tests each (`artifacts/phase23/test-speed/HANDOFF.md`, the entry that counts 2,911 against 2,359). The counts are
 each gate's own; they were not compared test by test here.
 
-## Install 1 (`152629cd`)
+<a id="evidence-rc15-installs--install-1-152629cd"></a>
+
+### Install 1 (`152629cd`)
 
 | Record | Install 1 |
 | --- | --- |
@@ -57,7 +294,9 @@ each gate's own; they were not compared test by test here.
 | Eden: release | Inbox 19:48:07Z, rv-integration: cleared for a limited release, with those rows carried to install 2. The entry says no waiver is a row pass. |
 | The operator's reports | None on record for this build. |
 
-## Install 2 (`71158421`)
+<a id="evidence-rc15-installs--install-2-71158421"></a>
+
+### Install 2 (`71158421`)
 
 | Record | Install 2 |
 | --- | --- |
@@ -71,7 +310,9 @@ each gate's own; they were not compared test by test here.
 | Eden: note | The install record's line "no product fail observed" was written at the install; the verdict above came just after it and is the final result. |
 | The operator's reports | None on record for this build. It was on the card from 00:43 to 03:07. |
 
-## Install 3 (`e7667f26`)
+<a id="evidence-rc15-installs--install-3-e7667f26"></a>
+
+### Install 3 (`e7667f26`)
 
 | Record | Install 3 |
 | --- | --- |
@@ -83,9 +324,11 @@ each gate's own; they were not compared test by test here.
 | Eden, after the install: Training, run `mod-inputs-yoga-01` | `artifacts/phase23/mod-tests/inputs-yoga/RESULTS.md`. Passed: the frame strip's marks for Pikachu's up special and Kirby's angled side tilt; drill files and grades for Pikachu, Pichu, Greninja, Palutena, Zelda and Mewtwo; Kirby's angled tilt as a drill. |
 | Yoga Training: product failures | Sheik's, Fox's, Falco's and Wolf's special direction was saved as a second step, and after a Training reset the next drill attempt was not graded. Install 4 addresses both. |
 | Yoga Training: not tested in that run | The waiting room (tested separately on the XPS), a Pikachu hit combo with up special, loading a version 2 drill, and the `L U` direction case (F14-3). |
-| The operator's reports | Two, on 2026-11-24, [below](#the-operator-s-reports-from-the-console). |
+| The operator's reports | Two, on 2026-11-24, [below](#evidence-rc15-installs--the-operator-s-reports-from-the-console). |
 
-## Install 4 (`a945b0c1`)
+<a id="evidence-rc15-installs--install-4-a945b0c1"></a>
+
+### Install 4 (`a945b0c1`)
 
 | Record | Install 4 |
 | --- | --- |
@@ -105,16 +348,20 @@ each gate's own; they were not compared test by test here.
 | --- | --- |
 | Not exercised in the final Eden session (from the install record) | The airborne entry of a steered special; the deflection half of Match angle and deflection; in Quick Play the practice pick, a new pick and a rematch; ledge attacks beyond the host tests; Recordings beyond one played capture; step titles beyond the list; the clip editor in a waiting room; the Trim setting's migration; the CPU's playback indicator; the reset chord pressed one button at a time. |
 | Repeated on the installed build | The Mario and Kirby reset rows, Load after, and the Mario steering and Kirby tilt controls. Two airborne rows were attempted again, but neither produced a jump. The other part 1 rows were not repeated. The two fixes between `a9131331` and `a945b0c1` change a saved take's move name and the reset chord. |
-| The operator's reports | Two, on 2026-11-25, [below](#the-operator-s-reports-from-the-console). |
+| The operator's reports | Two, on 2026-11-25, [below](#evidence-rc15-installs--the-operator-s-reports-from-the-console). |
 
-## The build before install 1 (`17060a5e`)
+<a id="evidence-rc15-installs--the-build-before-install-1-17060a5e"></a>
+
+### The build before install 1 (`17060a5e`)
 
 | Record | The build before install 1 |
 | --- | --- |
 | Card | `artifacts/phase23/card-install/20261123-1140Z/INSTALL.md`: `0a17c793`, 2026-11-23 11:40. |
-| The operator's reports | At seven times on 2026-11-23, [below](#the-operator-s-reports-from-the-console). |
+| The operator's reports | At seven times on 2026-11-23, [below](#evidence-rc15-installs--the-operator-s-reports-from-the-console). |
 
-## The operator's reports from the console
+<a id="evidence-rc15-installs--the-operator-s-reports-from-the-console"></a>
+
+### The operator's reports from the console
 
 | Evidence source | Recorded result |
 | --- | --- |
@@ -141,14 +388,16 @@ each gate's own; they were not compared test by test here.
 | 2026-11-24 19:35 | install 3 | Quick Play: after a match the loser declined the rematch, picked a different fighter and came back to the room; the earlier fighter was put back as both the CPU and Player 1. | Install 4 (`6146f8e9`). Not run in Eden: the final session exercised no Quick Play feature of TrainingRooms. |
 | 2026-11-24 22:09 | install 3 | The recording crop and preview showed a black screen, without the fighters and the timeline. | Install 4 (`42be97a3`): the clip editor is a strip over the game. Its layout passed in Eden on `a9131331`. |
 | 2026-11-25 13:30 | install 4 | The move names Jab 1 and Jab 2 are fine. | – |
-| 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is in install 5 (`445d1100`); its smoke boot played one take, and the start was not timed then; it was timed in Eden on 2026-11-26 ([Install 6](#install-6-5df3d9dc)). A change to placement is in install 5 (`6dcf5c40`); its smoke boot checked the Off stage switch only. The Delete is in install 5 (`3fd708bc`), host-tested only. |
+| 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is in install 5 (`445d1100`); its smoke boot played one take, and the start was not timed then; it was timed in Eden on 2026-11-26 ([Install 6](#evidence-rc15-installs--install-6-5df3d9dc)). A change to placement is in install 5 (`6dcf5c40`); its smoke boot checked the Off stage switch only. The Delete is in install 5 (`3fd708bc`), host-tested only. |
 | 2026-11-25 about 23:33 | install 5 | In the clip editor, the refusal that In is mid-action kept showing after a snap to the move start, so the clip could not be previewed or saved. | Not fixed in install 5. On `58c9ccb5`, with install 5's snap code, 4 of 24 host editor cases failed, including plain Y; the held-modifier control passed (`artifacts/phase23/clip-snap/gate-red-7982989b/logs/test.log`; inbox 23:49:51Z). Install 4 has the same snap code. The fix merged as `dbded2d1` (pin `3990f50e`; six gate steps exit 0). The install 5 smoke boot only previewed a take without moving a handle. Later, the release snap row on `eb39d6bc` showed Y resolving In so X previewed and A saved. This was a test capture, not the operator's own take. The fix is on the card since install 6 (2026-11-26). |
-| 2026-11-26 about 11:53 | install 5 | Moving an Off stage fighter into the ground left it grounded as the crosshair moved away. | Still present in install 6. The [preview smoke test](#smoke-tests-on-the-release-file) observed the fighter lift again. |
-| 2026-11-26 about 11:53 | install 5 | Guard the Edge: the fighter sometimes starts slightly off the chosen spot, and not the same way each round. With one off-stage spot over ten rounds, the first two were in one place, the third slightly lower, the fourth higher again. | The [Eden comparison](#guard-the-edge-release-points) found different first inputs and camera framing, not different release coordinates. It did not measure the operator's console rounds. |
+| 2026-11-26 about 11:53 | install 5 | Moving an Off stage fighter into the ground left it grounded as the crosshair moved away. | Still present in install 6. The [preview smoke test](#evidence-rc15-installs--smoke-tests-on-the-release-file) observed the fighter lift again. |
+| 2026-11-26 about 11:53 | install 5 | Guard the Edge: the fighter sometimes starts slightly off the chosen spot, and not the same way each round. With one off-stage spot over ten rounds, the first two were in one place, the third slightly lower, the fourth higher again. | The [Eden comparison](#evidence-rc15-installs--guard-the-edge-release-points) found different first inputs and camera framing, not different release coordinates. It did not measure the operator's console rounds. |
 | 2026-11-26 12:29 | install 6 | The game crashed right after A on the title screen; the operator guessed it is intermittent. | No TrainingRooms frame is in the crash, and its owner is not established. The game's resource inflate thread faulted in the game's own copy into a fresh block, for a stock file; ARCropolis only forwards that call. The block's first page could not be written, and what left the heap in that state is not known (inbox 13:35:17Z, tr-primary-2; `artifacts/phase23/hw-crash-20261126-1229Z/SUMMARY.md`). A May 25 report predating TrainingRooms has the same signature. Under investigation by another lane; no fix was tested. Not listed as a TrainingRooms issue. |
-| 2026-11-26 about 12:41 | install 6 | Scrubbing showed positions, not moves. A recorded/current fighter choice was requested for each side. | Both followed install 6: [preview results](#smoke-tests-on-the-release-file), [fixed editor](RELEASE-NOTES-rc15.md#fixed-build). Uneven movement wasn't diagnosed. |
+| 2026-11-26 about 12:41 | install 6 | Scrubbing showed positions, not moves. A recorded/current fighter choice was requested for each side. | Both followed install 6: [preview results](#evidence-rc15-installs--smoke-tests-on-the-release-file), [fixed editor](RELEASE-NOTES.md#release-notes-rc15--fixed-build). Uneven movement wasn't diagnosed. |
 
-### Guard the Edge release points
+<a id="evidence-rc15-installs--guard-the-edge-release-points"></a>
+
+#### Guard the Edge release points
 
 On install 6's release file (`5df3d9dc`, `c1ced861…`), all 35 release records matched the CPU's picked coordinates.
 These were two Guard the Edge runs in Eden on the XPS, not the release smoke test.
@@ -177,7 +426,9 @@ The camera also framed the stage differently at Ready. Screen height alone does 
 changed. Receipts: `artifacts/phase23/place-float/eden/out-03/` and `out-04/`; report 13:36:05Z, accepted
 13:36:40Z. The operator chose a change at 13:40:17Z; these runs did not test it.
 
-## Install 5 (`b7a382e4`)
+<a id="evidence-rc15-installs--install-5-b7a382e4"></a>
+
+### Install 5 (`b7a382e4`)
 
 | Card readback | Recorded result |
 | --- | --- |
@@ -193,7 +444,7 @@ changed. Receipts: `artifacts/phase23/place-float/eden/out-03/` and `out-04/`; r
   different SHA-256 (`0414f116…`); it was not installed. The install 5 readback matched `b7a382e4` (`0cb29525…`).
   Compare `artifacts/phase23/next-build/gate-f55dfbbe/SUMMARY.md` with the install gate above.
 - **Eden:** the smoke boot below, on this exact file.
-- **The operator's reports:** one, on 2026-11-25, [above](#the-operator-s-reports-from-the-console).
+- **The operator's reports:** one, on 2026-11-25, [above](#evidence-rc15-installs--the-operator-s-reports-from-the-console).
 
 The changes in this build were merged one by one after `a945b0c1` and are listed in the release notes. The Gate column names the receipt under
 `artifacts/phase23/next-build/` for the head that passed all six steps. Playback was gated together with the two
@@ -215,7 +466,9 @@ The plan was one short Eden smoke run on the finished build, then the operator's
 checked the waiting room. The operator reported the clip-editor refusal on the console; no full hardware verdict
 is on record.
 
-### The Eden smoke boot of the finished build
+<a id="evidence-rc15-installs--the-eden-smoke-boot-of-the-finished-build"></a>
+
+#### The Eden smoke boot of the finished build
 
 - On 2026-11-25, Eden run `nb-smoke-yoga-01` (22:21 to 22:57) ran the release build of `b7a382e4`, the head of merge 10, with the card's 20 other plugins.
 - Its NRO, sha256 `0cb29525…215ca2f`, is the release file of that head's gate (`artifacts/phase23/next-build/gate-b7a382e4/status.json`).
@@ -255,7 +508,9 @@ The table uses the row files for verdicts and values. The first Guard the Edge f
 On Battlefield the frame shows a fighter-preload notice, not the set-up card; the bridge recorded the wizard and its
 jump setting. The closing settings verdict comes from the audit, not its screenshot.
 
-### The waiting-room boot
+<a id="evidence-rc15-installs--the-waiting-room-boot"></a>
+
+#### The waiting-room boot
 
 On 2026-11-25, after the install, Eden run `nb-lobby-yoga-01` (23:28 to 23:39) ran the same release file with the
 card's 20 other plugins and the current test bridge. The game did not crash. Receipts:
@@ -287,7 +542,9 @@ frame was looked at.
 | Eggs-ercise's off-stage zone follows the stage | `1c6a71e5` | `gate-f9b81e42` |
 | A save's placement is changed with the crosshair; the Off stage switch | `6dcf5c40` | `gate-b7a382e4` (one gate for this merge and a docs merge) |
 
-## Install 6 (`5df3d9dc`)
+<a id="evidence-rc15-installs--install-6-5df3d9dc"></a>
+
+### Install 6 (`5df3d9dc`)
 
 | Card readback | Recorded result |
 | --- | --- |
@@ -307,9 +564,9 @@ frame was looked at.
 - **Eden at installation:** the two running Training boots used merge 17's diagnostic NRO (`853964b2…`), not the
   release file read back from the card. The release smoke and waiting-room checks were still pending. The first
   report on the two diagnostic Training runs was posted at 12:45:51Z, about 23 minutes after installation.
-  [Merge 17 test status](#eden-on-install-6-itself-5df3d9dc-merge-17)
+  [Merge 17 test status](#evidence-rc15-installs--eden-on-install-6-itself-5df3d9dc-merge-17)
 - **The operator's reports:** scrub positions moved without the move poses. The earlier title-screen crash has no
-  TrainingRooms frame; its owner is not established. The [reports table](#the-operator-s-reports-from-the-console) records both.
+  TrainingRooms frame; its owner is not established. The [reports table](#evidence-rc15-installs--the-operator-s-reports-from-the-console) records both.
 
 The changes in this build were merged one by one after install 5 (`b7a382e4`). The Gate column names the receipt
 under `artifacts/phase23/next-build/`; the gates are host tests and builds. The Eden runs follow the table.
@@ -336,7 +593,9 @@ under `artifacts/phase23/next-build/`; the gates are host tests and builds. The 
   in-game comparison with install 5, which is in the Eden part below. Source:
   `artifacts/phase23/scrub-positions/READY-ERRATUM-d8713ee4.md`.
 
-### Eden, on the build before the fix (`eb39d6bc`)
+<a id="evidence-rc15-installs--eden-on-the-build-before-the-fix-eb39d6bc"></a>
+
+#### Eden, on the build before the fix (`eb39d6bc`)
 
 One session by dup-audit on 2026-11-26, on merge 16's release NRO (sha256 `d4557201…`) and diag NRO (`8abda32f…`).
 **Nothing in this part ran on merge 17, the installed build.** Receipts: `artifacts/phase23/scrub-positions/eden-session/evidence/`.
@@ -381,7 +640,9 @@ bridge and the same three staged old macros on both builds):
   while a fighter is held; scrubbing the final frame of a long recording (SP-17); the menu thread's stack depth
   (SP-19 could not be read in that boot).
 
-### Eden, on install 6 itself (`5df3d9dc`, merge 17)
+<a id="evidence-rc15-installs--eden-on-install-6-itself-5df3d9dc-merge-17"></a>
+
+#### Eden, on install 6 itself (`5df3d9dc`, merge 17)
 
 These two runs used merge 17's diagnostic NRO `853964b2…`, not its release NRO `c1ced861…`
 (the file installed on November 26; `artifacts/phase23/next-build/gate-5df3d9dc/nro/`). Receipts:
@@ -406,7 +667,7 @@ files named below were read for this page.
 | Wall verdict | **Defect accepted** (13:20:24Z). **What it is, read from the stage's lines and not run** (preview-vis-sol, 13:42:30Z; ruled 13:43:10Z): the point is not inside the wall. The Training floor's solid run is x −80 to 620, so the point is 1.72 left of its end and the stage rule rightly answers open (`src/model/stage_geometry.rs` lines 222 to 254 read one column through the point and meet no wall). The fighter's body has width: it rests at x −86.85 when asked to x −81.72 and is exact at x −86.96, which fits a body pushed until it clears a wall at x −80. The editor does not read back where the game left the body. Fixed in the next build. |
 | First X on a capture: two takes | In `tut-5df3d9dc-yoga-3`, Y snapped In but X refused with In selected; no input frame was fed (12:46:48Z). In the control take, L deselected In; after a one-second wait X previewed on the CPU (12:51:05Z). The earlier successful release snap on `eb39d6bc` previewed on Player 1. |
 | S1 on the diagnostic build (third flight, 13:24:09Z) | In stepped to frame 7 and X played nothing, as wanted. Y moved In to 6. X then gave one `playing=1` line, the notice "Let the CPU settle to idle and leave the ledge before previewing", and no input frame; the CPU's status changed one frame after the check. No Replay-window preview fed a frame in that whole boot, so S2 and S3 show their snap and not a working preview. The Crop preview of a recorded macro (SP-5) did feed. On `eb39d6bc`'s release build the same steps fed 101 frames. **Classified at the time as an install 6 regression pending a release smoke test** (13:24:36Z, tr-primary-2); whether it comes from merge 17 or from the diagnostic flavour is not separated |
-| Why X can refuse (code reading, not a fix test) | A first temporary checkpoint requires a grounded, idle CPU (`states/preview.rs:128–137`). The request can reach it before the scrub hold releases the CPU. A macro loading its own start save bypasses that checkpoint. The team assigned a fix after this run. Snapped X later played in both preview release boots (see [smoke tests](#smoke-tests-on-the-release-file)). |
+| Why X can refuse (code reading, not a fix test) | A first temporary checkpoint requires a grounded, idle CPU (`states/preview.rs:128–137`). The request can reach it before the scrub hold releases the CPU. A macro loading its own start save bypasses that checkpoint. The team assigned a fix after this run. Snapped X later played in both preview release boots (see [smoke tests](#evidence-rc15-installs--smoke-tests-on-the-release-file)). |
 
 - **Not covered by these runs:** a smoke boot of install 6's release NRO or a fresh waiting-room pair.
 - **Not shown in the two test boots:** release through a fighter swap or a scene change (SP-12, SP-13), or a
@@ -414,7 +675,9 @@ files named below were read for this page.
   filming boot, the deselected-In control **did** feed inputs; it is not a pass for X with In still selected.
   The playhead rows passed on Yoga; the filming boot also showed browsing, Y to a move and both cuts on one macro.
 
-## Preview build (`cc71537c`)
+<a id="evidence-rc15-installs--preview-build-cc71537c"></a>
+
+### Preview build (`cc71537c`)
 
 | Fact | Value | Where |
 | --- | --- | --- |
@@ -426,7 +689,9 @@ files named below were read for this page.
 Staged on 2026-11-27, then removed when the install was cancelled. None of these preview runs used a console.
 
 
-### Smoke tests on the release file
+<a id="evidence-rc15-installs--smoke-tests-on-the-release-file"></a>
+
+#### Smoke tests on the release file
 
 Two boots on one host (the XPS). Neither log has a panic, abort, crash or unmapped-access line. Source: dup-audit,
 inbox 2026-11-26 23:11:03Z and 2026-11-27 00:38:37Z. For this page the two posts were read, not the row files.
@@ -449,7 +714,9 @@ inbox 2026-11-26 23:11:03Z and 2026-11-27 00:38:37Z. For this page the two posts
   boot Player 1 timed out twice; the roster applied the switch three game frames after close.
 - Four clips were made in the second boot (`artifacts/phase23/final-smoke-media/`). At the time, all four were withheld from the pages and three were marked for filming again after the fixes.
 
-### Eden, on the diagnostic build of the same commit
+<a id="evidence-rc15-installs--eden-on-the-diagnostic-build-of-the-same-commit"></a>
+
+#### Eden, on the diagnostic build of the same commit
 
 Source: place-t1a, inbox 2026-11-26 23:01:24Z and 23:19:06Z. Receipts:
 `artifacts/phase23/scrub-moves/proof/eden/evidence/`. The diagnostic file is sha256 `b156c5ff…`.
@@ -459,7 +726,9 @@ Source: place-t1a, inbox 2026-11-26 23:01:24Z and 23:19:06Z. Receipts:
 | `moves-proof-yoga-01` | Frames 114, 130 and 144 of a take were shown exactly, with no hitbox, effect or sound from the held fighters. X and B from a posed frame let the fighters go. On two rows the closing check gave no verdict: both fighters stood up to 0.8 units off their places after B |
 | `moves-proof-yoga-02` | The slide. With 120 frames on the posed frame before B, both fighters stayed in place for all 474 and 475 frames watched. With B straight after the pose, both came to rest 0.5754 units from their places |
 
-### Slide traces on the release file
+<a id="evidence-rc15-installs--slide-traces-on-the-release-file"></a>
+
+#### Slide traces on the release file
 
 Both Yoga traces used the staged release `78db86f5…`, not the diagnostic file. Receipts are in each run's
 `TRACE-REPORT.txt` under `artifacts/phase23/scrub-moves/proof/eden/evidence/`.
@@ -469,7 +738,9 @@ Both Yoga traces used the staged release `78db86f5…`, not the diagnostic file.
 | `moves-trace-yoga-01` | Both fighters returned to their places. In four of six quick releases from a pose the game then pushed them apart on the release tick and the next; each slid 0.592 units. Neither fighter slid in the unposed control. |
 | `moves-trace-yoga-02` | The push boxes moved back to the fighters' restored centres but kept the posed width for a few ticks. The boxes still overlapped, so the game applied a fresh push. One of three posed releases slid (0.6355 units each); the unposed control stayed in place. |
 
-### Not covered
+<a id="evidence-rc15-installs--not-covered"></a>
+
+#### Not covered
 
 - The preview install was cancelled. No console run was recorded.
 - Captures keeping their animation has host tests only, including one where a second process reads the files back.
