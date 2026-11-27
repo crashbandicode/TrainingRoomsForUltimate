@@ -174,8 +174,7 @@ relative to you, on either side of the CPU.
 of Down. The last four panels are from Eden. The thinner, dimmer lines are the look kept for rc.13.
 [DI chip decision](DECISIONS.md#rc13-di-lines-di-chips-like-the-game-s-blue-di-indicator-rc-13-item-2-e1-x1)*
 
-*CPU Level* (CPU › Level: Off, or Lv 1–9) replaces Training's own CPU level. When the two differ as Training starts, a
-notice says so once.
+If you choose a [CPU Level](menu/cpu.md#cpu-level) that differs from Training's own level, a notice shows both once per Training session.
 
 **Clip** [`rc11-cpu-level.gif`](media/rc11-cpu-level.gif): CPU Level set from Off to Lv 7; the CPU card at Lv. 3; the notice names both levels; the CPU fights at Lv 7
 

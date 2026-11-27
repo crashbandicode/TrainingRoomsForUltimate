@@ -35,7 +35,7 @@ A on a save state, macro or chain opens its own screen ([what each row is for](.
 | <a id="playback-slot"></a>Playback slot | None, Slot 1 to 5 | The CPU plays the macro when it picks that slot. Up to 600 frames. [Clip](../media/rc14-playback-slot.gif) |
 | Trim | Start, End, Both, Off | Skips neutral frames at those sides in playback. The file is unchanged. |
 | Crop | Opens the clip editor | Saves a shorter copy; the original stays ([Crop](../guide/recording.md#crop)). |
-| Make combo | Plays once on Player 1 | Hits make a combo. A pass with no hit makes an input drill. |
+| Make combo | Plays once on Player 1 | [What the take can save](../guide/recording.md#practise-a-combo-or-input-drill). |
 | + New chain, Edit chain | Opens the numbered picker | [Put macros in playback order](../guide/recording.md#chains). |
 | Duplicate, Rename, Delete | | Delete removes the file at once, without asking. [Clip](../media/rc13-save-duplicate-delete.gif) |
 
