@@ -31,12 +31,13 @@ They crop a 1842×1036 region at (39, 44) from the 1080p capture and scale it to
 yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows name their own source runs.
 
 Every clip of this table is cut with that same crop, except `tut-save-load.mp4`, which is the whole frame. The first,
-middle and last frame of all 34 published files were read on 2026-11-27: none shows the mark. Ten lose content of the
-game's own at the top edge and are listed for a whole-frame take:
+middle and last frame of all 34 files then published were read on 2026-11-27: none shows the mark. Ten lost content
+of the game's own at the top edge. Two of those, `tut-input-special-direction` and `tut-spacing-grader`, were retired
+the same day with two other clips; the eight below are still published and are listed for a whole-frame take:
 
 | Cut by the crop | Clips |
 | --- | --- |
-| The frame strip's top rows (IN, "now", the ADVANTAGE heading) | `tut-menu-tour`, `tut-menu-change-option`, `tut-controls-change-chord`, `tut-input-delay`, `tut-input-display`, `tut-input-drill-record`, `tut-input-special-direction`, `tut-spacing-grader` |
+| The frame strip's top rows (IN, "now", the ADVANTAGE heading) | `tut-menu-tour`, `tut-menu-change-option`, `tut-controls-change-chord`, `tut-input-delay`, `tut-input-display`, `tut-input-drill-record` |
 | The recording indicator ("REC P1", top left) | `tut-record-macro`, `tut-input-drill-record` |
 | Break the Targets' count and clock (top left) | `tut-break-the-targets` |
 
