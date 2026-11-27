@@ -94,37 +94,18 @@ INDEXES = ("README.md", "docs/README.md")
 # version rules (`version-stale`, `version-name`) skip them. Links and orphans are still checked. Player pages (docs/guide,
 # docs/menu and the top-level references) are never listed here as a folder.
 HISTORICAL = [
-    ("docs/RELEASE-NOTES-rc*.md", "the release notes of a past release describe that release"),
-    ("docs/DECISIONS.md", "the record of what was decided and when"),
-    ("docs/decisions/*", "decision records and their mock-ups, dated"),
-    ("docs/design/*", "design notes of the build they were written for"),
-    ("docs/provenance/*", "where carried code and assets came from, per build"),
-    ("docs/test-provenance/*", "which tests covered which package, per build"),
-    ("docs/menu-mockup/*", "mock-ups of a menu before it was built"),
-    ("docs/menu-redesign.md", "the redesign proposal, dated"),
+    ("docs/RELEASE-NOTES.md", "dated release notes"),
+    ("docs/EVIDENCE.md", "dated build evidence"),
+    ("docs/DECISIONS.md", "dated decisions and their illustrations"),
+    ("docs/PROVENANCE.md", "code and asset origins"),
+    ("docs/TEST-PROVENANCE.md", "test origins and past coverage"),
+    ("docs/BUDGETS.md", "size plans and measurements"),
     ("docs/ROADMAP.md", "planned work as of its date"),
-    ("docs/MEDIA.md", "where each clip was recorded: every row names the build it was shot on"),
+    ("docs/MEDIA.md", "recording builds"),
     ("docs/FEATURE-LEDGER.md", "test evidence per build"),
-    ("docs/CODE-REDUCTION-rc10.md", "a measurement of rc.10"),
-    ("docs/COVERAGE-rc9.md", "a measurement of rc.9"),
-    ("docs/TEST-CUT-LEDGER-rc9.md", "a measurement of rc.9"),
-    ("docs/SIZE-PLAN.md", "the size plan and its history"),
-    ("docs/resource-costs.md", "a measurement"),
-    ("docs/ASSET-REPRODUCTION-R15.md", "a record of how assets were reproduced"),
-    ("docs/MII.md", "developer notes on the Mii work, per build"),
 ]
 
-# Pages no link chain from README.md or docs/README.md reaches, on purpose (docs/README.md links these folders).
-ORPHAN_OK = [
-    ("docs/COMBOS.md", "a 'Moved' stub kept at the old path: older release pages and source comments cite it"),
-    ("docs/FRAME-STRIP.md", "a 'Moved' stub kept at the old path: older release pages and source comments cite it"),
-    ("docs/RECORDING.md", "a 'Moved' stub kept at the old path: older release pages and source comments cite it"),
-    ("docs/decisions/*", "project records: docs/README.md links the folder"),
-    ("docs/design/*", "project records: docs/README.md links the folder"),
-    ("docs/provenance/*", "project records: docs/README.md links the folder"),
-    ("docs/test-provenance/*", "project records: docs/README.md links the folder"),
-    ("docs/menu-mockup/*", "project records: docs/README.md links the folder"),
-]
+ORPHAN_OK = []
 
 # Sentences that say "newest" or "current" about something other than the build, or are quoted from a past state.
 # (path, text the sentence contains, reason). An entry whose text is gone fails as `allowlist-stale`.
