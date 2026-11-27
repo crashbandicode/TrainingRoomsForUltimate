@@ -54,3 +54,6 @@ mod epoch_tests;
 
 #[cfg(test)]
 mod wizard_tests;
+
+#[cfg(test)]
+mod aim_tests;
