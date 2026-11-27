@@ -123,39 +123,6 @@ fn the_spot_rows_sit_next_to_their_features() {
     }
 }
 
-/// The Loading rows' help lines against the code they describe. Ready Fighter Bodies said "how many bodies a ready
-/// fighter keeps": the setting is per role and counts the fighter on screen (`cycle_preload_config::Settings`,
-/// `bank_members`). Swap groups said Pokémon Trainer and Pyra / Mythra both need 3 free Ready Fighters: a group is
-/// placed whole, and Pyra / Mythra's has two bodies.
-fn the_loading_help_lines_say_what_the_code_does() {
-    use crate::engine::preload::cycle_preload_config::{self, BANK_MEMBERS_MAX, BANK_MEMBERS_MIN, READY_FIGHTERS_MIN};
-    use crate::engine::swap::body_bank::Members;
-    let row = |title: &str| ROWS.iter().find(|r| r.title == title).unwrap_or_else(|| panic!("no row {title}"));
-    for (title, help) in [
-        ("Cycle Preload", "How many fighters per role are kept ready for swaps.\nOff loads each fighter when you swap."),
-        ("Preload", "What is kept ready: fighters, Kirby hats, or both."),
-        ("Ready Fighters", "The total number of fighters kept ready across roles,\nincluding the two on screen."),
-        ("Ready Hats", "How many Kirby hats are kept ready, apart from the fighters.\nA hat of a ready fighter shares its body."),
-        ("Ready Fighter Bodies",
-            "How many fighters each role keeps in its own slot, counting\nthe one on screen. More means quicker swaps. Off: no groups."),
-        ("Group Swap", "The master switch of the group swaps below.\nOff turns every group off."),
-        ("Swap groups",
-            "Which swaps are done as a group. A greyed entry says why.\nPT / Aegis groups need free Ready Fighters: PT 3, Aegis 2."),
-    ] {
-        assert_eq!(row(title).help, help, "{title}");
-    }
-    // Per role, the fighter on screen included: Off, or a slot of two or three; the total counts the two on screen.
-    assert!(matches!(row("Ready Fighter Bodies").control, Control::Dropdown(list) if list.iter().copied().eq(["Off", "2", "3"])));
-    assert_eq!((BANK_MEMBERS_MIN, BANK_MEMBERS_MAX, READY_FIGHTERS_MIN), (2, 3, 2));
-    // Off leaves no group at all, whatever Group Swap says.
-    let mut settings = cycle_preload_config::Settings::default();
-    assert!(settings.groups_enabled());
-    settings.bank_members = 0;
-    assert!(!settings.groups_enabled());
-    // Pokémon Trainer's group is three bodies and Pyra / Mythra's two.
-    assert_eq!((Members::native_group(0x24).map(Members::count), Members::native_group(0x5a).map(Members::count)), (Some(3), Some(2)));
-}
-
 fn link_history_choices_persist() {
     let mut m = menu();
     let row = goto(&mut m, "link_history");
@@ -1299,7 +1266,6 @@ fn case_table() {
         ("state_change_resets_invalid_move_and_config_rejects_conflict", state_change_resets_invalid_move_and_config_rejects_conflict as fn()),
         ("not_mashable_rows_are_greyed_skipped_and_never_confirmed", not_mashable_rows_are_greyed_skipped_and_never_confirmed as fn()),
         ("the_spot_rows_sit_next_to_their_features", the_spot_rows_sit_next_to_their_features as fn()),
-        ("the_loading_help_lines_say_what_the_code_does", the_loading_help_lines_say_what_the_code_does as fn()),
         ("link_history_choices_persist", link_history_choices_persist as fn()),
         ("legacy_settings_default_link_history_to_on", legacy_settings_default_link_history_to_on as fn()),
         ("spacing_grader_row_after_hitbox_visualization", spacing_grader_row_after_hitbox_visualization as fn()),

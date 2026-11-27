@@ -2494,3 +2494,7 @@ mod practice_menu_tests;
 #[cfg(test)]
 #[path = "bridge_ack_tests.rs"]
 mod bridge_ack_tests;
+
+#[cfg(test)]
+#[path = "loading_help_tests.rs"]
+mod loading_help_tests;
