@@ -57,12 +57,12 @@ Shipped 2026-11-27. The [Tech practice guide](../guide/tech-practice.md) covers 
 
 ## Requirement trace
 
-| Requirement and decision time (UTC) | Regression test |
+| Requirement clause and decision time (UTC) | Regression test |
 | --- | --- |
 | Retry a draw without a start (05:40:04) | `an_unsolvable_draw_is_drawn_again_and_the_stop_is_a_listed_restriction` |
 | Avoid the factory-settings stop (05:40:04) | `factory_draws_on_a_flat_floor_never_need_a_second_candidate` |
 | Explain the stop for impossible player values (05:40:04) | `an_unsolvable_draw_is_drawn_again_and_the_stop_is_a_listed_restriction` |
-| Bound retries (05:50:07), including the initial draw (05:50:07) | `an_attempt_draws_eight_candidates_in_all` |
+| Count the initial draw toward the eight-candidate bound (05:50:07) | `an_attempt_draws_eight_candidates_in_all` |
 | Share line-parameter membership across producers and consumers (05:50:07) | `every_position_of_every_producer_is_a_target_the_solver_takes` |
 | Reject off-segment targets (05:50:07) | `a_target_off_its_segment_is_refused` |
 | Apply membership to wizard, Set and Random starts (06:38:56) | `off_segment_targets_never_replace_the_wizard_pick_or_get_a_manual_start` |

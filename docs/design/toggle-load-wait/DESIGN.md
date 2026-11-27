@@ -89,7 +89,7 @@ This removed `tick_fighter_load`, `fighter_load_passes` and the old timeout mess
 
 ## Requirement trace
 
-| Requirement from the 00:40:25Z and 01:02:26Z decisions | Test |
+| Requirement clause (00:40:25Z and 01:02:26Z decisions) | Test |
 | --- | --- |
 | Wait for the live fighter kind or an explicit refusal | `an_outcome_after_600_passes_still_ends_the_load` |
 | Keep Loading visible beyond 600 worker passes | `an_outcome_after_600_passes_still_ends_the_load` |
