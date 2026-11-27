@@ -79,9 +79,9 @@ The optional `tr.menu/1` test bridge publishes these keys:
 
 ## Requirement trace
 
-| Operator clause | Design | Test |
+| Requirement clause | Design | Test |
 | --- | --- | --- |
-| "I'd like to maintain the functionality": the zones | Everything outside the two zones is dimmed; each zone is a clear window. | `crop_window_dims_everything_outside_both_zones` `crop_window_with_one_side_or_a_zone_off_the_screen` |
+| Keep the functionality: the zones | Everything outside the two zones is dimmed; each zone is a clear window. | `crop_window_dims_everything_outside_both_zones` `crop_window_with_one_side_or_a_zone_off_the_screen` |
 | Keep the boundaries and the active edge | Four opaque edges a side, just outside the zone; the step's edge is thicker and carries a handle. | `crop_window_edges_lie_outside_the_zone_and_the_active_one_is_thicker` `crop_window_puts_a_handle_on_the_boundary_the_step_moves` `crop_window_handles_require_the_active_edge_on_both_axes` |
 | Keep which side is inward / off-stage | Yellow inner edge, purple outer edge, and one yellow line a side at the inner limit. | `crop_window_marks_the_inner_limit_once_a_side` |
 | Keep the inset view | The inset keeps its backing and contour and gets its own limits and edges, after every world rectangle. | `crop_window_draws_the_inset_after_the_world_view` |

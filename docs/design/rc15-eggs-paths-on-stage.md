@@ -109,7 +109,7 @@ The seeds named in `a_spot_with_room_among_the_thirty_two_wins_and_pop_up_is_for
 
 ## Requirement trace
 
-| Operator clause | Design | Test |
+| Requirement clause | Design | Test |
 | --- | --- | --- |
 | Moving paths are restricted to the stage | The box a moving path is fitted into is cut to the floor line the target appeared over, a radius in from its ends and a radius above it | `moving_paths_stay_over_the_stage`, `moving_paths_keep_to_their_own_floor_across_a_gap` |
 | A target does not end up off the stage where it cannot be reached | The flight is scaled and its start moved to fit that box, the start is held inside it and every tick is kept inside it, so the rest is over the target's own floor | `a_boomerang_rests_over_the_floor_it_appeared_over`, `moving_paths_keep_to_their_own_floor_across_a_gap`, `a_flight_starts_inside_its_box` |

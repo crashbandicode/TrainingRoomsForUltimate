@@ -1857,7 +1857,7 @@ fighter written onto it. The cursor already stops on the readable end of the flo
 
 ### Planned tests and proof (not written, not run)
 
-| Operator clause | Design | Planned test |
+| Requirement clause | Design | Planned test |
 | --- | --- | --- |
 | Player 1 returns to the stage successfully after a successful edgeguard for it to count | GJ1 rule A: the return window, the 10 s limit, a Player 1 KO or the limit is a miss | model tests of the session for each of the five card texts; a source test of the two native reads |
 | Use the same crosshair as Break the Targets instead of picking a quadrant | GJ2: one crosshair page with the shared controls; side, ledge and upper or lower read from the point | model tests of the allowed region, the two side defaults, the remembered start and the bests' bucket |
