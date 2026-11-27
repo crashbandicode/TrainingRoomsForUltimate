@@ -170,11 +170,16 @@ pub(super) unsafe fn free_at(body: usize, at: [f32; 2]) -> bool {
 /// with no blend from the pose, and the game makes the body's ground shape again from those joints, before
 /// `restore` writes its place. The box the game pushes fighters by is taken from that shape when the place is
 /// written: made from the posed joints, it pushed the two fighters apart after the release. Facing and situation
-/// come first, so the shape is the one of the side the body will face.
+/// come first, so the shape is the one of the side the body will face. The no-blend is a one-shot of the game's:
+/// it is armed only when the change is certain to follow (its native granted, and the fighter has the animation).
 pub(super) unsafe fn restore_posed(body: usize, origin: Origin, motion: u64) {
+    use crate::model::sites_pkg2::MOTION_CHANGE_HOOK_OFFSET;
     state::set_lr(body, origin.facing);
     state::set_situation_kind(body, konst(if origin.grounded { C::SituationGround } else { C::SituationAir }));
-    natives::change_motion_cut(body, motion, 0.0, 1.0, true);
+    if game::granted(MOTION_CHANGE_HOOK_OFFSET) && natives::is_anim_resource(body, motion) {
+        natives::set_next_no_comp(body);
+    }
+    natives::change_motion(body, motion, 0.0, 1.0, true);
     natives::ground_update_shape(body, true);
     restore(body, origin);
 }

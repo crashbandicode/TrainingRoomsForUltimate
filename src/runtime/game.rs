@@ -254,27 +254,17 @@ pub mod natives {
     /// starts the animation at `frame` and runs none of them (the native's last argument, true).
     /// Returns whether the guarded native was called, not whether the game accepted the motion.
     pub unsafe fn change_motion(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool) -> bool {
-        change_motion_with(accessor, motion, frame, rate, run_lines, || ())
+        if let Some(f) = at::<extern "C" fn(usize, u64, f32, f32, bool, f32, bool, bool) -> u64>(sites_pkg2::MOTION_CHANGE_HOOK_OFFSET) {
+            f(accessor, motion, frame, rate, false, 0.0, false, !run_lines);
+            true
+        } else { false }
     }
 
-    /// The one call of the native. `arm` runs once the native is in hand, immediately before it.
-    unsafe fn change_motion_with(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool, arm: impl FnOnce()) -> bool {
-        let Some(f) = at::<extern "C" fn(usize, u64, f32, f32, bool, f32, bool, bool) -> u64>(sites_pkg2::MOTION_CHANGE_HOOK_OFFSET) else { return false };
-        arm();
-        f(accessor, motion, frame, rate, false, 0.0, false, !run_lines);
-        true
-    }
-
-    /// `change_motion` with no blend from the animation before it. `MotionModule::set_next_no_comp(accessor)` arms
-    /// that for the fighter's next change, once; left armed, an unrelated change would use it. So it is armed only
-    /// when the change follows at once and is certain to run: the change's native in hand, and the fighter has
-    /// the animation. Otherwise the change is the plain one.
-    pub unsafe fn change_motion_cut(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool) -> bool {
-        change_motion_with(accessor, motion, frame, rate, run_lines, || {
-            if is_anim_resource(accessor, motion) {
-                at::<extern "C" fn(usize)>(sites_pkg2::MOTION_SET_NEXT_NO_COMP_OFFSET).map_or_else(Default::default, |arm| arm(accessor));
-            }
-        })
+    /// `MotionModule::set_next_no_comp(accessor)`: the fighter's next animation change starts with no blend from the
+    /// one before it, once. Left armed, an unrelated change would use it: the caller arms it only when its own
+    /// change is certain to follow at once.
+    pub unsafe fn set_next_no_comp(accessor: usize) {
+        at::<extern "C" fn(usize)>(sites_pkg2::MOTION_SET_NEXT_NO_COMP_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }
 
     /// `GroundModule::update_shape(accessor, update)`: the game makes the fighter's ground shape again from its
