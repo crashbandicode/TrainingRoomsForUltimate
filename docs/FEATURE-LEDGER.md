@@ -208,4 +208,4 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 | # | Feature | Cat | Eden rows | Eden verified (build, run) | Switch | Clip |
 | --- | --- | --- | --- | --- | --- | --- |
-| 112 | Frame strip scrollback: hold R3 and D-pad Left / Right, release R3 to return live | install 4 | not yet assigned | no test row. Seen in the install 4 film of 2026-11-25 on `a945b0c1`: the strip scrolls back and returns live ([release notes](RELEASE-NOTES-rc15.md#the-input-display)) | untested | `i4-scrollback-zoom.mp4`, filmed with the test overlay showing; no clean clip |
+| 112 | Frame strip scrollback: hold R3 and D-pad Left / Right, release R3 to return live | install 4 | not yet assigned | no test row. Seen in the install 4 film of 2026-11-25 on `a945b0c1`: the strip scrolls back and returns live ([release notes](RELEASE-NOTES-rc15.md#the-input-display)) | untested | The film `i4-scrollback-zoom.mp4` showed the test overlay and was removed on 2026-11-27; no clean clip |
