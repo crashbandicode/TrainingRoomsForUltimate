@@ -10,8 +10,8 @@
 |---|---|
 | <a id='changing-a-chord'></a>1 | Open [Button chords](../menu/display-and-controls.md#button-chords); choose an action with A. |
 | 2 | Press X, release every button, then hold your new combination and release it. |
-| 3 | A keeps it, B cancels, Y clears it. Close the menu to try it. |
-| 4 | Check the other bindings if the combination triggers two actions. |
+| 3 | Press A to save or B to cancel. To unbind, press Y then A. |
+| 4 | Close the menu and try the chord. Check other bindings if two actions trigger. |
 
 | If you use | What changes |
 |---|---|

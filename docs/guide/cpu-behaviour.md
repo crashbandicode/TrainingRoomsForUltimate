@@ -10,8 +10,9 @@
 |---|---|
 | <a id='mash-and-followup'></a>Pick a first response | Choose Jump in **Mash**. |
 | Add a second action | Choose Air Dodge in **Followup**. |
-| <a id='mash-triggers'></a>Tell it when | Tick Hitstun in **Mash Triggers**, then hit the CPU and watch its response. |
-| <a id='situation-overrides'></a>Change just this situation | Set the Hitstun override to Up Special; other situations keep their Mash choice. |
+| <a id='mash-triggers'></a>Tell it when | Open **Mash Triggers**. Hitstun starts ticked. Press A only if the box is clear. |
+| Try the response | Close the menu, hit the CPU, then watch for Jump followed by Air Dodge. |
+| <a id='situation-overrides'></a>Change just this situation | In **Situation overrides**, choose Hitstun, then Up Special. Other situations keep Mash. |
 
 ## Steer a launch
 
@@ -21,9 +22,12 @@
 
 | Try it | What to do |
 |---|---|
+| Save the starting position | [Save both fighters](save-states.md) before the first hit. |
 | <a id='direction-chips'></a>Choose DI | Open **DI Direction**, move to a chip and press A. |
 | Weight one direction | Press A again to increase its weight; the sixth press clears it. |
-| Compare | Hit the CPU, switch direction, then repeat from the [same saved position](save-states.md). |
+| Try the first direction | Close the menu and launch the CPU. |
+| Switch directions | Reopen **DI Direction**. Press Y on the first chip, then A on the second. |
+| Compare | Close the menu, load the saved position and repeat the same hit. |
 | <a id='delay-rows'></a>Delay a response | Use a [delay row](../menu/cpu.md#ledge-delay); choose ticked values or a range, not both. |
 | <a id='the-playback-slot-actions'></a><a id='recordings-and-the-cpu-settings'></a>Use a recording instead | Assign a macro's [Playback slot](../menu/recording.md#playback-slot), then select that action in Mash. |
 
