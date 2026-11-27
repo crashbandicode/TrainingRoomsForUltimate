@@ -35,6 +35,8 @@ A start write that finds Player 1 idle is not watched and follows the existing p
 
 ## Cursor mark and remembered start
 
+The Area page described here was part of the earlier wizard. [Guard the Edge setup](../guide/guard-the-edge.md) now starts on the CPU point; Y there tries the opposite side.
+
 The CPU start uses the whole marker. The Area step shows its coordinates without the word CPU. The Percent and Player steps are unchanged because the sealed rows' readers (`guard_rows.py:37–64`) tell the pages apart by that word and by the word start. A five-dot chevron at the picture border points toward a start outside the picture, on the steps whose notice shows the CPU coordinates: Area, CPU and Preview (tr-primary-2 ledger, 2026-11-22 08:49:08Z). On Percent and Player the mark is drawn when it is in the picture, and nothing points to it when it is not.
 
 The wizard records whether the player edited the CPU start. A stick move that changes the point is an edit, also when a later move brings the point back onto the default. Choosing an area and X assign a default and clear the edit. On a plain Start, a start saved without an edit follows the current fighter's default for its area, and a percent-dependent default follows the current percent. A start saved with an edit, and Juggler's saved start, stay exactly where they were. Set up… always opens on the current fighter's defaults.

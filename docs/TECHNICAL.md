@@ -237,7 +237,7 @@ Where the recording code is (moved here from the Recording guide; named by funct
 | Placement picker | Change placement and Place fighters before Record share `Wizard` in `src/model/record_place.rs`. The fighter-frame code is in `src/runtime/features/record_place.rs`. |
 | Placement on and off stage | `tech::floors` supplies traced floors for `src/model/floor_hop.rs`. Switching to Off stage uses `off_stage_spot` and the rules in `src/model/stage_geometry.rs`. |
 | Saving and applying placement | In `rr_host.rs`, `commit_placement` writes the edited fields, `active_placement_ids` finds the active macro and its start save, and `warp_pair` applies the macro's offset. |
-| Replay window | `Owners::REPLAY_LOADING` in `src/model/input_delay.rs` lets a capture load without blocking its own request. It is not the visible editor's fighter-switch gate. |
+| Replay window | Capture loads and [fighter switches](design/toggle-load-wait/DESIGN.md) use `REPLAY_LOADING`: neutral Player 1 input, unblocked roster. |
 | Replay fighter mismatch | A chain checks its first macro (`screen=mismatch ask=macro1`). For a replay Mii, `installable` in `src/model/mii_install.rs` supplies a configuration the game can load. |
 | [Named setup actions](guide/save-states.md#using-a-setup) | `Pane::leads_to` in `src/editors/setups.rs` distinguishes opening, restoring and binding; `src/model/state/setup_transaction.rs` validates the restore. |
 | Setup files | `src/model/state/setup.rs` defines the format. Saving creates a new file; renaming updates the existing file and keeps its ID (`save_name` in `src/editors/setups.rs`). |
