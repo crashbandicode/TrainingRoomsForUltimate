@@ -74,7 +74,8 @@ fn the_command_hooks_hand_over_and_phase_8_applies_before_it_samples() {
     ordered(body(src, "install"), &["Handoff::new()", "store.table.link(link)", "articles.link(link)",
         "install_hook!(hitbox_attack_hook)"]);
     ordered(body(src, "draw_articles"), &["articles.settle()", "finish_articles"]);
-    let handoff = include_str!("../src/model/handoff.rs").split("#[cfg(test)]").next().unwrap();
+    let (handoff, _) = include_str!("../src/model/handoff.rs").split_once("#[cfg(test)]\nmod tests {").unwrap();
+    assert!(!handoff.contains("#[cfg(test)]"));
     for forbidden in ["unsafe", "Mutex", ".lock()", "Box::new", "vec!", "format!"] {
         assert!(!handoff.contains(forbidden), "{forbidden}");
     }

@@ -420,6 +420,7 @@ pub struct Members {
     pub ids: [(u32, usize); ARTICLES],
     pub ages: [u64; ARTICLES],
     pub attacking: [bool; ARTICLES],
+    pub touched: [u64; ARTICLES],
 }
 
 impl Members {
@@ -431,9 +432,17 @@ impl Members {
         let replaced = (self.ids[i] != (id, key)).then(|| std::mem::replace(&mut self.ids[i], (id, key)));
         if replaced.is_some() {
             (self.ages[i], self.attacking[i]) = (stamp, false);
+            self.touched[i] = 0;
         }
         self.attacking[i] |= attacking;
         Some((i, replaced))
+    }
+
+    /// A command hook's track at `stamp`: the object attacks, and its slot remembers the command.
+    pub fn command(&mut self, id: u32, key: usize, stamp: u64) -> Option<usize> {
+        let (i, _) = self.track(id, key, true, stamp)?;
+        self.touched[i] = stamp;
+        Some(i)
     }
 }
 
@@ -450,18 +459,20 @@ pub struct Articles {
     /// then; what the pass set since goes out with the next change.
     link: Option<&'static Handoff>,
     seen: u64,
+    applied: u64,
     flags: [bool; ARTICLES],
 }
 
 impl Articles {
     pub const fn new() -> Articles {
         Articles {
-            members: Members { ids: [(0, 0); ARTICLES], ages: [0; ARTICLES], attacking: [false; ARTICLES] },
+            members: Members { ids: [(0, 0); ARTICLES], ages: [0; ARTICLES], attacking: [false; ARTICLES], touched: [0; ARTICLES] },
             clock: 0,
             sets: [HandleSet::new(); ARTICLES],
             evicted: false,
             link: None,
             seen: 0,
+            applied: 0,
             flags: [false; ARTICLES],
         }
     }
@@ -520,17 +531,26 @@ impl Articles {
     }
 
     pub fn forget(&mut self, id: u32, board: &mut Board) {
-        let keys = self.change(|members, _| {
+        let applied = self.applied;
+        let (keys, retained) = self.change(|members, _| {
             let mut keys = [0; ARTICLES];
+            let mut retained = [false; ARTICLES];
             for (i, key) in keys.iter_mut().enumerate() {
                 if members.ids[i].0 == id {
-                    (*key, members.ids[i]) = (members.ids[i].1, (0, 0));
+                    *key = members.ids[i].1;
+                    if members.touched[i] > applied {
+                        (members.ages[i], members.attacking[i]) = (members.ages[i].max(applied + 1), true);
+                        retained[i] = true;
+                    } else {
+                        members.ids[i] = (0, 0);
+                    }
                 }
             }
-            keys
+            (keys, retained)
         });
-        for key in keys {
+        for (i, key) in keys.into_iter().enumerate() {
             board.clear(key);
+            if retained[i] { self.sets[i].forget(); }
         }
     }
 
@@ -560,6 +580,7 @@ impl Articles {
     pub fn apply_grabs(&mut self, each: &mut dyn FnMut(&Record, Applied)) -> usize {
         let Some(link) = self.link else { return 0 };
         self.settle();
+        self.applied = self.seen;
         let mut count = 0;
         for i in 0..ARTICLES {
             while let Some(record) = (self.members.ids[i].0 != 0).then(|| link.next_waiting(FIGHTER_SETS + i, self.members.ages[i], self.seen)).flatten() {

@@ -620,6 +620,7 @@ fn case_table() {
         ("a_rebound_cancels_the_grabs_before_it_and_keeps_those_after", a_rebound_cancels_the_grabs_before_it_and_keeps_those_after as fn()),
         ("linked_tables_follow_the_same_rule_as_their_own", linked_tables_follow_the_same_rule_as_their_own as fn()),
         ("a_command_before_the_pass_holds_its_locks_is_applied_before_the_pass", a_command_before_the_pass_holds_its_locks_is_applied_before_the_pass as fn()),
+        ("a_catch_during_the_pass_survives_the_passes_forget", a_catch_during_the_pass_survives_the_passes_forget as fn()),
         ("a_rebound_clears_only_its_own_fighters_published_orbs_at_once", a_rebound_clears_only_its_own_fighters_published_orbs_at_once as fn()),
         ("a_rebound_during_the_sampling_pass_hides_what_the_pass_published", a_rebound_during_the_sampling_pass_hides_what_the_pass_published as fn()),
     ]);
@@ -957,6 +958,83 @@ fn a_command_before_the_pass_holds_its_locks_is_applied_before_the_pass() {
                 b.sets[b.find_life(key, life).unwrap()].len()
             };
             assert_eq!(count, if before_lock_point { 24 } else { 25 });
+        }
+    }
+}
+
+fn a_catch_during_the_pass_survives_the_passes_forget() {
+    use model::handoff::Put;
+    let generations = hitbox::FighterGenerations::new();
+    for case in 0..5 {
+        let mut a = Box::new(hitbox::SetTable::new());
+        let mut aa = orbs::Articles::new();
+        let (link, mut b, mut ab) = linked();
+        let mut board_a = Board::new();
+        let mut board_b = Board::new();
+        board_a.begin_frame(7);
+        board_b.begin_frame(7);
+        let initially_tracked = match case { 0 | 4 => 1, 1 => 4, _ => 0 };
+        for id in 1..=initially_tracked {
+            let key = id as usize * 16;
+            aa.track(id, key, Some(&mut board_a), true).unwrap();
+            ab.track(id, key, Some(&mut board_b), true).unwrap();
+        }
+        drain(&mut b, &mut ab, &generations);
+        if case == 2 || case == 3 {
+            aa.track(1, 16, Some(&mut board_a), false).unwrap();
+            ab.track(1, 16, Some(&mut board_b), false).unwrap();
+        }
+        let slot = aa.tracked().iter().position(|&(id, _)| id == 1).unwrap();
+        board_a.publish_article(16, 1, None, [orb(16.0)].into_iter());
+        board_b.publish_article(16, 1, None, [orb(16.0)].into_iter());
+        aa.forget(1, &mut board_a);
+        let commands = match case {
+            0 | 3 => vec![single_shape(16, 1, None, 201)],
+            1 => vec![
+                single_shape(48, 3, None, 101),
+                single_shape(48, 3, None, 102),
+                Command::Wind { key: 80, id: 5 },
+                Command::Wind { key: 96, id: 6 },
+                single_shape(16, 1, None, 201),
+            ],
+            _ => vec![],
+        };
+        for command in &commands {
+            assert_eq!(post(link, &generations, command), Put::Stored);
+        }
+        ab.forget(1, &mut board_b);
+        for command in &commands {
+            immediate(&mut a, &mut aa, &generations, command);
+        }
+        drain(&mut b, &mut ab, &generations);
+        assert_eq!(aa.tracked(), ab.tracked(), "case {case}");
+        assert!(!board_a.in_draw_order().any(|o| o.centre[0] == 16.0));
+        assert!(!board_b.in_draw_order().any(|o| o.centre[0] == 16.0));
+        if case == 2 {
+            assert_eq!(aa.tracked()[slot], (0, 0));
+            let command = Command::Wind { key: 32, id: 2 };
+            immediate(&mut a, &mut aa, &generations, &command);
+            assert_eq!(post(link, &generations, &command), Put::Stored);
+            drain(&mut b, &mut ab, &generations);
+            assert_eq!(aa.tracked()[slot], (2, 32));
+            assert_eq!(ab.tracked()[slot], (2, 32));
+        }
+        parity(&mut a, &mut aa, &mut b, &mut ab, &[], &[], 10);
+        if case == 0 || case == 1 || case == 3 {
+            let (set, attacking) = ab.track(1, 16, None, false).unwrap();
+            assert!(*attacking);
+            let spheres: Vec<_> = set.spheres().copied().collect();
+            assert_eq!(spheres.len(), 1, "case {case}");
+            assert_eq!(spheres[0].key, hitbox::sphere_key(hitbox::KIND_GRAB, 201, 0));
+        } else if case == 4 {
+            assert!(!ab.tracked().iter().any(|&(id, _)| id == 1));
+        }
+        if case == 1 {
+            for (id, key) in ab.tracked().into_iter().filter(|&(id, _)| id != 0) {
+                let (set, _) = ab.track(id, key, None, false).unwrap();
+                assert!(set.spheres().all(|s| s.key != hitbox::sphere_key(hitbox::KIND_GRAB, 101, 0)
+                    && s.key != hitbox::sphere_key(hitbox::KIND_GRAB, 102, 0)));
+            }
         }
     }
 }

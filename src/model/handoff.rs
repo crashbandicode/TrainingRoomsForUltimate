@@ -10,11 +10,11 @@
 //! A value's or a command's words sit in a buffer of the pool. A thread checks a buffer out, fills it while nobody else can
 //! reach it, and publishes it with one compare-and-swap; whoever takes it back reads it and returns it. So a buffer is in a
 //! cell, is one of the two current values, or is held by one thread between two of its own instructions, and a thread holds at
-//! most one: `BUFFERS` always leaves one free. The free stack's head carries a generation that every checkout raises and that
-//! never wraps: at its last value the pool hands out nothing more. Nothing here locks, allocates after `new`, or waits: a
-//! compare-and-swap is retried only when another thread's finished.
+//! most one: `BUFFERS` always leaves one free. The pool keeps one bit a buffer; a checkout claims one of the free buffers by
+//! count and then clears a set bit, and clearing it is the taking, so no buffer is handed out twice and nothing wraps or retires.
+//! Nothing here locks, allocates after `new`, or waits: a compare-and-swap is retried only when another thread's finished.
 
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering::{AcqRel, Acquire, Relaxed, Release}};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering::{AcqRel, Acquire, Relaxed}};
 
 use super::hitbox::{FighterLife, SetMembers, Shape, FIGHTER_SETS, MAX_PENDING};
 use super::hitbox_orbs::{Members, ARTICLES};
@@ -30,81 +30,62 @@ pub const BUFFERS: usize = 2 + ARTICLES * MAX_PENDING + FIGHTER_SETS * (MAX_PEND
 const INDEX_BITS: u32 = 12;
 const INDEX: u64 = (1 << INDEX_BITS) - 1;
 
-/// Fixed buffers of `WORDS` atomic words and the lock-free stack of the free ones.
+/// Fixed buffers of `WORDS` atomic words and the free ones' bits.
 pub struct Pool {
     words: Box<[AtomicU64]>,
-    /// The next free buffer below each one on the free stack.
-    next: Box<[AtomicU32]>,
-    /// The free stack's head: the top buffer and a generation that every checkout raises.
-    free: AtomicU64,
-    last_generation: u64,
+    /// One bit a buffer, set while it is free.
+    free: Box<[AtomicU64]>,
+    /// The free buffers a checkout may still claim: never more than the set bits.
+    available: AtomicU32,
 }
 
 impl Pool {
     /// `None` for no buffers, for more than a word can name, or when the allocation fails.
     pub fn new(capacity: usize) -> Option<Self> {
-        Self::make(capacity, u64::MAX >> INDEX_BITS)
-    }
-
-    fn make(capacity: usize, last_generation: u64) -> Option<Self> {
         if capacity == 0 || capacity > INDEX as usize { return None; }
-        let (mut words, mut next) = (Vec::new(), Vec::new());
+        let (mut words, mut free) = (Vec::new(), Vec::new());
         words.try_reserve_exact(capacity * WORDS).ok()?;
-        next.try_reserve_exact(capacity).ok()?;
+        free.try_reserve_exact(capacity.div_ceil(64)).ok()?;
         words.resize_with(capacity * WORDS, || AtomicU64::new(0));
-        next.extend((0..capacity).map(|i| AtomicU32::new(if i + 1 < capacity { i as u32 + 2 } else { 0 })));
-        Some(Self { words: words.into_boxed_slice(), next: next.into_boxed_slice(), free: AtomicU64::new(1), last_generation })
+        for i in 0..capacity.div_ceil(64) {
+            let count = (capacity - i * 64).min(64);
+            let bits = if count == 64 { u64::MAX } else { (1u64 << count) - 1 };
+            free.push(AtomicU64::new(bits));
+        }
+        Some(Self { words: words.into_boxed_slice(), free: free.into_boxed_slice(), available: AtomicU32::new(capacity as u32) })
     }
 
     pub fn capacity(&self) -> usize {
-        self.next.len()
-    }
-
-    #[cfg(test)]
-    fn free_count(&self) -> usize {
-        let mut buffers = Vec::new();
-        while let Some(buffer) = self.take() {
-            buffers.push(buffer);
-        }
-        let count = buffers.len();
-        for buffer in buffers { self.give(buffer); }
-        count
+        self.words.len() / WORDS
     }
 
     /// The bytes `new` allocated.
     pub fn heap_bytes(&self) -> usize {
-        std::mem::size_of_val(&*self.words) + std::mem::size_of_val(&*self.next)
+        std::mem::size_of_val(&*self.words) + std::mem::size_of_val(&*self.free)
     }
 
-    fn free_top(&self) -> Option<(u64, u32)> {
-        let head = self.free.load(Acquire);
-        let top = head & INDEX;
-        (top != 0 && (head >> INDEX_BITS) != self.last_generation).then(|| (head, self.next[top as usize - 1].load(Relaxed)))
-    }
-
-    fn take_free(&self, seen: (u64, u32)) -> bool {
-        let next = (((seen.0 >> INDEX_BITS) + 1) << INDEX_BITS) | u64::from(seen.1);
-        self.free.compare_exchange(seen.0, next, AcqRel, Relaxed).is_ok()
-    }
-
-    /// Check a buffer out: `None` when none is free or the pool is retired.
+    /// Check a buffer out: `None` when every buffer is out.
     pub fn take(&self) -> Option<u32> {
+        // Claim one of the free buffers first: then a set bit is this thread's to find, whatever the others take and return.
+        self.available.fetch_update(AcqRel, Acquire, |free| free.checked_sub(1)).ok()?;
         loop {
-            let seen = self.free_top()?;
-            if self.take_free(seen) { return Some((seen.0 & INDEX) as u32); }
+            for (i, word) in self.free.iter().enumerate() {
+                let mut bits = word.load(Acquire);
+                while bits != 0 {
+                    let bit = bits.trailing_zeros();
+                    // Clearing the bit is the taking: only the thread that found it set has the buffer.
+                    bits = word.fetch_and(!(1u64 << bit), AcqRel);
+                    if bits & (1u64 << bit) != 0 { return Some(i as u32 * 64 + bit + 1); }
+                }
+            }
         }
     }
 
     /// Return a buffer its caller took out of a cell or checked out.
     pub fn give(&self, buffer: u32) {
-        let mut head = self.free.load(Relaxed);
-        loop {
-            self.next[buffer as usize - 1].store((head & INDEX) as u32, Relaxed);
-            match self.free.compare_exchange_weak(head, (head & !INDEX) | u64::from(buffer), Release, Relaxed) {
-                Ok(_) => return,
-                Err(actual) => head = actual,
-            }
-        }
+        let index = buffer - 1;
+        self.free[index as usize / 64].fetch_or(1u64 << (index % 64), AcqRel);
+        self.available.fetch_add(1, AcqRel);
     }
 
     fn at(&self, buffer: u32) -> &[AtomicU64] {
@@ -189,6 +170,7 @@ fn members_words(members: &Members) -> [u64; WORDS] {
         w[i] = members.ids[i].1 as u64;
         w[ARTICLES + i] = u64::from(members.ids[i].0) | (u64::from(members.attacking[i]) << 32);
         w[2 * ARTICLES + i] = members.ages[i];
+        w[3 * ARTICLES + i] = members.touched[i];
     }
     w
 }
@@ -199,6 +181,7 @@ fn members_read(w: &[u64; WORDS]) -> Members {
         members.ids[i] = (w[ARTICLES + i] as u32, w[i] as usize);
         members.attacking[i] = (w[ARTICLES + i] >> 32) != 0;
         members.ages[i] = w[2 * ARTICLES + i];
+        members.touched[i] = w[3 * ARTICLES + i];
     }
     members
 }
@@ -466,7 +449,7 @@ impl Handoff {
 
     /// An article's ATTACK, CATCH or wind command: it is tracked as attacking now, and a CATCH's grab waits in its slot's lane.
     pub fn article_command(&self, id: u32, key: usize, grab: Option<(Shape, i32)>) -> Put {
-        let Some((version, members, slot)) = self.change_articles(|members, version| members.track(id, key, true, version).map(|found| found.0)) else {
+        let Some((version, members, slot)) = self.change_articles(|members, version| members.command(id, key, version)) else {
             return Put::NoBuffer;
         };
         let (Some(slot), Some((shape, status))) = (slot, grab) else { return Put::Stored };
@@ -491,6 +474,12 @@ mod tests {
     use super::super::hitbox::FighterGenerations;
     use std::sync::{Arc, Mutex};
 
+    impl Pool {
+        fn free_count(&self) -> usize {
+            self.available.load(Acquire) as usize
+        }
+    }
+
     fn shape(id: i32, extended: bool) -> Shape {
         Shape { id, joint: 7, size: 3.0, a: [1.0, 2.0, 3.0], b: extended.then_some([4.0, 5.0, 6.0]) }
     }
@@ -499,34 +488,6 @@ mod tests {
         assert!(Pool::new(0).is_none());
         assert!(Pool::new(0x1000).is_none());
         assert!(Pool::new(0xfff).is_some());
-    }
-
-    fn a_pop_suspended_across_a_reuse_of_its_node_takes_nothing_stale() {
-        let pool = Pool::new(2).unwrap();
-        let seen = pool.free_top().unwrap();
-        let first = pool.take().unwrap();
-        let second = pool.take().unwrap();
-        pool.give(first);
-        assert_eq!(pool.free.load(Relaxed) & INDEX, seen.0 & INDEX);
-        assert!(!pool.take_free(seen));
-        pool.give(second);
-        assert!(pool.take().is_some());
-        assert!(pool.take().is_some());
-        assert!(pool.take().is_none());
-    }
-
-    fn the_last_generation_retires_the_free_stack_before_it_can_wrap() {
-        let pool = Pool::make(2, 3).unwrap();
-        let seen = pool.free_top().unwrap();
-        for n in 1..=3 {
-            let buffer = pool.take().unwrap();
-            pool.write(buffer, &[n; WORDS]);
-            assert_eq!(pool.read(buffer), [n; WORDS]);
-            pool.give(buffer);
-            assert!(!pool.take_free(seen));
-        }
-        assert!(pool.take().is_none());
-        assert!(pool.take().is_none());
     }
 
     fn checkouts_from_several_threads_lose_and_duplicate_no_buffer() {
@@ -549,6 +510,16 @@ mod tests {
         let buffers: Vec<_> = (0..pool.capacity()).map(|_| pool.take().unwrap()).collect();
         assert!(pool.take().is_none());
         for buffer in buffers { pool.give(buffer); }
+        for capacity in [65usize, 128] {
+            let pool = Pool::new(capacity).unwrap();
+            for _ in 0..2 {
+                let mut buffers: Vec<_> = (0..capacity).map(|_| pool.take().unwrap()).collect();
+                assert!(pool.take().is_none());
+                buffers.sort_unstable();
+                assert_eq!(buffers, (1..=capacity as u32).collect::<Vec<_>>());
+                for buffer in buffers { pool.give(buffer); }
+            }
+        }
     }
 
     fn values_and_records_survive_their_words() {
@@ -563,7 +534,7 @@ mod tests {
             assert_eq!(Record::read(&record.words()), Some(record));
         }
         let members = Members { ids: [(1, 16), (2, 32), (0, 0), (4, 64)],
-            ages: [3, 7, 0, 10], attacking: [true, false, false, true] };
+            ages: [3, 7, 0, 10], attacking: [true, false, false, true], touched: [5, 8, 0, 12] };
         assert_eq!(members_read(&members_words(&members)), members);
         let words = members_words(&members);
         assert_eq!(members_words(&members_read(&words)), words);
@@ -589,8 +560,8 @@ mod tests {
         assert_eq!(BUFFERS, 2 + ARTICLES * MAX_PENDING + FIGHTER_SETS * (MAX_PENDING + 1) + THREADS);
         let link = Handoff::new().unwrap();
         let generations = FighterGenerations::new();
-        assert_eq!(link.heap_bytes(), BUFFERS * (WORDS * 8 + 4) + 12 * std::mem::size_of::<Lane>());
-        assert_eq!(link.heap_bytes(), 226_584);
+        assert_eq!(link.heap_bytes(), BUFFERS * WORDS * 8 + BUFFERS.div_ceil(64) * 8 + 12 * std::mem::size_of::<Lane>());
+        assert_eq!(link.heap_bytes(), 222_336);
         for n in 1..=FIGHTER_SETS {
             let life = generations.stamp((n as u32) << 16).unwrap();
             let key = n * 16;
@@ -767,8 +738,6 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("new_refuses_no_nodes_and_more_than_the_index_holds", new_refuses_no_nodes_and_more_than_the_index_holds as fn()),
-            ("a_pop_suspended_across_a_reuse_of_its_node_takes_nothing_stale", a_pop_suspended_across_a_reuse_of_its_node_takes_nothing_stale as fn()),
-            ("the_last_generation_retires_the_free_stack_before_it_can_wrap", the_last_generation_retires_the_free_stack_before_it_can_wrap as fn()),
             ("checkouts_from_several_threads_lose_and_duplicate_no_buffer", checkouts_from_several_threads_lose_and_duplicate_no_buffer as fn()),
             ("values_and_records_survive_their_words", values_and_records_survive_their_words as fn()),
             ("the_pool_holds_every_cell_and_one_buffer_for_every_thread", the_pool_holds_every_cell_and_one_buffer_for_every_thread as fn()),
