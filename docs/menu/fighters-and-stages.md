@@ -13,7 +13,7 @@ Pick both fighters and the order the cycle chords step through ([Fighter cycles]
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
 | <a id="player-swapping"></a>Player Swapping | On, **Off** | Enables Cycle Player. Manual fighter picks work either way. |
-| Player Character | Any fighter | Pick Player 1's fighter on the portrait grid. It loads when the menu closes. [Clip](../media/rc12-player-character.gif) |
+| Player Character | Any fighter | Pick Player 1's fighter on the grid. Close the menu to load it. [Clip](../media/rc12-player-character.gif) |
 | CPU Character | Any fighter | The same grid for the CPU. [Clip](../media/rc11-cpu-character.gif) |
 | <a id="character-cycles"></a>Character Cycles | **All**, or your own order | The order the cycle chords step through, per role. ZR switches role. [Clip](../media/rc11-cycle-switch.gif) |
 | <a id="solo-popo-original-ice-climbers"></a>Solo Popo (original Ice Climbers) | On, **Off** | On: Player 1's Ice Climbers from the character select are Popo alone. [Clip](../media/rc11-solo-popo.gif) |
@@ -106,5 +106,5 @@ A on a game opens its screen: Start first, then its settings ([Practice games](p
 | The Cycle Player chord does nothing | Check Player Swapping first; it defaults to Off. |
 | You pick a fighter in a waiting room | Only your practice fighter changes, not the match's. |
 | Respawn on platform is greyed | Save States and Auto-load on death are both On. |
-| Pokémon Trainer or Pyra / Mythra load late | PT / Aegis groups need free Ready Fighters: PT 3, Aegis 2. |
+| A Pokémon Trainer or Pyra / Mythra swap group is greyed | PT / Aegis groups need free Ready Fighters: PT 3, Aegis 2. |
 | You reset this page | The settings inside the games' screens reset too. |

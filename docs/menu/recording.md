@@ -81,8 +81,8 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 
 ## Options
 
-![Loop is set from 1 to 3 in the menu, and the macro then plays again and again on its own](../media/rc12-loop.gif)<br>
-*Setting Loop to 3 repeats the macro.*
+![Loop is set from 1 to 3 in the menu, and the macro plays three times](../media/rc12-loop.gif)<br>
+*Loop at 3 plays the macro three times.*
 
 How a macro plays back, and how the Combo helper grades.
 
@@ -120,7 +120,7 @@ How a macro plays back, and how the Combo helper grades.
 
 | If | Then |
 | --- | --- |
-| You press X or Y in the main lists | Neither changes defaults; the [capture list](../guide/recording.md#crop) has its own delete key. |
+| You press X or Y in the main lists | Neither changes defaults. The [capture list](../guide/recording.md#crop) has its own delete key. |
 | A file was recorded on another fighter | Play asks first, unless Ask before switching fighter is Off. |
 | You reset this page | Your files, the bound save, the active macros and the drill stay. |
 | The take has no pose for this frame | Switching fighters cannot show a pose the take did not store. |
