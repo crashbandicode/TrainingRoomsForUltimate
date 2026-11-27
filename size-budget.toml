@@ -3296,3 +3296,11 @@ ceiling = 209802
 date = "2026-11-27"
 reason = "Tech practice flies a manual start through the solver's contact test, on main 30f7f21a (209561): +241, measured by the size step of the gate on 25feebd3. The planner's candidate with the range check and its per-call bounds, the solver's contact rule and forward flight, the flight one frame at a time, and the runtime's frame-by-frame wiring. The 219 new test lines are excluded."
 approved_by = "tr-primary-2 2026-11-27 15:07:32Z (+241 lines; release NRO +4,096 B, BSS +0)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 209805
+date = "2026-11-27"
+reason = "Tech practice's manual range check keeps its search and one flight-frame budget across game callbacks, the reviewer's correction 4e6af533 on the manual-start fix (209802): +3, measured by the size step of the gate on 4e6af533 (209805 against 209802). The 33 new test lines are excluded."
+approved_by = "tr-primary-2 2026-11-27 15:50:39Z (+3 lines, +244 in all on 209561; release NRO +4,096 B and BSS +0 unchanged)."
