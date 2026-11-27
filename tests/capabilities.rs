@@ -660,6 +660,22 @@ fn the_install_line_names_the_row_that_blocked_a_feature() {
 }
 
 #[test]
+fn trap_review_capture_needs_the_parent_read_not_heros_commands() {
+    let a = Analysis::new();
+    let boundary = BOUNDARIES.iter().find(|b| b.function.ends_with("::held_by")).unwrap();
+    let module = boundary.function.split_once("::").unwrap().0;
+    let Gate::Flag(name) = boundary.gate;
+    let guard_key = format!("{module}::{name}");
+    let guard = &a.graph.funcs[a.graph.find(&guard_key)[0]];
+    let parent = capabilities::find("state_link_parent_object_id").unwrap();
+    assert_eq!(a.own_offsets(guard), BTreeSet::from([parent.offset]), "a rejected Hero command must not disable grab scoring");
+    let check = callgraph::lex("game::granted(");
+    assert!(guard.body.windows(check.len()).any(|tokens| tokens == check));
+    let start = a.graph.find("edge_juggle::allowed")[0];
+    assert!(a.graph.callees(start).contains(&a.graph.find(&guard_key)[0]), "do not start a trap that cannot score grabs");
+}
+
+#[test]
 fn missing_pk_thunder_reads_leave_general_drill_ownership_available() {
     let a = Analysis::new();
     let grant = &a.graph.funcs[a.graph.find("niche_pad::bolt_reads_granted")[0]];

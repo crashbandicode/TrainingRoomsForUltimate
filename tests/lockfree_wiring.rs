@@ -62,6 +62,20 @@ fn slot_capture_and_library_pad_priority_is_preserved() {
 }
 
 #[test]
+fn trap_review_climb_query_cannot_wait_on_the_cpu_or_read_the_menu_under_it() {
+    let src = include_str!("../src/runtime/features/cpu.rs");
+    let hook = body(src, "cpu_transition_term_hook");
+    let from = hook.find("super::edge_juggle::trap_options(accessor)").unwrap();
+    let trap_branch = &hook[from..hook[from..].find("role_of(accessor)").unwrap() + from];
+    assert!(!trap_branch.contains("with(|cpu|"), "trap ownership in the climb hook goes through blocking CPU.lock()");
+    assert!(trap_branch.contains("return"), "a trap query must not fall through to ordinary blocking role lookup");
+    let g = graph();
+    let key = g.funcs.iter().find(|f| f.body.windows(3).any(|w| w == callgraph::lex("cpu.trap_transition_term"))).unwrap().key();
+    let reach = reachable(&g, &key);
+    assert!(!reach.contains("cpu::with") && !reach.contains("cpu::role_scene"), "trap answer reaches a blocking acquisition: {key}");
+}
+
+#[test]
 fn the_ledge_query_reads_live_owed_before_locking_the_cpu() {
     let cpu = include_str!("../src/runtime/features/cpu.rs");
     ordered(body(cpu, "cpu_transition_term_hook"),
