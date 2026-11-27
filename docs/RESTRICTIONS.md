@@ -15,6 +15,10 @@ The table is one list, in the order the rows were approved. By subsystem:
 - **Parry practice:** `parry-practice-start-save-missing`, `parry-practice-macro-missing`, `parry-practice-no-recording`, `parry-mash-ignored`
 - **Practice games:** `btt-projectile-guard`, `edge-juggle-cpu-playback-busy`, `edge-juggle-start-over-stage`, `edge-juggle-stage-unread`, `edge-juggle-start-no-floor`, `edge-juggle-no-open-ledge`, `edge-juggle-juggler-start`, `edge-juggle-player-no-floor`
 
+![Placing fighters: Open, then the five pages Where, Spot, State, Percent and Preview, then either the save is written or Record starts; four red boxes show where each placement refusal comes](diagrams/placement-flow.svg)
+
+*Placing fighters: the five pages and the four refusals.*
+
 | ID | Message | Why | Approved |
 | --- | --- | --- | --- |
 | `record-place-practice` | `Stop the practice game to place fighters` | A running practice game owns the fighters, so placement does not open over it. | Operator record-placement design, R1 handoff |
