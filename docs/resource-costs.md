@@ -64,27 +64,27 @@ file mtime when nothing else dates it; mtimes are marked as such).
 | r31 sources, `"s"` + cgu1 | 2026-10-13 | 2,646,016 | 2,674,688 | 1,654,784 / 843,776 / 147,456 / 28,672 | s | `2bc20eb5`, `FOOT/results.json` key `opt-s-cgu1.segments` |
 | r31 sources, `opt-level="z"` | 2026-10-13 | 2,211,840 | 2,240,512 | 1,200,128 / 856,064 / 155,648 / 28,672 | z | `149b2f74`, `FOOT/results.json` key `opt-z.segments` |
 | revision 32 = r31 sources, `"z"` + cgu1 (profile kept to M5i) | 2026-10-13 | 2,174,976 | 2,203,648 | 1,171,456 / 851,968 / 151,552 / 28,672 | z | `65ed74ab`, `FOOT/results.json` key `opt-z-cgu1.segments`; `ART/switch-before-r33/libtraining_modpack.nro`; `REVISION32_SMALL_PROFILE.md:36` |
-| revision 33 (analytics/updater/dialog removed) | 2026-10-13 19:07 (mtime of `FOOT/results.json`) | 1,769,472 | 1,798,144 | 1,036,288 / 667,648 / 65,536 / 28,672 | z + cgu1 | `2b820346`, r33 working tree compiled with the r32 profile[^measure-56] |
+| revision 33 (analytics/updater/dialog removed) | 2026-10-13 19:07 (mtime of `FOOT/results.json`) | 1,769,472 | 1,798,144 | 1,036,288 / 667,648 / 65,536 / 28,672 | z + cgu1 | [`2b820346`, r33 working tree compiled with the r32 profile](#revision-33-provenance) |
 | card build before 7.1.2 | 2026-10-15 | 1,773,568 | 1,802,240 | 1,040,384 / 667,648 / 65,536 / 28,672 | z + cgu1 | `e1260d99`, `ART/switch-input-display-7.1.2/switch-before-7.1.2.nro`; `switch-before-7.1.2.json` key `plugins[libtraining_modpack.nro].bytes` |
 | 7.1.2 (`v7.1.2-practice.35w`, input display renderer cache) | 2026-10-15T13:18Z | 1,785,856 | 1,814,528 | 1,040,384 / 671,744 / 73,728 / 28,672 | z + cgu1 | `96605c5b` / `b20f128e` (same header), `ART/switch-input-display-7.1.2/switch-install-receipt.json` keys `installed_bytes`, `version`, `release`; `ART/training-performance-followup-20261015/input-candidate.nro` |
-| console-ui84 physical card build | 2026-10-22 (mtime) | 4,268,032 | 4,296,704 | 1,503,232 / 2,580,480 / 184,320 / 28,672 | z + cgu1 | `cac99b4c`, embedded roster, stage and item images[^measure-59] |
+| console-ui84 physical card build | 2026-10-22 (mtime) | 4,268,032 | 4,296,704 | 1,503,232 / 2,580,480 / 184,320 / 28,672 | z + cgu1 | [`cac99b4c`, embedded roster, stage and item images](#console-ui-assets) |
 | 7.1.2 experimental full candidate | not dated in the doc | 4,308,992 | not recorded | — | z + cgu1 | `4eb6ce41`, `STAGE/docs/experimental-release.md:95-96` (**stated**; NRO not located) |
 | C108 | 2026-10-30T11:04Z (`installed_at` 1793358289) | 4,370,432 | 4,399,104 | 1,720,320 / 2,396,160 / 253,952 / 28,672 | z + cgu1 | `14cc0698`, `D175/switch-collection/c111-install/payload/…/libtraining_modpack.nro`; `D175/c108-card-installed175.json` keys `installed_at`, `plugins[libtraining_modpack.nro].bytes` |
 | C111 | 2026-10-30T18:37Z | 4,485,120 | 4,513,792 | 1,765,376 / 2,404,352 / 315,392 / 28,672 | z + cgu1 | `719ee63d`, `D175/switch-collection/c111-speed-feedback/payload/…`; `D175/SWITCH-INSTALL-C111.json` key `at` |
 | C114 | 2026-10-30T20:57Z | 4,485,120 | 4,513,792 | 1,765,376 / 2,404,352 / 315,392 / 28,672 | z + cgu1 | `060cc3f0`, `D175/switch-collection/c115-install/payload/…`; `D175/SWITCH-INSTALL-C114.json` keys `at`, `after_snapshot` |
 | C115 | 2026-10-30T22:33Z | 4,489,216 | 4,517,888 | 1,769,472 / 2,404,352 / 315,392 / 28,672 | z + cgu1 | `1fed3cdd`, `D175/switch-collection/c116-install/payload/…`; `D175/SWITCH-INSTALL-C115.json` keys `at`, `bytes` |
-| C116 = B122 | 2026-10-31T05:06Z | 4,534,272 | 4,562,944 | 1,806,336 / 2,412,544 / 315,392 / 28,672 | z + cgu1 | `92cef8a7`, NRO header and ELF measurements[^measure-65] |
+| C116 = B122 | 2026-10-31T05:06Z | 4,534,272 | 4,562,944 | 1,806,336 / 2,412,544 / 315,392 / 28,672 | z + cgu1 | [`92cef8a7`, NRO header and ELF measurements](#b122-resident-measurements) |
 | B123-pre | 2026-10-31 | 4,440,064 | 4,466,496 ("heap") | — | z + cgu1 | `70d1be45`, `D175/C115-CAMPAIGN.md:237` (**stated**; NRO not located) |
 | B123-rc (= refactor baseline WP0) | 2026-10-31 | 4,444,160 | 4,472,832 | 1,728,512 / 2,400,256 / 315,392 / 28,672 | z + cgu1 | `f0965879`, `D175/refactor/INTEGRATION.md:15` (**stated** there as a `nro_size.py` result; NRO not located) |
 | M5 / M5b / M5c (release candidate) | 2026-11-01 02:5x–03:28Z | 4,759,552 | 4,829,184 | 1,851,392 / 2,498,560 / 409,600 / 69,632 | z + cgu1 | `924d4cee` / `d5e93709` / `6b63a740`, `D175/refactor/stages/m5/release/`, `…/m5b/release/`, `D175/switch-install-c1161/superseded-m5c-libtraining_modpack.nro`; `D175/refactor/RC-SUMMARY.md:13` |
-| **M5i = C116.1 (November 1 Switch install)** | 2026-11-01T13:31Z | **4,804,608** | **4,878,336** | 1,871,872 / 2,510,848 / 421,888 / 73,728 | z + cgu1 | `17708c2c`, installation receipt and B123-rc comparison[^measure-69] |
+| **M5i = C116.1 (November 1 Switch install)** | 2026-11-01T13:31Z | **4,804,608** | **4,878,336** | 1,871,872 / 2,510,848 / 421,888 / 73,728 | z + cgu1 | [`17708c2c`, installation receipt and B123-rc comparison](#m5i-installation-receipt) |
 | M5i diag build (never shipped) | 2026-11-01 | 4,816,896 | 4,988,928 | 1,880,064 / 2,510,848 / 425,984 / 172,032 | z + cgu1 | `c3e4e52e`, `D175/refactor/stages/m5i/release/libtraining_modpack-diag.nro` |
 | rc.7 `b3678dfe` (before FLAG 6's fix) | 2026-11-10 | 4,866,048 | 7,008,256 | 2,768,896 / 1,302,528 / 794,624 / 2,142,208 | s + cgu1 | `b73bc202`, release NRO of `b3678dfe`'s source (`tmp-p23/rc7-nt-fix-gates/g2-nro/release/`); measured 2026-11-11 from the NRO header (`/tmp/opencode/lp/nro-resident.py`) |
 | **rc.7 final `722525a5`** (= `3c7d43a1`: FLAG 6's four 320 KiB native-service stacks, +1,310,720 `.bss`) | 2026-11-11 | 4,886,528 | **8,339,456** | 2,789,376 / 1,302,528 / 794,624 / 3,452,928 | s + cgu1 | `b6e60bb9` (integration's `rc6-eden/inputs-int/6c33ef53/release/`, byte-identical); NRO header |
 | **rc.8 `p23/rc8-waste` `ea4a6de9`** (§6, then §4/§7: two 272 KiB service stacks; `artifacts/phase23/rc8-waste/DESIGN.md`) | 2026-11-11 | 4,886,528 | **7,585,792** (−753,664) | 2,785,280 / 1,302,528 / 798,720 / 2,699,264 | s + cgu1 | `f4f34f35`, `tmp-p23/rc8-waste-gates/g3-nro/release/`; NRO header |
-| rc.8 pass head `9d6c7e02`, integration[^measure-74] | 2026-11-11 | — | 7,659,520 | — | s + cgu1 | release `4f67766f`; integration's gates (its 2026-11-11 SHIP READY figure) |
-| rc.8 `21527b70`, R6 comparison at opt-level s[^measure-75] | 2026-11-11 | 4,890,624 | 6,721,536 | 2,781,184 / 1,310,720 / 798,720 / 1,830,912 | s + cgu1 | `63a7d1df`, scratch target `tmp-p23/rc8-rootz-target` (worktree `rc8-r6-wt` at `21527b70`); NRO header |
-| rc.8 `f86771f7`, R3–R6 and R8 at opt-level z[^measure-76] | 2026-11-11 | 4,149,248 | **5,914,624** (−1,744,896 against `9d6c7e02`; −2,424,832 against the rc.7 final) | 2,011,136 / 1,327,104 / 811,008 / 1,765,376 | z + cgu1 | `82c4cac5`, `tmp-p23/rc8-waste-gates/g5-nro/release/`; NRO header |
+| [rc.8 pass head `9d6c7e02`, integration](#integration-service-stacks) | 2026-11-11 | — | 7,659,520 | — | s + cgu1 | release `4f67766f`; integration's gates (its 2026-11-11 SHIP READY figure) |
+| [rc.8 `21527b70`, R6 comparison at opt-level s](#r6-at-level-s) | 2026-11-11 | 4,890,624 | 6,721,536 | 2,781,184 / 1,310,720 / 798,720 / 1,830,912 | s + cgu1 | `63a7d1df`, scratch target `tmp-p23/rc8-rootz-target` (worktree `rc8-r6-wt` at `21527b70`); NRO header |
+| [rc.8 `f86771f7`, R3–R6 and R8 at opt-level z](#r6-at-level-z) | 2026-11-11 | 4,149,248 | **5,914,624** (−1,744,896 against `9d6c7e02`; −2,424,832 against the rc.7 final) | 2,011,136 / 1,327,104 / 811,008 / 1,765,376 | z + cgu1 | `82c4cac5`, `tmp-p23/rc8-waste-gates/g5-nro/release/`; NRO header |
 
 Refactor stage trail between B123-rc and M5i (all measured 2026-11-01 from `D175/refactor/stages/<stage>/release/libtraining_modpack.nro`; the per-stage attribution is `D175/refactor/RC-SUMMARY.md:14-15`):
 
@@ -604,16 +604,30 @@ What the fork's profile and removals did to the image (derived from Table A rows
 - **Compressed archive.** REVISION33’s rough figure of 195 KB (`:39`) was closest to zlib level 6 (193,889 B). Level 9 yielded 175,527 B. The record does not identify `include_flate`’s compression level.
 - **Platform.** The per-fighter process charges in Table C came from Eden. `SWITCH-INSTALL-C116.1.json`, key `not_verified[0]`, assumed equal console costs without measuring console timing or heap. C111 recorded console headroom separately (`C111-SWITCH-SPEED.md:23`).
 
-[^measure-56]: `2b820346`, `FOOT/results.json` key `default.segments`; `ART/switch-before-r34/libtraining_modpack.nro`. **The `default` variant is not an upstream build**: `FOOT/build-default.log:13` compiles `training_modpack v7.1.1` from `UltimateTrainingModpack-single-file`, and `FOOT/post-build-check.json` shows that tree with `src/common/dialog.rs`, `events.rs`, `release.rs` deleted and `docs/REVISION33_STARTUP_MEMORY.md` untracked, i.e. the revision 33 working tree on the revision 32 profile
+#### Revision 33 provenance
 
-[^measure-59]: `cac99b4c`, `ART/enhancements/console-ui84/physical-plugins/libtraining_modpack.nro` (the `.rodata` jump to 2.58 MB is the fork's own embedded roster/stage/item image data, see §C)
+- `2b820346`, `FOOT/results.json` key `default.segments`; `ART/switch-before-r34/libtraining_modpack.nro`. **The `default` variant is not an upstream build**: `FOOT/build-default.log:13` compiles `training_modpack v7.1.1` from `UltimateTrainingModpack-single-file`, and `FOOT/post-build-check.json` shows that tree with `src/common/dialog.rs`, `events.rs`, `release.rs` deleted and `docs/REVISION33_STARTUP_MEMORY.md` untracked, i.e. the revision 33 working tree on the revision 32 profile
 
-[^measure-65]: `92cef8a7`, `D175/switch-collection/c116_1-precheck/payload/…`; `D175/SWITCH-INSTALL-C116.json` keys `at`, `bytes`. The ELF measurement of the same build reports `.bss` 26,432 and "heap cost (NRO + .bss)" 4,560,704 (`ART/enhancements/automation-macros01/toml08-experiment/JSON-EXPERIMENT.md:32-33`); see "Contradictions"
+#### Console UI assets
 
-[^measure-69]: `17708c2c`, `D175/refactor/stages/m5i/release/libtraining_modpack.nro`; `D175/SWITCH-INSTALL-C116.1.json` keys `bytes`, `resident`, `resident_vs_b123rc` ("about +9.1 %": 4,878,336 / 4,472,832 = 1.0907, derived)
+- `cac99b4c`, `ART/enhancements/console-ui84/physical-plugins/libtraining_modpack.nro` (the `.rodata` jump to 2.58 MB is the fork's own embedded roster/stage/item image data, see §C)
 
-[^measure-74]: rc.8 pass head `9d6c7e02` (`p23/rc8-integration`: §6, §4/§7 `729ab045` with two 304 KiB service stacks, the binds)
+#### B122 resident measurements
 
-[^measure-75]: rc.8 `p23/rc8-waste` `21527b70` at `"s"` (R3, R4 1024-slot replay mailboxes, R5, R8; two 272 KiB stacks): R6's comparison
+- `92cef8a7`, `D175/switch-collection/c116_1-precheck/payload/…`; `D175/SWITCH-INSTALL-C116.json` keys `at`, `bytes`. The ELF measurement of the same build reports `.bss` 26,432 and "heap cost (NRO + .bss)" 4,560,704 (`ART/enhancements/automation-macros01/toml08-experiment/JSON-EXPERIMENT.md:32-33`); see "Contradictions"
 
-[^measure-76]: **rc.8 `p23/rc8-waste` `f86771f7`** (the reopened scope: R3–R6, R8; `opt-level "z"`, 1024-slot replay mailboxes, two 236 KiB service stacks; `artifacts/phase23/rc8-waste/DESIGN.md` §0)
+#### M5i installation receipt
+
+- `17708c2c`, `D175/refactor/stages/m5i/release/libtraining_modpack.nro`; `D175/SWITCH-INSTALL-C116.1.json` keys `bytes`, `resident`, `resident_vs_b123rc` ("about +9.1 %": 4,878,336 / 4,472,832 = 1.0907, derived)
+
+#### Integration service stacks
+
+- rc.8 pass head `9d6c7e02` (`p23/rc8-integration`: §6, §4/§7 `729ab045` with two 304 KiB service stacks, the binds)
+
+#### R6 at level s
+
+- rc.8 `p23/rc8-waste` `21527b70` at `"s"` (R3, R4 1024-slot replay mailboxes, R5, R8; two 272 KiB stacks): R6's comparison
+
+#### R6 at level z
+
+- **rc.8 `p23/rc8-waste` `f86771f7`** (the reopened scope: R3–R6, R8; `opt-level "z"`, 1024-slot replay mailboxes, two 236 KiB service stacks; `artifacts/phase23/rc8-waste/DESIGN.md` §0)

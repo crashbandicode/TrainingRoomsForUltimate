@@ -35,7 +35,7 @@ runs its host tests (`tests/size_budget.rs`). "M" = measured, "E" = estimate. Fi
 | --- | ---: | --- |
 | Fork M5q | 112,500 | operator |
 | Clean room `7bb86fd` | 106,983 | M |
-| Pending in unmerged streams (work tree minus merge base, ~12:10Z) | +7,061 | Measured contributions across nine unmerged streams[^size-31] |
+| Pending in unmerged streams (work tree minus merge base, ~12:10Z) | +7,061 | [Measured contributions across nine unmerged streams](#unmerged-stream-contributions) |
 | Deluxe SDK under `third_party/` | 599 | M, not counted (vendored) |
 | If merged as they are | ~114,044 | above the fork |
 | Budget start (`size-budget.toml`) | 114,100 | measured + pending, rounded up |
@@ -80,12 +80,12 @@ At the November 2 checkpoint, EDEN-PACKAGE-6 covered the s6-01 sync probe and s6
 
 | Finding (examples) | Change | Saves | Risk | Rows |
 | --- | --- | ---: | --- | --- |
-| Legacy fingerprints alongside authoritative seam guards[^size-69] | delete the legacy words, keep relocated-data checks | ~190 | M | s6-02/03 install line, set A boot |
+| [Legacy fingerprints alongside authoritative seam guards](#legacy-roster-fingerprints) | delete the legacy words, keep relocated-data checks | ~190 | M | s6-02/03 install line, set A boot |
 | `mii_reload_probe` module `character_roster.rs:2434-2835` names modules that do not exist at `7bb86fd` (`crate::mii_fullconfig_probe` …) | becomes compilable when stream/pkg6 lands those probes; retire with them (D11) | ~350 | L (not shipped) | none |
 | Identical `trace!` macro defined 11 times (`copy_packages.rs:19`, `special_articles.rs:15`, …) | one crate macro | ~22 | L | none |
 | `identity_view.rs:184-343`: 14 near-identical inline hooks | one `macro_rules!` table (site, offset, registers, scope) | ~60 | M (hook code) | R-ID0..9, R-PC1 |
 | `cycle_preload_config.rs:66-182`: 4 logs of 11-15 fields | `Display` in the model, text byte-identical | ~45 | L | preload rows |
-| Repeated native wrappers, owner table and kind operations[^size-74] | one roster offsets table, one wrapper per native (extend `tests/native_wrappers.rs` beyond `game.rs`/`state_natives.rs`) | ~30 (rest leaves with the probes) | L | R-PC1/PC2 |
+| [Repeated native wrappers, owner table and kind operations](#repeated-native-wrappers) | one roster offsets table, one wrapper per native (extend `tests/native_wrappers.rs` beyond `game.rs`/`state_natives.rs`) | ~30 (rest leaves with the probes) | L | R-PC1/PC2 |
 | `cfg(not(alpha))` alternates for builds never shipped (`character_sources.rs:1555-1608` …) | one version via `slot_allowed()`; all branches if D11 is relaxed | 40 / ~205 | L / M | set D, R-PC1 |
 | Model functions only tests use (`body_bank.rs:287,508,568,836`, `ledger.rs:261,438,587,633-662`, `lifecycle.rs:306,350,381,399`, `roster_grid.rs:254-467` …), `swap_model/hud_model.rs` 68, `target.rs` 41 | delete with their tests (check roster_grid against the screens first) | ~360 | L-M | none |
 | Probes and observers (§4): ~6.4k incl. ~520 probe-gated lines inside product files | retire after the owners confirm (D11 ruling) | ~6,400 | M | none (diag) |
@@ -109,7 +109,7 @@ At the November 2 baseline, Cargo.toml:5,55-62 enabled all `mii-*-alpha` default
 | `mii_ordinary_player.rs` vs `mii_ordinary_cpu.rs`: 431 of 1,095 lines in identical blocks (`432-448` = cpu `538-554`) | one role adapter generic over Player/CPU | 150-300 | H | R-MII1 A/B, set D |
 | `mii_saved_alpha.rs:193-730` fallback owner (runs only when the ordinary gate fails) | behaviour decision | ≤350 | H | R-MII1 |
 | `mii_ldn_qualification.rs` (565, probe feature) | retire if the LDN layout facts are recorded | 565 | L | none |
-| Shipped editor input snapshots wrote about 13.8 KB per session[^size-97] | behind `diag` or delete (pkg6b decision 1) | ~70 | L | none |
+| [Shipped editor input snapshots wrote about 13.8 KB per session](#editor-snapshots) | behind `diag` or delete (pkg6b decision 1) | ~70 | L | none |
 
 Area: **0.85-1.05k** without a ruling (plus the 560 never-compiled lines in §1); **2.5-2.9k** with the rulings.
 
@@ -118,15 +118,15 @@ Area: **0.85-1.05k** without a ruling (plus the 560 never-compiled lines in §1)
 | Finding | Change | Saves | Risk | Rows |
 | --- | --- | ---: | --- | --- |
 | `model/guard.rs` (237) repeats the rules of `native_seams/mod.rs:38-130,546-837` (same enums, `guard_outcome`, `outcome_for`) | `native_seams` re-exports `guard` | 200-230 | L | s6-02/03, pkg1 boot install line |
-| 644 seam rows plus 49 image rows, including unchecked entries[^size-106] | delete the unchecked rows (keep `needle.set_cpu_controls`, `training.handle_effect`) | 1,300-1,550 | L-M | s6-02/03; owned-ELF host test |
-| Unread fields on all 693 rows and empty notes on 308[^size-107] | drop the fields | in the next row | L | owned-ELF host test |
-| Redundant legacy shadow comparisons in authoritative groups[^size-108] | delete | 130-165 | L | s6-03 `seams_shadow_diff=[]` |
-| INI-overlay functions lacked non-test callers after D7[^size-109] | delete | 250-300 | L | s6-01 |
+| [644 seam rows plus 49 image rows, including unchecked entries](#unchecked-seam-rows) | delete the unchecked rows (keep `needle.set_cpu_controls`, `training.handle_effect`) | 1,300-1,550 | L-M | s6-02/03; owned-ELF host test |
+| [Unread fields on all 693 rows and empty notes on 308](#unread-seam-fields) | drop the fields | in the next row | L | owned-ELF host test |
+| [Redundant legacy shadow comparisons in authoritative groups](#legacy-shadow-comparisons) | delete | 130-165 | L | s6-03 `seams_shadow_diff=[]` |
+| [INI-overlay functions lacked non-test callers after D7](#ini-overlay-functions) | delete | 250-300 | L | s6-01 |
 | Same file: 8 on/off switches repeated across struct, defaults, parse, render, menu | one key/bit/field table, INI byte-identical | 150-250 | M | s6-01, INI first-boot row (none yet) |
 | Same file `write_new`/`replace_live`/`recover_previous` (L1200-1288) vs `store::write_replace` | one writer (backup name changes) | ~40 | M | s6-01 |
-| Repeated notifications, hash reads, item gates and span queries[^size-112] | one each | 55-70 | L | lobby rows (none run) |
-| Site types overlapped across two tables[^size-113] | one site type | 150-300 | H | every install-line row; defer |
-| Only unreachable adapters used the lobby automation helper[^size-114] | park with them (L1) | ~1,500 | L | none |
+| [Repeated notifications, hash reads, item gates and span queries](#repeated-lookups) | one each | 55-70 | L | lobby rows (none run) |
+| [Site types overlapped across two tables](#overlapping-site-types) | one site type | 150-300 | H | every install-line row; defer |
+| [Only unreachable adapters used the lobby automation helper](#unreachable-lobby-adapters) | park with them (L1) | ~1,500 | L | none |
 
 Also found: `practice_stage_request::init` runs twice (`lobby/mod.rs:27`, `practice_stage_observer.rs:293`) and logs
 `ui_wired=true` while no ticket is ever queued (defect, reported to the lead, not a size item).
@@ -140,7 +140,7 @@ Area: **1.9-2.3k** without a ruling; **+1.5k** parking, **+2.5k** compaction (§
 | Named playback and slot transfer | removed in F7b; the panel, prompts and replay capture remain | measured in F7b | L | F7b-1–9 |
 | Two copies of the fork's practice/lobby/save-state facade vs `runtime/lobby/training/{practice.rs,lobby.rs,mod.rs}` | `port` uses the lobby facade (inside the pkg4 wiring) | ~100 | M-H | s4-03/04, lobby rows |
 | `InputFrame` (`macros/recording.rs:29`) = `MappedInputs` (`input_delay.rs:17`) | one type, JSON shape identical; F7b removed `StartSnapshot`/`Origin` | 60-70 | L-M | s4-01/02, s4-03/04 |
-| Duplicate constants, neutral checks, macro source and sync helpers[^size-128] | one each | ~40 | L | s4-01 |
+| [Duplicate constants, neutral checks, macro source and sync helpers](#repeated-macro-helpers) | one each | ~40 | L | s4-01 |
 | Diag hook counters written 3× (`features/cpu.rs:117-178`, `states.rs:167-241`, `recorder.rs:91-145`) | one counter type beside `hook_stats::ENTRIES` | 120-150 | L | s2-02..04 hook budget, s4-01 |
 | smash-match-data `capture.rs` (360), `clip.rs` (417), `validate.rs:1031-1141`, `Capture::load/save`: used only as a test oracle (`shared_capture.rs:482,734,769`) | vendor only what is used (lead ruling: the crate is carried unchanged) | 850-950 | M | s4-03/04 |
 
@@ -150,8 +150,8 @@ Area: **0.37k** without a ruling; **1.5k** with the smash-match-data ruling.
 
 | Finding | Change | Saves | Risk | Rows |
 | --- | --- | ---: | --- | --- |
-| Consolidated CPU parameters, pane bounds, hashes, constant tables and storage writes[^size-138] | | 129 (M) | L | s2-02..04, s3-03 (constants by name) |
-| Seven comparison loops repeated UI and u4 checks[^size-139] | one table registry in install-line order, `usable(name)`, `mark(name)` | 100-150 | M (`blocked_by` order) | tr105, s2-02, s4-01, w-01, u4-01, r2-01/02 |
+| [Consolidated CPU parameters, pane bounds, hashes, constant tables and storage writes](#core-consolidations) | | 129 (M) | L | s2-02..04, s3-03 (constants by name) |
+| [Seven comparison loops repeated UI and u4 checks](#repeated-row-comparisons) | one table registry in install-line order, `usable(name)`, `mark(name)` | 100-150 | M (`blocked_by` order) | tr105, s2-02, s4-01, w-01, u4-01, r2-01/02 |
 | Install-and-mark lists `boot.rs:197-216,383-464,488-502`, `state_boot.rs:37-83` (15 names twice) | one table | 40-60 | L-M | s2-02..04, s3-03..10 |
 | Game-constant mirrors `features/cpu.rs:49-92,373-411`, `states.rs:87-101,381-411` (one static per constant) | one array indexed by `C` | 70-90 | L-M | s2-02..04, s3-03 |
 | `HookId` + `ALL` + `name()` (`hook_stats.rs:26-119`), `Feature` + `name()` (`sites.rs:20-117`) | one `macro_rules!` each, like `cpu/ids.rs` | 50-70 | L | s4-01 hook counts |
@@ -190,11 +190,11 @@ Area: **0.6k** without the site compaction; **2.3-2.6k** more with it (§3).
 
 | File (count) | Class |
 | --- | --- |
-| `runtime/macros/port.rs` (24), `named_macros.rs` (4), `replay_preview.rs` (7) | Pkg4 and screen wiring remained outstanding; several helpers were unused[^size-172] |
+| `runtime/macros/port.rs` (24), `named_macros.rs` (4), `replay_preview.rs` (7) | [Pkg4 and screen wiring remained outstanding; several helpers were unused](#pending-wiring) |
 | `runtime/ui/menu_app.rs` (11) | waiting: ui-screens (Mii list screen) |
 | `mii_editor_bridge/editor_origin.rs` (16), `mii_saved_alpha.rs` (11), `mii_catalog_request.rs` (3) | waiting: pkg5/ui-screens Mii list screen (`request`, `menu_ready`) |
 | `mii_replay.rs` (4) | wiring gap: macros call the `port.rs` stubs instead; wiring removes ~60 stub lines |
-| `mii_auto_init.rs` (11) | Caller search found callers for every item. Warning text needed review.[^size-176] |
+| `mii_auto_init.rs` (11) | [Caller search found callers for every item. Warning text needed review.](#mii-initialization-warnings) |
 | `runtime/lobby/training/lobby.rs` (5), `practice_stage_request.rs` (4), `game_mode.rs` (2) | waiting: the waiting-room UI (`set_ui_ready`, stage picker); ~630 lines ship inert until then |
 | `roster/character_items.rs` (1) | probe-only (`turnip_probe_idle`) |
 
@@ -235,9 +235,9 @@ too (`tests/thread_stacks.rs`).
 
 | Step | Saves (E) | Count after (from ~114.0k with every stream merged) |
 | --- | ---: | ---: |
-| A. Removing unreachable implementations within existing ownership[^size-212] | 5.6-6.8k | ~107-108k |
-| B. Retiring probes and applying D11 rulings[^size-213] | ~9-11k | ~97-99k |
-| C. Changing behavior or structure under separate rulings[^size-214] | ~2-2.5k | ~95-96k |
+| [A. Removing unreachable implementations within existing ownership](#step-a-savings) | 5.6-6.8k | ~107-108k |
+| [B. Retiring probes and applying D11 rulings](#step-b-savings) | ~9-11k | ~97-99k |
+| [C. Changing behavior or structure under separate rulings](#step-c-savings) | ~2-2.5k | ~95-96k |
 | D. Data tables written compactly (§3) | ruled out (layout only) | — |
 | E. Counter correction (§1), applied to both trees | ~3.7k (M: 3,738 at `7bb86fd`) | reported as "test-fixed" |
 
@@ -464,40 +464,78 @@ outside `automation_helper_native`. After the slice the census shows unconsumed 
 | Budget at checkpoint | Canonical normalized count pending under rc.15 final-total approval. Ceiling unchanged. |
 | Evidence | Native evidence and RED/GREEN in `dedede99-interruption` lane artifacts. |
 
-[^size-31]: M: pkg6 +2,416 (mostly new probes: `mii_fullconfig_probe`, `mii_identity_probe`, `mii_saved_file_probe`, `item_state_probe`, `turnip_face_caller_probe`), hitbox +1,272, u4b +990, ui-screens +721, stack +640, sync +495 (`crates/hos-lock` 443), f6 +481, deluxe +83, pkg4 −37
+#### Unmerged stream contributions
 
-[^size-69]: Old word fingerprints next to the 64-byte seam guards: `character_roster.rs:2304-2383`, `native_body_bank.rs:3813-3927`, `character_lifecycle.rs:27-65,149-158`; the groups are `AUTHORITATIVE` (`seam_install.rs:55-86`) and `gate()` (`seam_install.rs:298`) ignores the legacy result
+- M: pkg6 +2,416 (mostly new probes: `mii_fullconfig_probe`, `mii_identity_probe`, `mii_saved_file_probe`, `item_state_probe`, `turnip_face_caller_probe`), hitbox +1,272, u4b +990, ui-screens +721, stack +640, sync +495 (`crates/hos-lock` 443), f6 +481, deluxe +83, pkg4 −37
 
-[^size-74]: Same native wrapped twice: 0x17e2880/0x17e8890/0x353ea90 in `native_source.rs:161-169` and `source_owner_probe.rs:213-222`; `OWNER_TABLE` 0x5324680 in 12 files; `ACQUIRE_KIND/RELEASE_KIND` in `native_body_bank.rs:245-252` and `r_handle.rs:38-40`
+#### Legacy roster fingerprints
 
-[^size-97]: Editor input-region snapshots in the shipped build (`mii_editor_bridge/native.rs:404-459`, `mod.rs:57,81,94-100`, `connected.rs:199-234`; ~13.8 KB per session to `mii-editor-last.json`)
+- Old word fingerprints next to the 64-byte seam guards: `character_roster.rs:2304-2383`, `native_body_bank.rs:3813-3927`, `character_lifecycle.rs:27-65,149-158`; the groups are `AUTHORITATIVE` (`seam_install.rs:55-86`) and `gate()` (`seam_install.rs:298`) ignores the legacy result
 
-[^size-106]: 644 seam rows (M: a1 94, a2 281, a3 82, a4 42, a5 127, identity 18) + 49 image rows; rows with no gate/site call and no outside reference (M): `training` 77 of 79, mii_quit 19, mii_preview 15, mii_fullconfig 14, kirby_resource 10, … and 37 image rows of modules not in the clean room
+#### Repeated native wrappers
 
-[^size-107]: Row fields never read (M): `scopes` (`Scopes::ALL` on all 693), `read_only`, `per_frame`; `note` empty on 308
+- Same native wrapped twice: 0x17e2880/0x17e8890/0x353ea90 in `native_source.rs:161-169` and `source_owner_probe.rs:213-222`; `OWNER_TABLE` 0x5324680 in 12 files; `ACQUIRE_KIND/RELEASE_KIND` in `native_body_bank.rs:245-252` and `r_handle.rs:38-40`
 
-[^size-108]: Shadow-compare `legacy` word tables though every group is authoritative: `lobby_stage_probe` ~45, `practice_stage_observer` ~50, `practice_stage_request_words.rs` ~22, rotation ~12, `game_mode` ~6, installer shadow branch ~30
+#### Editor snapshots
 
-[^size-109]: `cycle_preload_config.rs`: INI-overlay code with no non-test caller since D7 (`adopt_unset` L641, `Unset` L573, `apply_settings` L778, `pack`/`unpack` L459-542, 8 `*_enabled`)
+- Editor input-region snapshots in the shipped build (`mii_editor_bridge/native.rs:404-459`, `mod.rs:57,81,94-100`, `connected.rs:199-234`; ~13.8 KB per session to `mii-editor-last.json`)
 
-[^size-112]: Small doubles: three notification fns `training/mod.rs:122-145`; stage-catalog hash read 3×; item gate 2× (`practice_stage_request.rs:171`, `practice_stage_observer.rs:86`); QueryMemory `span` 3× (request, `effect_hook_chain`, `mii_ordinary_native`)
+#### Unchecked seam rows
 
-[^size-113]: `sites::Site` vs `native_seams::Site`: 69 of 82 rows_a3 rows and 3 hazard rows on the same offsets as `sites*.rs` rows
+- 644 seam rows (M: a1 94, a2 281, a3 82, a4 42, a5 127, identity 18) + 49 image rows; rows with no gate/site call and no outside reference (M): `training` 77 of 79, mii_quit 19, mii_preview 15, mii_fullconfig 14, kirby_resource 10, … and 37 image rows of modules not in the clean room
 
-[^size-114]: Lobby automation helper pure half (adapter, control, flow, popup, pulse 1,379) used only by the never-compiled `native.rs`/`plugin.rs`
+#### Unread seam fields
 
-[^size-128]: Constants and `is_neutral` 2× (`model/recording.rs:30-55` vs `macro_panel.rs:16-76,1661`); `MacroSource` 2× (`port.rs:141`, `compat/menu.rs:35`); sync helper 2× (`port.rs:6-23`, `compat/sync.rs`)
+- Row fields never read (M): `scopes` (`Scopes::ALL` on all 693), `read_only`, `per_frame`; `note` empty on 308
 
-[^size-138]: **Done in this stream:** six `too_many_arguments` in `model/cpu` (`mash::Step`, `ledge::TermQuery`, `FrameFacts`), pane box `[x, y, w, h]`, crc32/hash40 2× (`cpu/hash.rs` now re-exports `model::hash40`), the constant-table implementation 2× (`cpu/ids.rs`, `state/ids.rs`: one `game_constants!`), `Store::write_atomic` = `write_replace`
+#### Legacy shadow comparisons
 
-[^size-139]: "Compare every row" loop 7× (`boot.rs:127-154`, `state_boot.rs:15-21`, `p1/mod.rs:27-29`, `ui/mod.rs:100-103`, `ui/texture.rs:76`); UI and u4 rows compared twice
+- Shadow-compare `legacy` word tables though every group is authoritative: `lobby_stage_probe` ~45, `practice_stage_observer` ~50, `practice_stage_request_words.rs` ~22, rotation ~12, `game_mode` ~6, installer shadow branch ~30
 
-[^size-172]: waiting: stream/pkg4 wiring and ui-screens (the roster cycle now exists, so the `port.rs:72-139` stubs can go when wired); `Legacy`/`has_captured_frame`/`frame_at`/`capture_active`/`playback_active`/`using_frames` are truly dead
+#### INI overlay functions
 
-[^size-176]: not explained by a caller search (every item has a caller): re-check against the warning text
+- `cycle_preload_config.rs`: INI-overlay code with no non-test caller since D7 (`adopt_unset` L641, `Unset` L573, `apply_settings` L778, `pack`/`unpack` L459-542, 8 `*_enabled`)
 
-[^size-212]: A. Rulings not needed beyond file ownership: never-compiled files 1.1k, the "without a ruling" rows of §2 (roster 0.8-1.4k, mii 0.85-1.05k, seams/lobby 1.9-2.3k, macros 0.37k, core 0.6k incl. 129 done)
+#### Repeated lookups
 
-[^size-213]: B. Probe and D11 rulings: roster/Mii probes and observers ~7k, pkg6's new probes 2.4k if they serve their run and retire, Mii D11 fold 0.2k, automation-helper parking 1.5k
+- Small doubles: three notification fns `training/mod.rs:122-145`; stage-catalog hash read 3×; item gate 2× (`practice_stage_request.rs:171`, `practice_stage_observer.rs:86`); QueryMemory `span` 3× (request, `effect_hook_chain`, `mii_ordinary_native`)
 
-[^size-214]: C. Behaviour/structure rulings: player/cpu generic, saved_alpha fallback, smash-match-data trim, seam-label lookup, one site type, config switch table
+#### Overlapping site types
+
+- `sites::Site` vs `native_seams::Site`: 69 of 82 rows_a3 rows and 3 hazard rows on the same offsets as `sites*.rs` rows
+
+#### Unreachable lobby adapters
+
+- Lobby automation helper pure half (adapter, control, flow, popup, pulse 1,379) used only by the never-compiled `native.rs`/`plugin.rs`
+
+#### Repeated macro helpers
+
+- Constants and `is_neutral` 2× (`model/recording.rs:30-55` vs `macro_panel.rs:16-76,1661`); `MacroSource` 2× (`port.rs:141`, `compat/menu.rs:35`); sync helper 2× (`port.rs:6-23`, `compat/sync.rs`)
+
+#### Core consolidations
+
+- **Done in this stream:** six `too_many_arguments` in `model/cpu` (`mash::Step`, `ledge::TermQuery`, `FrameFacts`), pane box `[x, y, w, h]`, crc32/hash40 2× (`cpu/hash.rs` now re-exports `model::hash40`), the constant-table implementation 2× (`cpu/ids.rs`, `state/ids.rs`: one `game_constants!`), `Store::write_atomic` = `write_replace`
+
+#### Repeated row comparisons
+
+- "Compare every row" loop 7× (`boot.rs:127-154`, `state_boot.rs:15-21`, `p1/mod.rs:27-29`, `ui/mod.rs:100-103`, `ui/texture.rs:76`); UI and u4 rows compared twice
+
+#### Pending wiring
+
+- waiting: stream/pkg4 wiring and ui-screens (the roster cycle now exists, so the `port.rs:72-139` stubs can go when wired); `Legacy`/`has_captured_frame`/`frame_at`/`capture_active`/`playback_active`/`using_frames` are truly dead
+
+#### Mii initialization warnings
+
+- not explained by a caller search (every item has a caller): re-check against the warning text
+
+#### Step A savings
+
+- A. Rulings not needed beyond file ownership: never-compiled files 1.1k, the "without a ruling" rows of §2 (roster 0.8-1.4k, mii 0.85-1.05k, seams/lobby 1.9-2.3k, macros 0.37k, core 0.6k incl. 129 done)
+
+#### Step B savings
+
+- B. Probe and D11 rulings: roster/Mii probes and observers ~7k, pkg6's new probes 2.4k if they serve their run and retire, Mii D11 fold 0.2k, automation-helper parking 1.5k
+
+#### Step C savings
+
+- C. Behaviour/structure rulings: player/cpu generic, saved_alpha fallback, smash-match-data trim, seam-label lookup, one site type, config switch table
