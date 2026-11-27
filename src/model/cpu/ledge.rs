@@ -119,10 +119,11 @@ impl Ledge {
 
     /// One frame of the ledge step (SPEC-cpu-03 §5). `playback_running` is an input playback that is
     /// not this feature's own: the feature yields entirely.
-    pub fn frame(&mut self, step: Step, f: &FrameFacts) -> FrameOut {
+    pub fn frame(&mut self, step: Step, f: &FrameFacts, trap: Option<Weights<10>>) -> FrameOut {
         let Step { t, s, rng, counters, mash, ctx } = step;
         let mut out = FrameOut::default();
-        if ctx.playback.running || s.ledge_state.is_empty() {
+        let options = trap.unwrap_or(s.ledge_state);
+        if ctx.playback.running || options.is_empty() {
             return out;
         }
         // 1. Not hanging: forget the grab.
@@ -134,7 +135,7 @@ impl Ledge {
         // 2. Hanging: hold a delay and a case for this grab.
         let delay = *self.delay.get_or_insert_with(|| s.ledge_delay.pick(rng));
         if self.case.is_none() {
-            self.case = s.ledge_state.pick(rng).map(|i| i as u8);
+            self.case = options.pick(rng).map(|i| i as u8);
             self.native_grab = self.case.is_none();
             if self.native_grab {
                 // An empty effective set: the CPU behaves natively this grab, the climb is not denied.
@@ -196,6 +197,7 @@ impl Ledge {
         }
         // 8. The mash after the getup: the override row of the performed kind if set, else the mash
         // action when the Ledge Option trigger is ticked, else nothing.
+        if trap.is_some() { return out; }
         let row = over.map(|i| s.overrides[i]).filter(|r| !r.is_empty());
         let row = row.or_else(|| s.trigger_on(trigger::LEDGE_OPTION).then_some(s.mash_state));
         if let Some(row) = row {

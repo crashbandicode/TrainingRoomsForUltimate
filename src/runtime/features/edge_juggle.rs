@@ -626,7 +626,7 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
         }
         let hanging = natives::situation_kind(accessor) == cliff;
         let toward = if run.stage.side(natives::pos_x(accessor)) == 0 { 1.0 } else { -1.0 };
-        return run.rounds.trap_pad(hanging, toward, buttons);
+        return run.rounds.trap().pad(hanging, toward, buttons);
     }
     match run.opponent.mode {
         Mode::Drill(DrillId::Zoom) => return run.zoom.zoom_pad(accessor, buttons),
@@ -1864,9 +1864,10 @@ fn post_notice(capture: PracticeCapture, run: &mut Run, best: Option<u32>, best_
         if let Some(best) = best {
             let _ = write!(text, " · Fastest {:.2} s", best as f32 / 60.0);
         }
-        if run.drill == Drill::LedgeTrap && phase == Phase::Live && run.rounds.trap_clock() > 0 {
-            let clock = f32::from(run.rounds.trap_clock() / 30) * 0.5;
-            let fail = f32::from(run.rounds.trap_rules().fail) / 60.0;
+        let trap = run.rounds.trap();
+        if run.drill == Drill::LedgeTrap && phase == Phase::Live && trap.clock() > 0 {
+            let clock = f32::from(trap.clock() / 30) * 0.5;
+            let fail = f32::from(trap.rules.fail) / 60.0;
             let _ = write!(text, " · On stage {clock:.1}/{fail:.1} s");
         }
     } else {

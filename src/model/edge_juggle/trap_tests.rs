@@ -63,11 +63,11 @@ fn trap_clock_holds_in_the_air_and_clears_off_stage() {
 fn a_grab_inside_the_window_clears_the_clock() {
     let mut session = live(Rules::DEFAULT);
     for _ in 0..78 { session.advance_attempt(ground()); }
-    assert_eq!(session.trap_clock(), 78);
+    assert_eq!(session.trap().clock(), 78);
     session.advance_attempt(Observation { grabbed: true, ..ground() });
-    assert_eq!((session.trap_clock(), session.hits), (0, 1));
+    assert_eq!((session.trap().clock(), session.hits), (0, 1));
     session.advance_attempt(Observation { on_run: true, ..Observation::default() });
-    assert_eq!(session.trap_clock(), 0);
+    assert_eq!(session.trap().clock(), 0);
     for _ in 0..119 { session.advance_attempt(ground()); }
     assert_eq!(session.phase, Phase::Live);
     session.advance_attempt(ground());

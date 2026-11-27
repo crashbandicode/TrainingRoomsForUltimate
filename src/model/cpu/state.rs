@@ -320,25 +320,13 @@ impl Cpu {
         FrameOut { vanish: hide::step(&mut fighter.away, false, false), ..FrameOut::default() }
     }
 
-    fn trap_settings(&self, options: Weights<10>) -> CpuSettings {
-        let mut settings = self.settings;
-        settings.ledge_state = options;
-        settings.mash_triggers &= !(1 << trigger::LEDGE_OPTION);
-        for i in [situation::LEDGE_NEUTRAL, situation::LEDGE_ROLL, situation::LEDGE_JUMP, situation::LEDGE_ATTACK] {
-            settings.overrides[i] = Weights::default();
-        }
-        settings
-    }
-
     /// Ledge Trap owns this body: as `practice_frame`, and the ledge step alone runs, on the drill's options.
     pub fn trap_frame(&mut self, key: FighterKey, f: &FrameFacts, options: Weights<10>) -> FrameOut {
         let mut out = self.practice_frame(key);
-        let settings = self.trap_settings(options);
         let ctx = self.context();
-        let Self { ids, rng, fighters, .. } = self;
-        let fighter = &mut fighters[key.index()];
-        let step = Step { t: ids, s: &settings, rng, counters: &mut fighter.counters, mash: &mut fighter.mash, ctx };
-        out.request_status = fighter.ledge.frame(step, f).request_status;
+        let fighter = &mut self.fighters[key.index()];
+        let step = Step { t: &self.ids, s: &self.settings, rng: &mut self.rng, counters: &mut fighter.counters, mash: &mut fighter.mash, ctx };
+        out.request_status = fighter.ledge.frame(step, f, Some(options)).request_status;
         out
     }
 
@@ -388,7 +376,7 @@ impl Cpu {
             out.clatter = fighter.defence.clatter_frame(settings);
         }
         let step = Step { t: ids, s: settings, rng: &mut *rng, counters: &mut fighter.counters, mash: &mut fighter.mash, ctx };
-        let ledge = fighter.ledge.frame(step, f);
+        let ledge = fighter.ledge.frame(step, f, None);
         out.request_status = ledge.request_status;
         out.playback = ledge.playback;
         if fighter.pending & reroll::SHIELD_TILT != 0 {

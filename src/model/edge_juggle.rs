@@ -576,16 +576,8 @@ impl Session {
         self
     }
 
-    pub const fn trap_clock(self) -> u16 {
-        self.trap.clock()
-    }
-
-    pub const fn trap_rules(self) -> trap::Rules {
-        self.trap.rules
-    }
-
-    pub fn trap_pad(self, hanging: bool, toward: f32, buttons: u32) -> perfect::Correction {
-        self.trap.pad(hanging, toward, buttons)
+    pub const fn trap(&self) -> trap::Trap {
+        self.trap
     }
 
     pub fn restart_drill(&mut self) {
