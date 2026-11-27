@@ -171,6 +171,25 @@ fn a_target_off_its_segment_is_refused() {
     assert!(!picker::Spot::at(Line { ends: [line.ends[0], line.ends[0]], ..line }, 0.5).on_segment(), "a line of no length");
 }
 
+#[test]
+fn off_segment_targets_never_replace_the_wizard_pick_or_get_a_manual_start() {
+    let surfaces = block(v(85., 0.), v(-85., 0.));
+    let line = surfaces.lines().next().unwrap();
+    let valid = picker::Spot::at(line, 0.25);
+    let outside = picker::Spot::at(line, -0.125); // Finite and inside the blast box, but beyond the floor.
+    let mut config = factory_floor();
+    let mut wizard = wizard::Wizard::begin(config, false);
+    assert!(wizard.set_spot(valid));
+    let wizard_accepted = wizard.set_spot(outside);
+    let planned = [Mode::Set, Mode::Random].map(|mode| {
+        config.start = Numeric { mode, lo: 20., hi: 20. };
+        let plan = |spot| planner::plan(config, context(&surfaces, spot), &mut |n| n / 4).is_ok();
+        assert!(plan(valid), "the control has a start above the floor");
+        plan(outside)
+    });
+    assert_eq!((wizard_accepted, wizard.selected, planned), (false, Some(valid), [false, false]));
+}
+
 /// A remembered spot comes back on a stage whose lines were read again, also with their ends the other way round: the
 /// same world point bit for bit, which is the retained launch's target.
 #[test]
