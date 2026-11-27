@@ -12,7 +12,7 @@ use model::sites::{self, Feature, Site};
 use model::sites_pkg2;
 
 /// (row, symbol) of every package-2 row that is a named function in the owned ELF.
-const SYMBOLS: [(&str, &str); 46] = [
+const SYMBOLS: [(&str, &str); 48] = [
     ("lua_const_lookup", "_ZN3lib18lua_bind_get_valueIiEEbmRT_"),
     ("stage_id_call", "_ZN3app14sv_information8stage_idEv"),
     ("status_kind", "_ZN3app8lua_bind30StatusModule__status_kind_implEPNS_26BattleObjectModuleAccessorE"),
@@ -59,6 +59,8 @@ const SYMBOLS: [(&str, &str); 46] = [
     ("utility_get_category", "_ZN3app7utility12get_categoryEj"),
     ("utility_get_kind", "_ZN3app7utility8get_kindEPKNS_26BattleObjectModuleAccessorE"),
     ("motion_is_anim_resource", "_ZN3app8lua_bind35MotionModule__is_anim_resource_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40E"),
+    ("motion_set_next_no_comp", "_ZN3app8lua_bind35MotionModule__set_next_no_comp_implEPNS_26BattleObjectModuleAccessorE"),
+    ("ground_update_shape", "_ZN3app8lua_bind31GroundModule__update_shape_implEPNS_26BattleObjectModuleAccessorEb"),
 ];
 
 /// Offsets of every site of `ssbu-cpu-pilot` (commit 0162eed, `src/model.rs`; the list is the one
@@ -254,6 +256,36 @@ fn the_scrubs_animation_read_is_the_placement_units_own_guarded_row() {
         assert_eq!(owned.window(site.offset), site.guard);
         assert_eq!(&site.guard[..16], &[0x00, 0x44, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x02, 0x39, 0x41, 0xf9, 0x40, 0x00, 0x1f, 0xd6],
             "a thunk through the animation module's slot 0x270");
+    }
+}
+
+/// The posed release (the slide after a release, 2026-11-27): the plain animation starts with no blend, and the
+/// fighter's ground shape is made again from its joints before its place is written. Two calls, the placement
+/// unit's own rows: refused, they turn that unit off and no other.
+#[test]
+fn the_posed_releases_two_calls_are_the_placement_units_own_guarded_rows() {
+    use model::capabilities::{self, Granted};
+    let owned = common::owned_main("the_posed_releases_two_calls_are_the_placement_units_own_guarded_rows");
+    // (row, entry, the module's place in the accessor, the module's slot the entry jumps through)
+    for (name, offset, module, slot) in [("motion_set_next_no_comp", 0x205_d2a0, 0x88, 0x590), ("ground_update_shape", 0x202_9910, 0x58, 0x88)] {
+        let site = capabilities::find(name).unwrap_or_else(|| panic!("no row {name}"));
+        assert_eq!((site.offset, site.feature), (offset, Feature::RecordPlace), "{name}");
+        assert!(matches!(site.kind, SeamKind::Called), "{name}: called, never hooked");
+        assert_eq!(capabilities::call_rows(site.offset).map(|row| row.name).collect::<Vec<_>>(), [name]);
+        let usable = |row: &Site| row.name != name;
+        assert!(!Granted::from_usable(&usable).allows(site.offset));
+        assert_eq!(capabilities::blocked_by(Feature::RecordPlace, &usable), Some(name));
+        for unit in [Feature::CpuCore, Feature::CpuTech, Feature::Recording, Feature::NamedMacros, Feature::StateCore, Feature::EdgeJuggle] {
+            assert!(capabilities::unit_usable(unit, &usable), "{} does not need {name}", unit.name());
+        }
+        // `ldr x0, [x0, #module]`, `ldr x8, [x0]`, then the slot.
+        let word = |at: usize| u32::from_le_bytes(site.guard[at..at + 4].try_into().unwrap());
+        let field = |word: u32| ((word >> 10) & 0xfff) * 8;
+        assert_eq!((word(0) & 0xffc0_03ff, field(word(0)), word(4)), (0xf940_0000, module, 0xf940_0008), "{name}");
+        assert_eq!(field(word(8)), slot, "{name}");
+        if let Some(owned) = &owned {
+            assert_eq!(owned.window(site.offset), site.guard, "{name}");
+        }
     }
 }
 

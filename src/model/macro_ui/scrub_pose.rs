@@ -233,12 +233,67 @@ mod tests {
         let release = hold.split_once("unsafe fn release(block: &Block, index: usize, slot: &mut Option<CpuPreview>, accessor: usize) -> u32 {").map_or("", |(_, rest)| rest);
         let all = |text: &str| release.match_indices(text).map(|(at, _)| at).collect::<Vec<_>>();
         let posed = all("if block.pose(index).0 == POSE_SHOWN {");
-        let plain = all("natives::change_motion(accessor, if hold.origin().grounded { WAIT } else { FALL }, 0.0, 1.0, true);");
+        let plain = all("placement::restore_posed(accessor, hold.origin(), if hold.origin().grounded { WAIT } else { FALL });");
         let (restore, wake) = (all("placement::restore(accessor, hold.origin());"), all("state::set_sleep(accessor, false);"));
-        assert_eq!((posed.len(), plain.len(), restore.len(), wake.len()), (1, 1, 2, 2));
-        // The scrub's own body: the order run pose-probe-yoga-03 flew. Any other body: today's two lines, in today's order.
-        assert!(posed[0] < plain[0] && plain[0] < restore[0] && restore[0] < wake[0] && wake[0] < wake[1] && wake[1] < restore[1]);
+        assert_eq!((posed.len(), plain.len(), restore.len(), wake.len()), (1, 1, 1, 2));
+        // The scrub's own body: its plain animation and its place in one call, then the wake. Any other body: today's two
+        // lines, in today's order, and nothing else.
+        assert!(posed[0] < plain[0] && plain[0] < wake[0] && wake[0] < wake[1] && wake[1] < restore[0]);
+        assert!(!release.contains("natives::change_motion"), "the posed release's change is the cut, made in placement.rs");
         assert!(release.contains("block.set_pose(index, POSE_NONE, PackedPose::NONE);"), "a body let go shows nothing of the scrub's");
+    }
+
+    /// The slide after a release (place-t1a's traces, 2026-11-27 00:35Z and 01:06Z; rv-preview-vis's read B, 01:15Z):
+    /// the plain animation blended in from the pose, and the box the game pushes fighters by was made from the posed
+    /// joints when the body's place was written, so the two fighters were pushed apart. tr-primary-2, 01:16:14Z:
+    /// release with no blend, make the shape again from the released joints, then write the place, in that order,
+    /// with facing and situation first; on the posed body only.
+    #[test]
+    fn a_posed_bodys_release_cuts_to_the_plain_animation_and_makes_its_shape_again_before_its_place() {
+        let placement = include_str!("../../runtime/features/placement.rs");
+        let item = |head: &str| placement.split(head).nth(1).unwrap_or("").split("\n}").next().unwrap_or("");
+        let lines = |text: &'static str| text.lines().map(str::trim).filter(|line| !line.is_empty() && !line.starts_with("//")).collect::<Vec<_>>();
+        assert_eq!(lines(item("pub(super) unsafe fn restore_posed(body: usize, origin: Origin, motion: u64) {")), [
+            "state::set_lr(body, origin.facing);",
+            "state::set_situation_kind(body, konst(if origin.grounded { C::SituationGround } else { C::SituationAir }));",
+            "natives::change_motion_cut(body, motion, 0.0, 1.0, true);",
+            "natives::ground_update_shape(body, true);",
+            "restore(body, origin);",
+        ]);
+        // The place is written as it always was, for every body: the speed cleared, then `init_pos`.
+        assert_eq!(lines(item("pub(super) unsafe fn restore(body: usize, origin: Origin) {")), [
+            "if origin.grounded {",
+            "stand(body, origin.at, origin.facing);",
+            "} else {",
+            "lift(body, origin.at, origin.facing);",
+            "fall(body);",
+            "}",
+        ]);
+        for writer in ["pub(super) unsafe fn ground(", "pub(super) unsafe fn lift("] {
+            let body = lines(item(writer));
+            assert_eq!(body[1..3], ["state::clear_speed_all(body);", "state::init_pos(body, &state::Vector3f { x, y, z: 0.0 });"], "{writer}");
+        }
+        // Only the scrub's posed release makes the two calls: no other release, no picker and no drill.
+        assert_eq!(placement.matches("natives::change_motion_cut(").count(), 1);
+        assert_eq!(placement.matches("natives::ground_update_shape(").count(), 1);
+        assert_eq!(placement.matches("restore_posed(").count(), 1);
+        for other in [include_str!("../../runtime/features/record_place.rs"), include_str!("../../runtime/features/edge_juggle.rs")] {
+            assert!(!other.contains("restore_posed(") && !other.contains("change_motion_cut(") && !other.contains("ground_update_shape("));
+        }
+        assert!(!placement.contains("jostle") && !placement.contains("as *mut"), "no push switch, and no write to a field");
+        // The game's one-shot is armed only when the change is certain to follow, and nothing stands between the two.
+        let game = include_str!("../../runtime/game.rs");
+        let head = "pub unsafe fn change_motion_cut(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool) -> bool {";
+        let cut = game.split(head).nth(1).unwrap_or("").split("\n    }").next().unwrap_or("");
+        assert_eq!(lines(cut), [
+            "let arm = at::<extern \"C\" fn(usize)>(sites_pkg2::MOTION_SET_NEXT_NO_COMP_OFFSET);",
+            "if let Some(arm) = arm.filter(|_| super::granted(sites_pkg2::MOTION_CHANGE_HOOK_OFFSET) && is_anim_resource(accessor, motion)) {",
+            "arm(accessor);",
+            "}",
+            "change_motion(accessor, motion, frame, rate, run_lines)",
+        ]);
+        assert_eq!(game.matches("MOTION_SET_NEXT_NO_COMP_OFFSET").count(), 1, "armed in one place");
+        assert!(game.contains("at::<extern \"C\" fn(usize, bool)>(sites_pkg2::GROUND_UPDATE_SHAPE_OFFSET).map_or_else(Default::default, |f| f(accessor, update))"));
     }
 
     #[test]
@@ -317,7 +372,7 @@ mod tests {
         // The plain animation before the wake: the posed arm of the release reads that report.
         let release = hold.split_once("unsafe fn release(").map_or("", |(_, rest)| rest);
         let posed = release.find("if block.pose(index).0 == POSE_SHOWN {").expect("the release reads the role's report");
-        let plain = release.find("natives::change_motion(accessor, if hold.origin().grounded { WAIT } else { FALL }, 0.0, 1.0, true);").expect("the plain animation");
+        let plain = release.find("placement::restore_posed(accessor, hold.origin(), if hold.origin().grounded { WAIT } else { FALL });").expect("the plain animation");
         assert!(posed < plain && plain < release.find("state::set_sleep(accessor, false);").expect("the wake"));
     }
     }
