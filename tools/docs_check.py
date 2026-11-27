@@ -138,7 +138,6 @@ CLAIM_OK = [
 NOTICE_OK = [
     ("docs/TECHNICAL.md", "Same as 格斗, nothing new saved", "the notice with a Mii's name filled in: src/model/notify.rs joins 'Same as ', the name and ', nothing new saved'"),
     ("docs/guide/cpu-behaviour.md", "Selected: Up x3, In x1", "a help line built per chip: src/model/ui/screens.rs writes 'Selected: ' then '<direction> x<weight>' for each"),
-    ("docs/menu/cpu.md", "Selected: Up x2, Out x1", "the same help line, built per chip in src/model/ui/screens.rs"),
     ("docs/RESTRICTIONS.md", "Combos work in Training", "a retired restriction: the row says the string is gone from src/"),
 ]
 
@@ -199,10 +198,7 @@ WALL_PENDING = {
     "docs/guide/troubleshooting.md": 2,
     "docs/guide/using-the-menu.md": 8,
     "docs/guide/waiting-rooms.md": 4,
-    "docs/menu/cpu.md": 134,
-    "docs/menu/display-and-controls.md": 69,
     "docs/menu/practice-games.md": 3,
-    "docs/menu/saves.md": 47,
 }
 
 
@@ -240,11 +236,8 @@ BUDGET_PENDING = {
     "docs/guide/troubleshooting.md": 1408,
     "docs/guide/using-the-menu.md": 647,
     "docs/guide/waiting-rooms.md": 605,
-    "docs/menu/cpu.md": 3764,
-    "docs/menu/display-and-controls.md": 3394,
     "docs/menu/practice-games.md": 1589,
     "docs/menu/recording.md": 9606,
-    "docs/menu/saves.md": 2195,
 }
 
 
