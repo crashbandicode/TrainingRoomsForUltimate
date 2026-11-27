@@ -12,4 +12,4 @@
 | <a id='what-is-different-or-refused'></a>An AI plays Player 1 | Record captures its inputs; take control back before Play on Player 1 or Quick Reset. |
 | A match interrupts typing | Nothing is applied; return to the same room to resume the name. |
 | A match starts | Your matched fighters play at normal speed, without the practice partners' level. |
-| You return | Practice fighters and Kirby's hat return; Player 1 requires Player Swapping. |
+| You return to the same room with the same match pick | Practice fighters and Kirby's hat return; Player 1 requires Player Swapping. |
