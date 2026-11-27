@@ -42,4 +42,25 @@ fn the_loading_help_lines_say_what_the_code_does() {
     // bodies and Pyra / Mythra's two (`Forms::starting`).
     assert_eq!((Members::native_group(0x24).map(Members::count), Members::native_group(0x5a).map(Members::count)), (Some(3), Some(2)));
 }
+
+/// "Reload developer config" said holding the chord re-reads the file every frame. The input hook only counts a request,
+/// for Player 1 in Training with L, R and A all held; the menu worker reads dev.json (`model::developer_reload`,
+/// `runtime::developer_reload`). Found by the stale-docs pass, 2026-11-27.
+#[test]
+fn the_developer_reload_help_line_says_who_reads_the_file() {
+    use crate::model::chords::bit::{A, L, R};
+    use crate::model::developer_reload::{qualifies, Queue};
+    assert_eq!(
+        row("Reload developer config").help,
+        "On: hold L+R+A on Player 1 in Training to reload dev.json.\nThe reads are queued and done off the game's thread."
+    );
+    assert!(qualifies(0, true, L | R | A) && !qualifies(0, false, L | R | A), "in Training only");
+    assert!(!qualifies(1, true, L | R | A) && !qualifies(0, true, L | R), "Player 1, the whole chord");
+    // The hook's side counts a request and reads nothing: the read waits for the worker.
+    let queue = Queue::<4>::new();
+    queue.set_enabled(true);
+    assert!(queue.request());
+    let counts = queue.counts(false);
+    assert_eq!((counts.requested, counts.pending, counts.completed), (1, 1, 0));
+}
 }
