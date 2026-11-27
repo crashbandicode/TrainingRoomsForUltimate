@@ -2,7 +2,7 @@
 
 ## Break a flying target
 
-![Start Eggs-ercise from its game screen.](../media/rc15-practice-menu-start.gif)
+![Choose Start; the first target appears at 0/10.](../media/rc15-practice-menu-start.gif)
 
 | Step | What to do |
 |---|---|
