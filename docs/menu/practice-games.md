@@ -14,7 +14,7 @@ Break the targets that appear ([guide](../guide/eggs-ercise.md)).
 | Start, Stop | | Starts the game and closes the menu. Stop ends it. |
 | Eggs-ercise | **1 minute**, 10 targets, 20 targets, Free practice | The goal or the time limit. |
 | Breaks on | **Any attack**, Aerials, Hits of 12%+ | Which of your hits break a target, projectiles included. |
-| Target | **Disc**, CPU | The CPU flies like the disc unless [Hide CPU](cpu.md#hide-cpu) is on; then a disc flies. |
+| Target | **Disc**, CPU | CPU flies like a disc. With [Hide CPU](cpu.md#hide-cpu) on, a disc replaces it. |
 | Target speed | **Normal**, Slow, Fast | Slow is half speed. Fast is one and a half times as fast. |
 | Spawn area | **In view**, Whole stage, Off stage | Each checked area has the same chance. |
 | Off-stage zone… | Opens the zone editor | The edges of this stage's off-stage area. |
@@ -50,16 +50,16 @@ Tech a launch at a chosen or random surface; Set uses the low end of a range ([g
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| Start, Stop | | Tech wizard and Tech point close into their own views first. |
+| Start, Stop | | Start launches practice. Tech wizard and Tech point open separate setup views. |
 | Tech practice | **20 attempts**, 10 attempts, 1 minute, 3 minutes, Free practice | How long a session lasts. |
 | Tech wizard | Opens the wizard | Choose a spot, angle, start distance and hit. |
 | Surface | **Any**, Floor, Wall, Ceiling (underside), Chosen point | Where each launch is aimed. |
 | Tech point | Opens the crosshair | Stick moves, A sets the point, X starts. |
-| Damage, Damage range | **Set**, Random; 0 to 150%, **60%** | Your percent before the hit. |
-| Launch speed, its range | **Set**, Random; knockback 80 to 250, **100** | The launch's strength. |
+| Damage, Damage range | **Set**, Random; 0 to 150% by 5, **60%** | Your percent before the hit. |
+| Launch speed, its range | **Set**, Random; knockback 80 to 250 by 10, **100** | The launch's strength. |
 | Hit damage, its range | **Set**, Random; 1 to 30%, **12%** | The percent the hit adds. It also sets the freeze. |
-| Angle, Angle range | **Auto (approximate)**, Set, Random; 0 to 355° | World launch angle: right is 0°, up is 90°. |
-| Start position, Start range | **Auto (approximate)**, Set, Random; -120 to 120 units | Your start offset from the point. |
+| Angle, Angle range | **Auto (approximate)**, Set, Random; **0 to 355°**, steps of 5° | World launch angle: right is 0°, up is 90°. |
+| Start position, Start range | **Auto (approximate)**, Set, Random; -120 to 120 units, **-40 to 40** | Your start offset from the point. |
 | Time to contact, Time range | Set, **Random**; 10 to 60 frames, **20 to 40** | With Auto start, knockback limits the random draw: 20–38 frames at factory settings. |
 | DI, DI direction | **Off**, Player, Set, Random; a direction, **Neutral** | Off is neutral. Player reads your stick. |
 | Facing | **Toward the point**, Left, Right, Random | Which way you face at the start. |
@@ -97,7 +97,7 @@ Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.
 | <a id="guard-the-edge"></a><a id="juggler"></a>Start, Stop | | Reuses your set-up on the floor it was made on. Otherwise the set-up opens. |
 | CPU fighter and mode | **Current CPU**, or a fighter; **CPU 9**, CPU 1 to 8, Perfect, Hero's Zoom | The CPU's fighter and how it recovers or escapes. |
 | Reaction | Frame-perfect, **Human 12 f**, Custom 1 to 30 frames | The CPU's reaction delay. Greyed unless the mode is Perfect. |
-| Set up… | Opens the set-up | Place both fighters; [Juggler](../guide/juggler.md) also asks for the CPU's percent. |
+| Set up… | Opens the set-up | Place the CPU first, then yourself. [Juggler](../guide/juggler.md) also asks for CPU percent. |
 | Attempts | **10**, 20, Free | How many attempts are scored. |
 | <a id="zoom-landing-window"></a>Zoom landing window | 1 to 30 frames, **10** | Hit or grab Hero during descent or within this many frames after touchdown. |
 | Guard the Edge: Under the stage | On, **Off** | On: the CPU's start may be under the stage. |
