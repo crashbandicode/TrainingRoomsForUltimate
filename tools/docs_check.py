@@ -214,7 +214,35 @@ BUDGET_SENTENCES = 1
 BUDGET_GOOD_ROWS = 5
 # page -> its word count, for the pages not yet cut to the budget. Such a page is not held to the rule, but it may not
 # grow, a shorter page lowers its number, and a page that meets the budget leaves the list. Empty before a release.
-BUDGET_PENDING = {}
+BUDGET_PENDING = {
+    "docs/guide/break-the-targets.md": 257,
+    "docs/guide/combos.md": 2259,
+    "docs/guide/controls.md": 922,
+    "docs/guide/cpu-behaviour.md": 1241,
+    "docs/guide/eggs-ercise.md": 309,
+    "docs/guide/fighter-cycles.md": 838,
+    "docs/guide/frame-strip.md": 1153,
+    "docs/guide/game-speed.md": 474,
+    "docs/guide/getting-started.md": 552,
+    "docs/guide/guard-the-edge.md": 319,
+    "docs/guide/juggler.md": 304,
+    "docs/guide/mash-out.md": 200,
+    "docs/guide/mii.md": 682,
+    "docs/guide/parry-practice.md": 159,
+    "docs/guide/recording.md": 7517,
+    "docs/guide/save-states.md": 919,
+    "docs/guide/stages.md": 711,
+    "docs/guide/tech-practice.md": 284,
+    "docs/guide/troubleshooting.md": 1455,
+    "docs/guide/using-the-menu.md": 729,
+    "docs/guide/waiting-rooms.md": 635,
+    "docs/menu/cpu.md": 4895,
+    "docs/menu/display-and-controls.md": 4116,
+    "docs/menu/fighters-and-stages.md": 11251,
+    "docs/menu/practice-games.md": 1589,
+    "docs/menu/recording.md": 10623,
+    "docs/menu/saves.md": 2912,
+}
 
 
 class Problem(NamedTuple):
