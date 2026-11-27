@@ -1,8 +1,11 @@
 # Test provenance, package 1
 
-`Requirement | spec § | host test | Eden row planned | status`. Host tests run with `cargo test` (unit tests inside the model modules are also compiled into each by-path test binary, so the per-binary counts overlap; `cargo test` in total runs 7 + 8 + 6 + 17 lib unit tests plus the spec-named tests in `tests/`). "Eden row" labels are the specs' own; no Eden run has happened (package 1 is not
-Switch-compiled yet). Status: **host pass** = test exists and passes; **deferred** = the spec row belongs to a
-later package or needs the Switch runtime; **runtime, unbuilt** = code written, not compiled for the Switch.
+Package 1 test record opened 2026-11-01 (`39fd9e0f`). Each status records the evidence available at that stage.
+
+- `Requirement | spec § | host test | Eden row planned | status`.
+- Host tests run with `cargo test` (unit tests inside the model modules are also compiled into each by-path test binary, so the per-binary counts overlap; `cargo test` in total runs 7 + 8 + 6 + 17 lib unit tests plus the spec-named tests in `tests/`).
+- "Eden row" labels are the specs' own; no Eden run has happened (package 1 is not Switch-compiled yet).
+- Status: **host pass** = test exists and passes; **deferred** = the spec row belongs to a later package or needs the Switch runtime; **runtime, unbuilt** = code written, not compiled for the Switch.
 
 ## SPEC-core-01 (boot, install, sites)
 
@@ -92,7 +95,10 @@ updater record; the settings are in `training_modpack_menu.conf` (CARRY-OVER.md,
 `storage::file::LEGACY_SETTINGS` use the real name; copying the updater file as `settings.json` would have
 loaded factory settings over the player's own. Lead: please correct the spec.
 
-Note 3 (replaced by review R4, 2026-11-02): `developer.ini` compares the key and the value exactly (`developer_page`, lower-case `on`; lead, 2026-11-02), skips a leading UTF-8 BOM, and now **fails closed**: the loader reads at most 8 KiB + 1 byte and an over-limit file hides the page, a read error hides it, bytes that are not UTF-8 anywhere hide it, and a repeated `developer_page` key (in any order, any values) hides it. The earlier last-line-wins and prefix-truncation behaviour is gone. The install line says why: `developer=off reason=missing|unreadable|too_large|not_utf8|duplicate_key|key_absent|not_on`, or `developer=on reason=on`.
+- Note 3 (replaced by review R4, 2026-11-02): `developer.ini` compares the key and the value exactly (`developer_page`, lower-case `on`; lead, 2026-11-02), skips a leading UTF-8 BOM, and **failed closed** in R4.
+- The loader reads at most 8 KiB + 1 byte and an over-limit file hides the page, a read error hides it, bytes that are not UTF-8 anywhere hide it, and a repeated `developer_page` key (in any order, any values) hides it.
+- The earlier last-line-wins and prefix-truncation behaviour is gone.
+- The install line says why: `developer=off reason=missing|unreadable|too_large|not_utf8|duplicate_key|key_absent|not_on`, or `developer=on reason=on`.
 
 Note 1: the spec says unknown keys are dropped on rewrite. This build knows 3 of the ~90 rows, so dropping
 them would erase the player's other settings until their packages land; they are kept verbatim instead

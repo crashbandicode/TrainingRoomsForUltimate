@@ -1,17 +1,15 @@
 # Test provenance, package 2 (CPU behaviour)
 
-`Requirement | spec § | host test | Eden row planned | status`. Host tests run with `cargo test`
-(`tests/cpu_core.rs`, `tests/cpu02.rs`, `tests/cpu03.rs`, `tests/cpu_sites.rs`; the model's unit tests are
-compiled into each by-path binary, so per-binary counts overlap). Eden row labels are the specs' own and are
-batched per boot in `eden/EDEN-PACKAGE-2-PLAN.md`; no Eden run has happened. Status: **host pass** = test exists
-and passes; **runtime, unrun** = the hook is written and Switch-compiled but not run on Eden; **blocked** = needs
-an input the implementer does not have (reason in the row); **later** = the spec row belongs to a later milestone
-of this package.
+Package 2 test record opened 2026-11-01 (`fa8b77d3`). Each status records the evidence available at that stage.
 
-Design facts the tests rest on (all in `src/model/cpu/`): one `Cpu` value (settings, the plugin's own generator,
-the constant table, the role table, one state per fighter body); every hook reads the game first, takes the one
-lock for a pure decision, releases it and applies the answer; no status, term or work id is written down: they are
-asked from the game's constant table by name at run time (`hash.rs`, `ids.rs`).
+- `Requirement | spec § | host test | Eden row planned | status`.
+- Host tests run with `cargo test` (`tests/cpu_core.rs`, `tests/cpu02.rs`, `tests/cpu03.rs`, `tests/cpu_sites.rs`; the model's unit tests are compiled into each by-path binary, so per-binary counts overlap).
+- Eden row labels are the specs' own and are batched per boot in `eden/EDEN-PACKAGE-2-PLAN.md`; no Eden run has happened.
+- Status: **host pass** = test exists and passes; **runtime, unrun** = the hook is written and Switch-compiled but not run on Eden; **blocked** = needs an input the implementer does not have (reason in the row); **later** = the spec row belongs to a later milestone of this package.
+
+- Design facts the tests rest on (all in `src/model/cpu/`): one `Cpu` value (settings, the plugin's own generator, the constant table, the role table, one state per fighter body).
+- Each hook reads the game first, takes the one lock for a pure decision, releases it and applies the answer.
+- No status, term or work id is written down: they are asked from the game's constant table by name at run time (`hash.rs`, `ids.rs`).
 
 ## Shared by the CPU specs (SPEC-cpu-01 §3/§5, SPEC-cpu-07 §5, decisions B4, B5/N4, B6)
 

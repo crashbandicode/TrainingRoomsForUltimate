@@ -1,9 +1,10 @@
 # rc.9 line coverage
 
-2026-11-12. Line coverage of the `training_rooms` crate's host-compiled product code, measured with `cargo llvm-cov` 0.9.1
-(rustc 1.98.1, LLVM 22) at `a25fbbc6`. The order was 95% if possible with at most 1,000 tests. **Reached: 91.54% with 865 tests.**
-What blocks the rest is under "Why not 95%". **Then reduced on the operator's choice to the cases that add coverage: 90.18% with 821 test
-functions and 1,689 cases** (the last section, "Option (b)"); the sections before it describe the state before that reduction.
+- 2026-11-12.
+- Line coverage of the `training_rooms` crate's host-compiled product code, measured with `cargo llvm-cov` 0.9.1 (rustc 1.98.1, LLVM 22) at `a25fbbc6`.
+- The order was 95% if possible with at most 1,000 tests.
+- **Reached: 91.54% with 865 tests.** What blocks the rest is under "Why not 95%".
+- **Then reduced on the operator's choice to the cases that add coverage: 90.18% with 821 test functions and 1,689 cases** (the last section, "Option (b)"); the sections before it describe the state before that reduction.
 
 ## Figures
 
@@ -20,11 +21,10 @@ functions and 1,689 cases** (the last section, "Option (b)"); the sections befor
 
 ## How it was raised
 
-- **The cut tests came back as cases.** `tools/test_cut.py` (`tabulate_region`) turns the `#[test]` functions of a module into
-  the rows of one `#[test] fn case_table()`. Each case is the test function it was, unchanged, and asserts what it asserted.
-  `src/test_table.rs` runs each case on its own thread, as the harness did, runs every case even after one fails, and names
-  the failed ones. A test under `cfg`, `ignore` or `should_panic`, and one that re-executes the test binary by its own name
-  (`current_exe`), stays a plain test.
+- **The cut tests came back as cases.** `tools/test_cut.py` (`tabulate_region`) turns the `#[test]` functions of a module into the rows of one `#[test] fn case_table()`.
+  - Each case is the test function it was, unchanged, and asserts what it asserted.
+  - `src/test_table.rs` runs each case on its own thread, as the harness did, runs every case even after one fails, and names the failed ones.
+  - A test under `cfg`, `ignore` or `should_panic`, and one that re-executes the test binary by its own name (`current_exe`), stays a plain test.
   - The unit-test modules of `src/` are back (the 199 of the cut, and the 59 it kept are tables now too): 233 tables in 221 files.
   - 37 integration files are back as one table each: the menu model (`core02_menu`, `menu_nav`), the state detail rows
     (`state02`–`state04`), `input05`, `input_named`, `migration`, the Mii suites, `p1_core` and others. The seven CPU spec-row
@@ -131,12 +131,10 @@ A target directory reused from an earlier commit also skews the export (old bina
 
 ## Product code
 
-No product behaviour change. The release and diag NROs built at the commit before this work (`ef4113c2`) and at this commit have
-the same size and differ in 56 bytes each: the 32-byte build id, 7 characters of the commit in the build tag and 17 bytes of line
-numbers in 16 panic locations. The test cut's re-gates of `swap/mod.rs`, `stages/mod.rs` and `rr_host.rs` and its removed
-`#[cfg(test)]` helpers are back as they were at `28082c29`, because their tests are back; the import edit in `compat/menu.rs` stays
-(the two names are imported by its test module). `docs/TEST-CUT-LEDGER-rc9.md` describes the cut as it was made; where it says a
-module's tests are removed, this file says how they returned.
+- No product behaviour change.
+- The release and diag NROs built at the commit before this work (`ef4113c2`) and at this commit have the same size and differ in 56 bytes each: the 32-byte build id, 7 characters of the commit in the build tag and 17 bytes of line numbers in 16 panic locations.
+- The test cut's re-gates of `swap/mod.rs`, `stages/mod.rs` and `rr_host.rs` and its removed `#[cfg(test)]` helpers are back as they were at `28082c29`, because their tests are back; the import edit in `compat/menu.rs` stays (the two names are imported by its test module).
+- `docs/TEST-CUT-LEDGER-rc9.md` describes the cut as it was made; where it says a module's tests are removed, this file says how they returned.
 
 ## Option (b): only the cases that add coverage (2026-11-12)
 
@@ -178,10 +176,10 @@ cases that add coverage nothing else gives, with at most a 1.5-point drop.
 
 ### What was dropped, and why it is redundant
 
-All but a few dropped cases cover only product lines that the kept cases also cover: measured, case by case. The few that
-covered more account for the cost: 533 lines (1.35 points) that only dropped cases covered. This is redundancy of coverage,
-not of assertions: a dropped case may have asserted a different outcome on the same lines. None is in a required group or
-names an rc.8/rc.9 fix.
+- All but a few dropped cases cover only product lines that the kept cases also cover: measured, case by case.
+- The few that covered more account for the cost: 533 lines (1.35 points) that only dropped cases covered.
+- This is redundancy of coverage, not of assertions: a dropped case may have asserted a different outcome on the same lines.
+- None is in a required group or names an rc.8/rc.9 fix.
 
 | Area | Cases dropped | Files | What they were |
 | --- | ---: | ---: | --- |

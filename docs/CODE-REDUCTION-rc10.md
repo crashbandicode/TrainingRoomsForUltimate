@@ -253,18 +253,15 @@ the NROs unchanged and adds no warning.
 
 **The NROs are the same**
 
-Release and diag NROs built from the S3 commit against those built from `f5146184`: `.text` is byte-identical in
-both. Of the 4,136,960 and 4,329,472 bytes, 557 and 563 differ: the 32-byte build id, the 8 characters of the commit
-in the build tag, and the line numbers of 500 and 506 panic locations, which moved because lines above them were
-added or removed.
+- Release and diag NROs built from the S3 commit against those built from `f5146184`: `.text` is byte-identical in both.
+- Of the 4,136,960 and 4,329,472 bytes, 557 and 563 differ: the 32-byte build id, the 8 characters of the commit in the build tag, and the line numbers of 500 and 506 panic locations, which moved because lines above them were added or removed.
 
 **Why dead types stayed, and what touches them**
 
-- A first attempt also removed or gated the 132 dead types with their impl blocks (−5,428 product lines). Its NROs
-  had the same size and the same sections, and every function was the same once addresses were masked, but 83
-  functions had another mangled name and the functions were laid out in another order. An impl block, written or
-  derived, is numbered among the impls of its module, and that number is part of the name of everything in the later
-  impls. So removing a type renames code that stays.
+- A first attempt also removed or gated the 132 dead types with their impl blocks (−5,428 product lines).
+  - Its NROs had the same size and the same sections, and every function was the same once addresses were masked, but 83 functions had another mangled name and the functions were laid out in another order.
+  - An impl block, written or derived, is numbered among the impls of its module, and that number is part of the name of everything in the later impls.
+  - So removing a type renames code that stays.
 - A second attempt kept the types and gated their methods (−4,169). Its `.text` was identical, but the kept types'
   fields and variants were then unused in the Switch builds: 16 new `dead_code` warnings.
 - So S3 keeps every dead type, and everything dead that touches one, as it was. A file that is test-only as a whole
@@ -369,13 +366,11 @@ The five probes nothing used are deleted (the operator's Group A): `mii-ldn-qual
   one word. `cargo check --features named-input-trace` is now a gate of every slice (`docs/BUILD.md`, "Probe check";
   the `named-input-trace` row of `tools/feature_matrix.py`'s core set). Two of the probe's functions have no caller
   (`trace_write`, `trace_close_input`); they are left as they are.
-- **Eden boot** (run `rc10-s4-fb028a9b-g2`, the Surface, diag NRO `d2d39f02…` of `fb028a9b`, the GDB stub on before
-  the load, tracing off): the plugin installed (`result=installed heap_allocations=0`); 11 rows passed: the stub and
-  the load, boot to Training, the old settings, the migration, a chord, the CPU fighter through the menu, five hot
-  switches, a held item, the Replay window and a named Mii. One row failed, `acc-hook` (no `hook_stats` line in the
-  log); it failed the same way on the base build in the integration lane's last run of this set
-  (`final-rc8-surface-1-eca14e4b`). The console has no panic, abort, crash or unmapped-access line. This boot is also
-  S2's check: S2's binary was not byte-identical, and the build under test contains it.
+- **Eden boot** (run `rc10-s4-fb028a9b-g2`, the Surface, diag NRO `d2d39f02…` of `fb028a9b`, the GDB stub on before the load, tracing off): the plugin installed (`result=installed heap_allocations=0`).
+  - Eleven rows passed: the stub and the load, boot to Training, the old settings, the migration, a chord, the CPU fighter through the menu, five hot switches, a held item, the Replay window and a named Mii.
+  - One row failed, `acc-hook` (no `hook_stats` line in the log); it failed the same way on the base build in the integration lane's last run of this set (`final-rc8-surface-1-eca14e4b`).
+  - The console has no panic, abort, crash or unmapped-access line.
+  - This boot is also S2's check: S2's binary was not byte-identical, and the build under test contains it.
 ## S3b: done (2026-11-12)
 
 The dead code S3 left in place is removed: the dead types, their impl blocks and what touched them. The operator's

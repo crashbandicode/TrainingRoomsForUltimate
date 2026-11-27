@@ -1,5 +1,7 @@
 # Copy-package roster pointer lifetime
 
+Historical review opened 2026-11-02 (`743d2b0d`). Implementation details and outstanding checks refer to the revisions reviewed below.
+
 Owned 13.0.5 ELF SHA256:
 `0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2`.
 Complete shell static disassembly retained under

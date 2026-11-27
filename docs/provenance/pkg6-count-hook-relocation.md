@@ -1,5 +1,7 @@
 # Count-hook placement correction
 
+Historical review opened 2026-11-02 (`b97643ab`). Implementation details and outstanding checks refer to the revisions reviewed below.
+
 The previous inline site `155c16c` is unsafe in Skyline's far placement mode.
 It is four modulo eight, so the installer overwrites five instructions through
 `155c17c`. Native `CBZ x12` at `155c164` targets `155c174`, inside that patch.
@@ -12,14 +14,12 @@ intact. A whole-executable aligned direct B/BL/B.cond/CB/TB scan of the owned
 game ELF found no incoming edge into this replacement span. This does not
 prove absence of computed indirect targets.
 
-At this point w8 is the requested count, x23 the previous count, w9 the
-cooldown, and w10 its already-computed decrement. The callback reacquires the
-canonical manager singleton; x9 is no longer a manager pointer. For an
-unfinished new seat, active managed install, failed promotion reservation or
-unavailable manager, it substitutes w9=6 and w10=5. Native then stores its
-existing five-tick cooldown and the original `CMP w9,#1; BGT` returns before
-the committed-count store. Equal/invalid counts leave the context untouched.
-Normal readiness leaves the original decrement and count reconciliation intact.
+- At this point w8 is the requested count, x23 the previous count, w9 the cooldown, and w10 its already-computed decrement.
+- The callback reacquires the canonical manager singleton; x9 is no longer a manager pointer.
+- For an unfinished new seat, active managed install, failed promotion reservation or unavailable manager, it substitutes w9=6 and w10=5.
+- Native then stores its existing five-tick cooldown and the original `CMP w9,#1; BGT` returns before the committed-count store.
+- Equal/invalid counts leave the context untouched.
+- Normal readiness leaves the original decrement and count reconciliation intact.
 
 Incoming NZCV is dead at the displaced CMP. Its newly produced flags must
 survive both conditional-branch relocation and the trampoline tail. The owned
@@ -39,4 +39,9 @@ The test and native adapter remain uncompiled pending the coherent candidate.
 
 ## Integrated loader qualification
 
-Exact Yoga Skyline 9959ecb1 static conditional relocation is qualified in adjacent count-conditional-qualification.json. Far BEQ emits condition-preserving BEQ +8, B +20, LDR x17 literal and BR x17 to original155d9a0; false path continues via the qualified tail to155c198. Near hook displaces only BIC; original CMP/STR/BEQ remain. Both preserve newly produced flags. Combined with F6 exact110fb77 source/liveness review, this closes static placement review only. Compiled callback stack and live count transitions remain mandatory.
+- Exact Yoga Skyline 9959ecb1 static conditional relocation is qualified in adjacent count-conditional-qualification.json.
+- Far BEQ emits condition-preserving BEQ +8, B +20, LDR x17 literal and BR x17 to original155d9a0; false path continues via the qualified tail to155c198.
+- Near hook displaces only BIC; original CMP/STR/BEQ remain.
+- Both preserve newly produced flags.
+- Combined with F6 exact110fb77 source/liveness review, this closes static placement review only.
+- Compiled callback stack and live count transitions remain mandatory.

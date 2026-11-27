@@ -53,10 +53,6 @@ member, not merely its class kind. Defaults/capacity changes are separate work.
 
 ## Evidence required
 
-Original regressions: fixed seat selection; transfer with live leases; loading
-completion after count increase; stale scene/entry callbacks; reverse adoption;
-exact-Mii identity and independent CPU1/2/3 reset/save-load receipts.
-Then compiled native stack/guard gates and batched Eden count
-1→2→3→2→1, loading helper, exact Mii, L+R+A and save/load at 2–3 CPUs,
-with full console zero Unmapped and all hook allocation deltas zero.
-This document is a proposed source contract, not completion evidence.
+- Original regressions: fixed seat selection; transfer with live leases; loading completion after count increase; stale scene/entry callbacks; reverse adoption; exact-Mii identity and independent CPU1/2/3 reset/save-load receipts.
+- Then compiled native stack/guard gates and batched Eden count 1→2→3→2→1, loading helper, exact Mii, L+R+A and save/load at 2–3 CPUs, with full console zero Unmapped and all hook allocation deltas zero.
+- This document is a proposed source contract, not completion evidence.

@@ -1,10 +1,11 @@
 # Test provenance, package 6 (the fork's engines carried: hot swap, preload, Kirby hats, items, Mii, lobby practice, CPU-as-P1)
 
-`Requirement | host test | Eden row | status`. The carried engines bring their own host tests (the fork's unit and integration tests, run in
-every by-path test binary; counts overlap) and are not listed one by one: see `docs/provenance/pkg6-carry-ledger.md` and
-`tests/carry_pkg6.rs` (a hand edit of a carried file fails). This file lists what the clean-room work of package 6 added, and the Eden rows
-(labels `s6-NN`, results in `eden/EDEN-PACKAGE-6.md`). Status: **host pass**, **Eden pass**, **runtime, unrun** (written and Switch-compiled,
-no Eden row yet), **not built** (reported).
+Package 6 test record opened 2026-11-02 (`c008bcfc`). Each status records the evidence available at that stage.
+
+- `Requirement | host test | Eden row | status`.
+- The carried engines bring their own host tests (the fork's unit and integration tests, run in every by-path test binary; counts overlap) and are not listed one by one: see `docs/provenance/pkg6-carry-ledger.md` and `tests/carry_pkg6.rs` (a hand edit of a carried file fails).
+- This file lists what the clean-room work of package 6 added, and the Eden rows (labels `s6-NN`, results in `eden/EDEN-PACKAGE-6.md`).
+- Status: **host pass**, **Eden pass**, **runtime, unrun** (written and Switch-compiled, no Eden row yet), **not built** (reported).
 
 ## Allocator and features (lead ruling 2026-11-02: one global allocator, every feature builds)
 

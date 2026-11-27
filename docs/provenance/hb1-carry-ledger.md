@@ -29,12 +29,8 @@ Files this worker changed: `src/model/hitbox.rs`,
 | The checked-pointer live reader: type-check every pointer (null/misaligned refused, 0) because Eden answers 0 for an unmapped read | playbook EDEN "Read the results"; the runtime's raw-read pattern (`GameAttacks`) | `model::hitbox::GameHurt` (reads bound to one `load`, host-probed over a fake layout at exact addresses), runtime `stats::mem_load` |
 | The windowed diag-line pattern (accumulate, close a window, one formatted line) | `model::hook_stats::Observer` + `Display` (review R5 precedent) | `model::hitbox::HurtCensus`/`HurtWindow`, runtime `stats::CensusBook`/`hurt_census` (diag only), line `[Hitbox] hurt census kind=… parts=… parts_max=… first_pass=… frames=… ticks_min/avg/max=…` |
 
-Not carries but this session's decisions, for the record: `WANT_SCRATCH`
-(hit + hurt spheres together, `model::hitbox`); Hitbox's `CROSS_NEEDS` gains
-`utility_get_kind` — the census names each line with the fighter's kind
-through the already-guarded `utility::get_kind` row (diag-only caller; the
-release build calls no native and reads no HitModule; reverting is one
-identifier in the census line if the lead prefers an accessor-keyed line).
+- Not carries but this session's decisions, for the record: `WANT_SCRATCH` (hit + hurt spheres together, `model::hitbox`).
+- Hitbox's `CROSS_NEEDS` gains `utility_get_kind` — the census names each line with the fighter's kind through the already-guarded `utility::get_kind` row (diag-only caller; the release build calls no native and reads no HitModule; reverting is one identifier in the census line if the lead prefers an accessor-keyed line).
 
 ## C3 — route B wired (session tr-glm-hb1-routeb, 2026-11-04)
 

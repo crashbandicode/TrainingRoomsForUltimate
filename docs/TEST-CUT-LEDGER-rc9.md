@@ -3,10 +3,10 @@
 2026-11-11. Operator order (`artifacts/phase23/TASK-rc9-test-cut.md`): the host tests go to at most 1,000, a hard limit, keeping what
 guards real behaviour and the ship gates. This file lists every cut and why, and what is kept. Base: `28082c29` (rc.8 notes on `main`).
 
-**2026-11-12:** most of the cut tests returned as table-driven tests (one `#[test]` per module) for the coverage order:
-`docs/COVERAGE-rc9.md`. Of those, the cases that add no line coverage were removed again (its "Option (b)" section): 1,205 cases,
-nearly all covering only lines a kept case covers. The count is 821 test functions and 1,689 cases. This file describes the
-cut as it was made at `7a4cba64`.
+- **2026-11-12:** most of the cut tests returned as table-driven tests (one `#[test]` per module) for the coverage order: `docs/COVERAGE-rc9.md`.
+- Of those, the cases that add no line coverage were removed again (its "Option (b)" section): 1,205 cases, nearly all covering only lines a kept case covers.
+- The count is 821 test functions and 1,689 cases.
+- This file describes the cut as it was made at `7a4cba64`.
 
 ## Before and after
 
@@ -55,7 +55,9 @@ rows, are counted there. The integration rows' numbers are their own files' test
 
 ### `*_wiring.rs` and other source pins (30 files, 115 tests of their own)
 
-Why not necessary: Source-text pin of one past fix: it reads the Switch-only runtime's `.rs` text through the call-graph scanner and asserts that one named call path or line still exists. The rule itself is host-tested in the model or was accepted in Eden; the pin fails on a refactor that keeps behaviour and passes on a wrong value at the right call site. Not a ship gate.
+- Why not necessary: Source-text pin of one past fix: it reads the Switch-only runtime's `.rs` text through the call-graph scanner and asserts that one named call path or line still exists.
+- The rule itself is host-tested in the model or was accepted in Eden; the pin fails on a refactor that keeps behaviour and passes on a wrong value at the right call site.
+- Not a ship gate.
 
 | File | Own tests | Listed before | What it covered |
 | --- | ---: | ---: | --- |
@@ -231,10 +233,9 @@ The cut modules of the two "mixed" areas, each with its test count:
   that gate (`source_descriptor`, `source_visible_forms`, `native_hud_refresh`). Without it the host test build warns dead code.
 - `tools/layout-builder/src/main.rs`: defines `lib_unit_tests!` (pass-through) for the `src/` file it includes by path.
 
-Proof (release NRO of `28082c29` against this branch, `cargo skyline build --release`, both 4,136,960 B, resident 5,902,336 B):
-57 bytes differ: the 32-byte build id, the 8 characters of the commit in the build tag, and 17 bytes of line numbers in 16 panic
-locations (lines moved where a test module sat above code). The code is byte-identical. `proof.py` (kept with the lane's evidence, `artifacts/phase23/rc9-test-cut/` in the workspace) compares every
-`src/`, `crates/` and `third_party/` file with its test modules removed: 671 identical, 14 differ (the files above and wrapped test files).
+- Proof (release NRO of `28082c29` against this branch, `cargo skyline build --release`, both 4,136,960 B, resident 5,902,336 B): 57 bytes differ: the 32-byte build id, the 8 characters of the commit in the build tag, and 17 bytes of line numbers in 16 panic locations (lines moved where a test module sat above code).
+- The code is byte-identical.
+- `proof.py` (kept with the lane's evidence, `artifacts/phase23/rc9-test-cut/` in the workspace) compares every `src/`, `crates/` and `third_party/` file with its test modules removed: 671 identical, 14 differ (the files above and wrapped test files).
 
 ## Gate scripts and tools changed
 

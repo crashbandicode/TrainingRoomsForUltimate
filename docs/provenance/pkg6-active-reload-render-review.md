@@ -44,12 +44,7 @@ active exact-Mii target changes still require a different qualified root
 contract. No active render, new hook, native flag write, forced lease release,
 count freeze or fourth-created-row assumption was added.
 
-Evidence: exact owned ELF
-`0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2`;
-bounded fresh excerpts `tmp-pkg6/reload-install.asm` and `reload-service.asm`;
-12-entry loader jump table read by `tmp-pkg6/reload-jump-table.py`;
-existing `artifacts/enhancements/mii-hud54-design/{DESIGN,ROOT-FLAG-RESPONSE}.md`.
-An attempted LLVM `-s` range dump ignored its range and emitted excessive
-output; it was discarded, not used as evidence. The corrected table reader
-reads only the ELF header/program headers and 48 table bytes. No compile,
-Eden, profile mutation or new native activation was performed.
+- Evidence: exact owned ELF `0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2`; bounded fresh excerpts `tmp-pkg6/reload-install.asm` and `reload-service.asm`; 12-entry loader jump table read by `tmp-pkg6/reload-jump-table.py`; existing `artifacts/enhancements/mii-hud54-design/{DESIGN,ROOT-FLAG-RESPONSE}.md`.
+- An attempted LLVM `-s` range dump ignored its range and emitted excessive output; it was discarded, not used as evidence.
+- The corrected table reader reads only the ELF header/program headers and 48 table bytes.
+- No compile, Eden, profile mutation or new native activation was performed.

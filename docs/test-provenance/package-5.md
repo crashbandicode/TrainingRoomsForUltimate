@@ -1,5 +1,7 @@
 # Test provenance, package 5 (menu rendering and assets)
 
+Package 5 test record opened 2026-11-02 (`d1de600e`). Each status records the evidence available at that stage.
+
 | Requirement (spec) | Host test | Eden row | Result |
 | --- | --- | --- | --- |
 | UI site rows match the owned ELF; anchor pins; manager slot decode (SPEC-core-05 §9) | `tests/ui_sites.rs` (4), `model::sites_ui::tests` | install line `ui_*=stock/near`, `[Ui] anchors installed` (s5-02..09) | pass |

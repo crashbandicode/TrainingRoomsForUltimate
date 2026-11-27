@@ -1,5 +1,7 @@
 # Test provenance, package 4 (recording, input display, chords, notifications)
 
+Package 4 test record opened 2026-11-01 (`b9d6497d`). Each status records the evidence available at that stage.
+
 Stream `stream/pkg4` (Claude Sonnet 5.5 high under lead `0caa72b8`). Playbook followed: `009c9ac`. Host tests are in
 `tests/input01.rs` (SPEC-input-01), `tests/input02.rs` (SPEC-input-02), `tests/input04.rs` (SPEC-input-04),
 `tests/input05.rs` (SPEC-input-05) and `tests/input_sites.rs` (sites against the owned 13.0.5 ELF); the carried files
