@@ -20,7 +20,7 @@ fn the_loading_help_lines_say_what_the_code_does() {
         ("Ready Hats", "How many Kirby hats are kept ready, apart from the fighters.\nA hat of a ready fighter shares its body."),
         ("Ready Fighter Bodies",
             "How many fighters each role keeps in its own slot, counting\nthe one on screen. More means quicker swaps. Off: no groups."),
-        ("Group Swap", "The master switch of the group swaps below.\nOff turns every group off."),
+        ("Group Swap", "On: each role keeps extra groups ready besides its own slot.\nOff: no extra groups. The two bank entries below stay as set."),
         ("Swap groups",
             "Which swaps are done as a group. A greyed entry says why.\nPT / Aegis groups need free Ready Fighters: PT 3, Aegis 2."),
     ] {
@@ -32,6 +32,12 @@ fn the_loading_help_lines_say_what_the_code_does() {
     // Off leaves no group at all, whatever Group Swap says.
     assert!(Settings::DEFAULT.groups_enabled());
     assert!(!Settings { bank_members: 0, ..Settings::DEFAULT }.groups_enabled());
+    // Group Swap Off: no group of any kind, and the two banks of the Swap groups row do not ask it.
+    let off = Settings { group_swap: false, ..Settings::DEFAULT };
+    assert!(!off.groups_enabled() && !off.native_groups_enabled() && !off.mii_groups_enabled());
+    assert!(!off.solo_popo_groups_enabled() && !off.ic_pair_groups_enabled() && !off.pair_groups_enabled());
+    assert!(off.pair_bank_enabled() && off.original_bank_enabled());
+    assert_eq!(super::options::SWAP_GROUPS[..2], ["Ice Climbers pair bank", "Original fighter bank"]);
     // A group is placed whole when that many bodies are free (`body_bank`'s planner): Pokémon Trainer's is three
     // bodies and Pyra / Mythra's two (`Forms::starting`).
     assert_eq!((Members::native_group(0x24).map(Members::count), Members::native_group(0x5a).map(Members::count)), (Some(3), Some(2)));
