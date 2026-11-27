@@ -138,7 +138,7 @@ The tool uses the operator's own MIT crate **nx-layout-toolbox** as a git depend
 - reproducible from a clean checkout: 2026-11-02 the recipe built from the git dependency is byte-identical to the committed `assets/info_training.tra1` (sha256 `a1f3ee13...`, target archive fnv `e8a5a9ce3f4ec968`; rebuilt 2026-11-02 after the chip-grid geometry change, in the Ally WSL with `eden/ally/ally-build.sh recipe`: sha256 `225fdfd0...`, target archive fnv `6ba2f66617e6c4ea`, 529,300 B) given the same stock archive.
 
 - Item pictures: the builder reads the 39 PNGs from assets/item-icons (the 38 approved renders and rc.13's Wario bike, an Eden capture cut out by background subtraction), appends BC7 sRGB textures and corresponding picture materials to the stock combined BNTX, and emits the same TRA1 delta format.
-- Verify source/destination provenance with `python3 -I tools/carry_ui_items.py`; the 40-file ledger is docs/provenance/ui-item-assets-ledger.md.
+- Verify source/destination provenance with `python3 -I tools/carry_ui_items.py`; see the [UI item asset ledger](../tools/provenance-data/ui-item-assets-ledger.txt).
 - Regenerate both recipes whenever the shared pane table changes.
 - The generated target archives stay private.
 

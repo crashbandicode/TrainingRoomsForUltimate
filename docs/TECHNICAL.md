@@ -22,10 +22,6 @@ How TrainingRooms works in Training and waiting rooms; see [Media](MEDIA.md) for
 
 ## Install
 
-| Detail | Decision record |
-| --- | --- |
-| First-boot import | [Decision of 2026-11-01](DECISIONS.md). |
-
 ![The first-boot import, file by file: what is copied from the fork's folder, what is regenerated and what is left](decisions/S1-import-details.png)
 
 For the plugins and their install path, see [Getting started](guide/getting-started.md#installing).
@@ -864,12 +860,9 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Miis: what came over from the fork
 
-| # | Behaviour | Fork | Here | Status |
-| --- | --- | --- | --- | --- |
-| 1 | [Open the native Mii editor](#mii--mii-1) | `src/mii_editor_bridge/mod.rs` `request`, `editor_origin.rs` `admit` | `src/runtime/mii/mii_editor_bridge/mod.rs:146` `request`, `editor_origin.rs:14`; `NATIVE_EDITOR_AVAILABLE = true` (`src/model/mii_root/mii_menu.rs:12`) | present |
+TrainingRooms ports the fork’s Mii code from M5q (`parked-reuse175/refactor/stages/m5q/stage`).
 
-The Mii code is the fork's own (M5q stage, `parked-reuse175/refactor/stages/m5q/stage`), ported directly. The pkg6
-carry records (`docs/provenance/pkg6-carry-manifest.json`, `pkg6-carry-ledger.md`, checked by
+The pkg6 carry records (`docs/provenance/pkg6-carry-manifest.json`, [pkg6 carry ledger](../tools/provenance-data/pkg6-carry-ledger.txt), checked by
 `python3 -I tools/carry_pkg6.py verify`) name the fork file behind every carried file and every exact-text change.
 This page is the parity checklist of 2026-11-05 (branch `p23/mii-editor`). "Fork" paths are relative to the M5q
 stage; "Here" paths to this repository.
@@ -1039,8 +1032,7 @@ The Brawler, Swordfighter and Gunner lists grey out each role's character-select
     memory (cov-rest `f2298ee`, `src/model/mii_install.rs` `installable`).
   - **Edit placement** and the **Setup library** returned in that port. Edit placement changed the active macro's
     offset until [Change placement](guide/recording.md#change-placement-and-the-replay-window) replaced it on 2026-11-25.
-- **Capture commit:** a committed replay capture goes to the menu worker through a 16-slot mailbox (no heap in the
-  game's hooks); the fork wrote it directly.
+- **Capture commit:** the game hook posts a save event to the 1,024-slot replay mailbox. The worker passes the committed capture to the writer.
 - **Not carried:** the fork's diagnostic Mii probes and observers (listed in the manifest's `not_carried`); the two
   Lua helper tests (`lua_helpers/tests/*.lua`; they need a Lua 5.3 interpreter, not a cargo test); and the fork test
   `training_mod_mii/tests/source_provenance.rs`, whose subjects are runtime files that a host test could only include

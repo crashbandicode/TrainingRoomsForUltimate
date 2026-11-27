@@ -234,7 +234,7 @@ Find a restriction by subsystem, then look up its ID in the table.
 
 **mii-class-unavailable — reason**
 
-- A greyed Mii tile: the role has no Mii of that class it can load (`docs/MII.md` row 17; the fork's behaviour).
+- A greyed Mii tile: the role has no Mii of that class it can load ([Mii cycle tile rules](TECHNICAL.md#mii--mii-14); the fork's behaviour).
 
 <a id="restrictions-25"></a>
 

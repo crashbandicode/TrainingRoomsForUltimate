@@ -11,7 +11,7 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 | [Install one training plugin per card](#differences-from-the-fork-1) | `Cargo.toml:2`, `src/model/storage.rs:10` |
 | [Import fork settings on first boot](#differences-from-the-fork-2) | `src/model/migration.rs:42-62` |
 | [Recover invalid settings](#differences-from-the-fork-3) | `src/model/settings_file.rs:5-13` |
-| [Log a panic](#differences-from-the-fork-4) | `src/runtime/boot.rs:100-104` |
+| [Log a panic](#differences-from-the-fork-4) | `src/runtime/boot.rs:97-101` |
 | If another mod replaces the Training HUD layout, the plugin still injects its own. | `src/runtime/ui/archive.rs` (`build_on_vanilla`) |
 
 <a id="differences-from-the-fork-1"></a>
@@ -43,7 +43,7 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 ## Menu
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4ec5bff51d1c512e252fbb8e6788fc6adc32cdcc" autoplay muted loop playsinline controls></video>
-*The five pages of the menu, then Hitbox Visualization with three rows ticked. Eden, rc.14 (untested on hardware).* [Open the clip](media/rc14-menu-tour.mp4)
+*Five menu pages, then three hitbox layers selected.* [Open the clip](media/rc14-menu-tour.mp4)
 
 | Change | Where in the code |
 | --- | --- |
@@ -93,7 +93,7 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4aa2f2e58ef1c505ac2b4e9dcc4fcf435232f904" autoplay muted loop playsinline controls></video>
 
-*Fighter grid with cycle badges, then the cycle chord switching Player 1 in that order* [Open the clip](media/rc11-cycle-switch.mp4)
+*Cycle badges show the order of Player 1’s fighter swaps.* [Open the clip](media/rc11-cycle-switch.mp4)
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/29fadaf711f22a5ea361c3aaebe670a04c07bdc1" autoplay muted loop playsinline controls></video>
 
@@ -154,10 +154,10 @@ Operator decisions of 2026-11-05 (`origin/review/menu-proposal` `deccd62`); the 
 
 | Change | Where in the code |
 | --- | --- |
-| [Retire loading helpers before opening pause](#differences-from-the-fork-14) | `src/runtime/roster/native_source_capacity.rs:793` (`pause_state_exit`), `src/runtime/roster/character_sources.rs:276` (`pause_opening`), `src/runtime/roster/native_source_capacity.rs:829` (`retire_at`) |
-| [Place Solo Popo marks above the name](#differences-from-the-fork-15) | `src/model/ui/panes.rs:216` (`roster_tile`) |
-| [End unsuccessful Kirby hat requests](#differences-from-the-fork-16) | `src/runtime/roster/kirby_hats.rs:390` (`tick`) |
-| A swap away from Kirby ends that role's pending hat request (HAT-REQUEST-END, rule 2). | `src/runtime/roster/kirby_hats.rs:445` (`fighter_committed`) |
+| [Retire loading helpers before opening pause](#differences-from-the-fork-14) | `src/runtime/roster/native_source_capacity.rs:714` (`pause_state_exit`), `src/runtime/roster/character_sources.rs:255` (`pause_opening`), `src/runtime/roster/native_source_capacity.rs:749` (`retire_at`) |
+| [Place Solo Popo marks above the name](#differences-from-the-fork-15) | `src/model/ui/panes.rs:366` (`roster_tile`) |
+| [End unsuccessful Kirby hat requests](#differences-from-the-fork-16) | `src/runtime/roster/kirby_hats.rs:411` (`tick`) |
+| A swap away from Kirby ends that role's pending hat request (HAT-REQUEST-END, rule 2). | `src/runtime/roster/kirby_hats.rs:466` (`fighter_committed`) |
 
 <a id="differences-from-the-fork-14"></a>
 
