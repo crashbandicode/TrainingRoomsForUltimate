@@ -42,7 +42,7 @@ The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
 
 ## Installing
 
-Copy `libtraining_rooms.nro` and `libnro_hook.nro` into the Skyline plugins folder: [Getting started](guide/getting-started.md).
+See [Installing TrainingRooms](guide/getting-started.md#installing) for the required files and their destination.
 
 ## Known issues
 

@@ -22,7 +22,7 @@
 | Goal | On the Saves page |
 |---|---|
 | <a id='making-a-setup'></a>Keep this position | Choose **Save setup here…** and name it; the bound save stays unchanged. |
-| Copy an existing save | Choose **Save setup from bound save…** instead. |
+| Copy the next Load's positions | Choose **Save setup from bound save…**; a setup selected for Load also counts. |
 | <a id='using-a-setup'></a>Move to a setup once | Open the named setup, choose **Restore here**, then close the menu. |
 | Restore refused? | Enable Save States and match the stage and both fighters, including exact Miis. |
 | Use the setup for later loads | Choose **Make Load use it**; nobody moves until the next load. |

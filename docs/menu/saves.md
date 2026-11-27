@@ -85,6 +85,6 @@ Keep a [named setup](../guide/save-states.md#making-a-setup) from the current po
 | --- | --- |
 | Looking for the save files themselves? | Open [Save states & Macros](recording.md#save-states-macros) on Recording. |
 | Rebound Save or Load conflicts with [Online Deluxe](../guide/controls.md#online-deluxe)? | Close its settings page before using that chord. |
-| Restore here is refused | Enable Save States; match both fighters, exact Miis and stage. |
+| Restore here is refused | Check the [restore requirements](../guide/save-states.md#using-a-setup). |
 | Respawn on platform is greyed | [Auto-load takes priority](fighters-and-stages.md#respawn-on-platform) while Save States is also On. |
 | <a id="reset-page-to-defaults"></a>Reset page to defaults | Confirm to restore this page's [saved defaults](../guide/using-the-menu.md#your-defaults). |

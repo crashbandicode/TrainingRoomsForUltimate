@@ -42,17 +42,15 @@ The rustup home used for a Switch build must contain `skyline-v3`. The Surface's
 
 ## Commands
 
-Yoga (`memento-claw-yoga-ubuntu`): `cargo skyline build --release`, then `cargo skyline build --release --features diag`.
+On a build host, use `cargo skyline build --release` for the shipped plugin and
+`cargo skyline build --release --features diag` for diagnostics.
 
-Surface: the same two commands with
-`RUSTUP_HOME=/home/intpa/smash-training-lobby/toolchain/tools/rustup`,
-`CARGO_HOME=/home/intpa/smash-training-lobby/toolchain/tools/cargo`,
-cargo-skyline from `/home/intpa/smash-training-lobby/toolchain/tools/skyline-install/bin`, and this copy's own
-`CARGO_TARGET_DIR`; each call under `systemd-run --user --scope -p MemoryMax=6G /usr/bin/timeout 1800`.
+For campaign builds, run `remote-gate.ps1 -BuildHost auto` from the Surface to book a free build host;
+do not run Cargo on the Surface. The runner uses the `tr-yoga` alias when it selects the Yoga.
 
 ## Evidence
 
-2026-11-02: a detached clean checkout of `e8dbcc9`, pin unchanged, no `RUSTUP_TOOLCHAIN`, the Surface command above
+2026-11-02: a detached clean checkout of `e8dbcc9`, pin unchanged, no `RUSTUP_TOOLCHAIN`, built on the Surface
 (script `/tmp/tr-pin-probe.ps1`): `Finished release … in 16.54s`, `libtraining_rooms.nro` sha256
 `26a5fef0383d2252f44868257bd7e95ccf17c7157b4e1c00a314e377016303f9` — byte-identical to the release NRO built
 earlier with a `RUSTUP_TOOLCHAIN=nightly-2026-02-14` override (`IMPLEMENTATION-PROGRESS.md`) (removed after v0.2.0-rc.1; see that tag), so the build is
