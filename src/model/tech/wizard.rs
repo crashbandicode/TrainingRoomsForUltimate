@@ -62,9 +62,8 @@ pub struct Wizard {
 fn valid_spot(spot: Spot) -> bool {
     // The surface reader supplies native normals. Use their direction for the
     // angle and preserve their exact values for the existing start model.
-    spot.line.valid()
+    spot.on_segment()
         && spot.line.kind().is_some()
-        && finite(spot.point)
         && dot(spot.line.normal, spot.line.normal).is_finite()
         && dot(spot.line.normal, spot.line.normal) > 0.
 }
@@ -122,7 +121,7 @@ impl Wizard {
         if !self.distance.is_finite() || !(0. ..=120.).contains(&self.distance) {
             return None;
         }
-        let point = add(spot.point, scale(spot.line.normal, self.distance));
+        let point = add(spot.point(), scale(spot.line.normal, self.distance));
         finite(point).then_some(point)
     }
     /// Exact transient overrides; advanced settings and their sampling remain

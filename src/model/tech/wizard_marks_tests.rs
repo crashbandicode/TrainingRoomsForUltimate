@@ -31,17 +31,14 @@ fn wizard(selected: bool) -> Wizard {
     w
 }
 fn spot(normal: Vec2) -> Spot {
-    Spot {
-        point: Vec2 { x: 7., y: 11. },
-        line: Line {
+    Spot::near(Line {
             id: 42,
             ends: [Vec2 { x: -20., y: 11. }, Vec2 { x: 20., y: 11. }],
             normal,
             floor: normal.y >= 0.7,
             wall: normal.y == 0.,
             passable: false,
-        },
-    }
+        }, Vec2 { x: 7., y: 11. })
 }
 
 #[test]
@@ -50,11 +47,11 @@ fn wizard_marks_full_picker_matches_original_normal_arrow_bit_exactly() {
     for normal in [Vec2{x:0.,y:1.},Vec2{x:0.,y:-1.},Vec2{x:-1.,y:0.},Vec2{x:1.,y:0.},Vec2{x:0.6,y:0.8}] {
         let s=spot(normal);
         let out=super::wizard_marks::marks(Some(s),Some(CURSOR),None,Some(params()),true);
-        let tip=add(s.point,scale(normal,5.));
+        let tip=add(s.point(),scale(normal,5.));
         let side=Vec2{x:-normal.y,y:normal.x};
         let back=add(tip,scale(normal,-1.5));
-        let expected=[add(s.point,scale(normal,2.5)),tip,add(back,side),add(back,scale(side,-1.))];
-        assert_eq!(out[0],Some(([s.point.x,s.point.y],EggLook{scale:0.3,..EGG_WHOLE})));
+        let expected=[add(s.point(),scale(normal,2.5)),tip,add(back,side),add(back,scale(side,-1.))];
+        assert_eq!(out[0],Some(([s.point().x,s.point().y],EggLook{scale:0.3,..EGG_WHOLE})));
         for (slot,point) in out[1..5].iter().zip(expected) {
             assert_eq!(*slot,Some(([point.x,point.y],EggLook{scale:0.12,..EGG_WHOLE})));
         }

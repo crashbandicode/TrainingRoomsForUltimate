@@ -3,7 +3,8 @@
 use super::super::tech_launch::{self as flight, FlightParams};
 use super::{
     add, finite, scale, sub,
-    surface::{self, Kind, Line, Surfaces, Walk},
+    picker::Spot,
+    surface::{self, Kind, Surfaces, Walk},
     Vec2,
 };
 
@@ -49,8 +50,7 @@ pub(super) fn contact_frames(knockback: f32) -> core::ops::RangeInclusive<f32> {
 
 pub struct Aim<'a> {
     pub surfaces: &'a Surfaces,
-    pub line: Line,
-    pub target: Vec2,
+    pub spot: Spot,
     pub knockback: f32,
     pub params: FlightParams,
     pub blast: Box2,
@@ -60,21 +60,22 @@ impl Aim<'_> {
     /// Translate the path to the target, then reject an early collision, a solid
     /// start, an out-of-bounds path or a contact outside the timed passive regime.
     pub fn at(&self, angle: f32, frames: u16) -> Option<Solution> {
+        let (line, target) = (self.spot.line, self.spot.point());
         if self.surfaces.state != Walk::Closed
-            || self.line.kind().is_none()
-            || self.line.snap(self.target)? != self.target
+            || line.kind().is_none()
+            || !self.spot.on_segment()
             || !contact_frames(self.knockback).contains(&f32::from(frames))
         {
             return None;
         }
         let velocity = flight::launch_velocity(self.knockback, flight::direction_degrees(angle)?)?;
         let start = flight::solve_start(
-            self.target,
+            target,
             velocity,
             self.params,
             frames,
             self.knockback * flight::DAMAGE_FRAME_MUL,
-            self.line.normal,
+            line.normal,
             5.7,
         )?;
         if inside(self.surfaces, start) {
@@ -93,7 +94,7 @@ impl Aim<'_> {
                 for l in self.surfaces.lines() {
                     if let Some(t) = surface::crossing(previous, p, l) {
                         // Only the selected line on the final segment may be hit.
-                        if l.id != self.line.id || f < frames || t < 1.0 {
+                        if l.id != line.id || f < frames || t < 1.0 {
                             return None;
                         }
                     }
@@ -102,7 +103,7 @@ impl Aim<'_> {
             previous = p;
         }
         let end = flight::flight(velocity, self.params, frames)?;
-        if self.line.kind() == Some(Kind::Ceiling)
+        if line.kind() == Some(Kind::Ceiling)
             && end.damage_velocity.y - end.gravity_speed <= 0.0
         {
             return None;
@@ -120,7 +121,7 @@ impl Aim<'_> {
         if let Some(a) = angle {
             return self.at(a, frames);
         }
-        let inward = scale(self.line.normal, -1.0);
+        let inward = scale(self.spot.line.normal, -1.0);
         let preferred = inward.y.atan2(inward.x).to_degrees().rem_euclid(360.0);
         self.at(preferred, frames)
             .or_else(|| (0..72).find_map(|i| self.at(i as f32 * 5.0, frames)))

@@ -1,6 +1,6 @@
 //! BTT placing controls over the complete camera rectangle, including undersides.
-use super::surface::{Kind, Line, Source, Surfaces, END_MARGIN};
-use super::{add, dot, finite, scale, sub, Vec2};
+use super::surface::{Kind, Line, RecoverError, RememberedSpot, Source, Surfaces, END_MARGIN};
+use super::{add, scale, sub, Vec2};
 use crate::model::btt::placing_motion;
 use crate::model::btt::Pad;
 use crate::model::chords::logical::{A, X, ZL};
@@ -8,9 +8,42 @@ use crate::model::chords::logical::{A, X, ZL};
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Spot {
     pub line: Line,
-    pub point: Vec2,
+    /// Where on the line: 0 at the end it is measured from, 1 at the other.
+    t: f32,
+    /// Measured from the line's second end: a remembered spot whose line was read again with its ends reversed.
+    far: bool,
 }
 impl Spot {
+    pub fn at(line: Line, t: f32) -> Self {
+        Self { line, t, far: false }
+    }
+    /// The cursor's nearest point on a targetable line of `kind`.
+    pub fn nearest(surfaces: &Surfaces, cursor: Vec2, kind: Option<Kind>) -> Option<Self> {
+        surfaces.nearest(cursor, kind).map(|(line, t)| Self::at(line, t)).filter(|s| s.on_segment())
+    }
+    #[cfg(test)]
+    pub fn near(line: Line, point: Vec2) -> Self {
+        Self::at(line, line.project(point).unwrap_or(f32::NAN))
+    }
+    /// The spot's world point: the one place that computes it.
+    pub fn point(self) -> Vec2 {
+        self.line.at(self.t, self.far)
+    }
+    /// The one rule for "this target is on its line": a parameter from 0 to 1 on a line with a length. No position
+    /// is compared: a line's snap of its own point is not that point bit for bit.
+    pub fn on_segment(self) -> bool {
+        (0.0..=1.0).contains(&self.t) && self.line.valid()
+    }
+    pub fn remember(self) -> Option<RememberedSpot> {
+        (self.on_segment() && self.line.kind().is_some()).then(|| RememberedSpot::capture(self.line, self.t, self.far))
+    }
+    /// The remembered spot on the stage's lines as read again: the same world point, whichever way the line's ends
+    /// come back.
+    pub fn recover(remembered: RememberedSpot, surfaces: &Surfaces) -> Result<Self, RecoverError> {
+        let (line, t, far) = remembered.resolve(surfaces)?;
+        let spot = Self { line, t, far };
+        spot.on_segment().then_some(spot).ok_or(RecoverError::MissingSurface)
+    }
     /// A moved line invalidates the old point rather than silently dragging it.
     pub fn current(self, source: &mut impl Source) -> bool {
         source
@@ -50,7 +83,7 @@ impl Picker {
     /// Save only world data and discard every borrowed native-line snapshot.
     pub fn enter(&mut self, stage: i32, here: Vec2) {
         if let Some(spot) = self.selected {
-            let remembered = (self.stage, spot.point, spot.line.kind());
+            let remembered = (self.stage, spot.point(), spot.line.kind());
             if let Some(entry) = self
                 .kept
                 .iter_mut()
@@ -83,9 +116,7 @@ impl Picker {
         let Some((point, kind)) = self.restore.take() else {
             return false;
         };
-        self.selected = surfaces
-            .nearest(point, kind)
-            .map(|(line, point)| Spot { line, point });
+        self.selected = Spot::nearest(surfaces, point, kind);
         self.selected.is_some()
     }
     /// The full camera rectangle is [left,right,top,bottom]; unlike BTT targets,
@@ -103,12 +134,10 @@ impl Picker {
         let motion = self.placing_motion(&pad);
         self.cursor.x = (self.cursor.x + motion[0]).clamp(range[0], range[1]);
         self.cursor.y = (self.cursor.y + motion[1]).clamp(range[3], range[2]);
-        self.hovered = surfaces
-            .nearest(self.cursor, kind)
-            .filter(|(_, p)| {
-                p.x >= range[0] && p.x <= range[1] && p.y >= range[3] && p.y <= range[2]
-            })
-            .map(|(line, point)| Spot { line, point });
+        self.hovered = Spot::nearest(surfaces, self.cursor, kind).filter(|spot| {
+            let p = spot.point();
+            p.x >= range[0] && p.x <= range[1] && p.y >= range[3] && p.y <= range[2]
+        });
         if pad.held & (1 << ZL) != 0 {
             return Pick::None;
         }
@@ -131,7 +160,7 @@ impl Picker {
     }
     pub fn normal_arrow(&self) -> Option<[Vec2; 2]> {
         self.hovered
-            .map(|s| [s.point, add(s.point, scale(s.line.normal, 5.0))])
+            .map(|s| [s.point(), add(s.point(), scale(s.line.normal, 5.0))])
     }
 }
 
@@ -214,13 +243,6 @@ pub fn random_spot<S: Source>(
     if unit >= 65536 {
         return None;
     }
-    let point = add(
-        line.ends[0],
-        scale(
-            sub(line.ends[1], line.ends[0]),
-            low + (high - low) * unit as f32 / 65535.0,
-        ),
-    );
-    (finite(point) && dot(sub(point, line.ends[0]), sub(point, line.ends[0])).is_finite())
-        .then_some(Spot { line, point })
+    let spot = Spot::at(line, low + (high - low) * unit as f32 / 65535.0);
+    spot.on_segment().then_some(spot)
 }

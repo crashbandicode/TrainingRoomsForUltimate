@@ -224,7 +224,7 @@ fn point_picker_reaches_underside_and_remembers_stage() {
         picker.feed(pad(1 << A), &surfaces, [-100., 100., 100., -100.], None),
         picker::Pick::Saved
     );
-    assert_eq!(picker.selected.unwrap().point.y, -40.);
+    assert_eq!(picker.selected.unwrap().point().y, -40.);
     assert_eq!(
         picker.feed(pad(1 << X), &surfaces, [-100., 100., 100., -100.], None),
         picker::Pick::Start
@@ -243,7 +243,7 @@ fn point_picker_reaches_underside_and_remembers_stage() {
     let mut reloaded = Surfaces::EMPTY;
     reloaded.push(ceiling(101, -40.));
     assert!(picker.restore(&reloaded));
-    assert_eq!(picker.selected.unwrap().point.y, -40.);
+    assert_eq!(picker.selected.unwrap().point().y, -40.);
     assert_eq!(picker.selected.unwrap().line.id, 101);
     assert_ne!(picker.selected.unwrap().line.id, line.id);
 }
@@ -265,7 +265,7 @@ fn random_spot_refreshes_lines_and_clips_camera_before_sampling() {
     )
     .unwrap();
     assert_eq!(spot.line.id, 1);
-    assert!(spot.point.x >= -10. && spot.point.x <= 10.);
+    assert!(spot.point().x >= -10. && spot.point().x <= 10.);
     assert!(spot.current(&mut source));
     source.0[0].ends[0].x += 0.001;
     assert!(!spot.current(&mut source));
@@ -317,10 +317,7 @@ fn all_fixed_attempt_values_stay_and_random_rerolls_only_on_request() {
     };
     let context = || planner::Context {
         surfaces: &surfaces,
-        spot: picker::Spot {
-            line,
-            point: Vec2::default(),
-        },
+        spot: picker::Spot::near(line, Vec2::default()),
         params: crate::model::tech_launch::FlightParams {
             brake: 0.051,
             gravity: 0.087,
@@ -370,7 +367,7 @@ fn all_fixed_attempt_values_stay_and_random_rerolls_only_on_request() {
             },
             &mut |_| panic!("unavailable multiplier must not sample an attempt")
         )
-        .is_none());
+        .is_err());
     }
     config.speed = Numeric {
         mode: Mode::Random,
@@ -495,10 +492,7 @@ fn percent_fixture(
         config,
         planner::Context {
             surfaces: &surfaces,
-            spot: picker::Spot {
-                line,
-                point: Vec2::default(),
-            },
+            spot: picker::Spot::near(line, Vec2::default()),
             params: crate::model::tech_launch::FlightParams {
                 brake: 0.051,
                 gravity: 0.087,
@@ -795,43 +789,34 @@ fn abandoned_attempt_cancels_pending_launch_retry() {
 #[test]
 fn stage_point_cache_returns_the_latest_choice() {
     let mut picker = picker::Picker::EMPTY;
-    let first = picker::Spot {
-        line: ceiling(1, -40.),
-        point: Vec2 { x: 0., y: -40. },
-    };
-    let second = picker::Spot {
-        line: ceiling(2, -20.),
-        point: Vec2 { x: 10., y: -20. },
-    };
+    let first = picker::Spot::near(ceiling(1, -40.), Vec2 { x: 0., y: -40. });
+    let second = picker::Spot::near(ceiling(2, -20.), Vec2 { x: 10., y: -20. });
     picker.enter(3, Vec2::default());
     picker.selected = Some(first);
     picker.enter(4, Vec2::default());
-    let other = picker::Spot {
-        line: ceiling(9, -60.),
-        point: Vec2 { x: -5., y: -60. },
-    };
+    let other = picker::Spot::near(ceiling(9, -60.), Vec2 { x: -5., y: -60. });
     picker.selected = Some(other);
     picker.enter(3, Vec2::default());
-    assert_eq!(picker.cursor, first.point);
+    assert_eq!(picker.cursor, first.point());
     let mut first_return = Surfaces::EMPTY;
     first_return.push(ceiling(101, -40.));
     assert!(picker.restore(&first_return));
     picker.selected = Some(second);
     picker.enter(4, Vec2::default());
     assert_eq!(
-        picker.cursor, other.point,
+        picker.cursor, other.point(),
         "each stage keeps its own latest point"
     );
     assert!(picker.selected.is_none());
     picker.enter(3, Vec2::default());
-    assert_eq!(picker.cursor, second.point);
+    assert_eq!(picker.cursor, second.point());
     assert!(picker.selected.is_none());
     let mut second_return = Surfaces::EMPTY;
     second_return.push(ceiling(201, -40.));
     second_return.push(ceiling(202, -20.));
     assert!(picker.restore(&second_return));
     let restored = picker.selected.unwrap();
-    assert_eq!(restored.point, second.point);
+    assert_eq!(restored.point(), second.point());
     assert_eq!(restored.line.id, 202);
     assert_ne!(restored.line.id, second.line.id);
 }
@@ -887,17 +872,14 @@ fn unavailable_press_calibration_never_becomes_zero_or_an_average_sample() {
 #[test]
 fn same_stage_rediscovery_rebinds_once_and_preserves_moved_line_refusal() {
     let mut picker = picker::Picker::EMPTY;
-    let old = picker::Spot {
-        line: ceiling(7, -40.),
-        point: Vec2 { x: 10., y: -40. },
-    };
+    let old = picker::Spot::near(ceiling(7, -40.), Vec2 { x: 10., y: -40. });
     picker.enter(3, Vec2::default());
     picker.selected = Some(old);
     picker.hovered = Some(old);
 
     // A new native scene may use the same stage id and completely new line ids.
     picker.enter(3, Vec2 { x: 90., y: 90. });
-    assert_eq!(picker.cursor, old.point);
+    assert_eq!(picker.cursor, old.point());
     assert!(picker.selected.is_none());
     assert!(picker.hovered.is_none());
     let fresh = ceiling(8, -40.);
@@ -906,7 +888,7 @@ fn same_stage_rediscovery_rebinds_once_and_preserves_moved_line_refusal() {
     assert!(picker.restore(&surfaces));
     let restored = picker.selected.unwrap();
     assert_eq!(restored.line, fresh);
-    assert_eq!(restored.point, old.point);
+    assert_eq!(restored.point(), old.point());
     let mut source = Lines(vec![fresh]);
     assert!(restored.current(&mut source));
 
@@ -1797,7 +1779,7 @@ fn bootstrap_ray_can_seed_an_unflagged_solid_outline_line() {
 #[test]
 fn recovery_discards_same_epoch_dead_ids_then_rebinds_and_allows_launch() {
     use crate::model::cpu::role::{RoleTable, Scene};
-    use surface::{RememberedSpot, StageEpoch, Walk};
+    use surface::{StageEpoch, Walk};
     let mut roles = RoleTable::new();
     roles.observe_scene(Some(Scene::Training));
     let epoch = StageEpoch {
@@ -1813,11 +1795,8 @@ fn recovery_discards_same_epoch_dead_ids_then_rebinds_and_allows_launch() {
         surfaces.step(&mut source);
     }
     assert_eq!(surfaces.state, Walk::Closed);
-    let old = picker::Spot {
-        line: source.read(101).unwrap(),
-        point: Vec2 { x: 80., y: -10. },
-    };
-    let saved = RememberedSpot::capture(old.line, old.point).unwrap();
+    let old = picker::Spot::near(source.read(101).unwrap(), Vec2 { x: 80., y: -10. });
+    let saved = old.remember().unwrap();
     for line in &mut source.lines {
         line.id += 1000;
     }
@@ -1846,10 +1825,11 @@ fn recovery_discards_same_epoch_dead_ids_then_rebinds_and_allows_launch() {
         surfaces.step(&mut source);
     }
     assert_eq!(surfaces.state, Walk::Closed);
-    let (line, point) = saved.resolve(&surfaces).unwrap();
-    assert_eq!(line.id, 1101);
-    assert_eq!(point, old.point);
-    assert!(picker::Spot { line, point }.current(&mut source));
+    let back = picker::Spot::recover(saved, &surfaces).unwrap();
+    let point = back.point();
+    assert_eq!(back.line.id, 1101);
+    assert_eq!(point, old.point());
+    assert!(back.current(&mut source));
     assert!(source.read(old.line.id).is_none());
     struct Guarded<'a> {
         native: Fake,
@@ -1863,7 +1843,7 @@ fn recovery_discards_same_epoch_dead_ids_then_rebinds_and_allows_launch() {
             if !self.spot.current(self.source) {
                 return Err(());
             }
-            assert_eq!(launch.target, self.spot.point);
+            assert_eq!(launch.target, self.spot.point());
             self.placed_id = Some(self.spot.line.id);
             self.native.place(launch)
         }
@@ -1894,7 +1874,7 @@ fn recovery_discards_same_epoch_dead_ids_then_rebinds_and_allows_launch() {
     }
     let mut launcher = Guarded {
         native: Fake::new(),
-        spot: picker::Spot { line, point },
+        spot: back,
         source: &mut source,
         placed_id: None,
     };
@@ -1916,9 +1896,9 @@ fn recovery_discards_same_epoch_dead_ids_then_rebinds_and_allows_launch() {
 
 #[test]
 fn recovery_missing_geometry_reports_specific_failure_without_nearest_substitution() {
-    use surface::{RecoverError, RememberedSpot, Walk};
+    use surface::{RecoverError, Walk};
     let old = ceiling(1, -40.);
-    let saved = RememberedSpot::capture(old, Vec2 { x: 0., y: -40. }).unwrap();
+    let saved = picker::Spot::near(old, Vec2 { x: 0., y: -40. }).remember().unwrap();
     let mut fresh = Surfaces::EMPTY;
     fresh.push(ceiling(2, -39.));
     fresh.state = Walk::Closed;
@@ -1938,9 +1918,9 @@ fn recovery_missing_geometry_reports_specific_failure_without_nearest_substituti
 
 #[test]
 fn recovery_requires_exact_normal_flags_and_unmoved_endpoints() {
-    use surface::{RecoverError, RememberedSpot, Walk};
+    use surface::{RecoverError, Walk};
     let old = ceiling(1, -40.);
-    let saved = RememberedSpot::capture(old, Vec2 { x: 0., y: -40. }).unwrap();
+    let saved = picker::Spot::near(old, Vec2 { x: 0., y: -40. }).remember().unwrap();
     let mut shifted = old;
     shifted.ends[0].x = f32::from_bits(old.ends[0].x.to_bits() + 1);
     let mut normal = old;
@@ -1966,38 +1946,32 @@ fn recovery_requires_exact_normal_flags_and_unmoved_endpoints() {
 
 #[test]
 fn recovery_accepts_reversed_endpoints_with_same_normal_kind_and_point() {
-    use surface::{RememberedSpot, Walk};
+    use surface::Walk;
     let old = ceiling(1, -40.);
     let point = Vec2 { x: 7., y: -40. };
-    let saved = RememberedSpot::capture(old, point).unwrap();
+    let spot = picker::Spot::near(old, point);
+    assert_eq!(spot.point(), point);
+    let saved = spot.remember().unwrap();
     let mut reversed = old;
     reversed.id = 7;
     reversed.ends.swap(0, 1);
     let mut fresh = Surfaces::EMPTY;
     fresh.push(reversed);
     fresh.state = Walk::Closed;
-    assert_eq!(saved.resolve(&fresh), Ok((reversed, point)));
+    assert_eq!(picker::Spot::recover(saved, &fresh).map(|s| (s.line, s.point())), Ok((reversed, point)));
 }
 
 #[test]
 fn recovery_capture_rejects_invalid_or_untargetable_world_data() {
-    use surface::RememberedSpot;
     let old = ceiling(1, -40.);
-    assert!(RememberedSpot::capture(
-        old,
-        Vec2 {
-            x: f32::NAN,
-            y: -40.
-        }
-    )
-    .is_none());
+    assert!(picker::Spot::at(old, f32::NAN).remember().is_none());
     let mut invalid = old;
     invalid.ends[1] = invalid.ends[0];
-    assert!(RememberedSpot::capture(invalid, old.ends[0]).is_none());
+    assert!(picker::Spot::at(invalid, 0.).remember().is_none());
     let mut unflagged = old;
     unflagged.normal = Vec2 { x: 0.8, y: 0.6 };
     assert_eq!(unflagged.kind(), None);
-    assert!(RememberedSpot::capture(unflagged, old.ends[0]).is_none());
+    assert!(picker::Spot::at(unflagged, 0.).remember().is_none());
 }
 
 #[test]
@@ -2199,14 +2173,14 @@ fn tech_f006_fixture() -> (Surfaces, picker::Spot, crate::model::tech_settings::
         }));
     }
     surfaces.state = surface::Walk::Closed;
-    let (line, point) = surfaces.nearest(v(-63.36, 0.), Some(Kind::Floor)).unwrap();
-    assert_eq!((line.id, point.y), (1, 0.));
+    let spot = picker::Spot::nearest(&surfaces, v(-63.36, 0.), Some(Kind::Floor)).unwrap();
+    assert_eq!((spot.line.id, spot.point().y), (1, 0.));
 
     let snapshot = crate::model::settings::Settings::factory().menu;
     let mut config = crate::model::tech_settings::read(&snapshot);
     config.surface = 4;
     config.camera = 1;
-    (surfaces, picker::Spot { line, point }, config)
+    (surfaces, spot, config)
 }
 
 fn tech_f006_context(surfaces: &Surfaces, spot: picker::Spot) -> planner::Context<'_> {
@@ -2280,7 +2254,7 @@ fn damage_surface_hint_observes_only_eligible_targets_without_changing_draws() {
         },
     )
     .unwrap();
-    assert_eq!((picked.line.id, picked.point.y), (1, 0.));
+    assert_eq!((picked.line.id, picked.point().y), (1, 0.));
     assert_eq!(bins, [1, 2, 65536]);
     assert_eq!(observed, [1, 7], "other passable platforms are outside this camera");
     config.surface = 1;
@@ -2331,7 +2305,7 @@ fn tech_f006_auto_clamp_uses_sampled_speed_and_rejects_empty_intersections() {
     }
     config.speed.mode = Mode::Set;
     config.time.lo = 31.;
-    assert!(planner::plan(config, context(), &mut |_| panic!("the time interval is empty")).is_none());
+    assert!(planner::plan(config, context(), &mut |_| panic!("the time interval is empty")).is_err());
 }
 
 #[test]
@@ -2341,7 +2315,7 @@ fn tech_f006_set_time_and_non_auto_start_keep_their_sampling() {
     let (surfaces, spot, mut config) = tech_f006_fixture();
     let context = || tech_f006_context(&surfaces, spot);
     config.time = Numeric { mode: Mode::Set, lo: 39., hi: 40. };
-    assert!(planner::plan(config, context(), &mut |_| panic!("Set time never draws")).is_none());
+    assert!(planner::plan(config, context(), &mut |_| panic!("Set time never draws")).is_err());
     config.time.lo = 38.;
     let fixed = planner::plan(config, context(), &mut |_| panic!("Set time never draws")).unwrap();
     assert_eq!(fixed.contact_frames, 38);
@@ -2358,7 +2332,7 @@ fn tech_f006_set_time_and_non_auto_start_keep_their_sampling() {
         .unwrap();
         assert!(choices.next().is_none());
         assert_eq!(plan.contact_frames, 40);
-        assert_eq!(plan.setup.launch.start, Vec2 { x: spot.point.x, y: 30. });
+        assert_eq!(plan.setup.launch.start, Vec2 { x: spot.point().x, y: 30. });
     }
 }
 
