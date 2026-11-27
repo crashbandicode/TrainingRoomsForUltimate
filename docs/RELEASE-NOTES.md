@@ -2,9 +2,11 @@
 
 <a id="release-notes-rc15"></a>
 
-## rc.15 · November 15–27, 2026
+## rc.15 · November 27, 2026
 
-For Training players editing recordings, grading drills and practising against the CPU.
+For Training players editing recordings, practising against the CPU, and using practice tools.
+
+TrainingRooms 0.2.0-rc.15 is the November 27, 2026 hardware-tested release for players editing recordings, practising against the CPU, and using practice tools.
 
 ### What you need
 
@@ -19,74 +21,64 @@ For Training players editing recordings, grading drills and practising against t
 ### Install
 
 1. Close Smash. Open `sd:/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/`.
-2. Put `libnro_hook.nro` there if missing. Remove `libtraining_modpack.nro` if present.
-3. Copy the downloaded `libtraining_rooms.nro` there. Replace the previous copy to update.
-4. Keep your settings and recordings in `sd:/ultimate/TrainingRooms/`.
+2. Put libnro_hook.nro there if missing.
+3. Copy `libtraining_rooms.nro` from this download into that folder, replacing the previous copy.
+4. Keep `manifest.json` and `SHA256SUMS.txt` on your computer to verify the download; keep settings and recordings in `sd:/ultimate/TrainingRooms/`.
+5. Remove `libtraining_modpack.nro` if present. Never install both TrainingRooms plugins.
 
-To uninstall, remove only `libtraining_rooms.nro`. Keep saved data and shared hooks.
+libparam_hook is not needed (an older page said it was; you can keep or remove it).
 
+To update, replace only `libtraining_rooms.nro`. To uninstall, remove only that file and keep shared hooks and saved data.
 
-<a id="release-notes-rc15--fixed-build"></a>
-
-### What changed
+### What's new since rc.13
 
 | Change | Read more |
 | --- | --- |
+| <a id="release-notes-rc15--install-5"></a><a id="release-notes-rc15--record-works-while-an-ai-plays-player-1"></a>Record while an AI controls Player 1 | [Guide](guide/recording.md) |
 | Switch recorded fighters after loading finishes | [Guide](guide/recording.md) |
 | Return fighters to their spots after scrubbing a pose | [Guide](guide/recording.md) |
-| Explain loading and extra fighter groups in the menu | [Loading](menu/fighters-and-stages.md#loading) |
-| Clarify what L+R+A does in Training | [Controls](guide/controls.md) |
+| Scrub recorded poses on matching fighters | [Guide](guide/recording.md) |
+| Move the playhead freely or snap In to a move | [Guide](guide/recording.md) |
+| <a id="release-notes-rc15--install-4"></a>Trim recordings and edit clips over the game | [Guide](guide/recording.md) |
+| <a id="release-notes-rc15--combo-reader-through-a945b0c1"></a>Save named grabs and throws | [Guide](guide/combos.md) |
+| <a id="release-notes-rc15--the-input-display"></a>Scroll back through the input display | [Guide](guide/frame-strip.md) |
+| Stop the practice partner in waiting rooms | [Guide](guide/waiting-rooms.md) |
+| Back out of a chain without saving | [Guide](guide/combos.md) |
+| Show the active recording role | [Guide](guide/recording.md) |
+| Edit clips and practise input drills | [Guide](guide/recording.md) |
+| Explain loading and extra fighter groups | [Guide](menu/fighters-and-stages.md#loading) |
+| Clarify what L+R+A does in Training | [Guide](guide/controls.md) |
 | Read the CPU-first setup order in Guard the Edge | [Guide](guide/guard-the-edge.md) |
 | Count Tech practice attempts with factory launch settings | [Guide](guide/tech-practice.md) |
 
+<a id="release-notes-rc15--fixed-build"></a>
+
 ### Tested on
 
-| Feature | Hardware | Eden |
+| Feature | Hardware (Switch) | Eden |
 | --- | --- | --- |
-| Switch recorded fighters after loading finishes | no | no |
-| Returning fighters to their spots after scrubbing | no | no |
-| Showing a recorded pose while scrubbing | no | yes |
-| Loading and Group Swap help | no | no |
-| L+R+A help | no | no |
-| Read the CPU-first setup order in Guard the Edge | no | yes |
-| Count Tech practice attempts with factory launch settings | no | yes |
-
-“No” means a passing run is unconfirmed for this release.
-
-
-### Earlier changes in rc.15
-
-| Date | Change | Guide |
-| --- | --- | --- |
-| <a id="release-notes-rc15--preview-build"></a>Nov 27 | Scrub recorded poses on matching fighters. | [Guide](guide/recording.md) |
-| <a id="release-notes-rc15--install-6"></a>Nov 26 | Move the playhead freely or snap In to a move. | [Guide](guide/recording.md) |
-| <a id="release-notes-rc15--install-5"></a><a id="release-notes-rc15--record-works-while-an-ai-plays-player-1"></a>Nov 25 | Record while an AI controls Player 1. | [Guide](guide/recording.md) |
-| <a id="release-notes-rc15--combo-reader-through-a945b0c1"></a>Nov 25 | Save named grabs and throws. Earlier readers cannot open those keys. | [Guide](guide/combos.md) |
-| <a id="release-notes-rc15--install-4"></a>Nov 25 | Trim recordings and edit clips over the game. | [Guide](guide/recording.md) |
-| <a id="release-notes-rc15--the-input-display"></a>Nov 25 | Scroll back through the input display. | [Guide](guide/frame-strip.md) |
-| <a id="release-notes-rc15--install-3"></a>Nov 24 | Keep the practice partner stopped in the waiting room. | [Guide](guide/waiting-rooms.md) |
-| <a id="release-notes-rc15--install-2"></a>Nov 24 | Back out of a chain without saving. | [Guide](guide/combos.md) |
-| <a id="release-notes-rc15--install-1"></a>Nov 23 | See which fighter is recording. | [Guide](guide/recording.md) |
-| Nov 15 | Edit clips and practise input drills. | [Guide](guide/recording.md) |
-
-### Earlier rc.15 tests
-
-| Feature | Hardware | Eden |
-| --- | --- | --- |
-| Scrub recorded poses on matching fighters | no | yes |
-| Move the playhead or snap In to a move | no | yes |
-| Record while an AI plays Player 1 | no | yes |
-| Save named grabs and throws | no | no |
-| Trim recordings and edit clips over the game | no | yes |
-| Scroll back through inputs | no | yes |
-| Stop the waiting-room practice partner | no | yes |
-| Back out of a new chain | no | no |
-| Show the active recording role | no | yes |
-| Edit clips and practise input drills | no | yes |
+| Record while an AI controls Player 1 | yes | yes |
+| Switch recorded fighters after loading finishes | yes | no |
+| Return fighters to their spots after scrubbing a pose | yes | no |
+| Scrub recorded poses on matching fighters | yes | yes |
+| Move the playhead freely or snap In to a move | yes | yes |
+| Trim recordings and edit clips over the game | yes | yes |
+| Save named grabs and throws | yes | no |
+| Scroll back through the input display | yes | yes |
+| Stop the practice partner in waiting rooms | yes | yes |
+| Back out of a chain without saving | yes | no |
+| Show the active recording role | yes | yes |
+| Edit clips and practise input drills | yes | yes |
+| Explain loading and extra fighter groups | yes | no |
+| Clarify what L+R+A does in Training | yes | no |
+| Read the CPU-first setup order in Guard the Edge | yes | yes |
+| Count Tech practice attempts with factory launch settings | yes | yes |
 
 ### Known limits
 
-- Older captures without poses show positions only. [Practice restrictions](RESTRICTIONS.md)
+- Some hitbox-overlay hooks can wait on a plugin lock. The docs audit found this; it was not seen in play, and a fix is in progress for the next build.
+- Older captures without pose data show recorded positions only. [Practice restrictions](RESTRICTIONS.md).
+
 
 <a id="release-notes-rc13"></a>
 
