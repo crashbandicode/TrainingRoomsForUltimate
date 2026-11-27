@@ -5,12 +5,12 @@ Notes for players. rc.15 is one release name for a line of builds. Each build's 
 ([Which build you have](guide/getting-started.md#which-build-you-have)).
 
 Six of these builds were installed on the project's test console one after another, and are called install 1 to 6.
-The preview build is staged for the card; install 6 is still the newest installed build.
+The preview install was cancelled; install 6 remains on the test console.
 Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Preview build](#preview-build) | Not installed; staged 2026-11-27 | `cc71537c` | Scrubbing shows each fighter's recorded move; fixes to install 6's scrubbing and to a save's placement |
+| [Preview build](#preview-build) | Install cancelled 2026-11-27 | `cc71537c` | Scrubbing shows recorded poses on matching fighters; fixes to scrubbing and save placement |
 | [Install 6](#install-6) | 2026-11-26 | `5df3d9dc` | The clip editor: Y on In makes a capture previewable, a free playhead, and the fighters shown while you scrub |
 | [Install 5](#install-5) | 2026-11-25 | `b7a382e4` | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
@@ -29,14 +29,13 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 
 ## Preview build
 
-An in-between build for the operator to play while two defects are fixed. It is **staged for the card and not
-installed**, and it is not the next release.
+This preview was tested in Eden. Its planned console install was cancelled; it is not the next release.
 
 | Preview | Details |
 | --- | --- |
 | Built from | `cc71537c` (the footer ends with it) |
 | Release file | `78db86f5…`, 5,419,008 bytes |
-| Replaces | Install 6, when it is installed |
+| On the test console | Install 6; the preview did not replace it |
 
 ### Scrubbing shows the recorded moves
 
@@ -77,7 +76,7 @@ Both are to be fixed before the next release.
 
 | Check | Preview build |
 | --- | --- |
-| Installed | No. The file is staged with its approval record |
+| Installed | No. The staged copy was removed when the install was cancelled |
 | Host | Tests and all builds passed on `cc71537c`. Refusing a fighter pushed by a wall, and captures keeping their animation, are host-tested only |
 | Eden, on the release file, first boot | No crash. Passed: a long take, snapped X, the refusal at a point inside the stage, a save's fighter floating again, the settings check, and the menu in a waiting room as host. Scrub poses showed for both fighters |
 | Eden, on the release file, second boot | No crash. Snapped X, scrub poses and the settings check passed again. The fighter choice failed as above |

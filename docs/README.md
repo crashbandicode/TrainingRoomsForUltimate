@@ -1,6 +1,6 @@
 # TrainingRooms documentation
 
-Installing and the first buttons are in the [README](../README.md); every other page is in the table.
+Start with [installation and controls](../README.md), or choose a menu page, guide or technical reference.
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b5760c58e2de36d18ee1fc677043ffb7c7376dce" autoplay muted loop playsinline controls></video>
 

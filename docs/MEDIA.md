@@ -4,6 +4,8 @@ The gameplay GIFs in [`media/`](media) use actual Eden footage. See each entry f
 Single takes are 1280×720; the 68 comparison and composite GIFs are 1280 wide and 404, 436 or 764 high. Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+The [zone-editor proof still](decisions/rc15-zone-editor-crop-proving-boot.png) omits the 28-row test banner at the top. The remaining 1280×646 pixels are unchanged.
+
 ## Tutorial clips (2026-11-25 through 2026-11-27)
 
 The menu tour, menu option and button-chord films come from `tut-c51f4d81-yoga-1` on release build `c51f4d81`.

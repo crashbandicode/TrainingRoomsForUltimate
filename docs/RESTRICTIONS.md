@@ -15,14 +15,14 @@ The table is one list, in the order the rows were approved. By subsystem:
 - **Parry practice:** `parry-practice-start-save-missing`, `parry-practice-macro-missing`, `parry-practice-no-recording`, `parry-mash-ignored`
 - **Practice games:** `btt-projectile-guard`, `edge-juggle-cpu-playback-busy`, `edge-juggle-start-over-stage`, `edge-juggle-stage-unread`, `edge-juggle-start-no-floor`, `edge-juggle-no-open-ledge`, `edge-juggle-juggler-start`, `edge-juggle-player-no-floor`
 
-![Placing fighters: Open, then the five pages Where, Spot, State, Percent and Preview, then either the save is written or Record starts; four red boxes show where each placement refusal comes](diagrams/placement-flow.svg)
+![Five placement pages and four refusal notices.](diagrams/placement-flow.svg)
 
 *Placing fighters: the five pages and the four refusals.*
 
 | ID | Message | Why | Approved |
 | --- | --- | --- | --- |
 | `record-place-practice` | `Stop the practice game to place fighters` | A running practice game owns the fighters, so placement does not open over it. | Operator record-placement design, R1 handoff |
-| `record-place-start` | `Not recorded · {fighter} could not start in {state}` | A placed recording is discarded if either fighter cannot start in its requested state at the first input. | Operator record-placement design, R1 handoff |
+| `record-place-start` | `Not recorded · {fighter} could not start in {state}` | A placed recording does not start if readiness or the final placement check fails. | Operator record-placement design, R1 handoff |
 | `record-place-load` | `Not placed · {fighter} could not start in {state}` | Playback is stopped if the requested start cannot be synchronized; its save is retained. | Operator record-placement design, R1 handoff |
 | `place-save-write` | `Not saved · {save} could not be written` | Change placement writes the save file on the worker. If the file is gone or the card refuses the write, nothing is loaded and both fighters are put back where they stood. | tr-primary-2, 2026-11-25 15:23:38Z (placement design, ask 2) |
 | `clip-cut-here-order` | "Playhead is past Out: set Out first" / "Playhead is at or before In: set In first" | In the clip editor, L and R set In and Out at a moved playhead. A playhead at or after Out cannot become In, and one at or before In cannot become Out: the handles are never swapped or reordered, and nothing changes. | tr-primary-2, 2026-11-26 00:31:52Z (free playhead, point 3) and 00:45:28Z (the two texts) |

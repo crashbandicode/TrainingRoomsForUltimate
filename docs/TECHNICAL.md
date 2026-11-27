@@ -3,9 +3,7 @@
 The detail behind the [README](../README.md): how TrainingRooms is installed and built, how each feature behaves, and
 where every clip in the README was recorded (build, commit and what the run checked). Release notes are the
 `RELEASE-NOTES-rc*.md` files in this folder: rc.5, rc.6, rc.8, rc.9 and [rc.15](RELEASE-NOTES-rc15.md)
-(rc.7, rc.10 and rc.11 have none); rc.12's,
-rc.13's and rc.14's are on their Forgejo release pages, linked from [CURRENT-RELEASE.md](CURRENT-RELEASE.md) and
-[Status](#status).
+(rc.7, rc.10 and rc.11 have none). [Earlier releases](CURRENT-RELEASE.md#earlier-releases) links the rc.12, rc.13 and rc.14 release pages.
 
 Practice tools for Training mode and the online waiting rooms of Super Smash Bros. Ultimate 13.0.5, as a Skyline plugin.
 
@@ -530,8 +528,7 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-The current release is **rc.15**: what is installed, what is new and what is known not to work are on
-[Current release](CURRENT-RELEASE.md).
+See [Current release](CURRENT-RELEASE.md) for the installed build, changes and known issues in rc.15.
 
 ## Build
 

@@ -11,7 +11,7 @@ Current release: rc.15
 | | |
 | --- | --- |
 | On the test console | Install 6, built from `5df3d9dc`, installed 2026-11-26 and read back |
-| Staged, not installed | A preview build from `cc71537c`: [what it changes](RELEASE-NOTES-rc15.md#preview-build) |
+| Preview install cancelled | `cc71537c` was never installed: [preview notes](RELEASE-NOTES-rc15.md#preview-build) |
 | Changes | [Release notes](RELEASE-NOTES-rc15.md) |
 | Tests | [Install evidence](EVIDENCE-rc15-installs.md) |
 
@@ -21,7 +21,7 @@ The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
 
 | The tag ends with | Build | Installed |
 | --- | --- | --- |
-| `cc71537c` | Preview build | Not installed; staged 2026-11-27 |
+| `cc71537c` | Preview build | Never installed |
 | `5df3d9dc` | Install 6 | 2026-11-26 |
 | `b7a382e4` | Install 5 | 2026-11-25 |
 | `a945b0c1` | Install 4 | 2026-11-25 |
