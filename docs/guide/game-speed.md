@@ -26,7 +26,7 @@ On a GameCube controller use Z + D-pad Up. You can change the chord at Display &
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e5abb4fd2c63e89d58d681a1895fca97024b6388" autoplay muted loop playsinline controls></video>
 
-*Hold R + D-pad Up and tap Left until the label reads “1 Frame (Press ZL)”. Each ZL press then advances the game by one frame, and Mario's jab moves pose by pose. The label steps back to normal speed at the end. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-one-frame.mp4)
+*The speed label changes to “1 Frame (Press ZL)”. Mario's stance changes in small steps before normal speed returns. The clip does not show a jab connecting or a counter for individual frames. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-one-frame.mp4)
 
 1. Hold R + D-pad Up and tap Left until the pop-up reads 1 Frame.
 2. Let go of the chord. Press ZL once to advance one frame, or hold it to keep advancing after the initial delay.

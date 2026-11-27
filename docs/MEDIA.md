@@ -4,7 +4,7 @@ Every GIF in [`media/`](media) is actual Eden footage: whole screen, 1280×720, 
 game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
-## Tutorial clips (2026-11-25 and 2026-11-26)
+## Tutorial clips (2026-11-25 through 2026-11-27)
 
 The menu tour, menu option and button-chord films come from `tut-c51f4d81-yoga-1` on release build `c51f4d81`.
 They crop a 1842×1036 region at (39, 44) from the 1080p capture and scale it to 720p, removing the capture tool's
@@ -26,8 +26,8 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 | `tut-notice-save-states-off.mp4` | The save chord refused with Save States Off; Save States On; the chord saves | `t05-notice-save-states-off` of the same run, 0.3–9.0 s | 2,463,368 | `911d7fd9435aff39` | [Troubleshooting](guide/troubleshooting.md) |
 | `tut-record-macro.mp4` | Player 1 turns red while recording; Mario's forward smash hits Link for 18.5%; the tint clears | `t08-record-macro` of the same run, 0.3–7.5 s | 3,349,706 | `9e94692216f4955e` | [Recording](guide/recording.md) |
 | `tut-mash-out.mp4` | Mash out: a mashed hold reads Good · 30f, the next one Poor · 90f | `t14-mash-out` of run `tut-cc71537c-yoga-4`, 7.5–15.0 s | 3,873,860 | `053d7299efc52285` | [Mash out](guide/mash-out.md) |
-| `tut-break-the-targets.mp4` | Break the Targets: a jab, a tilt, then a short-hop back air breaks the placed target | `t15-break-the-targets` of run `tut-cc71537c-yoga-4`, 14.5–25.5 s | 4,896,200 | `3571a7f96cafadc2` | [Break the Targets](guide/break-the-targets.md) |
-| `tut-tech-practice.mp4` | Tech practice from Start: launches at 72% and untech'd landings | `t16-tech-practice` of the same run, 13.5–30.0 s | 7,511,366 | `b5a88dc8254878ed` | [Tech practice](guide/tech-practice.md) |
+| `tut-break-the-targets.mp4` | Mario misses the target, then punches it; it flashes and disappears | `t15-break-the-targets` of run `tut-cc71537c-yoga-4`, 14.5–25.5 s | 4,896,200 | `3571a7f96cafadc2` | [Break the Targets](guide/break-the-targets.md) |
+| `tut-tech-practice.mp4` | Tech practice from Start: launches at 72% and untech'd landings | `t16-tech-practice` of run `tut-5df3d9dc-yoga-3`, 13.5–30.0 s | 7,511,366 | `b5a88dc8254878ed` | [Tech practice](guide/tech-practice.md) |
 | `tut-hitbox-visualization.mp4` | Hurtbox pills on both fighters; a jab and a grab with their boxes drawn | `t18-hitbox-visualization` of the same run, 0.3–6.0 s | 2,508,502 | `3506e99fdcd8da32` | [Display & Controls](menu/display-and-controls.md#hitbox-visualization) |
 | `tut-hitbox-colour-legend.mp4` | The Hitbox Visualization checklist and its Colour legend | `t20-hitbox-colour-legend` of the same run, 0.3–5.0 s | 130,141 | `1d90ab63bde904b0` | [Display & Controls](menu/display-and-controls.md#hitbox-visualization) |
 | `tut-cpu-mash.mp4` | CPU Mash: Link answers a jab out of hitstun | `t26-cpu-mash` of the same run, 0.3–8.5 s | 4,249,903 | `00e5cd16878ebc16` | [CPU behaviour](guide/cpu-behaviour.md#mash-and-followup) |
@@ -35,7 +35,7 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 | `tut-cpu-di.mp4` | DI Direction Left, then Right: the same smash at 80% sends Link along two lines | `t28-cpu-di` of the same run, 0.5–16.0 s | 9,503,476 | `ea876d6c9fcb0271` | [CPU behaviour](guide/cpu-behaviour.md#direction-chips) |
 | `tut-cpu-hide.mp4` | Hide CPU On, the CPU gone; Off, the CPU back | `t30-cpu-hide` of the same run, 0.5–11.0 s | 2,693,222 | `29c7aa26b49d119f` | [CPU](menu/cpu.md#hide-cpu) |
 | `tut-fighter-cycle.mp4` | Cycle Player: Mario becomes Donkey Kong in place | `t31-fighter-cycle` of the same run, 0.3–6.0 s | 2,499,823 | `a629bd963f6b3bd0` | [Fighter cycles](guide/fighter-cycles.md) |
-| `tut-game-speed.mp4` | The same forward smash at normal speed and at 1/4, with the speed label | `t35-game-speed` of run `tut-cc71537c-yoga-4` (the diagnostic file of preview build `cc71537c`), 0.5–10.0 s | 4,099,078 | `fe364b3f1c192320` | [Game speed](guide/game-speed.md) |
+| `tut-game-speed.mp4` | The same forward smash at normal speed and at 1/4, with the speed label | `t35-game-speed` of run `tut-cc71537c-yoga-4` (the diagnostic file of preview build `cc71537c`), 0.5–10.0 s | 4,099,078 | `fe364b3f1c192320` | [README](../README.md), [Game speed](guide/game-speed.md) |
 | `tut-input-display.mp4` | Frame strip on: two jabs hit, the lanes fill, the link line reads TRUE -6 Jab > Jab | `t21-input-display` of run `tut-cc71537c-yoga-4` (the diagnostic file of preview build `cc71537c`), 0.3–6.3 s | 2,592,316 | `0f412a197ed9e93c` | [Frame strip](guide/frame-strip.md) |
 | `tut-input-special-direction.mp4` | A neutral, a side and an up special in a row with the frame strip on | `t22-input-special-direction` of the same run, 0.5–9.0 s | 4,439,496 | `9aa72ee27664cb3c` | [Frame strip](guide/frame-strip.md) |
 | `tut-input-delay.mp4` | A jab at Input Delay 0, the setting moved to 10, the same jab again | `t24-input-delay` of the same run, 0.5–14.0 s | 2,552,981 | `898728fd56ca087e` | [Display & Controls](menu/display-and-controls.md#input-delay) |
@@ -43,9 +43,9 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 | `tut-kirby-hat.mp4` | Kirby as Player 1 gets Mario's cap from hold B + left-stick click; one hat | `t32-kirby-hat` of the same run, 0.8–10.0 s | 3,793,315 | `7771d3b17eea8633` | [Fighter cycles](guide/fighter-cycles.md) |
 | `tut-stage-change.mp4` | Change Stage grid, Y for Ω, A on Battlefield; the stage swaps with both fighters on it | `t33-stage-change` of the same run, 0.3–12.0 s | 6,532,251 | `2ef8e6dc3f63a8d6` | [README](../README.md), [Stages](guide/stages.md) |
 | `tut-input-drill-record.mp4` | Player 1 red while a drill is recorded; DRILLS lists Drill 1; a try follows | `t10-input-drill-record` of the same run, 14–30 s | 4,072,178 | `c8272b9b40882c26` | [Recording](guide/recording.md#input-drills) |
-| `tut-one-frame.mp4` | Speed stepped to 1 Frame; ZL advances a jab frame by frame; speed restored | `t36-one-frame` of the same run, 0.3–14.0 s | 2,311,554 | `595a432f3380c8e5` | [Game speed](guide/game-speed.md) |
+| `tut-one-frame.mp4` | The 1 Frame label, small changes in Mario's stance, then normal speed | `t36-one-frame` of the same run, 0.3–14.0 s | 2,311,554 | `595a432f3380c8e5` | [Game speed](guide/game-speed.md) |
 | `tut-hitbox-windboxes.mp4` | Only Windboxes ticked, the legend, then F.L.U.D.D. at 1/4 speed pushing the CPU off with no damage | `t19-hitbox-windboxes` of the same run, 8.5–20.5 s | 4,854,247 | `fec8c3c7867e1ba0` | [Display & Controls](menu/display-and-controls.md#hitbox-visualization) |
-| `tut-mii-pick.mp4` | A saved Mii Brawler picked in the Player list, then Cycle Player brings it in as Player 1 | `t34-mii-pick` of the same run, 6–22 s | 4,670,765 | `eb1a5e950691f406` | [Mii Fighters](guide/mii.md) |
+| `tut-mii-pick.mp4` | The saved Brawler confirmed again in the Player list; Cycle Player brings it in as Player 1 | `t34-mii-pick` of the same run, 6–22 s | 4,670,765 | `eb1a5e950691f406` | [Mii Fighters](guide/mii.md) |
 
 ### Earlier waiting-room example
 
