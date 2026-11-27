@@ -26,7 +26,7 @@ Record a dash-back or a string of short hops, then [try to match your timing](do
 
 *Snap to the aerial's start, then preview it on the CPU.* [Open the clip](docs/media/tut-clip-snap.mp4)
 
-[Scrub and trim a take](docs/guide/recording.md#crop) by position on install 6, or by recorded pose on a matching fighter in the preview build.
+[Scrub through a take](docs/guide/recording.md#crop) to see a matching fighter's recorded pose, then snap the start or end of the clip to a move.
 
 ### Match recordings in practice
 
