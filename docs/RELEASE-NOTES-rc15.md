@@ -419,20 +419,18 @@ More: [Recording › Change placement](menu/recording.md#change-placement) and
 | Build | `a945b0c1` |
 
 The clips below were recorded in Eden on the installed build, not on the console. Where a clip is a close-up, the effect sits on a
-small panel that cannot be read at full-screen size. The yellow BRIDGE LIVE banner in some frames is the test
-tool's, not TrainingRooms'.
+small panel that cannot be read at full-screen size. Ten takes showed the test tool's yellow banner. They are not
+embedded; each is described where it stood.
 
 ### Drills and combos
 
 **Drill steps are listed by move**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/cd0b8b07aa26c3e00a692faedd589d16126e5410" autoplay muted loop playsinline controls></video><br>
-*DRILLS, with a three-step drill selected: its help line reads S1 jab, S2 side tilt, S3 up b. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-drill-step-names.mp4)
+*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: DRILLS, with a three-step drill selected: its help line reads S1 jab, S2 side tilt, S3 up b. It carries the test tool's banner, so it is not embedded.*
 
 **Move names Off and On**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/edd9787940d24d0eb09d0a71f1ea68de4f58267b" autoplay muted loop playsinline controls></video><br>
-*With Move names Off the drill reads jab, side tilt, up b. With it On it reads Jab 1, Forward tilt, Final Cutter. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-move-names-toggle.mp4)
+*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: With Move names Off the drill reads jab, side tilt, up b. With it On it reads Jab 1, Forward tilt, Final Cutter. It carries the test tool's banner, so it is not embedded.*
 
 **Match angle and deflection, Off**
 
@@ -461,13 +459,11 @@ tool's, not TrainingRooms'.
 
 **A get-up attack, recorded**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/cbc8cd75b8b22c99acd1e03fc910fb5efdf3ca5f" autoplay muted loop playsinline controls></video><br>
-*Place fighters starts Kirby lying down, and his get-up attack is recorded. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-edge-getup-record.mp4)
+*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: Place fighters starts Kirby lying down, and his get-up attack is recorded. It carries the test tool's banner, so it is not embedded.*
 
 **A get-up attack, played back**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/016231d178e57592cfe067807f46bbf627cc48f1" autoplay muted loop playsinline controls></video><br>
-*Playing the take puts Kirby down again and repeats the get-up attack. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-edge-getup-play.mp4)
+*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: Playing the take puts Kirby down again and repeats the get-up attack. It carries the test tool's banner, so it is not embedded.*
 
 **L + R + A by itself**
 
@@ -498,23 +494,19 @@ tool's, not TrainingRooms'.
 
 **The clip editor over the game**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/99f4cf63a17f837c9077eecda13bb9a267650d8b" autoplay muted loop playsinline controls></video><br>
-*Crop opens the editor as a strip under the fighters. The End handle moves in, and Y snaps it to the end of the jab. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-replay-editor-timeline.mp4)
+*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: Crop opens the editor as a strip under the fighters. The End handle moves in, and Y snaps it to the end of the jab. It carries the test tool's banner, so it is not embedded.*
 
 **Preview on Player 1, then on the CPU**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7029a8b5915102970c6af108e1d3909f5e614645" autoplay muted loop playsinline controls></video><br>
-*X previews the kept part on Player 1. A ZR tap switches to the CPU and X previews it there. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-replay-editor-preview.mp4)
+*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: X previews the kept part on Player 1. A ZR tap switches to the CPU and X previews it there. It carries the test tool's banner, so it is not embedded.*
 
 **Recordings**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f5b8891b2eb0285ad5178ed34f668f765a5d28ce" autoplay muted loop playsinline controls></video><br>
-*RECORDINGS lists a Quick Play capture. A opens its screen: Inputs from, Plays on, Play back and the three Make rows. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-vault-recordings-menu.mp4)
+*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: RECORDINGS lists a Quick Play capture. A opens its screen: Inputs from, Plays on, Play back and the three Make rows. It carries the test tool's banner, so it is not embedded.*
 
 **Playing a capture back**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a743aae1c8bfe6267175ce653776bd89eccd3da0" autoplay muted loop playsinline controls></video><br>
-*Play back runs the captured King K. Rool on the CPU, with the timeline of its moves under the game. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-vault-playback.mp4)
+*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: Play back runs the captured King K. Rool on the CPU, with the timeline of its moves under the game. It carries the test tool's banner, so it is not embedded.*
 
 **Trim: Off, Start, End and Both**
 
@@ -538,8 +530,7 @@ tool's, not TrainingRooms'.
 
 **Scrolling the input display back**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/16db06e0ff5b07c584ded3173e52cfade51d4dfa" autoplay muted loop playsinline controls></video><br>
-*Close-up of the input display. With R3 held, D-pad Left scrolls back (the label reads -0.2 s, then -5.0 s), and the display then returns to now. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-scrollback-zoom.mp4)
+*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: Close-up of the input display. With R3 held, D-pad Left scrolls back (the label reads -0.2 s, then -5.0 s), and the display then returns to now. It carries the test tool's banner, so it is not embedded.*
 
 | Change | What it does | More |
 | --- | --- | --- |
@@ -549,8 +540,7 @@ tool's, not TrainingRooms'.
 
 **Damage range sliders**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/04dbf0b9d7e33489a3bd051e0ffb1d49efaffc74" autoplay muted loop playsinline controls></video><br>
-*CPU damage range: Min goes 0, 0.5, 3, 8% and Max 150, 148.5, 144%, by taps and a hold. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-cpu-damage-range.mp4)
+*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: CPU damage range: Min goes 0, 0.5, 3, 8% and Max 150, 148.5, 144%, by taps and a hold. It carries the test tool's banner, so it is not embedded.*
 
 | Change | What it does | More |
 | --- | --- | --- |
