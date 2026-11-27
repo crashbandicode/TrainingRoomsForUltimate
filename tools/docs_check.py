@@ -169,7 +169,37 @@ WALL_BULLETS = re.compile(r"^\*\*(?:Values|Default|How):\*\*")
 # page -> the number of `wall` problems it may still have while the pages are rewritten one by one. A page with more
 # fails with every one of them listed; a page with fewer fails as `allowlist-stale`, so a number only falls and a
 # finished page leaves the list. An empty list means every page is held to the rule.
-WALL_PENDING = {}
+WALL_PENDING = {
+    # Counted on 2026-11-27 at the commit that added the rule (739 on 27 pages). Rewritten in this order: the menu pages
+    # (Fighters & Stages first), then the guide.
+    "docs/guide/break-the-targets.md": 3,
+    "docs/guide/combos.md": 13,
+    "docs/guide/controls.md": 9,
+    "docs/guide/cpu-behaviour.md": 13,
+    "docs/guide/eggs-ercise.md": 3,
+    "docs/guide/fighter-cycles.md": 8,
+    "docs/guide/frame-strip.md": 9,
+    "docs/guide/game-speed.md": 6,
+    "docs/guide/getting-started.md": 4,
+    "docs/guide/guard-the-edge.md": 4,
+    "docs/guide/juggler.md": 4,
+    "docs/guide/mash-out.md": 3,
+    "docs/guide/mii.md": 8,
+    "docs/guide/parry-practice.md": 1,
+    "docs/guide/recording.md": 76,
+    "docs/guide/save-states.md": 9,
+    "docs/guide/stages.md": 7,
+    "docs/guide/tech-practice.md": 3,
+    "docs/guide/troubleshooting.md": 2,
+    "docs/guide/using-the-menu.md": 8,
+    "docs/guide/waiting-rooms.md": 4,
+    "docs/menu/cpu.md": 134,
+    "docs/menu/display-and-controls.md": 69,
+    "docs/menu/fighters-and-stages.md": 154,
+    "docs/menu/practice-games.md": 3,
+    "docs/menu/recording.md": 135,
+    "docs/menu/saves.md": 47,
+}
 
 
 class Problem(NamedTuple):
