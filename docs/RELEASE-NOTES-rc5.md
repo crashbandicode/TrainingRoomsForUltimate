@@ -13,7 +13,10 @@ ADVANTAGE is the CPU's first actionable frame minus yours after the last hit. Pl
 
 A follow-up more than 20 frames after the CPU can act is a new exchange, not a dropped link.
 
-Under Player 1's lane, a stick row shows the held direction on each frame. A C-stick attack, the attack the game marks as coming from the C-stick, takes its chip arrow from the C-stick when that stick is outside the dead zone. Any other press, including a C-stick that stays neutral, keeps the left-stick arrow. The stick row reads the physical left stick either way, so a C-stick attack with the left stick neutral leaves the row blank.
+- Under Player 1's lane, a stick row shows the held direction on each frame.
+- A C-stick attack, the attack the game marks as coming from the C-stick, takes its chip arrow from the C-stick when that stick is outside the dead zone.
+- Any other press, including a C-stick that stays neutral, keeps the left-stick arrow.
+- The stick row reads the physical left stick either way, so a C-stick attack with the left stick neutral leaves the row blank.
 
 Holding one direction long enough can freeze the strip. A new binned direction, including a move out of neutral, starts it scrolling again.
 
@@ -75,7 +78,16 @@ Pins are gone. The five most recently used of each kind are listed first. Y does
 
 Recording and the stick row are above. The same build also adds:
 
-- The combo helper under the frame strip, and combo files you can copy or share. Any fighter can practise one. Grading uses the recorded presses, releases, C-stick, and stick flicks. Drift is shown and is not graded. A link counts without being a true combo. Switch or Keep can change Player 1 to the combo's recorded fighter, and Player Swapping Off does not block that Switch. Combos open in lobby practice. In an online waiting room a saved combo is named Combo N. A saved combo's footer shows the recorded fighter. Notices sit under the frame strip.
+- The combo helper under the frame strip, and combo files you can copy or share.
+- Any fighter can practise one.
+- Grading uses the recorded presses, releases, C-stick, and stick flicks.
+- Drift is shown and is not graded.
+- A link counts without being a true combo.
+- Switch or Keep can change Player 1 to the combo's recorded fighter, and Player Swapping Off does not block that Switch.
+- Combos open in lobby practice.
+- In an online waiting room a saved combo is named Combo N.
+- A saved combo's footer shows the recorded fighter.
+- Notices sit under the frame strip.
 - Add New on a Mii class opens Smash's own Mii editor. Saving adds one Mii. Leaving without saving adds none.
 - Lobby Items, on Fighters & Stages › Stages. Off stops item spawning in the waiting room.
 - The replay window, edit placement, and the setup library. A timer match's replay capture continues through sudden death instead of stopping at the end of regular time.

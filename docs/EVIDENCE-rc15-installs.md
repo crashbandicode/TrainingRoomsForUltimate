@@ -116,13 +116,12 @@ each gate's own; they were not compared test by test here.
 
 ## The operator's reports from the console
 
-The operator's own reports from play on a Switch. Most were relayed by the coordinator (inbox 2026-11-25 17:09:15Z,
-tr-primary-2; the report on install 5, inbox 23:33:51Z). Two were recorded by the coordinator at the time, in its handoff
-(`artifacts/phase23/HANDOFF-PRIMARY-tr-primary-2.md`); their rows name the entry. Each report is placed on the build
-that was on the card at its time, by the install records' times above.
-They say what the operator saw; none is a pass or a fail of a build. "Changed in" names the first install whose
-history holds the change (`git merge-base --is-ancestor`), and what an Eden run showed of it. Reports about other
-plugins are left out, except the first, which was made in Training and turned out to be another plugin's.
+- The operator's own reports from play on a Switch.
+- Most were relayed by the coordinator (inbox 2026-11-25 17:09:15Z, tr-primary-2; the report on install 5, inbox 23:33:51Z).
+- Two were recorded by the coordinator at the time, in its handoff (`artifacts/phase23/HANDOFF-PRIMARY-tr-primary-2.md`); their rows name the entry.
+- Each report is placed on the build that was on the card at its time, by the install records' times above.
+- They say what the operator saw; none is a pass or a fail of a build. "Changed in" names the first install whose history holds the change (`git merge-base --is-ancestor`), and what an Eden run showed of it.
+- Reports about other plugins are left out, except the first, which was made in Training and turned out to be another plugin's.
 
 | When (UTC) | Build on the card | The operator reported | Changed in |
 | --- | --- | --- | --- |
@@ -192,12 +191,10 @@ The changes in this build were merged one by one after `a945b0c1` and are listed
 `artifacts/phase23/next-build/` for the head that passed all six steps. Playback was gated together with the two
 documentation merges that followed it. These receipts are host tests and builds, not gameplay tests.
 
-On 2026-11-25, Eden run `tso-3fd708bc-ally-1` used the diagnostic build of `3fd708bc` to check the Training stage
-**before** the off-stage changes. Guard the Edge and Juggler did not start there, and the menu then read "Stop … Running"
-(`out/p05/ally-173401-786500-p05-open.png` for Guard the Edge and `out/p06/ally-173435-667300-p06-reopen.png`
-for Juggler in the run's folder). This was not a test of the fix,
-which merged later as `7e6ff810` (the smoke boot below opened both set-ups on that stage), or of capture Delete. Receipts: `artifacts/phase23/training-stage-tracing/ally-boot/tso-3fd708bc-ally-1/` and the
-17:39:04Z report from training-offstage.
+- On 2026-11-25, Eden run `tso-3fd708bc-ally-1` used the diagnostic build of `3fd708bc` to check the Training stage **before** the off-stage changes.
+- Guard the Edge and Juggler did not start there, and the menu then read "Stop … Running" (`out/p05/ally-173401-786500-p05-open.png` for Guard the Edge and `out/p06/ally-173435-667300-p06-reopen.png` for Juggler in the run's folder).
+- This was not a test of the fix, which merged later as `7e6ff810` (the smoke boot below opened both set-ups on that stage), or of capture Delete.
+- Receipts: `artifacts/phase23/training-stage-tracing/ally-boot/tso-3fd708bc-ally-1/` and the 17:39:04Z report from training-offstage.
 
 A later Eden probe (`sg-probe-yoga-01`, diagnostic `0f39ec04`) read the Training stage's long floor and Battlefield.
 The point below the long floor read Solid; the point beneath Battlefield read Under. This was not a run of the
@@ -212,11 +209,10 @@ is on record.
 
 ### The Eden smoke boot of the finished build
 
-On 2026-11-25, Eden run `nb-smoke-yoga-01` (22:21 to 22:57) ran the release build of `b7a382e4`, the head of merge 10,
-with the card's 20 other plugins. Its NRO, sha256 `0cb29525…215ca2f`, is the release file of that head's gate
-(`artifacts/phase23/next-build/gate-b7a382e4/status.json`). The game did not crash. Receipts:
-`artifacts/phase23/next-build-smoke/20261125-1745Z/RESULTS.md` and, in full, `smoke/RESULT.md` there; for each row its
-JSON and one frame under `smoke/evidence/out/<row>/`. Reported by dup-audit (inbox 22:57:42Z).
+- On 2026-11-25, Eden run `nb-smoke-yoga-01` (22:21 to 22:57) ran the release build of `b7a382e4`, the head of merge 10, with the card's 20 other plugins.
+- Its NRO, sha256 `0cb29525…215ca2f`, is the release file of that head's gate (`artifacts/phase23/next-build/gate-b7a382e4/status.json`).
+- The game did not crash.
+- Receipts: `artifacts/phase23/next-build-smoke/20261125-1745Z/RESULTS.md` and, in full, `smoke/RESULT.md` there; for each row its JSON and one frame under `smoke/evidence/out/<row>/`. Reported by dup-audit (inbox 22:57:42Z).
 
 Two rows, the eggs zone and placement, passed on a later try in the same boot, after the test's own steps were
 corrected (it looked for a row named Stop, and expected the placement card to open on Spot). The build did not change
@@ -359,11 +355,11 @@ bridge and the same three staged old macros on both builds):
 - **Limits of the counts:** one boot per build on one host; one sample each for the two long macros; whole frames
   only, so nothing under a frame is shown; the takes recorded in the two boots differ by a few frames in length.
   This is Eden, not the console.
-- **What carries over:** the Play-start comparison is not repeated on merge 17: the fix changed the scrub hold
-  and stage check, not the playback path (rv-preview-vis, inbox 11:07:22Z). The rename path is also unchanged.
-  SP-22 **passed with a note** (tr-primary-2, 11:15:37Z): the automated pad attempt failed. Typing into Eden's
-  own keyboard window changed "Macro 3" to "Macro 3q"; the list and Crop showed the new name, the ID and positions
-  file's hash stayed the same, and Crop still held. See `eden-session/packet-a/gate/handoff45-rename.json` under
+- **What carries over:** the Play-start comparison is not repeated on merge 17: the fix changed the scrub hold and stage check, not the playback path (rv-preview-vis, inbox 11:07:22Z).
+  - The rename path is also unchanged.
+  - SP-22 **passed with a note** (tr-primary-2, 11:15:37Z): the automated pad attempt failed.
+  - Typing into Eden's own keyboard window changed "Macro 3" to "Macro 3q"; the list and Crop showed the new name, the ID and positions file's hash stayed the same, and Crop still held.
+  - See `eden-session/packet-a/gate/handoff45-rename.json` under
   `artifacts/phase23/scrub-positions/`. This did not test typing on the console. The other rows above report
   what ran on merge 16, not a fresh merge-17 result.
 - **Logs:** dup-audit counted 0 lines with panic, abort, Unmapped, crash, Fatal or a break call in each run's Eden

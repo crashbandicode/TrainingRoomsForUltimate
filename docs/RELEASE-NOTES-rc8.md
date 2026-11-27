@@ -44,7 +44,6 @@ These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer
   starts at normal speed.
 - **With the standalone CPU pilot** driving Player 1, the chord works the same way. In the waiting-room practice the
   pilot still gets one input per game update at every speed, x1.5 included, so its inputs are never doubled.
-  <!-- R14 (worker B's r14bc-eca14e4b pair): keep this line only if R14 passes on the final head. -->
 
 ### Both chords
 
@@ -58,7 +57,7 @@ These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer
 
 ![Two menu pages: the key hints end with 0.2.0-rc.6 · rc8 3f9d61dd](media/rc8-footer-tag.gif)
 
-- The key hints at the foot of every menu page end with the build tag: the version, then `rc8` and the commit the NRO
+- The rc.8 key hints at the foot of every menu page ended with the build tag: the version, then `rc8` and the commit the NRO
   was built from, for example `0.2.0-rc.6 · rc8 3f9d61dd`.
 - A build from uncommitted changes adds `-dirty`.
 

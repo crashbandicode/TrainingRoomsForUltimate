@@ -1,9 +1,8 @@
 # rc.9
 
-The rc.9 menu footer read `0.2.0-rc.6 · rc9` followed by the build's commit. rc.9 fixes the places where a
-TrainingRooms shortcut and another plugin's shortcut on the same buttons both fired, and it ships beside new builds of
-three of those plugins. The fix IDs (C3, C4, …) are the numbers of the conflict survey the fixes came from. What rc.8
-changed is [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md).
+- The rc.9 menu footer read `0.2.0-rc.6 · rc9` followed by the build's commit. rc.9 fixes the places where a TrainingRooms shortcut and another plugin's shortcut on the same buttons both fired, and it ships beside new builds of three of those plugins.
+- The fix IDs (C3, C4, …) are the numbers of the conflict survey the fixes came from.
+- What rc.8 changed is [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md).
 
 ## Fixed
 
@@ -63,7 +62,7 @@ changed is [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md).
 
 ### The build in the menu footer
 
-- The build tag at the foot of every menu page now names rc.9, for example `0.2.0-rc.6 · rc9 01950601`.
+- The rc.9 build tag at the foot of each menu page named the candidate, for example `0.2.0-rc.6 · rc9 01950601`.
 
 ## The plugins that ship beside it
 

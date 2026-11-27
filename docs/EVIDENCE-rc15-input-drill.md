@@ -4,7 +4,11 @@ Tested source: **2eb3903e6eb66aedafc3e4dff6d802e9b856fdd7**, base400e2c69. This 
 
 All six Yoga gate steps ran. Release, diag, clippy and no-default-features passed, with zero clippy warnings. Host tests:2,202 passed, one failed (size only), four ignored across102 binaries. Standalone size148141 is220 over147921 and66 over148075; no ceiling was changed in this lane. Net410 versus imported crop3549ee3f. The integration owner resolves the combined size. Gate receipts: `/home/intpa/smash-training-lobby/artifacts/rc15-input-drill/gate-2eb3903e/`.
 
-The first native boot, `rc15-input-drill-1b134e51`, exposed an idle input flag incorrectly becoming Jump: an empty take saved a phantom Jump and the four-dash take saved five steps. Both files and the failing host regression remain. The repair normalizes that flag only in InputCapture below the existing jump-stick threshold; real Jump/release and tap-jump remain covered. Full host library302/0 passes. Hit-link event capture, tolerances, guards and file schemas were not changed by the repair.
+- The first native boot, `rc15-input-drill-1b134e51`, exposed an idle input flag incorrectly becoming Jump: an empty take saved a phantom Jump and the four-dash take saved five steps.
+- Both files and the failing host regression remain.
+- The repair normalizes that flag only in InputCapture below the existing jump-stick threshold; real Jump/release and tap-jump remain covered.
+- Full host library302/0 passes.
+- Hit-link event capture, tolerances, guards and file schemas were not changed by the repair.
 
 The authorized replacement was `rc15-input-drill-2eb3903e` on Yoga, one copied profile fromg, display72. Eden AppImage SHA256 `2f315fc4b7d9658afef84f4ba3cb80a3d0b33292eaef66a802ef837222a247b9`, actual game13.0.5, muted volume0, memory_layout_mode0 and GDB stub enabled before game.load. Start reached the actual main menu, visually checked. The real CPU was Min Min despite the inherited setup helper calling it Mario. No waiting-room pair or hardware test was performed.
 
@@ -19,9 +23,17 @@ The authorized replacement was `rc15-input-drill-2eb3903e` on Yoga, one copied p
 
 The original late-before still already had streak0 after source selection, so this native take does not prove a1→0 transition. The host tests cover streak reset; the live frames separately prove clean0→1 and late0. The schema1 fixture stayed byte-identical, SHA256 `27e5549c53cfd104dfab8143b69ecb7a0940e540996a371d1b9a8514bf01a75d`.
 
-Initial setup retained four passing boot rows and one failed optional register snapshot: the inherited direct GDB kick had already ended its holding helper, so no helper served the dump request. That root-added step was removed under fresh prepare labeldrill-prepare-r2 on the same boot. Five product/setup rows passed. Original manifest, failure, STOP and runner log are retained. Guest tracing remains unverified; no second debugger client or trace boot was added.
+- Initial setup retained four passing boot rows and one failed optional register snapshot: the inherited direct GDB kick had already ended its holding helper, so no helper served the dump request.
+- That root-added step was removed under fresh prepare labeldrill-prepare-r2 on the same boot.
+- Five product/setup rows passed.
+- Original manifest, failure, STOP and runner log are retained.
+- Guest tracing remains unverified; no second debugger client or trace boot was added.
 
-Two additional fresh re-grade rows passed on the same boot with the approved55s recorder cap, a full source allowance after the actual playback receipt, and unchanged20s finalization checks. All first captures/source bytes remain. The earlier claim of a12.8s warp eating the capture is retracted: native diagnostic prefixes use Switch GetSystemTick, while Python uses host monotonic time; the clocks were not calibrated. R3 records both host timestamps and observes request→receipt about0.405s. The original decisive frames already contained completion and the initial late fault.
+- Two additional fresh re-grade rows passed on the same boot with the approved55s recorder cap, a full source allowance after the actual playback receipt, and unchanged20s finalization checks.
+- All first captures/source bytes remain.
+- The earlier claim of a12.8s warp eating the capture is retracted: native diagnostic prefixes use Switch GetSystemTick, while Python uses host monotonic time; the clocks were not calibrated.
+- R3 records both host timestamps and observes request→receipt about0.405s.
+- The original decisive frames already contained completion and the initial late fault.
 
 ![A four-step input drill is cropped to three whole steps](media/rc15-input-drill.gif)
 
@@ -29,4 +41,15 @@ Two additional fresh re-grade rows passed on the same boot with the approved55s 
 
 Known visual issue: after the first handle action, the helper HUD redraws over the editor's upper centre. The range and handle result remain readable. This capture preserves that overlap; it is reported to the editor/integration owner, not called a clean editor-layout pass. Native grading/step interfaces and save-as-new are established separately above.
 
-Shared Down RELEASED at17:57:26Z, lifecycleec37282ac71a495c9ee6481c1e32ec8a. Cleanup failures were empty; restoration independently verified equal and snapshot_equal across2,016 entries; owned Eden PIDs1072946/1072952 were absent. All three owned copies were pruned after58 written files were harvested, freeing2,616,865,297 unique bytes. A terminal game.stop deadline required lifecycle SIGKILL; this is a forced cleanup, not a crash. Console patterns panic/abort/crash/fatal/segmentation had zero matches; memory.peak was6,616,621,056B. The verified raw archive SHA256 is `cd206eb8c15c685e3103f44295140bba512786cb723602d69d411d5f559c743c`. All retained unique receipts total11 PASS and one failed optional setup snapshot; the generated final-run summary counts only the last two rows. Separate GRADE-REVIEW.md and frame/hash manifests retain the independent visual review. No push, tag, release or card write. Historical process exceptions remain disclosed: not every inspection command before16:11Z used the required memory/time guard, and the failed first boot reused row labels despite preserving attempt files. Replacement continuations use fresh row labels. No claim of full process compliance or paired waiting-room acceptance is made.
+- Shared Down RELEASED at17:57:26Z, lifecycleec37282ac71a495c9ee6481c1e32ec8a.
+- Cleanup failures were empty; restoration independently verified equal and snapshot_equal across2,016 entries; owned Eden PIDs1072946/1072952 were absent.
+- All three owned copies were pruned after58 written files were harvested, freeing2,616,865,297 unique bytes.
+- A terminal game.stop deadline required lifecycle SIGKILL; this is a forced cleanup, not a crash.
+- Console patterns panic/abort/crash/fatal/segmentation had zero matches; memory.peak was6,616,621,056B.
+- The verified raw archive SHA256 is `cd206eb8c15c685e3103f44295140bba512786cb723602d69d411d5f559c743c`.
+- All retained unique receipts total11 PASS and one failed optional setup snapshot; the generated final-run summary counts only the last two rows.
+- Separate GRADE-REVIEW.md and frame/hash manifests retain the independent visual review.
+- No push, tag, release or card write.
+- Historical process exceptions remain disclosed: not every inspection command before16:11Z used the required memory/time guard, and the failed first boot reused row labels despite preserving attempt files.
+- Replacement continuations use fresh row labels.
+- No claim of full process compliance or paired waiting-room acceptance is made.
