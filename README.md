@@ -2,7 +2,7 @@
 Practise matchups, edit recordings and play training games in Super Smash Bros. Ultimate.<br>
 [Download a published release](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases) · [Player guide](docs/README.md) · [rc.15 status](docs/CURRENT-RELEASE.md)
 
-## Features the Training Modpack doesn't have
+## Notable features
 
 ### Practice games
 
