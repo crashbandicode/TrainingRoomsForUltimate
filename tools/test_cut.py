@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rc.9 test cut (docs/TEST-CUT-LEDGER-rc9.md): remove or wrap test-gated modules of a Rust source text.
+"""rc.9 test cut (docs/TEST-PROVENANCE.md#test-cut-ledger-rc9): remove or wrap test-gated modules of a Rust source text.
 
 Used by tools/carry_pkg4.py and tools/carry_pkg6.py for the manifest edits `cut_tests`, `wrap_tests` and `wrap_file`, so a
 re-sync from the fork stage re-derives the carried files without the cut unit tests:

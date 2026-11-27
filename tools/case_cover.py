@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rc.9 coverage, option (b) (docs/COVERAGE-rc9.md): the product lines each test case covers on its own.
+"""rc.9 coverage, option (b) (docs/TEST-PROVENANCE.md#coverage-rc9): the product lines each test case covers on its own.
 
     CARGO_TARGET_DIR=<fresh dir> cargo llvm-cov --no-fail-fast --no-report     # builds the instrumented test binaries
     python3 -I tools/case_cover.py measure <fresh dir> <out dir> [--jobs N]

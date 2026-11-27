@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reproduce the AttackData layout evidence of SPEC-core-06 from the owned 13.0.5 `main` ELF (`docs/test-provenance/core-06.md`).
+"""Reproduce the AttackData layout evidence of SPEC-core-06 from the owned 13.0.5 `main` ELF (`docs/TEST-PROVENANCE.md#core-06`).
 
     python3 -I tools/re_hitbox_layout.py <main-13.0.5.elf>
 
