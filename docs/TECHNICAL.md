@@ -572,9 +572,9 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 | Menu gates | `src/model/menu/mod.rs::swap_entry_grey` checks the conditions above. |
 | Defaults | `src/model/preload/cycle_preload_config.rs` enables all seven entries. |
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e68d8706eafc7ca46f542bddb55837747a11dd4e" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/020fa5d092472f535f640bbe279d831337fbcf97" autoplay muted loop playsinline controls></video>
 
-*2026-11-11 · [Capture record](MEDIA.md)* [Open the clip](media/rc7-kirby-hats.mp4)
+*2026-11-27 · [Capture record](MEDIA.md)* [Open the clip](media/rc7-kirby-hats.mp4)
 
 Kirby hats change with a chord, for Player 1 or the CPU.
 
@@ -621,9 +621,9 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 
 ### Stages
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bf22a53f788666f54bfc9e43f9ac2becfda8a701" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/afe6bc6e8801e38a325100bfed0fac9086280716" autoplay muted loop playsinline controls></video>
 
-*2026-11-13 · [Capture record](MEDIA.md)* [Open the clip](media/rc11-change-stage.mp4)
+*2026-11-27 · [Capture record](MEDIA.md)* [Open the clip](media/rc11-change-stage.mp4)
 
 | Row (Fighters & Stages › Stages) | What it does |
 | --- | --- |
