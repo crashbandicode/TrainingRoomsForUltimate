@@ -122,14 +122,14 @@ unsafe fn pose(block: &Block, index: usize, accessor: usize, spot: Spot, asleep:
 }
 
 /// Let the body go: awake again and back where the hold found it. A body the scrub posed gets its plain animation
-/// first and is woken last (the order Eden run `pose-probe-yoga-03` flew), so it never wakes with a move on it;
-/// any other body is let go as before. A hold of another body (a swapped fighter, a new scene) is only forgotten.
+/// first, with no blend from the pose, and its ground shape made again before its place is written
+/// (`placement::restore_posed`); it is woken last, so it never wakes with a move on it. Any other body is let go
+/// as before. A hold of another body (a swapped fighter, a new scene) is only forgotten.
 unsafe fn release(block: &Block, index: usize, slot: &mut Option<CpuPreview>, accessor: usize) -> u32 {
     if let Some(hold) = slot.take() {
         if hold.body() == natives::battle_object_id(accessor) {
             if block.pose(index).0 == POSE_SHOWN {
-                natives::change_motion(accessor, if hold.origin().grounded { WAIT } else { FALL }, 0.0, 1.0, true);
-                placement::restore(accessor, hold.origin());
+                placement::restore_posed(accessor, hold.origin(), if hold.origin().grounded { WAIT } else { FALL });
                 if hold.asleep {
                     state::set_sleep(accessor, false);
                 }

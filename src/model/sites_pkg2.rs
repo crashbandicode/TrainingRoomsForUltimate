@@ -39,6 +39,10 @@ pub const MOTION_CHANGE_HOOK_OFFSET: usize = 0x205_cb30;
 pub const MOTION_KIND_OFFSET: usize = 0x205_cc20;
 /// `MotionModule::is_anim_resource`: the clip editor's scrub asks it before it starts a recorded animation.
 pub const MOTION_IS_ANIM_RESOURCE_OFFSET: usize = 0x205_ce10;
+/// `MotionModule::set_next_no_comp`: the next animation change starts with no blend, once (the scrub's posed release).
+pub const MOTION_SET_NEXT_NO_COMP_OFFSET: usize = 0x205_d2a0;
+/// `GroundModule::update_shape`: the fighter's ground shape is made again from its joints (the scrub's posed release).
+pub const GROUND_UPDATE_SHAPE_OFFSET: usize = 0x202_9910;
 pub const COMMAND_FLAG_HOOK_OFFSET: usize = 0x200_1630;
 pub const ATTACK_AIR_KIND_HOOK_OFFSET: usize = 0x200_1710;
 pub const STICK_DIR_HOOK_OFFSET: usize = 0x200_1030;
@@ -87,7 +91,7 @@ pub const CHANGE_ACTIVE_CAMERA_OFFSET: usize = 0x4e_e480;
 pub const CAMERA_FUNCTOR_VTABLE: usize = 0x4f7_4ca0;
 pub const CAMERA_MODE_FIELD: usize = 0x4;
 
-pub static SITES_PKG2: [Site; 53] = include!(concat!(env!("OUT_DIR"), "/tables/sites_pkg2.SITES_PKG2.rs"));
+pub static SITES_PKG2: [Site; 55] = include!(concat!(env!("OUT_DIR"), "/tables/sites_pkg2.SITES_PKG2.rs"));
 
 /// A site in the `common` script module (`lua2cpp_common.nro`), found by symbol when that module loads and
 /// guarded against the 64 bytes of the owned 13.0.5 module (`tests/cpu_common.rs` reads them from

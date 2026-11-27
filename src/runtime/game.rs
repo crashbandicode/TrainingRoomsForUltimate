@@ -260,6 +260,24 @@ pub mod natives {
         } else { false }
     }
 
+    /// `change_motion` with no blend from the animation before it. `MotionModule::set_next_no_comp(accessor)` arms
+    /// that for the fighter's next change, once; left armed, an unrelated change would use it. So it is armed only
+    /// when the change follows at once and is certain to run: both natives granted, and the fighter has the
+    /// animation. Otherwise the change is the plain one.
+    pub unsafe fn change_motion_cut(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool) -> bool {
+        let arm = at::<extern "C" fn(usize)>(sites_pkg2::MOTION_SET_NEXT_NO_COMP_OFFSET);
+        if let Some(arm) = arm.filter(|_| super::granted(sites_pkg2::MOTION_CHANGE_HOOK_OFFSET) && is_anim_resource(accessor, motion)) {
+            arm(accessor);
+        }
+        change_motion(accessor, motion, frame, rate, run_lines)
+    }
+
+    /// `GroundModule::update_shape(accessor, update)`: the game makes the fighter's ground shape again from its
+    /// joints, now.
+    pub unsafe fn ground_update_shape(accessor: usize, update: bool) {
+        at::<extern "C" fn(usize, bool)>(sites_pkg2::GROUND_UPDATE_SHAPE_OFFSET).map_or_else(Default::default, |f| f(accessor, update))
+    }
+
     pub unsafe fn is_enable_cancel(accessor: usize) -> bool {
         at::<extern "C" fn(usize) -> bool>(sites_pkg2::CANCEL_IS_ENABLE_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }

@@ -166,6 +166,19 @@ pub(super) unsafe fn free_at(body: usize, at: [f32; 2]) -> bool {
     can_stand(RayProbe::new(body).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at)))
 }
 
+/// Let go of a body the clip editor's scrub had posed. Its plain animation (`motion`: standing or falling) starts
+/// with no blend from the pose, and the game makes the body's ground shape again from those joints, before
+/// `restore` writes its place. The box the game pushes fighters by is taken from that shape when the place is
+/// written: made from the posed joints, it pushed the two fighters apart after the release. Facing and situation
+/// come first, so the shape is the one of the side the body will face.
+pub(super) unsafe fn restore_posed(body: usize, origin: Origin, motion: u64) {
+    state::set_lr(body, origin.facing);
+    state::set_situation_kind(body, konst(if origin.grounded { C::SituationGround } else { C::SituationAir }));
+    natives::change_motion_cut(body, motion, 0.0, 1.0, true);
+    natives::ground_update_shape(body, true);
+    restore(body, origin);
+}
+
 /// Put a previewed body back where its picker found it. A preview only exists where `preview_ready` held.
 pub(super) unsafe fn restore(body: usize, origin: Origin) {
     if origin.grounded {
