@@ -3280,3 +3280,11 @@ ceiling = 209167
 date = "2026-11-27"
 reason = "A release published inside one fighter callback (rv-preview-vis's review of 355afa48, 2026-11-27 03:42Z and 03:49Z: the callback read the editor's request more than once, so a release published between two reads put one fighter back alone), on 355afa48 (209156): +11, measured by the size step of the gate on 1aec9cc5 (XPS, bid 5c4e8bea; the Yoga gate of the same commit agrees). A callback reads the request once and uses that one value for both fighters (Block::frame_ask, Block::point_for). Written by rv-preview-vis, lead-reviewed by tile-fix-g4."
 approved_by = "tr-primary-2 2026-11-27 03:57:26Z (+11 lines granted for the one-read-per-callback fix; the ceiling becomes 209167; the release NRO size and raw .bss are unchanged)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 209194
+date = "2026-11-27"
+reason = "The slide after a same-tick release (place-t1a's trace D 2026-11-27 04:56Z, six posed rows of six: the first callback to read the release put its partner back and woke it before the partner's own frame function, and the push the game had written into the held, posed body became speed: the CPU slid 1.98), on 6809af64 (209167): +27, measured by the size step of the gate on bcf0a001. From its partner's callback a body is placed and left asleep, and it is woken only on its own callback, at the release and at the start of a hold: no fighter order assumed, no count of frames, no push switch."
+approved_by = "tr-primary-2 2026-11-27 06:19:43Z (+27 lines granted; the ceiling becomes 209194; release text +144 B, the release NRO size unchanged, raw .bss +0)."
