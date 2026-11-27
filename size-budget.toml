@@ -3264,3 +3264,11 @@ ceiling = 209286
 date = "2026-11-27"
 reason = "The fighter toggle of scrub moves waits on the roster, a defect fix on rc-next 0a63c101 (209091): +195, measured by the size step of the gate on the green tree (543878a9). The editor's switch has a ticket word with its states in place of a 600-pass count; the roster marks a user's direct request it gives up, at each site, and removes a waiting one on B; the editor publishes the load's owner bit while a switch is under way. About 150 of the lines are the tests."
 approved_by = "tr-primary-2 2026-11-27 02:12:25Z (+195 lines granted; release NRO +0 B and raw BSS +0 against cc71537c)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 209387
+date = "2026-11-27"
+reason = "The fighter toggle's lifecycle, the reviewer's fixes on the toggle fix (209286): +101, measured by rv-hit-streak's size run on 783c1309. The switch's ticket is decided at the roster's own points of no return (B against the commit), ends with its role's departure and with an evicted request, carries the owner generation of its toggle, and the roster's own install keeps the editor that asked for it open."
+approved_by = "tr-primary-2 2026-11-27 02:37:11Z (+60) and 02:56Z (+41; +296 in all on 209091)."
