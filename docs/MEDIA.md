@@ -493,8 +493,8 @@ reviewed take by take (batches L and M): the reshoots of the clips that had been
 
 Kept from rc.5 but cut down to leave out the bar (primary 04:40Z, rule c: the retake from rd1 fell short, and the clip
 is clean outside the bar). The crops keep every frame and its time; the trims keep the menu part only.
-- The eight frame-strip crops and the play-chord crop (`<name>-crop.gif`, 2026-11-11 morning) are no longer
-  embedded: the retakes above replace them.
+- The eight frame-strip crops and the play-chord crop (`<name>-crop.gif`, 2026-11-11 morning) were removed from the
+  tree on 2026-11-27: the retakes above replace them. The files are in the history before `64496a81`.
 - Trimmed: `rc5-popup-trim.gif` (0.45–3.95 s, the pop-up only; the bar shows once it closes, so the close is not
   shown) and `rc5-recording-page-trim.gif` (from 0.5 s; the first 0.47 s in Training had the bar).
 - Removed: `rc5-record-start-save.gif` (guide/recording.md). `rc7-record-macro.gif`, embedded right after it, shows the
