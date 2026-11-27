@@ -128,8 +128,8 @@ fn the_spot_rows_sit_next_to_their_features() {
 /// `bank_members`). Swap groups said Pokémon Trainer and Pyra / Mythra both need 3 free Ready Fighters: a group is
 /// placed whole, and Pyra / Mythra's has two bodies.
 fn the_loading_help_lines_say_what_the_code_does() {
-    use model::preload::cycle_preload_config::{BANK_MEMBERS_MAX, BANK_MEMBERS_MIN, READY_FIGHTERS_MIN};
-    use model::swap::body_bank::Members;
+    use crate::engine::preload::cycle_preload_config::{self, BANK_MEMBERS_MAX, BANK_MEMBERS_MIN, READY_FIGHTERS_MIN};
+    use crate::engine::swap::body_bank::Members;
     let row = |title: &str| ROWS.iter().find(|r| r.title == title).unwrap_or_else(|| panic!("no row {title}"));
     for (title, help) in [
         ("Cycle Preload", "How many fighters per role are kept ready for swaps.\nOff loads each fighter when you swap."),
@@ -148,7 +148,7 @@ fn the_loading_help_lines_say_what_the_code_does() {
     assert!(matches!(row("Ready Fighter Bodies").control, Control::Dropdown(list) if list.iter().copied().eq(["Off", "2", "3"])));
     assert_eq!((BANK_MEMBERS_MIN, BANK_MEMBERS_MAX, READY_FIGHTERS_MIN), (2, 3, 2));
     // Off leaves no group at all, whatever Group Swap says.
-    let mut settings = model::preload::cycle_preload_config::Settings::default();
+    let mut settings = cycle_preload_config::Settings::default();
     assert!(settings.groups_enabled());
     settings.bank_members = 0;
     assert!(!settings.groups_enabled());
