@@ -637,7 +637,7 @@ pub static ROWS: [Row; 175] = [
     r(EDGE, "Reaction", "edge_reaction", Control::Dropdown(&["Frame-perfect", "Human 12 f", "Custom"]),
       "Delay before the CPU reacts to your actions.\nA selects a preset. Left or Right adjusts Custom."),
     r(EDGE, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::GuardEdge)),
-      "Choose the start area, the CPU's point and your point.\nPreview both positions before starting."),
+      "Place the CPU's start, then your own, then preview both.\nOn the CPU's start, X takes the default and Y tries the other side."),
     r(EDGE, "Under the stage", "edge_under", TOGGLE,
       "Off (default): the CPU start must be beside the stage.\nOn: A also takes a point under the stage."),
     r(EDGE, "CPU percent", "edge_cpu_percent", Control::Number { first: 0, step: 1 },

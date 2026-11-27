@@ -61,8 +61,8 @@ impl Aim<'_> {
     /// start, an out-of-bounds path or a contact outside the timed passive regime.
     pub fn at(&self, angle: f32, frames: u16) -> Option<Solution> {
         let (line, target) = (self.spot.line, self.spot.point());
+        let kind = line.kind()?;
         if self.surfaces.state != Walk::Closed
-            || line.kind().is_none()
             || !self.spot.on_segment()
             || !contact_frames(self.knockback).contains(&f32::from(frames))
         {
@@ -78,33 +78,29 @@ impl Aim<'_> {
             line.normal,
             5.7,
         )?;
-        if inside(self.surfaces, start) {
+        let in_bounds = |p| self.blast.contains(p) && self.view.is_none_or(|v| v.contains(p));
+        if !in_bounds(start) || inside(self.surfaces, start) {
             return None;
         }
         let mut previous = start;
-        for f in 0..=frames {
-            let p = add(
-                start,
-                flight::flight(velocity, self.params, f)?.displacement,
-            );
-            if !self.blast.contains(p) || self.view.is_some_and(|v| !v.contains(p)) {
+        for f in 1..=frames {
+            let p = if f == frames {
+                target
+            } else {
+                add(start, flight::flight(velocity, self.params, f)?.displacement)
+            };
+            // The last segment ends at the chosen point on this line by construction.
+            if !in_bounds(p) || self.surfaces.lines().any(|l| {
+                (f != frames || l.id != line.id) && surface::crossing(previous, p, l).is_some()
+            }) {
                 return None;
-            }
-            if f > 0 {
-                for l in self.surfaces.lines() {
-                    if let Some(t) = surface::crossing(previous, p, l) {
-                        // Only the selected line on the final segment may be hit.
-                        if l.id != line.id || f < frames || t < 1.0 {
-                            return None;
-                        }
-                    }
-                }
             }
             previous = p;
         }
         let end = flight::flight(velocity, self.params, frames)?;
-        if line.kind() == Some(Kind::Ceiling)
-            && end.damage_velocity.y - end.gravity_speed <= 0.0
+        // Stock wall reflection tests signed horizontal damage speed, not speed along the normal.
+        if kind == Kind::Wall && end.damage_velocity.x * line.normal.x >= 0.0
+            || kind == Kind::Ceiling && end.damage_velocity.y <= end.gravity_speed
         {
             return None;
         }
