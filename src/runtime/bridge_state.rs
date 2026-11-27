@@ -53,7 +53,11 @@ struct PracticeSample {
 static PRACTICE: hos_lock::Mailbox<PracticeSample, { practice::SAMPLE_SLOTS }> = hos_lock::Mailbox::new();
 
 fn practice_admission() -> u64 {
-    let address = ADMISSION.load(Ordering::Acquire);
+    toggle_generation(ADMISSION.load(Ordering::Acquire))
+}
+
+/// The bridge's toggle generation through its export at `address`: 0 while the bridge is Off, or without the export.
+fn toggle_generation(address: usize) -> u64 {
     if address == 0 {
         return 0;
     }
@@ -467,6 +471,7 @@ impl Provider {
         let notice = shown.map_or((String::new(), String::new()), |(h, b)| (h.to_string(), b.to_string()));
         view(&notice, ACK.load(Ordering::Acquire), &mut self.snapshot);
         if self.snapshot.is_empty() { return; }
+        self.publisher.session(toggle_generation(self.practice.as_ref().map_or(0, |practice| practice.admission_export)));
         if !self.publisher.wants(self.snapshot.as_bytes()) {
             return;
         }

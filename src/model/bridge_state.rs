@@ -492,6 +492,9 @@ pub struct Publisher {
 }
 
 impl Publisher {
+    /// The bridge's toggle generation as read before a pass: 0 while the bridge is Off, or when it has none.
+    pub fn session(&mut self, _generation: u64) {}
+
     pub fn wants(&self, snapshot: &[u8]) -> bool {
         self.dirty || hash(snapshot) != self.last
     }
