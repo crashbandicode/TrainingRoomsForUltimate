@@ -614,7 +614,298 @@ fn case_table() {
         ("a_hurtbox_without_a_valid_bone_scale_is_not_drawn", a_hurtbox_without_a_valid_bone_scale_is_not_drawn as fn()),
         ("a_live_targets_hurtbox_is_its_picture_disc", a_live_targets_hurtbox_is_its_picture_disc as fn()),
         ("a_busy_board_tick_leaves_the_fighters_panes_to_the_target", a_busy_board_tick_leaves_the_fighters_panes_to_the_target as fn()),
+        ("handed_off_commands_leave_what_immediate_commands_left", handed_off_commands_leave_what_immediate_commands_left as fn()),
+        ("commands_pushed_from_several_threads_match_the_synchronous_result", commands_pushed_from_several_threads_match_the_synchronous_result as fn()),
+        ("an_exhausted_pool_applies_directly_in_issue_order_or_skips_when_the_store_is_busy", an_exhausted_pool_applies_directly_in_issue_order_or_skips_when_the_store_is_busy as fn()),
+        ("a_rebound_clears_only_its_own_fighters_published_orbs_at_once", a_rebound_clears_only_its_own_fighters_published_orbs_at_once as fn()),
+        ("a_rebound_during_the_sampling_pass_hides_what_the_pass_published", a_rebound_during_the_sampling_pass_hides_what_the_pass_published as fn()),
     ]);
+}
+
+fn command_shape(key: usize, id: u32, life: Option<hitbox::FighterLife>, grab: bool, status: i32) -> orbs::Command {
+    orbs::Command::Shape {
+        key, id, life, grab, status,
+        shape: hitbox::Shape { id: id as i32, joint: 7, size: 3.0, a: [1.0, 2.0, 3.0], b: Some([4.0, 5.0, 6.0]) },
+    }
+}
+
+fn immediate(table: &mut hitbox::SetTable, articles: &mut orbs::Articles, generations: &hitbox::FighterGenerations, command: &orbs::Command) {
+    match *command {
+        orbs::Command::Shape { key, id, life, grab, shape, status } => {
+            let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
+            let mut len = 0;
+            let tint = hitbox::legend_colour(hitbox::KIND_GRAB, None, 0);
+            hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, tint);
+            let set = if let Some(life) = life {
+                if !generations.is_current(life) { return; }
+                let i = table.index_for(key, life);
+                &mut table.sets[i]
+            } else {
+                articles.track(id, key, None, true).unwrap().0
+            };
+            let _ = wants[..len].iter().filter(|w| grab && set.push_grab(**w, Some(status))).count() as u32;
+        }
+        orbs::Command::Wind { key, id } => { articles.track(id, key, None, true).unwrap(); }
+        orbs::Command::Rebound { key, life } => {
+            if let Some(i) = table.find_life(key, life).filter(|_| generations.is_current(life)) {
+                let _ = table.sets[i].clear(&mut OrbSink { status: i32::MIN });
+                let _ = table.held_spheres();
+            }
+        }
+    }
+}
+
+fn parity(table_a: &mut hitbox::SetTable, articles_a: &mut orbs::Articles, table_b: &mut hitbox::SetTable,
+    articles_b: &mut orbs::Articles, fighters: &[(usize, hitbox::FighterLife)], article_keys: &[(u32, usize)], status: i32) {
+    assert_eq!(format!("{table_a:?}"), format!("{table_b:?}"));
+    assert_eq!(articles_a.tracked(), articles_b.tracked());
+    let mut board_a = Board::new();
+    let mut board_b = Board::new();
+    board_a.begin_frame(7);
+    board_b.begin_frame(7);
+    for &(id, key) in article_keys {
+        board_a.publish_article(key, id, None, [orb(key as f32)].into_iter());
+        board_b.publish_article(key, id, None, [orb(key as f32)].into_iter());
+    }
+    for i in 0..FIGHTER_SETS {
+        let a = &mut table_a.sets[i];
+        let b = &mut table_b.sets[i];
+        a.reconcile(&[], true, &mut OrbSink { status });
+        b.reconcile(&[], true, &mut OrbSink { status });
+        assert_eq!(a.handles().collect::<Vec<_>>(), b.handles().collect::<Vec<_>>());
+        assert_eq!(a.spheres().copied().collect::<Vec<_>>(), b.spheres().copied().collect::<Vec<_>>());
+    }
+    for &(key, life) in fighters {
+        if let Some(i) = table_a.find_life(key, life) {
+            let mut a = [Orb::NONE; orbs::BOARD_ORBS];
+            let mut b = [Orb::NONE; orbs::BOARD_ORBS];
+            let n = orbs::place_orbs(&table_a.sets[i], |s| Some(s.pos), None, |_| None, &mut a);
+            let m = orbs::place_orbs(&table_b.sets[i], |s| Some(s.pos), None, |_| None, &mut b);
+            board_a.publish_fighter(key, life, a[..n].iter().copied());
+            board_b.publish_fighter(key, life, b[..m].iter().copied());
+        }
+    }
+    for (id, key) in articles_a.tracked().into_iter().filter(|(id, _)| *id != 0) {
+        let (a, flag_a) = articles_a.track(id, key, None, false).unwrap();
+        let (b, flag_b) = articles_b.track(id, key, None, false).unwrap();
+        assert_eq!(*flag_a, *flag_b);
+        assert_eq!(format!("{a:?}"), format!("{b:?}"));
+        orbs::article_pass(&mut board_a, a, (id, key), status, &mut Shot(false), |s| Some(s.pos), orbs::Extras::NONE);
+        orbs::article_pass(&mut board_b, b, (id, key), status, &mut Shot(false), |s| Some(s.pos), orbs::Extras::NONE);
+        assert_eq!(a.handles().collect::<Vec<_>>(), b.handles().collect::<Vec<_>>());
+        assert_eq!(a.spheres().copied().collect::<Vec<_>>(), b.spheres().copied().collect::<Vec<_>>());
+    }
+    articles_a.clear_evicted(&mut board_a);
+    articles_b.clear_evicted(&mut board_b);
+    assert_eq!(board_a.draw_slots_in_order(u8::MAX).copied().collect::<Vec<_>>(),
+        board_b.draw_slots_in_order(u8::MAX).copied().collect::<Vec<_>>());
+}
+
+fn handed_off_commands_leave_what_immediate_commands_left() {
+    use model::pool_list::PoolList;
+    let generations = hitbox::FighterGenerations::new();
+    let life = generations.stamp(0x10000).unwrap();
+    let retired = generations.stamp(0x20000).unwrap();
+    generations.retire(0x20000);
+    let article = |id| command_shape(id as usize * 16, id, None, true, 10);
+    let catch = command_shape(0x1000, life.id, Some(life), true, 10);
+    let rebound = orbs::Command::Rebound { key: 0x1000, life };
+    let sequences = [
+        vec![article(1), article(2), article(3), article(4), article(5)],
+        vec![article(1), article(2), article(3), article(4), article(1), article(5)],
+        vec![article(1), article(2), article(3), article(5)],
+        vec![command_shape(16, 1, None, false, 10), article(1), orbs::Command::Wind { key: 16, id: 1 }],
+        vec![catch],
+        vec![command_shape(0x2000, retired.id, Some(retired), true, 10)],
+        vec![catch, rebound],
+        vec![rebound, catch],
+        vec![orbs::Command::Rebound { key: 0x2000, life: retired }],
+    ];
+    let keys: Vec<_> = (1..=5).map(|id| (id, id as usize * 16)).collect();
+    for (case, commands) in sequences.iter().enumerate() {
+        let mut a = Box::new(hitbox::SetTable::new());
+        let mut b = Box::new(hitbox::SetTable::new());
+        let mut aa = orbs::Articles::new();
+        let mut ab = orbs::Articles::new();
+        if case == 2 {
+            aa.track(4, 64, Some(&mut Board::new()), false).unwrap();
+            ab.track(4, 64, Some(&mut Board::new()), false).unwrap();
+        }
+        let list = PoolList::new(commands.len()).unwrap();
+        for command in commands {
+            immediate(&mut a, &mut aa, &generations, command);
+            assert!(list.push(*command));
+        }
+        assert_eq!(orbs::apply_all(&list, None, &mut b, &mut ab, &generations, &mut |_, _| {}), commands.len());
+        if case <= 1 { assert!(!aa.tracked().contains(&(1, 16))); }
+        if case == 2 { assert!(!aa.tracked().contains(&(4, 64)) && aa.tracked().contains(&(1, 16))); }
+        parity(&mut a, &mut aa, &mut b, &mut ab, &[(0x1000, life), (0x2000, retired)], &keys, 11);
+        if case == 4 {
+            let i = b.find_life(0x1000, life).unwrap();
+            assert_eq!(b.sets[i].handles().collect::<Vec<_>>(), [orbs::orb_handle(10); 2]);
+        }
+        if case == 5 { assert_eq!(b.find_life(0x2000, retired), None); }
+    }
+}
+
+fn commands_pushed_from_several_threads_match_the_synchronous_result() {
+    use model::pool_list::PoolList;
+    let generations = hitbox::FighterGenerations::new();
+    let fighters: Vec<_> = (1..=4).map(|n| (0x1000 * n, generations.stamp((n as u32) << 16).unwrap())).collect();
+    let list = PoolList::new(12).unwrap();
+    std::thread::scope(|scope| {
+        for &(key, life) in &fighters {
+            let list = &list;
+            scope.spawn(move || {
+                let id = life.id >> 16;
+                assert!(list.push(orbs::Command::Wind { key: id as usize * 16, id }));
+                assert!(list.push(command_shape(key, life.id, Some(life), true, 10)));
+                assert!(list.push(orbs::Command::Wind { key: (id as usize + 4) * 16, id: id + 4 }));
+            });
+        }
+    });
+    let mut a = Box::new(hitbox::SetTable::new());
+    let mut b = Box::new(hitbox::SetTable::new());
+    let mut aa = orbs::Articles::new();
+    let mut ab = orbs::Articles::new();
+    let mut observed = Vec::new();
+    assert_eq!(orbs::apply_all(&list, None, &mut b, &mut ab, &generations, &mut |c, _| observed.push(*c)), 12);
+    for &(key, life) in &fighters {
+        let id = life.id >> 16;
+        let own: Vec<_> = observed.iter().copied().filter(|c| match *c {
+            orbs::Command::Wind { id: found, .. } => found == id || found == id + 4,
+            orbs::Command::Shape { key: found, .. } => found == key,
+            _ => false,
+        }).collect();
+        assert_eq!(own, [orbs::Command::Wind { key: id as usize * 16, id }, command_shape(key, life.id, Some(life), true, 10),
+            orbs::Command::Wind { key: (id as usize + 4) * 16, id: id + 4 }]);
+    }
+    for command in &observed { immediate(&mut a, &mut aa, &generations, command); }
+    let keys: Vec<_> = (1..=8).map(|id| (id, id as usize * 16)).collect();
+    parity(&mut a, &mut aa, &mut b, &mut ab, &fighters, &keys, 11);
+}
+
+fn an_exhausted_pool_applies_directly_in_issue_order_or_skips_when_the_store_is_busy() {
+    use model::pool_list::PoolList;
+    let generations = hitbox::FighterGenerations::new();
+    let life = generations.stamp(0x10000).unwrap();
+    let catch = command_shape(0x1000, life.id, Some(life), true, 10);
+    let rebound = orbs::Command::Rebound { key: 0x1000, life };
+    let list = PoolList::new(1).unwrap();
+    let table = hos_lock::Mutex::new(Box::new(hitbox::SetTable::new()));
+    let articles = hos_lock::Mutex::new(orbs::Articles::new());
+    let owner = |run: &mut dyn FnMut(&mut hitbox::SetTable, &mut orbs::Articles)| {
+        let (Some(mut table), Some(mut articles)) = (table.try_lock(), articles.try_lock()) else { return false };
+        run(&mut table, &mut articles);
+        true
+    };
+    assert_eq!(orbs::hand_off(&list, &generations, catch, owner, &mut |_, _| {}), orbs::HandOff::Queued);
+    assert_eq!(orbs::hand_off(&list, &generations, rebound, owner, &mut |_, _| {}), orbs::HandOff::Direct);
+    let mut reference = Box::new(hitbox::SetTable::new());
+    let mut reference_articles = orbs::Articles::new();
+    immediate(&mut reference, &mut reference_articles, &generations, &catch);
+    immediate(&mut reference, &mut reference_articles, &generations, &rebound);
+    parity(&mut reference, &mut reference_articles, &mut table.lock(), &mut articles.lock(), &[(0x1000, life)], &[], 11);
+    {
+        let table = table.lock();
+        assert!(table.sets[table.find_life(0x1000, life).unwrap()].is_empty());
+    }
+    assert_eq!(orbs::hand_off(&list, &generations, catch, owner, &mut |_, _| {}), orbs::HandOff::Queued);
+    let busy = table.lock();
+    assert_eq!(orbs::hand_off(&list, &generations, rebound, owner, &mut |_, _| {}), orbs::HandOff::Skipped);
+    drop(busy);
+    assert_eq!(orbs::apply_all(&list, None, &mut table.lock(), &mut articles.lock(), &generations, &mut |_, _| {}), 1);
+    assert!(list.push(catch));
+    let third = orbs::Command::Wind { key: 16, id: 1 };
+    let mut first = true;
+    assert_eq!(orbs::hand_off(&list, &generations, rebound, owner, &mut |_, _| {
+        if first { first = false; assert!(list.push(third)); }
+    }), orbs::HandOff::Direct);
+    assert!(!articles.lock().tracked().contains(&(1, 16)));
+    assert_eq!(orbs::apply_all(&list, None, &mut table.lock(), &mut articles.lock(), &generations, &mut |c, _| assert_eq!(*c, third)), 1);
+    assert!(articles.lock().tracked().contains(&(1, 16)));
+    assert!(list.push(catch));
+    assert!(!list.push(rebound));
+    assert_eq!(list.drain(|_| {}), 1);
+}
+
+fn a_rebound_clears_only_its_own_fighters_published_orbs_at_once() {
+    let generations = hitbox::FighterGenerations::new();
+    let life = generations.stamp(0x10000).unwrap();
+    let other = generations.stamp(0x20000).unwrap();
+    let mut board = Board::new();
+    board.begin_frame(7);
+    board.publish_fighter(10, life, [orb(1.0)].into_iter());
+    board.publish_fighter(20, other, [orb(2.0)].into_iter());
+    board.publish_article(30, 1, None, [orb(3.0)].into_iter());
+    let draw = |b: &Board| b.draw_slots_in_order(u8::MAX).map(|o| o.centre[0]).collect::<Vec<_>>();
+    board.clear_publication(10, other, 7);
+    board.clear_publication(99, life, 7);
+    board.clear_publication(10, life, 8);
+    assert_eq!(draw(&board), [1.0, 2.0, 3.0]);
+    board.clear_publication(10, life, 7);
+    assert_eq!(draw(&board), [2.0, 3.0]);
+    board.begin_frame(8);
+    board.publish_fighter(10, life, [orb(4.0)].into_iter());
+    board.clear_publication(10, life, 7);
+    assert_eq!(draw(&board), [4.0]);
+}
+
+fn a_rebound_during_the_sampling_pass_hides_what_the_pass_published() {
+    let generations = hitbox::FighterGenerations::new();
+    let life = generations.stamp(0x10000).unwrap();
+    let other = generations.stamp(0x20000).unwrap();
+    let catch = command_shape(10, life.id, Some(life), true, 10);
+    let rebound = orbs::Command::Rebound { key: 10, life };
+    for after_pass in [false, true] {
+        let mut a = Box::new(hitbox::SetTable::new());
+        let mut b = Box::new(hitbox::SetTable::new());
+        let mut aa = orbs::Articles::new();
+        let mut ab = orbs::Articles::new();
+        immediate(&mut a, &mut aa, &generations, &catch);
+        immediate(&mut b, &mut ab, &generations, &catch);
+        for table in [&mut a, &mut b] {
+            let i = table.find_life(10, life).unwrap();
+            table.sets[i].reconcile(&[], true, &mut OrbSink { status: 10 });
+            assert_eq!(table.sets[i].len(), 2);
+        }
+        let mut board_a = Board::new();
+        let mut board_b = Board::new();
+        for board in [&mut board_a, &mut board_b] {
+            board.begin_frame(1);
+            board.publish_fighter(10, life, [orb(1.0)].into_iter());
+        }
+        if !after_pass {
+            board_a.clear(10);
+            immediate(&mut a, &mut aa, &generations, &rebound);
+            board_b.clear_publication(10, life, 1);
+            orbs::apply(&mut b, &mut ab, &generations, &rebound);
+        }
+        for (board, table) in [(&mut board_a, &mut a), (&mut board_b, &mut b)] {
+            board.begin_frame(2);
+            let i = table.find_life(10, life).unwrap();
+            let want = sphere(hitbox::sphere_key(hitbox::KIND_HIT, 0, 0), 4.0, 1.0);
+            table.sets[i].reconcile(&[want], true, &mut OrbSink { status: 10 });
+            let mut placed = [Orb::NONE; orbs::BOARD_ORBS];
+            let count = orbs::place_orbs(&table.sets[i], |s| Some(s.pos), None, |_| None, &mut placed);
+            board.publish_fighter(10, life, placed[..count].iter().copied());
+            board.publish_fighter(20, other, [orb(2.0)].into_iter());
+            board.publish_article(30, 1, None, [orb(3.0)].into_iter());
+        }
+        if after_pass {
+            board_a.clear(10);
+            immediate(&mut a, &mut aa, &generations, &rebound);
+            board_b.clear_publication(10, life, 1);
+            assert!(matches!(orbs::apply(&mut b, &mut ab, &generations, &rebound), orbs::Applied::Rebound(Some(_))));
+            board_b.clear_publication(10, life, 2);
+        } else {
+            board_b.clear_publication(10, life, 1);
+        }
+        let draw = |board: &Board| board.draw_slots_in_order(u8::MAX).map(|o| o.centre[0]).collect::<Vec<_>>();
+        assert_eq!(draw(&board_a), draw(&board_b));
+        assert_eq!(draw(&board_b), if after_pass { vec![2.0, 3.0] } else { vec![4.0, 2.0, 3.0] });
+        parity(&mut a, &mut aa, &mut b, &mut ab, &[(10, life)], &[], 10);
+    }
 }
 
 #[test]

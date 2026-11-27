@@ -25,6 +25,76 @@ fn allocating_hook(id: HookId, bytes: usize) -> usize {
 }
 
 #[test]
+fn handing_over_and_applying_overlay_commands_allocates_nothing_in_a_hook() {
+    use model::hitbox::{FighterGenerations, SetTable};
+    use model::hitbox_orbs::{self as orbs, Articles, Command, HandOff};
+    use model::pool_list::PoolList;
+    use std::sync::Barrier;
+    let _turn = crate::allocation::hook_counter_turn();
+    let generations = FighterGenerations::new();
+    let life = generations.stamp(0x10000).unwrap();
+    let catch = Command::Shape { key: 0x1000, id: life.id, life: Some(life), grab: true,
+        shape: model::hitbox::Shape { id: 0, joint: 1, size: 1.0, a: [0.0; 3], b: None }, status: 1 };
+    let wind = Command::Wind { key: 0x2000, id: 1 };
+    let rebound = Command::Rebound { key: 0x1000, life };
+    let list = PoolList::new(3).unwrap();
+    let table = hos_lock::Mutex::new(Box::new(SetTable::new()));
+    let articles = hos_lock::Mutex::new(Articles::new());
+    let begin = Barrier::new(3);
+    let end = Barrier::new(3);
+    std::thread::scope(|scope| {
+        for (id, command) in [(HookId::HitboxWind, wind), (HookId::HitboxRebound, rebound)] {
+            let (begin, end, list) = (&begin, &end, &list);
+            scope.spawn(move || {
+                begin.wait();
+                {
+                    let _scope = HookScope::enter_hook(id);
+                    assert!(list.push(command));
+                }
+                end.wait();
+            });
+        }
+        let before = hook_allocations();
+        {
+            let _scope = HookScope::enter_hook(HookId::HitboxCatch);
+            assert!(list.push(catch));
+        }
+        begin.wait();
+        end.wait();
+        {
+            let _scope = HookScope::enter_hook(HookId::HitboxFrame);
+            assert_eq!(orbs::apply_all(&list, None, &mut table.lock(), &mut articles.lock(), &generations, &mut |_, _| {}), 3);
+        }
+        for command in [catch, wind, rebound] {
+            let _scope = HookScope::enter_hook(HookId::HitboxCatch);
+            assert!(list.push(command));
+        }
+        let owner = |run: &mut dyn FnMut(&mut SetTable, &mut Articles)| {
+            let (Some(mut table), Some(mut articles)) = (table.try_lock(), articles.try_lock()) else { return false };
+            run(&mut table, &mut articles);
+            true
+        };
+        {
+            let _scope = HookScope::enter_hook(HookId::HitboxRebound);
+            assert_eq!(orbs::hand_off(&list, &generations, rebound, owner, &mut |_, _| {}), HandOff::Direct);
+        }
+        for command in [catch, wind, rebound] { assert!(list.push(command)); }
+        let held = table.lock();
+        {
+            let _scope = HookScope::enter_hook(HookId::HitboxRebound);
+            assert_eq!(orbs::hand_off(&list, &generations, rebound, owner, &mut |_, _| {}), HandOff::Skipped);
+        }
+        drop(held);
+        assert_eq!(hook_allocations(), before);
+        {
+            let _scope = HookScope::enter_hook(HookId::HitboxCatch);
+            std::hint::black_box(vec![1u8; 8]);
+        }
+        assert!(hook_allocations() > before);
+    });
+}
+
+#[test]
 fn preview_checkpoint_first_use_restart_and_retirement_allocate_nothing() {
     use model::state::{preview::Checkpoint, record::SavedState};
     let _turn = crate::allocation::hook_counter_turn();

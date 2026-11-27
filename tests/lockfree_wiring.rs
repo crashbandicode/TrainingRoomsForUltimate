@@ -48,6 +48,41 @@ fn ordered(src: &str, steps: &[&str]) {
 }
 
 #[test]
+fn the_command_hooks_hand_over_and_phase_8_applies_before_it_samples() {
+    let src = include_str!("../src/runtime/features/hitbox.rs");
+    for name in ["animation_command", "wind_command", "hitbox_rebound_hook"] {
+        let hook = body(src, name);
+        assert!(hook.contains("hand_off("));
+        for forbidden in ["STORE", "ARTICLES", ".lock()"] {
+            assert!(!hook.contains(forbidden), "{name}: {forbidden}");
+        }
+    }
+    ordered(body(src, "hitbox_rebound_hook"), &["call_original!", "kill_on_rebound", "SAMPLE.load",
+        "FIGHTER_GENERATIONS.is_current(life)", "hand_off(", "clear_board(accessor, life, frame)"]);
+    let handoff = body(src, "hand_off");
+    ordered(handoff, &["orbs::hand_off(", "STORE.try_lock()", "ARTICLES.try_lock()", "return false",
+        "run(&mut store.table, &mut articles)"]);
+    for forbidden in [".lock()", "Vec", "Box", "format!", "collect", "to_string", "to_owned", "diagnostic("] {
+        assert!(!handoff.contains(forbidden), "{forbidden}");
+    }
+    ordered(body(src, "apply_commands"), &["STORE.try_lock()", "ARTICLES.try_lock()", "drain_commands("]);
+    assert!(body(src, "drain_commands").contains("orbs::apply_all("));
+    ordered(body(src, "sample_overlay"), &["INSTALLED.load", "apply_commands()", "FIGHTERS.try_lock()",
+        "SAMPLE.fetch_add", "BOARD.try_lock()", "STORE.try_lock()", "ARTICLES.try_lock()", "drop(sample)",
+        "drain_commands(&mut store, &mut articles, Some(sample_id))"]);
+    ordered(body(src, "install"), &["PoolList::new(orbs::COMMAND_NODES)", "install_hook!(hitbox_attack_hook)"]);
+    let clear = body(src, "clear_board");
+    assert!(clear.contains("BOARD.try_lock()") && clear.contains("clear_publication(accessor, life, frame)"));
+    assert!(!body(src, "applied").contains("diagnostic("));
+    let stats = src.split_once("mod stats {").unwrap().1;
+    for name in ["command", "rebound_cleared"] {
+        let stat = stats.split_once(&format!("fn {name}(")).unwrap().1.split_once("\n    }").unwrap().0;
+        assert!(stat.contains("enqueue_diagnostic("));
+        assert!(!stat.replace("enqueue_diagnostic(", "").contains("diagnostic("));
+    }
+}
+
+#[test]
 fn slot_capture_and_library_pad_priority_is_preserved() {
     let recorder = include_str!("../src/runtime/features/recorder.rs");
     ordered(body(recorder, "on_ai_frame"),

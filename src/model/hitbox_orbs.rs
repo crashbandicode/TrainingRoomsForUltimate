@@ -14,8 +14,104 @@
 //! orb's pill (`plan_pill`). Pure and host-tested (`tests/core06_orbs.rs`).
 
 use super::cpu::role::FighterKey;
-use super::hitbox::{want_hits, AttackReader, Effects, FighterGenerations, FighterLife, HandleSet, Sphere, FIGHTER_SETS, KIND_ARTICLE_HURT, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
+use super::hitbox::{self, want_hits, AttackReader, Counts, Effects, FighterGenerations, FighterLife, HandleSet, SetTable, Shape, Sphere, FIGHTER_SETS, KIND_ARTICLE_HURT, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
 use super::legend::{self, KIND_MARK, KIND_WIND};
+use super::pool_list::PoolList;
+
+/// Nodes of the runtime's command pool. PLACEHOLDER until the ordered Eden stress run on the release candidate: the size
+/// is that run's highest per-frame command count times at least 8 (lane overlay-handoff, tr-primary-2 2026-11-27 14:45:17Z).
+pub const COMMAND_NODES: usize = 64;
+
+/// A command recorded by an overlay hook for ordered application.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Command {
+    /// An ATTACK or CATCH that passed its hook's gates: `life` is a fighter's stamp taken before the shape was read, `None` an article;
+    /// `status` the status the command ran in.
+    Shape { key: usize, id: u32, life: Option<FighterLife>, grab: bool, shape: Shape, status: i32 },
+    /// An article's wind-area command.
+    Wind { key: usize, id: u32 },
+    /// A fighter's rebound was cleared and its spheres go.
+    Rebound { key: usize, life: FighterLife },
+}
+
+/// The result of applying one overlay command.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Applied {
+    /// The grab spheres queued in the object's set; `None` when the fighter's lifetime had ended.
+    Shape(Option<u32>),
+    /// An article was tracked.
+    Wind,
+    /// What clearing the fighter's set did and the spheres every fighter holds afterwards; `None` without a set of that lifetime.
+    Rebound(Option<(Counts, usize)>),
+}
+
+/// How the handoff handled a command.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HandOff {
+    /// The command was queued for a later drain.
+    Queued,
+    /// The caller lent the state and the command was applied directly.
+    Direct,
+    /// The pool was full and the state was busy.
+    Skipped,
+}
+
+/// Apply one command to its fighter or article state.
+pub fn apply(table: &mut SetTable, articles: &mut Articles, generations: &FighterGenerations, command: &Command) -> Applied {
+    match *command {
+        Command::Shape { key, id, life, grab, shape, status } => {
+            let set = if let Some(life) = life {
+                if !generations.is_current(life) { return Applied::Shape(None); }
+                let i = table.index_for(key, life);
+                &mut table.sets[i]
+            } else {
+                articles.track(id, key, None, true).unwrap().0
+            };
+            let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
+            let mut len = 0;
+            hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, hitbox::legend_colour(hitbox::KIND_GRAB, None, 0));
+            let made = wants[..len].iter().filter(|w| grab && set.push_grab(**w, Some(status))).count() as u32;
+            Applied::Shape(Some(made))
+        }
+        Command::Wind { key, id } => {
+            articles.track(id, key, None, true).unwrap();
+            Applied::Wind
+        }
+        Command::Rebound { key, life } => {
+            Applied::Rebound(table.find_life(key, life).filter(|_| generations.is_current(life)).map(|i| {
+                let counts = table.sets[i].clear(&mut OrbSink { status: i32::MIN });
+                (counts, table.held_spheres())
+            }))
+        }
+    }
+}
+
+/// Apply the detached batch in issue order, followed by an optional direct command.
+pub fn apply_all(list: &PoolList<Command>, last: Option<Command>, table: &mut SetTable, articles: &mut Articles,
+    generations: &FighterGenerations, each: &mut dyn FnMut(&Command, Applied)) -> usize {
+    let mut run = |command| {
+        let applied = apply(table, articles, generations, &command);
+        each(&command, applied);
+    };
+    let count = list.drain(&mut run);
+    if let Some(command) = last {
+        run(command);
+        count + 1
+    } else {
+        count
+    }
+}
+
+/// Queue a command, or apply the batch directly when the pool is full and the owner can lend its state.
+pub fn hand_off(list: &PoolList<Command>, generations: &FighterGenerations, command: Command,
+    owner: impl FnOnce(&mut dyn FnMut(&mut SetTable, &mut Articles)) -> bool, each: &mut dyn FnMut(&Command, Applied)) -> HandOff {
+    if list.push(command) { return HandOff::Queued; }
+    if owner(&mut |table, articles| { apply_all(list, Some(command), table, articles, generations, each); }) {
+        HandOff::Direct
+    } else {
+        HandOff::Skipped
+    }
+}
 
 /// One fighter's orbs on the board: its spheres' and, with *Launch angles* On, up to two marks per hitbox, and with *Windboxes* its wind
 /// areas (legend::area_orbs: a shape, the line's shadow and the line each).
@@ -226,6 +322,16 @@ impl Board {
     /// `key` has no orbs now.
     pub fn clear(&mut self, key: usize) {
         if let Some(i) = self.keys.iter().position(|k| *k == key && key != 0) {
+            self.keys[i] = 0;
+            self.lens[i] = 0;
+            self.article_ids[i] = None;
+        }
+    }
+
+    /// Clear only this fighter lifetime's publication of the named sample.
+    pub fn clear_publication(&mut self, key: usize, life: FighterLife, frame: u32) {
+        if !self.is_frame(frame) { return; }
+        if let Some(i) = self.keys.iter().enumerate().position(|(i, k)| *k == key && key != 0 && self.fighter_lives[i] == Some(life)) {
             self.keys[i] = 0;
             self.lens[i] = 0;
             self.article_ids[i] = None;
