@@ -89,6 +89,27 @@ fn pending(role: usize) -> Option<u32> { character_roster::PENDING.lock().unwrap
 fn toggle_cases(role: usize, kind: i32, failed: &mut Vec<String>) {
     let mut check = |name: &str, ok: bool| if !ok { failed.push(format!("role {role}: {name}")); };
     let admitted = || { character_roster::reset(); ask(role, kind); roster_requests::service(); service_wanted_fighter(); };
+    // The worker can post between the game frame's mailbox drain and scene teardown.
+    character_roster::reset();
+    ask(role, kind);
+    roster_requests::note_drop(role == 0, None);
+    roster_requests::service();
+    service_wanted_fighter();
+    check("scene loss before admission must not dispatch the old request", pending(role).is_none());
+    check("old scene's asked ticket terminates", loading().is_none() && notice() == FIGHTER_REFUSED);
+    // A full production mailbox discards its oldest request, not necessarily a legacy request.
+    character_roster::reset();
+    ask(role, kind);
+    for _ in 0..8 { roster_requests::request_player_kind(99); }
+    roster_requests::service();
+    service_wanted_fighter();
+    check("evicted clip request ends with the roster's refusal", loading().is_none() && notice() == FIGHTER_REFUSED);
+    character_roster::reset();
+    for _ in 0..8 { roster_requests::request_player_kind(99); }
+    ask(role, kind);
+    roster_requests::service();
+    service_wanted_fighter();
+    check("an older evicted message is not this ticket", pending(role) == Some(kind as u32) && loading().is_some());
     // The roster keeps the request for as long as it likes: the editor keeps loading and says nothing.
     admitted();
     for _ in 0..2_000 { roster_requests::service(); service_wanted_fighter(); }
