@@ -1197,7 +1197,7 @@ Each status records the evidence available at that stage.
 | --- | --- | --- | --- | --- |
 | Hold predicate (playback, standby, loading, was-airborne, queue request, toggles), guard-button answers | §5 | `cpu05_should_hold_shield` | `cpu-05-hold-shield-stands` | host pass; runtime, unrun (`cpu_check_button_on/off_hook`) |
 | Decay override per toggle; Hold flips after the first hit and back when not guarding; None native | §5 | `cpu05_decay_override_rules` | `cpu-05-infinite-no-decay`, `cpu-05-hold-decays-after-hit`, `cpu-05-none-native-decay` | host pass; runtime, unrun (`cpu_shield_param_hook`); the flip on leaving shieldstun needs the `common` script hook (blocked), so Hold never flips in the runtime |
-| Damage multiplier 0 for Infinite, restored otherwise and outside Training, cached across session clears | §4 | `cpu05_damage_mul_restore` | `cpu-05-leave-training-restores-mul` | host pass; **blocked** for the runtime: it needs the param-hook plugin's pointer (SPEC-cpu-05 question 6, the lead decides) |
+| Damage multiplier 0 for Infinite, restored otherwise and outside Training, cached across session clears | §4 | `cpu05_damage_mul_restore` | `cpu-05-leave-training-restores-mul` | host pass; **blocked** for the runtime at this handoff (the param-hook plugin's pointer, SPEC-cpu-05 question 6); closed on 2026-11-02 without that plugin, see the [update](#package-2--update-2026-11-02-successor-worker-eden-runs-s2-01-s2-04-on-the-ally-the-two-open-items-closed) |
 | OoS offset: N hits shielded then act; reset when idle or in hitstun | §5 | `cpu05_oos_offset_count` | `cpu-05-oos-offset-2` | host pass; blocked (out-of-shield hook) |
 | Reaction time counted after shieldstun; parry blocks; not shielding resets | §5 | `cpu05_reaction_time` | `cpu-05-reaction-10`, `cpu-05-parry-no-oos` | host pass; blocked |
 | Each OoS action: dodge or roll by status, jump, aerial, up special and up smash by native release, grab without drop, the rest with suspension | §5 | `cpu05_oos_action_table` | `cpu-05-oos-each-action` | host pass; blocked |
@@ -1205,7 +1205,7 @@ Each status records the evidence available at that stage.
 | Shield tilt; a changed tilt applies at the next CPU frame and on the reset (Q18 A); In / Out opponent-relative (B7) | §5 | `cpu05_shield_tilt`, `cpu05_shield_tilt_applies_next_frame`, `cpu05_shield_tilt_opponent_relative` | `cpu-05-tilt-up`, `cpu-05-tilt-change-no-reset`, `cpu-05-tilt-in-left-and-right` | host pass; runtime, unrun (`cpu_stick_x/y_no_clamp_hook`) |
 | N3: OoS Offset and Reaction Time ranges | §9 | `cpu05_oos_offset_range_pick`, `cpu05_reaction_time_range_pick` | `cpu-05-oos-range-1-3`, `cpu-05-reaction-range-5-15` | host pass |
 | B6 per-fighter state | §10 | `cpu05_per_fighter_state` | `cpu-05-ice-climbers` | host pass |
-| Common-module hook guard; param-hook absent path logs once | §9 | - | `cpu-05-install-line` | **blocked** |
+| Common-module hook guard | §9 | - | `cpu-05-install-line` | **blocked** at this handoff; passed on 2026-11-02, see the [update](#package-2--update-2026-11-02-successor-worker-eden-runs-s2-01-s2-04-on-the-ally-the-two-open-items-closed). There is no param-hook absent path: the plugin is not used |
 
 <a id="package-2--spec-cpu-01-the-mash-run-spec-cpu-06-aerials-throws-angle-fast-fall-full-hop-crouch-spec-cpu-07-frame-advantage"></a>
 
