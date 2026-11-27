@@ -8,9 +8,9 @@
 
 | Step | What to do |
 |---|---|
-| 1. Choose your ledge | Stand on the floor you want to defend; open Guard the Edge in [Practice games](../menu/practice-games.md). |
+| 1. Choose your ledge | Stand on the floor to defend. Open [Practice games](../menu/practice-games.md) → **Guard the Edge**. |
 | 2. Place the fighters | **Set up…** opens CPU start, Player 1 start, then Preview. |
-| 3. Pick the CPU spot | Move offstage with the stick or D-pad; A accepts. Y tries the other side. |
+| 3. Pick the CPU spot | Move offstage with the stick or D-pad. A accepts. Y tries the other side. |
 | 4. Pick your spot | Aim above the main floor, press A, then A or Plus on Preview. |
 | 5. Secure a stock | KO the CPU and get back to ground or ledge before the return window closes. |
 | If you don't return | Your KO or an expired window earns no secured stock. |

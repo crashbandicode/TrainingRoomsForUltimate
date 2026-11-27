@@ -8,7 +8,7 @@
 
 | Goal | What to do |
 |---|---|
-| <a id='recording-a-macro-and-its-start-save'></a>Record | Open the Recording pop-up, choose Player or CPU with ZR, then close with B. |
+| <a id='recording-a-macro-and-its-start-save'></a>Record | Default popup chord: ZR + D-pad Right. ZR selects Player/CPU. B closes. |
 | Make the take | Press Record, perform the moves, press Record again. [Find your chords](../menu/display-and-controls.md#button-chords). |
 | <a id='set-active-and-the-play-chords'></a>Play | Select the macro for the intended role; press its Play chord. Press again to stop. |
 | <a id='reading-the-lists'></a>Read the list | Green marks active files, white the cursor, a floppy the linked start save. |

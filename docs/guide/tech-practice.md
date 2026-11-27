@@ -9,7 +9,7 @@
 | Step | What to do |
 |---|---|
 | 1. Choose a session | Open Tech practice in [Practice games](../menu/practice-games.md), then choose **Tech wizard**. |
-| 2. Aim | Move to a surface; set Spot, Angle, Distance and Hit with A. |
+| 2. Aim | Place Spot on a surface. Adjust Angle, Distance and Hit. A advances each step. |
 | 3. Preview | Check the approximate path; move a blocked start before launching. |
 | 4. Launch | A or Plus starts from Preview; **Skip wizard preview** starts immediately after Hit. |
 | 5. Tech | Press shield just before touching the surface; compare the grade and streak. |
