@@ -14,7 +14,7 @@
 | <a id='reading-the-lists'></a>Read the list | Green marks active files, white the cursor, a floppy the linked start save. |
 | <a id='save-states-only-warp'></a>Start elsewhere | Set **Start save** Off to play from here; [Load](save-states.md) alone never plays inputs. |
 | <a id='change-placement-and-the-replay-window'></a>Change the starting positions | Open **Change placement** on the save; choose spots, states and percents, then confirm Preview. |
-| Edit a shared save | Choose copy for a separate start or change the save for all linked macros. |
+| Give one macro a separate start | Open **Change placement** from that macro and copy; copying from the save leaves macros unchanged. |
 | <a id='chains'></a>Play several takes | Choose **+ New chain**; A numbers macros, R removes, X finishes, B cancels. |
 | <a id='the-loop'></a>Repeat | Set [Loop](../menu/recording.md#loop) for the role; only the first pass warps. |
 | <a id='fighter-mismatch'></a>Fighter Mismatch | Keep your fighter, switch to the recorded fighter, or cancel with B. |
