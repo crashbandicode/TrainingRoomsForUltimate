@@ -82,7 +82,7 @@ Where the frame strip code is (moved here from the [Frame strip](guide/frame-str
 
 | Strip detail | Mechanism |
 | --- | --- |
-| Link | `Tracker::on_hit`: follow-up hit minus CPU free frame; unknown if no free frame is available. |
+| Link | `Tracker::on_hit`: hit minus CPU free frame; TRUE without a number when timing is unknown. |
 | Input | `Tracker::on_hit` subtracts Player 1's first actionable frame from the follow-up press. |
 | Step | `src/model/strip_scroll.rs::stepped` moves 15 columns per step. |
 | Repeat | `Scroll::poll` repeats after 18 held polls, then every six. |

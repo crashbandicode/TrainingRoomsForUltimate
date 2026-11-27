@@ -54,7 +54,7 @@ Choose damage separately for each fighter; a range is editable only with Random 
 
 *Corner trap joins the library without changing Load.*
 
-Keep a [named setup](../guide/save-states.md#making-a-setup) from the current positions or from your bound save.
+Keep a [named setup](../guide/save-states.md#making-a-setup) from the fighters' current positions or the positions Load would restore.
 
 | Setting | Input | What it does |
 | --- | --- | --- |
