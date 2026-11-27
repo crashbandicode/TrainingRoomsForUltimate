@@ -41,11 +41,11 @@ fn handing_over_and_applying_overlay_commands_allocates_nothing_in_a_hook() {
     table.link(link);
     articles.link(link);
     let begin = Barrier::new(4);
-    let bound = Barrier::new(4);
+    let rendezvous = Barrier::new(4);
     let end = Barrier::new(4);
     std::thread::scope(|scope| {
         let life = lives[8];
-        let (first, bound, last) = (&begin, &bound, &end);
+        let (first, bound, last) = (&begin, &rendezvous, &end);
         scope.spawn(move || {
             first.wait();
             bound.wait();
@@ -55,7 +55,7 @@ fn handing_over_and_applying_overlay_commands_allocates_nothing_in_a_hook() {
             }
             last.wait();
         });
-        let (first, bound, last) = (&begin, &bound, &end);
+        let (first, bound, last) = (&begin, &rendezvous, &end);
         scope.spawn(move || {
             first.wait();
             bound.wait();
@@ -68,7 +68,7 @@ fn handing_over_and_applying_overlay_commands_allocates_nothing_in_a_hook() {
             }
             last.wait();
         });
-        let (first, bound, last, lives) = (&begin, &bound, &end, &lives);
+        let (first, bound, last, lives) = (&begin, &rendezvous, &end, &lives);
         scope.spawn(move || {
             first.wait();
             {
@@ -82,7 +82,7 @@ fn handing_over_and_applying_overlay_commands_allocates_nothing_in_a_hook() {
         });
         let before = hook_allocations();
         begin.wait();
-        bound.wait();
+        rendezvous.wait();
         end.wait();
         {
             let _scope = HookScope::enter_hook(HookId::HitboxFrame);

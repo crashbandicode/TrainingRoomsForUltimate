@@ -60,6 +60,17 @@ impl Pool {
         self.next.len()
     }
 
+    #[cfg(test)]
+    fn free_count(&self) -> usize {
+        let mut buffers = Vec::new();
+        while let Some(buffer) = self.take() {
+            buffers.push(buffer);
+        }
+        let count = buffers.len();
+        for buffer in buffers { self.give(buffer); }
+        count
+    }
+
     /// The bytes `new` allocated.
     pub fn heap_bytes(&self) -> usize {
         std::mem::size_of_val(&*self.words) + std::mem::size_of_val(&*self.next)
@@ -387,18 +398,20 @@ impl Handoff {
             let version = (word >> INDEX_BITS) + 1;
             let mut after = before;
             let result = op(&mut after, version);
-            let new = if after == before {
-                old
+            // A changed value goes into a buffer of its own; an unchanged one keeps the buffer and only takes the next version.
+            let fresh = if after == before {
+                None
             } else {
                 let buffer = self.pool.take()?;
                 self.pool.write(buffer, &words(&after));
-                buffer
+                Some(buffer)
             };
-            if current.compare_exchange(word, u64::from(new) | (version << INDEX_BITS), AcqRel, Acquire).is_ok() {
-                if new != old { self.pool.give(old); }
+            if current.compare_exchange(word, u64::from(fresh.unwrap_or(old)) | (version << INDEX_BITS), AcqRel, Acquire).is_ok() {
+                if fresh.is_some() { self.pool.give(old); }
                 return Some((version, after, result));
             }
-            if new != old { self.pool.give(new); }
+            // Another change came first. The checkout goes back even when it is the very buffer that was current before.
+            if let Some(buffer) = fresh { self.pool.give(buffer); }
         }
     }
 
@@ -652,9 +665,41 @@ mod tests {
             }
             assert_eq!(next, [3000; 4]);
         });
-        let free: Vec<_> = (0..BUFFERS - 2).map(|_| link.pool.take().unwrap()).collect();
-        assert!(link.pool.take().is_none());
-        for buffer in free { link.pool.give(buffer); }
+        assert_eq!(link.pool.free_count(), BUFFERS - 2);
+    }
+
+    fn a_change_that_loses_the_race_returns_its_buffer() {
+        let link = Handoff::new().unwrap();
+        let free = link.pool.free_count();
+        let mut calls = 0;
+        link.change_articles(|members, version| {
+            calls += 1;
+            if calls == 1 {
+                link.change_articles(|members, version| members.track(2, 32, true, version)).unwrap();
+            }
+            members.track(1, 16, true, version)
+        }).unwrap();
+        assert_eq!(calls, 2);
+        let articles = link.articles().1;
+        assert!(articles.ids.contains(&(1, 16)) && articles.ids.contains(&(2, 32)));
+        assert_eq!(link.pool.free_count(), free);
+
+        let generations = FighterGenerations::new();
+        let first = generations.stamp(0x10000).unwrap();
+        let second = generations.stamp(0x20000).unwrap();
+        let free = link.pool.free_count();
+        let mut calls = 0;
+        link.change_sets(|members, version| {
+            calls += 1;
+            if calls == 1 {
+                link.change_sets(|members, version| members.index_for(32, second, version)).unwrap();
+            }
+            members.index_for(16, first, version)
+        }).unwrap();
+        assert_eq!(calls, 2);
+        let sets = link.sets().1;
+        assert!(sets.find_life(16, first).is_some() && sets.find_life(32, second).is_some());
+        assert_eq!(link.pool.free_count(), free);
     }
 
     fn table_changes_from_several_threads_equal_one_order_of_them() {
@@ -697,6 +742,7 @@ mod tests {
         a.sort_by_key(|&i| (actual.used[i], i));
         b.sort_by_key(|&i| (expected.used[i], i));
         assert_eq!(a, b);
+        assert_eq!(link.pool.free_count(), BUFFERS - 2);
     }
 
     #[test]
@@ -710,6 +756,7 @@ mod tests {
             ("the_pool_holds_every_cell_and_one_buffer_for_every_thread", the_pool_holds_every_cell_and_one_buffer_for_every_thread as fn()),
             ("a_full_lane_frees_a_cell_when_a_rebound_or_a_new_binding_comes", a_full_lane_frees_a_cell_when_a_rebound_or_a_new_binding_comes as fn()),
             ("waiting_commands_from_several_threads_come_out_once_and_in_each_threads_order", waiting_commands_from_several_threads_come_out_once_and_in_each_threads_order as fn()),
+            ("a_change_that_loses_the_race_returns_its_buffer", a_change_that_loses_the_race_returns_its_buffer as fn()),
             ("table_changes_from_several_threads_equal_one_order_of_them", table_changes_from_several_threads_equal_one_order_of_them as fn()),
         ]);
     }

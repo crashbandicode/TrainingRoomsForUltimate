@@ -478,8 +478,8 @@ impl Articles {
     fn change<R>(&mut self, mut op: impl FnMut(&mut Members, u64) -> R) -> R {
         let (view, seen, flags) = (self.members, self.seen, self.flags);
         let changed = self.link.and_then(|link| link.change_articles(|members, version| {
-            for i in 0..ARTICLES {
-                if view.attacking[i] != flags[i] && (members.ids[i], members.ages[i]) == (view.ids[i], view.ages[i]) {
+            for (i, &flag) in flags.iter().enumerate() {
+                if view.attacking[i] != flag && (members.ids[i], members.ages[i]) == (view.ids[i], view.ages[i]) {
                     members.attacking[i] = view.attacking[i] || (version != seen + 1 && members.attacking[i]);
                 }
             }
@@ -522,9 +522,9 @@ impl Articles {
     pub fn forget(&mut self, id: u32, board: &mut Board) {
         let keys = self.change(|members, _| {
             let mut keys = [0; ARTICLES];
-            for i in 0..ARTICLES {
+            for (i, key) in keys.iter_mut().enumerate() {
                 if members.ids[i].0 == id {
-                    (keys[i], members.ids[i]) = (members.ids[i].1, (0, 0));
+                    (*key, members.ids[i]) = (members.ids[i].1, (0, 0));
                 }
             }
             keys
