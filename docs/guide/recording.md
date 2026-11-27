@@ -30,7 +30,8 @@
 |---|---|
 | <a id='practise-a-combo-or-cut-a-take'></a><a id='combos'></a><a id='getting-a-combo'></a>Drill hits you just landed | Choose **Combos & Sequences → + Save last combo…**, name it and try again. |
 | Drill an existing file | In the Player view, select the combo and choose **Drill**. |
-| Turn a take into a drill | **Make combo** replays it; linked hits make a combo, no contact an input drill. |
+| Turn a take into a drill | Choose **Make combo**: linked hits become a combo; input steps without contact become a drill. |
+| Nothing was saved | A lone hit without a follow-up saves nothing; neither does an idle take. |
 | <a id='how-a-combo-is-graded'></a>Read the grade | Match the move and timed inputs; the [strip's TRUE verdict](frame-strip.md#link) isn't required. |
 | <a id='input-drills'></a>Practise movement without a hit | Choose **DRILLS → + Record drill…**; use Record to start and stop your inputs. |
 | Preview an input drill | X on its row plays its available take on Player 1; B stops it. |

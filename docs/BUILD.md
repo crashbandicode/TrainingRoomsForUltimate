@@ -143,10 +143,11 @@ Item pictures: the builder reads the 39 PNGs from assets/item-icons (the 38 appr
 and the fixtures that prove each rule fails on a seeded break (`tools/test_docs_check.py`,
 `tools/test_check_external_links.py`). It needs `/usr/bin/python3` and has no skip switch, like the size gate. It uses no
 network and no clock. In a checkout it asks git for the tracked files and for the clips' blob ids; in a plain export
-it reads the files themselves. The rules are:
+it reads the files themselves. [The checker](../tools/docs_check.py) lists every rule, including video blob IDs,
+headings with links, and the menu and guide budgets. These checks also apply:
 
 - **Links.** Every relative link and image resolves to a file or folder (with the exact case), and every `#anchor` to a
-  heading, by the forge's slug rules (they are not GitHub's: `L+R+A Reset` is `#l-r-a-reset`). A path that starts with `/`
+  heading or explicit anchor (the forge's heading slugs are not GitHub's: `L+R+A Reset` is `#l-r-a-reset`). A path that starts with `/`
   or leaves the repository fails. Links inside code, code blocks and comments are not read.
 - **Orphans.** Every page under `docs/` is reached by a chain of links from `README.md` or `docs/README.md`. A link to a
   folder does not count. The pages kept on purpose without a link (redirect stubs, the folders of project records) are
