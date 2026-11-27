@@ -20,7 +20,7 @@ ZR + D-pad Right opens the pop-up over the match ([reading the lists](../guide/r
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35e8edb3e156f65dc2b9cc87b450a10d83e2f8d9" autoplay muted loop playsinline controls></video>
 
-*Record tints Player 1 red. Eden, diagnostic `5df3d9dc`.* [Open the clip](../media/tut-record-macro.mp4)
+*Record tints Player 1 red.* [Open the clip](../media/tut-record-macro.mp4)
 
 A on a save state, macro or chain opens its own screen ([what each row is for](../guide/recording.md#a-file-s-own-screen)).
 
@@ -43,7 +43,7 @@ A on a save state, macro or chain opens its own screen ([what each row is for](.
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b635893c4df02daaae5535f19b5b3f5c2346245b" autoplay muted loop playsinline controls></video>
 
-*A drill is recorded and listed. Eden, diagnostic `cc71537c`.* [Open the clip](../media/tut-input-drill-record.mp4)
+*The recorded drill appears in the list.* [Open the clip](../media/tut-input-drill-record.mp4)
 
 <a id="combos"></a>
 
@@ -82,7 +82,7 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 ## Options
 
 ![Loop is set from 1 to 3 in the menu, and the macro then plays again and again on its own](../media/rc12-loop.gif)<br>
-*Loop set from 1 to 3. Eden, rc.12.*
+*Setting Loop to 3 repeats the macro.*
 
 How a macro plays back, and how the Combo helper grades.
 
@@ -107,7 +107,7 @@ How a macro plays back, and how the Combo helper grades.
 ## Reset page to defaults
 
 ![Recording > Options with seven values changed and Loop at 3: Reset page to defaults, A asks, A resets](../media/rc13-reset-page-recording.gif)<br>
-*A asks, A resets the rows. Eden, rc.13.*
+*A opens the reset question; A again confirms.*
 
 | Setting | Values | What it does |
 | --- | --- | --- |
@@ -116,11 +116,11 @@ How a macro plays back, and how the Combo helper grades.
 ## Good to know
 
 ![The Recording page, Player view: the hot five outlined, the bound save and the active macro green, orange floppies, CONNECTIONS filled](../media/rc13-recording-page.png)<br>
-*Green: the bound save and the active macro. Eden, rc.13.*
+*Green marks the bound save and the active macro.*
 
 | If | Then |
 | --- | --- |
-| You press B in the numbered picker | Nothing is saved. X finishes. Older clips show B finishing. |
+| You press B in the numbered picker | Nothing is saved; X finishes the chain. |
 | You press X or Y on this page | X never saves your defaults here, and Y does nothing. |
 | A file was recorded on another fighter | Play asks first, unless Ask before switching fighter is Off. |
 | You reset this page | Your files, the bound save, the active macros and the drill stay. |

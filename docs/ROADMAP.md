@@ -3,10 +3,9 @@
 Deferred work after 0.2.0-rc.3. Folded from the former `NEXT-VERSION.md` (removed after v0.2.0-rc.1; see that tag)
 on 2026-11-05; no item was dropped.
 
-## Done: 0.2.0-rc.6 (release date: TODO-FINAL-PASS)
+## Done: 0.2.0-rc.6
 
-rc.5 was withdrawn before it reached players. rc.6 ships only when every feature since rc.3 has passed in Eden on the
-rc.6 build; the final pass is TODO-FINAL-PASS. The player notes are [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
+The [feature ledger](FEATURE-LEDGER.md) records the rc.6 candidate's test results; the [rc.6 notes](RELEASE-NOTES-rc6.md) describe the changes.
 
 | Item | Where | State |
 | --- | --- | --- |
@@ -23,7 +22,7 @@ rc.6 build; the final pass is TODO-FINAL-PASS. The player notes are [RELEASE-NOT
 | The waiting room remembers its partners | `p23/rc6-lobby-persist` | Eden `rc6-lp-qp1` 13/13, `rc6-lp-ldn2` 14/14; on the candidate `lp-ldn` 14/14 and `rc6-bg-final1-1261f56c` |
 | CPU Level (Off, Lv 1–9) for Training and the waiting room's practice | `p23/rc6-lobby-cpu` | Eden `lc-xps-02`, `lc-xps-04` 6/6; on the candidate `surface-lc` 11/11 (Training) and `rc6-bg-final1-1261f56c` (the waiting room; nothing in the match) |
 | Lobby Items Off stops the timed drops in Quickplay's waiting area (#62) | `p23/rc6-qp-items` | Eden `rc6-bg-qp7`, `rc6-bg-ldn62`; on the candidate `rc6-bg-final1-1261f56c` (`f1-items62`: Off made 0 items) and `yoga-pair-r2` 17/17 |
-| P1 CPU Control in an online match | `p23/rc6-qp-pilot` | Eden `rc6-bg-qp6` 10/10. TODO-PROOF: the final Quickplay session |
+| P1 CPU Control in an online match | `p23/rc6-qp-pilot` | [Feature ledger, row 77](FEATURE-LEDGER.md): branch and final Quickplay sessions |
 | No. of CPUs seats: the first raise, a Mii seat's configuration, the proof of a promoted seat, the portrait race, the seats after a cycle change | `p23/rc6-cov-rest` | Eden `covrest-10`, `-14`, `covrest-yoga-06` |
 | The "Same as ‹name›, nothing new saved" notice (decision MII-SAME-NOTICE) | `p23/rc6-cov-rest` | Eden `covrest-07` |
 | Open readings (decisions SETUP-Y-BIND, PLAY-MOMENTUM, F9-SEAT-NOTICE): Y on a setup, Play's Momentum, the start save at Record's start, a seat held for memory in the notice | `p23/rc6-open-fixes` | Eden `rc6-openfix-2` (`of-setup-y`, `of-momentum`), `rc6-openfix-5` (`of-seat-notice`); z-gates clean on both |
@@ -31,10 +30,7 @@ rc.6 build; the final pass is TODO-FINAL-PASS. The player notes are [RELEASE-NOT
 | No heap in the CPU-as-P1 fallback's hooks | `p23/rc6-integration` `6d6994e` | Eden `rc6-int-smoke2` 11/11 |
 | rc.5 features first proven in Eden: P2 L+R+A and Mii swaps, respawn, intro once, the online flag, the Lobby Items online smoke, the timer capture through sudden death, the Mii editor's interrupt and resume, combos in a local-wireless room | the lane branches | Eden `covrest-16`, `-04`, `-13`/`-15`, `covrest-pair-02`/`-03`, `rc6-int-vs3`, `covrest-pair-y3`/`-y1`. Lobby Items #62: PASS on the spawner-level proof (`rc6-int-li1` li-02/li-04, `rc6-int-lipair1`; decided 2026-11-08 23:43Z); the game spawns no item in Eden's local-wireless rooms |
 
-The menu-close freeze is open: Eden saw it in `covrest-yoga-05` (Training, a diag reload path), `rc6-bg-qp3`,
-`rc6-qpf1` and `rc6-qpf2` (Quickplay's waiting area, paging the menu; after 38 and 36 clean closes, one guest core
-spinning). In `rc6-qpf2` (`1261f56c`, `diag,hang-trace`) no TrainingRooms code ran while frozen (0 hits on its import
-stubs, loop heads and function entries); the spinner is in game or SDK code. Its cause isn't found.
+The rc.6 investigation saw freezes in `covrest-yoga-05`, `rc6-bg-qp3`, `rc6-qpf1` and `rc6-qpf2`; the [later menu-close fix](RELEASE-NOTES-rc8.md#a-rare-freeze-as-the-menu-closes) removed a wait on the menu thread.
 
 ## Done: 0.2.0-rc.3 (2026-11-05)
 
@@ -70,7 +66,7 @@ The RC is M5q parity plus the new UI and clean MIT provenance; this list is not 
 | Deferred work | State at rc.1 |
 | --- | --- |
 | F9 helper promotion, fixed-seat ownership, hat/item cutover | Done in rc.5 (`p23/f9`): fixed CPU seats, slow mode on live entries, hat and item cutover, and the option-1 same-close raise from 1 to 3. |
-| Hurtboxes (HB1) | Phase 3 work; see the hitbox visualizer's current state in the README. |
+| Hurtboxes (HB1) | Deferred at rc.1; see [Hitbox Visualization](menu/display-and-controls.md#on-screen) for the supported layers. |
 | Ten hot fighters plus five separate hot hats | Done in rc.5 (`p23/hot-slots`): ten hot fighters and five hot hats, hats off the fighter budget. No separate 15-body feature. |
 | Saved/replay Mii bust provider (Q15) | No new provider or hook; the native saved-Mii selection stays. |
 | Frame/status text backgrounds (UI22) | Done in rc.5: a dark plate behind each notice text (header, short body, long body). The input-log plates stay reverted. The frame strip keeps its own backdrop. |

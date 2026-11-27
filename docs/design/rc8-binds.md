@@ -111,7 +111,7 @@ Where a choice is the operator's, this takes the sensible default and states it.
    - It's updated on each step and cleared on release. A notice it covered comes back with the time it had left.
 5. **The speeds and their order:**
    - **Training:** the five speeds Training offers: 1/4, 1/2, 2/3, x1, x1.5 (values 5, 4, 3, 1, 6).
-     - **1 Frame is left to the native menu.** It's a pause-and-step mode with its own button, not a speed.
+     - **In rc.8, 1 Frame stayed in the native menu.** The [later frame-step design](rc15-speed-frame.md) added it to the bind.
      - When Training is on 1 Frame, the pop-up shows "1 Frame", and the first step goes from x1's place.
    - **Waiting-room practice:** ~~1/4, 1/2, x1~~. **Superseded 2026-11-11 (rc.8 R2, `TASK-rc8.md` "SCOPE REOPENED"):**
      the same five as Training. 2/3 is a paced slot and x1.5 an extra world step, both local

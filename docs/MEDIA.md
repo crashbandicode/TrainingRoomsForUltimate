@@ -38,7 +38,7 @@ game's own at the top edge and are listed for a whole-frame take:
 | The recording indicator ("REC P1", top left) | `tut-record-macro`, `tut-input-drill-record` |
 | Break the Targets' count and clock (top left) | `tut-break-the-targets` |
 
-| Clip | Shows | Film, cut | Bytes | SHA256 (first 16) | Embedded in |
+| Clip | Shows | Film, cut | Bytes | SHA256 (first 16) | Pages at capture time |
 | --- | --- | --- | ---: | --- | --- |
 | `tut-menu-tour.mp4` | B + D-pad Up opens the menu, R turns through the five pages, B closes it, Mario walks | `t01-menu-tour`, 0.3–9.8 s | 1,301,566 | `866d3984b6c2c2cc` | [Getting started](guide/getting-started.md) |
 | `readme-menu-tour.gif` | The same film as an image preview: 1280×720, 10 fps, 128 colours, no dithering | cut from `tut-menu-tour.mp4` (build `c51f4d81`), its whole 9.5 s | 6,353,868 | `a107cbf0955c5f56` | Former README opening |
@@ -56,7 +56,7 @@ game's own at the top edge and are listed for a whole-frame take:
 | `tut-record-macro.mp4` | Player 1 turns red while recording; Mario's forward smash hits Link for 18.5%; the tint clears | `t08-record-macro` of the same run, 0.3–7.5 s | 3,349,706 | `9e94692216f4955e` | [Recording](guide/recording.md) |
 | `tut-mash-out.mp4` | Mash out: a mashed hold reads Good · 30f, the next one Poor · 90f | `t14-mash-out` of run `tut-cc71537c-yoga-4`, 7.5–15.0 s | 3,873,860 | `053d7299efc52285` | [Mash out](guide/mash-out.md), [Practice games](menu/fighters-and-stages.md#practice-games) |
 | `tut-break-the-targets.mp4` | Mario misses the target, then punches it; it flashes and disappears | `t15-break-the-targets` of run `tut-cc71537c-yoga-4`, 14.5–25.5 s | 4,896,200 | `3571a7f96cafadc2` | [Break the Targets](guide/break-the-targets.md) |
-| `tut-tech-practice.mp4` | Tech practice from Start: launches at 72% and untech'd landings | `t16-tech-practice` of run `tut-5df3d9dc-yoga-3`, 13.5–30.0 s | 7,511,366 | `b5a88dc8254878ed` | [Tech practice](guide/tech-practice.md) |
+| `tut-tech-practice.mp4` | Missed at 3/20; the final frame reports no solution for the next launch | `t16-tech-practice` of run `tut-5df3d9dc-yoga-3`, 13.5–30.0 s | 7,511,366 | `b5a88dc8254878ed` | [Tech practice](guide/tech-practice.md) |
 | `tut-hitbox-visualization.mp4` | Hurtbox pills on both fighters; a jab and a grab with their boxes drawn | `t18-hitbox-visualization` of the same run, 0.3–6.0 s | 2,508,502 | `3506e99fdcd8da32` | [Display & Controls](menu/display-and-controls.md#hitbox-visualization) |
 | `tut-hitbox-colour-legend.mp4` | The Hitbox Visualization checklist and its Colour legend | `t20-hitbox-colour-legend` of the same run, 0.3–5.0 s | 130,141 | `1d90ab63bde904b0` | [Display & Controls](menu/display-and-controls.md#hitbox-visualization) |
 | `tut-cpu-mash.mp4` | CPU Mash: Link answers a jab out of hitstun | `t26-cpu-mash` of the same run, 0.3–8.5 s | 4,249,903 | `00e5cd16878ebc16` | [CPU behaviour](guide/cpu-behaviour.md#mash-and-followup) |
@@ -84,7 +84,7 @@ game's own at the top edge and are listed for a whole-frame take:
 
 ## rc.15 install 4 clips (2026-11-25)
 
-19 MP4 clips of install 4's features, embedded in the [rc.15 release notes](RELEASE-NOTES-rc15.md#install-4).
+Nineteen clips were recorded for install 4; the [release notes](RELEASE-NOTES-rc15.md#install-4) show the nine clean takes and describe the ten whose recordings carried a test banner.
 
 - **Run/build:** Eden runs `i4-media-qp-yoga-01` (the Quick Play capture) and `i4-media-yoga-01` (Training), the
   installed build `a945b0c1` with the card's 21 plugins; Eden only, not checked on the console.
@@ -124,8 +124,7 @@ game's own at the top edge and are listed for a whole-frame take:
 ## rc.15 Stage tech practice (2026-11-17)
 
 `media/rc15-stage-tech.gif` shows the crosshair on a floor spot, the launch, shield input on the frame strip,
-then "Perfect · timing unavailable · In place · 1/10 · streak 1". It is embedded in
-[Fighters & Stages](menu/fighters-and-stages.md#stage-tech-practice).
+then "Perfect · timing unavailable · In place · 1/10 · streak 1". For the current procedure see [Tech practice](guide/tech-practice.md).
 
 - **Run/build:** `rc15-tech-ui-55b20f59-reset-v2-boot1`, rc.15 `55b20f59`; Eden, untested on hardware.
 - **Size:** 1280×720, 22 frames, 3.32 s, 4,396,682 bytes.
@@ -140,8 +139,7 @@ The smaller evidence GIF was not enlarged. The raw take and review receipt stay 
 This shared preview does not show the session-choice list, Random surface selection, variable edits,
 Set / Random / Auto changes or the completed summary; dedicated per-option clips remain a capture gap.
 
-Since 2026-11-13 the README shows one GIF per menu page; the [menu docs](menu/) and [guides](guide/) embed the rest.
-The "Embedded in" column of the older sections records where a clip was placed when it was made.
+The [README](../README.md) now pairs feature clips with a menu tour of stills. “Embedded in” entries below record the placements at the time of capture, not a current link index.
 
 ## rc.13 clips (2026-11-14, untested on hardware)
 

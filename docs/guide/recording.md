@@ -58,7 +58,7 @@
 | Include a captured move's setup | Hold ZL or ZR (GameCube: Z), press Y, then release the modifier before previewing. |
 | Compare two Vault captures | From Latest, ZR + X swaps captures if Previous exists; this resets the cut. |
 | Preview without saving | X previews a macro or capture; X or B stops playback or its tail. |
-| Leave without saving | B closes the idle editor. |
+| Leave without saving | B closes the idle editor; both fighters return to their original spots without sliding. |
 | The editor names a different fighter | Press ZL+L for Player 1 or ZL+R for CPU; press again to switch back. |
-| X refuses a mid-action capture | Select In and press Y; [if X still refuses](../CURRENT-RELEASE.md#known-issues), deselect In with L. |
+| X refuses a mid-action capture | Select In, press Y to snap to a move start, then X to preview. |
 | Keep the result | A names a new file; the original stays. Combos crop by link, drills by step. |

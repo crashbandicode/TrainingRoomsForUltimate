@@ -25,5 +25,5 @@
 | To | Do this |
 |---|---|
 | <a id='kirby-hats'></a>Choose hats | Open **Kirby Hats**, switch roles with ZR, then add hats in order. |
-| Change your hat | With the left stick centred, hold B and click the left stick. |
-| Change the CPU Kirby's hat | Keep B held and click the right stick instead. |
+| Change your hat | With the left stick centred, hold Special and click the left stick. |
+| Change the CPU Kirby's hat | Keep Special held and click the right stick instead. |

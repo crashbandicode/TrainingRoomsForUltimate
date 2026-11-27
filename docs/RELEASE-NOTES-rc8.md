@@ -1,8 +1,7 @@
-# rc.8 (draft)
+# rc.8
 
-Notes for players. rc.8 is the internal name; the release's version name is set when it ships. Until then the menu's
-footer shows this build as `0.2.0-rc.6 · rc8` and the commit it was built from (below). This draft lists what the rc.8
-head `3f9d61dd` contains for players, plus the CPU pilot plugin's 0.2.3, which ships beside it. How to use recording is
+These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer identified that build as
+`0.2.0-rc.6 · rc8` followed by its commit. How to use recording is
 [RECORDING.md](guide/recording.md), the frame strip is [FRAME-STRIP.md](guide/frame-strip.md), and the pictures are the list in
 [MEDIA.md](MEDIA.md).
 

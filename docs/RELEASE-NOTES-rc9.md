@@ -1,7 +1,6 @@
-# rc.9 (draft)
+# rc.9
 
-Notes for players. rc.9 is the internal name; the release's version name is set when it ships. Until then the menu's
-footer shows this build as `0.2.0-rc.6 · rc9` and the commit it was built from. rc.9 fixes the places where a
+The rc.9 menu footer read `0.2.0-rc.6 · rc9` followed by the build's commit. rc.9 fixes the places where a
 TrainingRooms shortcut and another plugin's shortcut on the same buttons both fired, and it ships beside new builds of
 three of those plugins. The fix IDs (C3, C4, …) are the numbers of the conflict survey the fixes came from. What rc.8
 changed is [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md).
