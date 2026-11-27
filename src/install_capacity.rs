@@ -16,7 +16,7 @@ use crate::model::sites::{self, Site};
 use crate::model::{sites_pkg3, sites_pkg4, sites_pkg6, sites_u4, sites_ui};
 
 /// The feature reports the boot writes, at most (`runtime::boot`, its `features` array: a compile-time check there).
-pub const MAX_FEATURE_REPORTS: usize = 34;
+pub const MAX_FEATURE_REPORTS: usize = 35;
 /// The longest feature name in a report.
 pub const MAX_FEATURE_NAME: usize = 32;
 /// The longest `reason=` value a feature report names (a provider's state, or `site:<row>`).
@@ -272,6 +272,7 @@ mod tests {
         for feature in [
             sites::Feature::Training,
             sites::Feature::CpuShieldDamage,
+            sites::Feature::NroLoad,
             sites::Feature::NamedMacros,
             sites::Feature::InputDisplay,
             sites::Feature::UiTexture,

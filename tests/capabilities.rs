@@ -183,6 +183,7 @@ fn unit_of_hook(f: &Func) -> Option<Feature> {
     }
     match f.module.as_str() {
         "input_delay" => Some(Feature::InputDelay),
+        "nro_load" => Some(Feature::NroLoad),
         "input_display" => Some(Feature::InputDisplay),
         "hitbox" => Some(Feature::Hitbox),
         "lra_reset" => Some(Feature::LraReset),

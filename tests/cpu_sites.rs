@@ -436,10 +436,11 @@ fn the_install_line_of_every_site_and_feature_is_whole_and_ends_with_its_result(
     let names = [
         "input_delay", "lra_reset", "stage_hazards", "reset_hub", "cpu_core", "cpu_defence", "cpu_ledge", "cpu_tech", "cpu_shield",
         "cpu_mash", "cpu_shield_damage", "cpu_camera", "cpu_common", "state_core", "chords", "input_display", "recording", "notices", "ui",
-        "p1_cpu", "ui_texture", "named_macros", "live_replay", "macros_port", "roster",
+        "p1_cpu", "ui_texture", "named_macros", "live_replay", "macros_port", "roster", "nro_load",
     ];
     assert_eq!(Feature::CpuShieldDamage.name(), "cpu_shield_damage");
     assert_eq!(Feature::CpuCamera.name(), "cpu_camera");
+    assert_eq!(Feature::NroLoad.name(), "nro_load");
     let features: Vec<FeatureReport> = names
         .iter()
         .map(|feature| FeatureReport { feature, installed: false, reason: Some("roster=unavailable_until_cycle_lands menu_app=screens_installed"), site: None })
@@ -466,5 +467,6 @@ fn the_install_line_of_every_site_and_feature_is_whole_and_ends_with_its_result(
     assert!(text.ends_with(" migration=partial result=installed heap_allocations=0"), "{}", &text[text.len() - 120..]);
     assert!(text.contains(" cpu_shield_damage=not_installed reason=") && text.contains(" cpu_camera=not_installed reason="));
     assert!(text.contains(" common_params_fill=") && text.contains(" stage_table="));
+    assert!(text.contains(" nro_loaded=") && text.contains(" nro_load="));
     assert_eq!(text, line.to_string());
 }

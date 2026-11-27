@@ -61,6 +61,10 @@ pub const STICK_Y_NO_CLAMP_HOOK_OFFSET: usize = 0x200_1610;
 pub const UTILITY_GET_CATEGORY_OFFSET: usize = 0x15c_dfe0;
 pub const UTILITY_GET_KIND_OFFSET: usize = 0x15c_dff0;
 
+/// On the success path after the game's only `nn::ro::LoadModule` call, `add x8, x25, #0x132`:
+/// x25 is the loaded `nn::ro::Module`, and only the result-zero branch reaches this site.
+pub const NRO_LOADED_OFFSET: usize = 0x22b_6cc8;
+
 /// The game's `CommonParams` filler (`from_prc(this, params)`, a 70 KB function that stores each field the parameter
 /// file names into `this`): the site is its `mov x19, x0`, where x0 is the object. 13.0.5 stores `shield_damage_mul` at
 /// `this + 0x174` (`shield_dec1` at 0x16c, `shield_recovery1` at 0x170, `shield_damage_add` at 0x178). The object is
@@ -91,7 +95,7 @@ pub const CHANGE_ACTIVE_CAMERA_OFFSET: usize = 0x4e_e480;
 pub const CAMERA_FUNCTOR_VTABLE: usize = 0x4f7_4ca0;
 pub const CAMERA_MODE_FIELD: usize = 0x4;
 
-pub static SITES_PKG2: [Site; 55] = include!(concat!(env!("OUT_DIR"), "/tables/sites_pkg2.SITES_PKG2.rs"));
+pub static SITES_PKG2: [Site; 56] = include!(concat!(env!("OUT_DIR"), "/tables/sites_pkg2.SITES_PKG2.rs"));
 
 /// A site in the `common` script module (`lua2cpp_common.nro`), found by symbol when that module loads and
 /// guarded against the 64 bytes of the owned 13.0.5 module (`tests/cpu_common.rs` reads them from

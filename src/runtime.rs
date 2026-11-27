@@ -27,6 +27,7 @@ mod log_file;
 mod lobby;
 mod macros;
 mod mii;
+mod nro_load;
 mod p1;
 mod published;
 mod roster;

@@ -109,6 +109,8 @@ pub mod lobby_flag;
 pub mod migration_run;
 #[path = "model/notify.rs"]
 pub mod notify;
+#[path = "model/nro_load.rs"]
+pub mod nro_load;
 #[path = "model/recording.rs"]
 pub mod recording;
 #[path = "model/trim.rs"]

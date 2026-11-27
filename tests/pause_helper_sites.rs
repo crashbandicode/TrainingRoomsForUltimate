@@ -23,7 +23,7 @@ fn u64_at(d: &[u8], at: usize) -> u64 {
 }
 
 /// The target of a direct branch word at `pc`: B, BL, B.cond, CBZ/CBNZ, TBZ/TBNZ.
-fn target(pc: u64, w: u32) -> Option<u64> {
+pub(crate) fn target(pc: u64, w: u32) -> Option<u64> {
     let rel = |imm: u32, bits: u32| ((imm << (32 - bits)) as i32 >> (32 - bits)) as i64 * 4;
     let off = match w {
         w if w >> 26 == 0b000101 || w >> 26 == 0b100101 => rel(w & 0x03ff_ffff, 26),
@@ -44,7 +44,7 @@ fn exec(d: &[u8]) -> Vec<(usize, u64, usize)> {
         .collect()
 }
 
-fn word(d: &[u8], at: u64) -> u32 {
+pub(crate) fn word(d: &[u8], at: u64) -> u32 {
     let (off, va, _) = exec(d).into_iter().find(|(_, va, size)| (*va..*va + *size as u64).contains(&at)).unwrap();
     let at = off + (at - va) as usize;
     u32::from_le_bytes(d[at..at + 4].try_into().unwrap())
