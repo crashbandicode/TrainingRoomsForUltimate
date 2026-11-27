@@ -37,11 +37,12 @@ column below, and implementation may begin. The remaining answers arrived on Nov
 | Q11 | P1 CPU fallback without the pilot | fallback rows, as drawn | **as recommended** |
 | Q12 | Direction grid weights | weight digit on the chip | **as recommended** |
 | Q14 | Grid paging | 4 × 8 items, 4 × 4 stages (the fork) | **B: denser, items and stages** (stages added 2026-11-02); in handheld mode 4 × 4 pages |
-| Q15 | Mii rows | list with the bust where one exists | **as recommended** |
+| Q15 | Mii rows | list with the bust where one exists | Approved November 1. [Text-only saved/replay rows, November 5](ROADMAP.md#deferred-operator-decision-2026-11-03). |
 | Q16 | Fighter portraits and mods | read at run time, like stages | **as recommended** |
-| Q17 | Which chips show the game's DI / SDI visual | DI and SDI only | **as recommended;** the SDI spark's white streaks drawn longer, closer to a match (×2.0 confirmed 2026-11-02) |
+| Q17 | Which chips show the game's DI / SDI visual | DI and SDI only | As recommended. Longer white streaks bring the SDI spark closer to a match. |
+| Q17 |  |  | Stretch ×2.0 confirmed 2026-11-02. |
 | Q18 | When a CPU setting change takes effect | follow the fork: apply at the next CPU frame | **as recommended (A)** |
-| S1 | Five import details | rename to `settings.json`, import both INIs, the rest as proposed | **as recommended, except item 3:** `replay_captures/` is imported in full (it is the Replay Window's crop source) |
+| S1 | Five import details | rename to `settings.json`, import both INIs, the rest as proposed | As recommended except item 3. Import all of `replay_captures/`, the Replay Window's crop source. |
 | S2 | Corrupt settings file | keep a copy, load field by field | **as recommended** |
 | B1 | Plugin name | `training_rooms` | **as recommended** |
 | B2 | Panic policy | log it, no pop-up | **as recommended** |
@@ -50,19 +51,22 @@ column below, and implementation may begin. The remaining answers arrived on Nov
 | B5 | Input playback and the CPU settings | the recording wins | **the recording wins by default;** an advanced row lets the settings override it (default Off) |
 | B6 | Ice Climbers state | one state per fighter | **as recommended** |
 | B7 | In / Out for Airdodge and Shield Tilt | toward the opponent, everywhere | **as recommended** |
-| B8 | Behaviour changes from the fork | accept the batch | **as recommended, except:** SDI not set means no SDI (the fork's rule stays); the respawn line becomes a toggle |
+| B8 | Behaviour changes from the fork | accept the batch | As recommended, with two exceptions. No SDI setting means no SDI, preserving the fork's rule. |
+| B8 |  |  | Respawn becomes a toggle. |
 | B9 | Upstream developer-only code | drop it from the shipped build | **Developer page** (with Q8): shipped, hidden unless the INI enables it |
 | B10 | README media | reuse the GIFs that show no menu | **as recommended** |
-| B11 | Ledge options changed while the CPU is already on the ledge (fork and clean room) | re-roll on menu change, like SDI | **as recommended** (2026-11-02): re-roll on menu change, in both trees (the fork gets it in its next build) |
+| B11 | Ledge options changed while the CPU is already on the ledge (fork and clean room) | re-roll on menu change, like SDI | 2026-11-02: both trees re-roll on menu change. The fork gets this in its next build. |
 
 ## Menu
 
-The [November 1–2 decision table](#decisions-for-the-operator) records the outcome for each recommendation below.
+| Menu recommendations | Recorded outcomes |
+| --- | --- |
+| Q1–Q18 | [November 1–2 decision table](#decisions-for-the-operator) |
 
 ### Q1 · Number of pages
 
 Five pages, four (Saves and Display & Controls merged) or six (Stages & Lobby split out)?
-**Original recommendation: five.** Each page has one theme, and no page is very long or nearly empty. Cost: none; the
+**Q1 proposal ([November 1 outcome](#decisions-for-the-operator)): five.** Each page has one theme, and no page is very long or nearly empty. Cost: none; the
 mockups already show five.
 
 ![Q1 pages](decisions/01-pages.png)
@@ -70,7 +74,7 @@ mockups already show five.
 ### Q2 · Dropdown input
 
 Should Left / Right change a dropdown's value in place, or must A open the list first?
-**Original recommendation: in place, as drawn.** A still opens the full list. It is one press per change instead of
+**Q2 proposal ([November 1 outcome](#decisions-for-the-operator)): in place, as drawn.** A still opens the full list. It is one press per change instead of
 three. Cost: a stray Left / Right changes the value.
 
 ![Q2 dropdown](decisions/02-dropdown.png)
@@ -79,7 +83,7 @@ three. Cost: a stray Left / Right changes the value.
 
 Aerial, fast-fall, throw, pummel and ledge delays, OoS offset, reaction time and the slot sets: keep them as
 checklists, or use a min–max slider?
-**Original recommendation: checklists.** They keep today's meaning, so saved files load unchanged. A range slider
+**Q3 proposal ([November 1 outcome](#decisions-for-the-operator)): checklists.** They keep today's meaning, so saved files load unchanged. A range slider
 cannot express a set like {0, 5, 10}. Cost: a checklist is a longer popup than a slider.
 
 ![Q3 delays](decisions/03-delays.png)
@@ -89,7 +93,7 @@ cannot express a set like {0, 5, 10}. Cost: a checklist is a longer popup than a
 ### Q4 · Situation overrides, Button chords, Swap groups
 
 Should these three be sub-screens (one row each), or should all their rows sit on the page?
-**Original recommendation: sub-screens.** Putting the rows on the page adds 12 rows to CPU, 6 to Fighters & Stages
+**Q4 proposal ([November 1 outcome](#decisions-for-the-operator)): sub-screens.** Putting the rows on the page adds 12 rows to CPU, 6 to Fighters & Stages
 and 5 to Display & Controls. Cost: one more press (A) to reach them.
 
 ![Q4 sub-screens](decisions/04-subscreens.png)
@@ -97,7 +101,7 @@ and 5 to Display & Controls. Cost: one more press (A) to reach them.
 ### Q5 · First page on open
 
 Should the menu open on the last page used (today's behaviour) or always on CPU?
-**Original recommendation: the last page used.** A drill loop (record, test, adjust) comes back to the same page.
+**Q5 proposal ([November 2 outcome](#decisions-for-the-operator)): the last page used.** A drill loop (record, test, adjust) comes back to the same page.
 Cost: none; this is today's behaviour.
 
 ![Q5 first page](decisions/05-first-page.png)
@@ -108,7 +112,7 @@ Cost: none; this is today's behaviour.
 
 Keep this legacy row for saves made before the fork's item snapshot, or convert those saves once at import
 and drop the row?
-**Original recommendation: keep it for now.** It carries no risk, and new saves never use it. Revisit once the import
+**Q6 proposal ([November 1 outcome](#decisions-for-the-operator)): keep it for now.** It carries no risk, and new saves never use it. Revisit once the import
 has been tested on real cards. Cost: one rarely used row on Saves.
 
 ![Q6 item on load](decisions/06-item-on-load.png)
@@ -119,7 +123,7 @@ has been tested on real cards. Cost: one rarely used row on Saves.
 
 Should there be a menu toggle that writes `replay_capture.ini` and matches the Deluxe Plugins row, or should
 the setting stay INI / Deluxe only?
-**Original recommendation: add the toggle.** It can then be changed in game, and all three places always agree. Cost:
+**Q7 proposal ([November 1 outcome](#decisions-for-the-operator)): add the toggle.** It can then be changed in game, and all three places always agree. Cost:
 one row, and one small INI write when the row changes.
 
 ![Q7 replay capture](decisions/07-replay-capture.png)
@@ -127,7 +131,7 @@ one row, and one small INI write when the row changes.
 ### Q8 · Preload Samples
 
 Ship this diagnostics row under *Loading (advanced)*, or put it in the `diag` build only?
-**Original recommendation: diag build only.** Players never need it, and the playbook's `diag` feature exists for
+**Q8 proposal ([November 1 outcome](#decisions-for-the-operator)): diag build only.** Players never need it, and the playbook's `diag` feature exists for
 exactly this. Cost: measuring on a card then needs the diag build.
 
 ![Q8 preload samples](decisions/08-preload-samples.png)
@@ -138,7 +142,7 @@ exactly this. Cost: measuring on a card then needs the diag build.
 
 Show the INI shortcuts read-only in the menu, or make them editable there with the INI as the file of
 record? (This also answers `PROVENANCE.md` open question 5.)
-**Original recommendation: read-only.** No second chord editor is needed, and the behaviour matches the fork
+**Q9 proposal ([November 1 outcome](#decisions-for-the-operator)): read-only.** No second chord editor is needed, and the behaviour matches the fork
 (restart to apply). Cost: changing a shortcut means editing `button_config.ini`.
 
 ![Q9 menu shortcuts](decisions/09-menu-shortcuts.png)
@@ -148,7 +152,7 @@ record? (This also answers `PROVENANCE.md` open question 5.)
 ### Q10 · Help text
 
 Keep one help line at the bottom, or use a two-line panel?
-**Original recommendation: two lines.** The fork's longer help texts (the group rows, for example) then fit without
+**Q10 proposal ([November 1 outcome](#decisions-for-the-operator)): two lines.** The fork's longer help texts (the group rows, for example) then fit without
 being cut. Cost: the item list shows one row fewer.
 
 ![Q10 help text](decisions/10-help-text.png)
@@ -157,7 +161,7 @@ being cut. Cost: the item list shows one row fewer.
 
 Show the two hidden fallback rows (as proposed), make it INI only, or drop the TM-side control and require
 the pilot?
-**Original recommendation: the fallback rows.** P1 control still works on a card without the pilot. With the pilot
+**Q11 proposal ([November 1 outcome](#decisions-for-the-operator)): the fallback rows.** P1 control still works on a card without the pilot. With the pilot
 installed, only the info row shows. Cost: two rows, shown only when the pilot is absent.
 
 ![Q11 P1 fallback](decisions/11-p1-fallback.png)
@@ -165,7 +169,7 @@ installed, only the info row shows. Cost: two rows, shown only when the pilot is
 ### Q12 · Direction grid weights
 
 Show a weight digit on each selected chip (today's counts), or use plain on/off chips with an even pick?
-**Original recommendation: weights.** They keep today's semantics, and saved files carry the counts. Cost: a small
+**Q12 proposal ([November 1 outcome](#decisions-for-the-operator)): weights.** They keep today's semantics, and saved files carry the counts. Cost: a small
 badge per chip, and A adds weight instead of only toggling.
 
 ![Q12 weights](decisions/12-direction-weights.png)
@@ -174,26 +178,30 @@ badge per chip, and A adds weight instead of only toggling.
 
 Keep items at 4 × 8 per page (two pages) and stages at 4 × 4 (eight pages), as the fork does, or use denser
 pages?
-**Original recommendation: as the fork.** This layout is tested on the console, and the item names stay readable.
+**Q14 proposal ([November 1 outcome](#decisions-for-the-operator)): as the fork.** This layout is tested on the console, and the item names stay readable.
 Cost: L / R to reach items 33–38.
 
 ![Q14 paging](decisions/14-grid-paging.png)
 
-**Decided 2026-11-01: B, denser, with a handheld rule.** Docked: all 38 items on one page. Handheld: three pages. Stages (operator, 2026-11-02): the denser paging applies to the stage grid too (N5).
+**Decided 2026-11-01: B, denser, with a handheld rule.** The November design placed 38 items on one docked page or three handheld pages. Stages (operator, 2026-11-02): the denser paging applies to the stage grid too (N5).
+
+At the November 27 audit the [shipped item grid](../src/model/menu/grid.rs) held 39 items, or 16, 16 and 7 in handheld mode.
 
 ### Q15 · Mii rows
 
 Lists with the fork's bust thumbnail beside each saved Mii where one exists, or text only?
-**Original recommendation: busts where they exist.** They make saved Miis easy to tell apart, and the fork already
+**Q15 proposal ([November 1 outcome](#decisions-for-the-operator)): busts where they exist.** They make saved Miis easy to tell apart, and the fork already
 makes them. Cost: one small texture per visible Mii. (The picture uses a neutral silhouette in place of a
 bust.)
+
+On November 5, the operator kept saved and replay Mii rows text-only. The native selector supplies the picture. [Q15 outcome](ROADMAP.md#deferred-operator-decision-2026-11-03)
 
 ![Q15 Mii rows](decisions/15-mii-rows.png)
 
 ### Q16 · Fighter portraits and mods
 
 - Should the portrait grid read each fighter's own UI portrait from the game at run time, as the stage grid does (so character and costume mods show), or keep fixed stock icons as the fork does?
-- **Original recommendation: read at run time, falling back to a text tile.**
+- **Q16 proposal ([November 1 outcome](#decisions-for-the-operator)): read at run time, falling back to a text tile.**
 - This is the same rule as stages and DI / SDI chips: nothing is baked or committed, and mods show.
 - Cost: the run-time read has the same open unknowns as the stage thumbnails (`SPEC-core-07` §4.5, U1–U8), plus choosing the right costume, so it needs one more development probe.
 
@@ -203,7 +211,8 @@ bust.)
 
 Should only the DI and SDI chips show the game's own visual, with Airdodge Direction and Shield Tilt keeping
 the clean room's arrows?
-**Original recommendation: yes, DI and SDI only.** The game's visual shows launch influence; on an air-dodge or shield
+
+**Q17 proposal ([November 1 outcome](#decisions-for-the-operator)): yes, DI and SDI only.** The game's visual shows launch influence; on an air-dodge or shield
 chip it would suggest something those options do not do. Cost: none; this is how the mockups are drawn.
 
 ![Q17 chips](decisions/17-di-sdi-chips.png)
@@ -216,11 +225,11 @@ chip it would suggest something those options do not do. Cost: none; this is how
 - A. Apply at the next CPU frame. The roll holds until reset or another change to the row.
 - B. Apply as in A and roll a new SDI direction every hitlag episode (`SPEC-cpu-02` questions 1 and 9).
 - C. Keep reset-only and label the row "applies on next reset".
-- **Original recommendation: A, follow the fork.**
+- **Q18 proposal ([November 1 outcome](#decisions-for-the-operator)): A, follow the fork.**
 - It is built and was checked in Eden (the SDI Up → In change, and the Shield Tilt change, applied with no reset).
 - The menu then means the same in both plugins, and Shield Tilt and the other per-reset rolls follow the same rule.
 - Cost: with two or more directions selected, SDI keeps one direction until the next reset or change, which upstream's own source marks as a bug.
-- B would vary it every hit at the price of one roll per hitlag episode and a parity difference from the fork; it stays open if you want it.
+- B would vary it every hit at the price of one roll per hitlag episode and a parity difference from the fork. Q18 selected A on November 1.
 
 ![Q18 apply on change](decisions/18-apply-on-change.png)
 
@@ -229,7 +238,9 @@ passed on the patch's own builds; `PATCH.patch` is in the same folder); the pict
 
 ## Files
 
-The [November 1 decision table](#decisions-for-the-operator) records the S1 and S2 outcomes.
+| File decisions | Recorded outcomes |
+| --- | --- |
+| S1 and S2 | [November 1 decision table](#decisions-for-the-operator) |
 
 ### S1 · Five import details (`SPEC-core-08` §10)
 
@@ -257,19 +268,22 @@ Corrected 2026-11-02: the source is `training_modpack_menu.conf`; `training_modp
 ### S2 · Corrupt settings file (`SPEC-core-04` question 2)
 
 Delete the file and start from defaults (upstream), or keep a renamed copy and load it field by field?
-**Original recommendation: keep a copy, default per field.** One bad field no longer wipes every setting. Cost: one
+**S2 proposal ([November 1 outcome](#decisions-for-the-operator)): keep a copy, default per field.** One bad field no longer wipes every setting. Cost: one
 renamed file on the card until the player deletes it.
 
 ![S2 corrupt settings](decisions/S2-corrupt-settings.png)
 
 ## Behaviour and product
 
-The [November 1–2 decision table](#decisions-for-the-operator) records the B1–B11 outcomes and the November 25 reversal for B4.
+| Decisions | Recorded outcomes |
+| --- | --- |
+| B1–B11 | [November 1–2 decision table](#decisions-for-the-operator) |
+| B4 | November 25 reversal recorded in the same table. |
 
 ### B1 · Plugin name (`SPEC-core-01` question 6)
 
 Name the plugin `training_rooms` (`libtraining_rooms.nro`), or keep `training_modpack`?
-**Original recommendation: `training_rooms`.** The two plugins can then be told apart on a card and in logs. They must
+**B1 proposal ([November 1 outcome](#decisions-for-the-operator)): `training_rooms`.** The two plugins can then be told apart on a card and in logs. They must
 never be installed together, because they hook the same sites. Cost: none.
 
 ![B1 plugin name](decisions/B1-plugin-name.png)
@@ -278,7 +292,7 @@ never be installed together, because they hook the same sites. Cost: none.
 
 Show the error pop-up on a panic (upstream: the game is unusable until it is closed), or write the panic to
 the diagnostics file and the Skyline log with no pop-up?
-**Original recommendation: log it, no pop-up**, as the playbook's plugins do. Cost: the player sees no message on
+**B2 proposal ([November 1 outcome](#decisions-for-the-operator)): log it, no pop-up**, as the playbook's plugins do. Cost: the player sees no message on
 screen; the reason is in the logs.
 
 ![B2 panic](decisions/B2-panic-policy.png)
@@ -288,7 +302,7 @@ screen; the reason is in the logs.
 When another mod ships its own `info_training` layout, should the plugin inject its layout anyway and
 document the conflict, or detect it and skip injection (the other mod's HUD stays and our menu is off)?
 
-- **Original recommendation: inject anyway, document it.** The install line notes the other layout. Cost: that mod's
+- **B3 proposal ([November 1 outcome](#decisions-for-the-operator)): inject anyway, document it.** The install line notes the other layout. Cost: that mod's
 training HUD does not show while this plugin is installed.
 
 ![B3 layout mods](decisions/B3-layout-mods.png)
@@ -296,7 +310,7 @@ training HUD does not show while this plugin is installed.
 ### B4 · P1 driven by an AI (`SPEC-cpu-01` question 7, `SPEC-input-01` question 7)
 
 - When the pilot or the fallback drives P1: should the CPU settings (Mash, DI, SDI, ledge, tech, shield …) apply to P1 too, and what should Record do?
-- **Original recommendation: the CPU settings apply to the CPU role only, and Record is refused with a notice.**
+- **B4 proposal ([November 1 outcome](#decisions-for-the-operator)): the CPU settings apply to the CPU role only, and Record is refused with a notice.**
 - Two drivers never fight over P1, and no new game site is needed.
 - Cost: recording the AI's line would need the alternative (reading P1's controller slot).
 
@@ -309,7 +323,7 @@ The CPU-settings half stands.
 
 While a recording plays on the CPU, should the DI, SDI, air-dodge, tech and throw settings override it
 (upstream), or should the recording win?
-**Original recommendation: the recording wins**, the same way shield and stick already yield to playback. Cost: none;
+**B5 proposal ([November 1 outcome](#decisions-for-the-operator)): the recording wins**, the same way shield and stick already yield to playback. Cost: none;
 the settings apply again when playback ends.
 
 ![B5 playback](decisions/B5-playback-vs-settings.png)
@@ -319,7 +333,7 @@ the settings apply again when playback ends.
 ### B6 · Ice Climbers state (cross-cutting; `SPEC-cpu-02` … `-06` question 4 or 5)
 
 Should Popo and Nana share one set of CPU counters and cases (upstream), or have one each?
-**Original recommendation: one per fighter.** Nana's SDI count, DI case and delays then stop leaking into Popo's.
+**B6 proposal ([November 1 outcome](#decisions-for-the-operator)): one per fighter.** Nana's SDI count, DI case and delays then stop leaking into Popo's.
 Cost: a few bytes per CPU fighter.
 
 ![B6 per fighter](decisions/B6-per-fighter-state.png)
@@ -328,7 +342,7 @@ Cost: a few bytes per CPU fighter.
 
 - Upstream's air dodge mirrors only when the player is on the CPU's right, and its shield tilt is absolute.
 - Should both use the opponent-relative rule that DI and SDI use?
-- **Original recommendation: yes, toward the opponent everywhere.**
+- **B7 proposal ([November 1 outcome](#decisions-for-the-operator)): yes, toward the opponent everywhere.**
 - The direction grid labels its chips In and Out, so they should mean the same on every row and on both sides.
 - Cost: a visible change against the fork when the player stands on the CPU's left.
 
@@ -338,7 +352,8 @@ Cost: a few bytes per CPU fighter.
 
 The specs recommend thirteen small user-visible fixes (top of the picture) and six behaviours to keep as
 the fork has them (bottom).
-**Original recommendation: accept the batch.** Any single line can be reversed by naming it. Each line's spec
+
+**B8 proposal ([November 1 outcome](#decisions-for-the-operator)): accept the batch.** Any single line can be reversed by naming it. Each line's spec
 question has the details. Cost: each fix is a small parity change against the fork, and the release notes
 list them.
 
@@ -351,7 +366,7 @@ list them.
 Drop `dev_config`, the debug hooks and `raygun_printer` from the shipped build, or keep them as diag-only
 behaviour? Should `training_mod_sync` (36 lines of lock helpers) be kept, or should the code use
 `parking_lot` directly?
-**Original recommendation: drop them, and add a diag version only if a developer asks; use `parking_lot` directly.**
+**B9 proposal ([November 1 outcome](#decisions-for-the-operator)): drop them, and add a diag version only if a developer asks; use `parking_lot` directly.**
 Cost: none for players.
 
 ![B9 dev code](decisions/B9-dev-only-code.png)
@@ -362,7 +377,7 @@ Cost: none for players.
 
 Reuse the fork's walkthrough GIFs now (some show the old menu), reuse only those without the menu, or ship
 no media until the new menu is built?
-**Original recommendation: reuse the GIFs that show no menu now, and re-record the menu GIFs after the build.**
+**B10 proposal ([November 1 outcome](#decisions-for-the-operator)): reuse the GIFs that show no menu now, and re-record the menu GIFs after the build.**
 Cost: the README has no menu pictures until then.
 
 ![B10 README media](decisions/B10-readme-media.png)
@@ -374,7 +389,7 @@ Cost: the README has no menu pictures until then.
 - The throw option behaves the same way for a CPU already holding someone.
 - The fork's SDI and Shield Tilt rolls no longer have this problem (Q18).
 - Options: (a) re-roll the ledge options (and the throw options) when the menu changes them, like SDI Direction: the CPU takes the new option during the same hang; (b) apply on the next ledge grab, which is what the fork does today and what `SPEC-cpu-03` currently says.
-- **Original recommendation: (a).**
+- **B11 proposal ([November 2 outcome](#decisions-for-the-operator)): (a).**
 - The menu then does what it says without a second hang, and it follows the same rule as Q18.
 - Cost: one more roll cleared on a menu change; a CPU already hanging can act differently the moment the row changes; the fork keeps (b) until it gets the same change.
 - Source: the fork's `c1162/di-sdi-apply/PROGRESS.md`, "For the primary" item 2.
@@ -396,38 +411,72 @@ Cost: the README has no menu pictures until then.
 | Storage root and import | `sd:/ultimate/TrainingRooms/`, one-time copy of the fork's data | `specs/SPEC-core-08`; `MENU-DRAFT.md` §4 (also closes `SPEC-core-01` Q2, `SPEC-core-04` Q3, `SPEC-input-01` Q15, `SPEC-state-01` Q9) |
 | Q13 grid picture source | stage thumbnails read at run time, never baked; item grid uses the fork's own icons | `MENU-DRAFT.md` draft 5; `SPEC-core-07` §4.5 |
 | Placeholder chips (Kirby Hats, Solo Popo, items) | neutral placeholder until the icons are designed | `MENU-DRAFT.md` draft 4 |
+| Shipped item pictures | Approved game assets | [Pane definitions](../src/model/ui/panes.rs) |
+| Shipped hat and Solo Popo chips | Fighter portraits for hats, corner S marks for Solo Popo | [Grid definitions](../src/model/menu/grid.rs) |
 | Origin tags on screens | removed | `docs/MENU-PROPOSAL.md` (removed after v0.2.0-rc.1; see that tag) v6 |
-| DI / SDI chips | the game's own visual, read at run time | `MENU-DRAFT.md` draft 6; `SPEC-core-07` §4.6 (Q17 asks only whether Airdodge / Shield Tilt keep the arrows) |
-| Who drives P1 | the standalone CPU pilot owns P1; only the fallback is open (Q11) | `MENU-DRAFT.md` §2/§3; `specs/INDEX-cpu.md` |
+| DI / SDI chips | the game's own visual, read at run time | `MENU-DRAFT.md` draft 6; `SPEC-core-07` §4.6. |
+| DI / SDI chips |  | Q17 concerns only arrows for Airdodge and Shield Tilt. |
+| Who drives P1 | Standalone CPU pilot owns P1; Q11 approved fallback rows on 2026-11-01. | `MENU-DRAFT.md` §2/§3; `specs/INDEX-cpu.md` |
 | Menu shortcuts (`PROVENANCE.md` question 5) | merged into Q9 | above |
 | Upstream HEAD `077a8e43` inverted reset gate | not adopted | `SPEC-cpu-07` Q5, `SPEC-cpu-01` Q8 |
 | Auto-update, Menu Open Start Press | dropped from the menu; old keys read and ignored | `MENU-DRAFT.md` §3; `SPEC-core-02` Q4 |
-| Pushing `review/menu-proposal` | docs-only pushes allowed (standing order); any other push, the Forgejo release and the Switch install still need an explicit order | `TRAININGROOMS-HANDOFF.md` (removed after v0.2.0-rc.1; see that tag) |
+| Pushing `review/menu-proposal` | Standing order allowed docs-only pushes. | `TRAININGROOMS-HANDOFF.md` (removed after v0.2.0-rc.1; see that tag) |
+| Pushing `review/menu-proposal` | All other pushes, Forgejo release and Switch install required an explicit order. |  |
 
 ## Left to the lead
 
-The remaining *Open questions* in `specs/` are technical: site guards, hook placement, measurements, RNG
-source, cost-only changes and Eden rows to run. Each has a written recommendation that stands unless the
-operator objects; they are not repeated here. The operator-facing ones are pulled into Q18 and S1–B11 above.
+| Questions in `specs/` | Disposition |
+| --- | --- |
+| Site guards, hook placement, measurements, RNG source, cost-only changes and Eden rows | Technical recommendations stand unless the operator objects; omitted here. |
+| Operator-facing questions | Covered above in Q18 and S1–B11. |
 
 ## New requirements from the answers
+
+| # | Requirement | Where | Mockup |
+| --- | --- | --- | --- |
+| N1 | **Developer page.** Sixth page, after Display & Controls. | `SPEC-core-01`, `SPEC-core-02`, `SPEC-core-08` | `20-developer.png` |
+| N1 | At boot, read `developer_page=on` from `sd:/ultimate/TrainingRooms/developer.ini`. |  |  |
+| N1 | A missing file or other value hides the page and disables its rows. |  |  |
+| N1 | Preload Samples moves here from Loading (Q8). |  |  |
+| N1 | B9 developer rows are rebuilt from their `SPEC-core-01` descriptions. |  |  |
+| N1 | The normal build supports capture and testing. Only Eden stand-ins need `diag`. |  |  |
+| N1 | The operator's card and Eden test profiles set `developer_page=on`. |  |  |
+| N2 | **Respawn invincibility.** Default Off matches the fork: instant respawn without invincibility. | Saves › Save states, after *Auto-load on death*; `SPEC-state-01` | `02-saves.png` |
+| N2 | On: natural Training deaths give P1 or CPU the game's normal respawn invincibility. |  |  |
+| N2 | Use the game's match respawn platform wherever its native path allows. |  |  |
+| N2 | Auto-load on death greys the row because it loads a save instead. |  |  |
+| N2 | Any native-platform limitation required an operator decision before shipping. |  |  |
+| N3 | **Delay rows (Q3).** One popup contains both the checklist and the range. | `SPEC-core-02`, `SPEC-cpu-01`/`-03`/`-05`/`-06` | `19-delay-popup.png` |
+| N3 | Applies to Aerial, Fast Fall, Throw, Pummel and Ledge Delay, OoS Offset and Reaction Time. |  |  |
+| N3 | Checking a value greys the range. Setting a range greys the checklist. |  |  |
+| N3 | Range picks uniformly among steps between minimum and maximum. Y clears the active control. |  |  |
+| N3 | Older files without a range load as checklists. |  |  |
+| N3 | All three slot sets keep only their checklist (confirmed 2026-11-02). |  |  |
+| N4 | **Settings override playback.** Advanced toggle, default Off. | Recording › Playback; `SPEC-cpu-02`/`-04`/`-06`, `SPEC-input-01` | `03-recording.png` |
+| N4 | Off: playback takes precedence over DI, SDI, air-dodge, tech and throw settings (B5). |  |  |
+| N4 | On: those settings take precedence, matching upstream. |  |  |
+| N5 | **Item grid paging (Q14).** Docked: one 5 × 8 page, 38 items, short names. | `SPEC-core-03`; item grid (carried over) | `11-item-grid.png`, `18-item-grid-handheld.png`, `12-stage-grid.png`, `22-stage-grid-handheld.png` |
+| N5 | Handheld: full names; three 4 × 4 pages holding 16, 16 and 6 items. |  |  |
+| N5 | Shipped count, November 27: [39 items](../src/model/menu/grid.rs). Handheld pages hold 16, 16 and 7. |  |  |
+| N5 | Item grid uses the console's operation mode when opened. |  |  |
+| N5 | Stage decision, 2026-11-02: same tile geometry as items. |  |  |
+| N5 | Docked stages: 5 × 8 with short names; All plus 117 stages. |  |  |
+| N5 | Three docked pages hold 40, 40 and 38 tiles. |  |  |
+| N5 | Handheld stages: eight 4 × 4 pages, matching the fork. |  |  |
+| N6 | **Item on load dropped (Q6).** On first boot, import the old setting once. | `SPEC-core-08`, `SPEC-state-04` | `02-saves.png` |
+| N6 | Write its item snapshot into each save lacking one; drop the row and setting. |  |  |
+| N7 | **Editable menu shortcuts (Q9 B).** Menu shortcut 1 and 2 open the chord editor. | Display & Controls › Controls; `SPEC-input-04` | `05-display-controls.png` |
+| N7 | Changes apply immediately and persist in `button_config.ini`, the file of record. |  |  |
+| N7 | The permanent B + D-pad Up shortcut stays fixed. |  |  |
+| N8 | **Import all replay captures (S1, item 3).** Copy `replay_captures/` in full to the new root. | `SPEC-core-08` | `S1-import-details.png` (as drawn, item 3 changed) |
+| N8 | First boot continues during the copy; originals stay. |  |  |
+| N9 | **SDI not set (B8).** With no Direction chip selected, the CPU performs no SDI. | `SPEC-cpu-02` | – |
+| N9 | This keeps the fork's rule. |  |  |
+| N10 | **Longer SDI streaks (Q17).** The chips lengthen the spark's white streaks to match gameplay. | `SPEC-core-07` §4.6 | screens `01`, `16`, `17` |
 
 Added 2026-11-01 by the lead from the operator's answers. Each one is folded into `MENU-DRAFT.md` (draft 9), the
 affected spec (its *Open questions* answer and §9 test-provenance rows) and the mockups named here
 (`docs/menu-mockup/`, the renderer's style).
-
-| # | Requirement | Where | Mockup |
-| --- | --- | --- | --- |
-| N1 | **Developer page.** A sixth page, *Developer*, after Display & Controls. It is hidden, and its rows do nothing, unless `sd:/ultimate/TrainingRooms/developer.ini` has `developer_page=on` (read at boot; missing file or any other value = hidden). It holds Preload Samples (Q8, moved from *Loading*) and the developer-only rows of B9, rebuilt from `SPEC-core-01`'s description of them. They ship in the normal build, so capturing or testing them needs no diag build; the playbook's `diag` feature keeps only the Eden stand-ins. The operator's card and the Eden test profiles carry `developer_page=on`. | `SPEC-core-01`, `SPEC-core-02`, `SPEC-core-08` | `20-developer.png` |
-| N2 | **Respawn invincibility** (toggle, default Off = the fork: instant respawn, no invincibility). On: after a natural death in Training the fighter (P1 or CPU) respawns with the game's own respawn invincibility and, where the game's own respawn path can be used, on the respawn platform as in a match. Greyed while *Auto-load on death* is On (a save state is loaded instead). If the platform cannot be had through the game's own path, that limit goes to the operator before it ships. | Saves › Save states, after *Auto-load on death*; `SPEC-state-01` | `02-saves.png` |
-| N3 | **Delay rows: checklist and range** (Q3). Aerial Delay, Fast Fall Delay, Throw Delay, Pummel Delay, Ledge Delay, OoS Offset and Reaction Time open one popup with both controls. A ticked checklist greys the range; a set range (any step value from min to max, uniform) greys the checklist; Y clears the active one. Saved files without a range load as checklists. The three slot sets keep the checklist only (confirmed 2026-11-02). | `SPEC-core-02`, `SPEC-cpu-01`/`-03`/`-05`/`-06` | `19-delay-popup.png` |
-| N4 | **Settings override playback** (toggle, *advanced*, default Off). Off: a playing recording wins over DI, SDI, air-dodge, tech and throw settings (B5). On: those settings override the recording, as upstream does. | Recording › Playback; `SPEC-cpu-02`/`-04`/`-06`, `SPEC-input-01` | `03-recording.png` |
-| N5 | **Item grid paging** (Q14). Docked: one page, 5 × 8 tiles (38 used), short names. Handheld (the console's operation mode when the grid opens): three pages of 4 × 4 (16, 16, 6) with full names. Stages (2026-11-02): docked 5 × 8 tiles per page (All + 117 = 118 tiles, three pages: 40, 40, 38) with short names; handheld 4 × 4 (eight pages), as the fork. Same tile geometry as the item grid. | `SPEC-core-03`; item grid (carried over) | `11-item-grid.png`, `18-item-grid-handheld.png`, `12-stage-grid.png`, `22-stage-grid-handheld.png` |
-| N6 | **Item on load dropped** (Q6). The first-boot import writes the item snapshot of each save that has none, from the old setting, once; the row and its setting are gone. | `SPEC-core-08`, `SPEC-state-04` | `02-saves.png` |
-| N7 | **Editable menu shortcuts** (Q9 B). *Menu shortcut 1 / 2* open the chord editor; a change applies at once and is written to `button_config.ini`, the file of record. The permanent `B + D-pad Up` stays fixed. | Display & Controls › Controls; `SPEC-input-04` | `05-display-controls.png` |
-| N8 | **Import all replay captures** (S1 item 3). `replay_captures/` is copied in full to the new root on first boot, without blocking the boot; the originals stay. | `SPEC-core-08` | `S1-import-details.png` (as drawn, item 3 changed) |
-| N9 | **SDI not set = no SDI** (B8). With no SDI Direction chip selected, the CPU does not SDI, as in the fork. | `SPEC-cpu-02` | – |
-| N10 | **SDI chip streaks longer** (Q17). The SDI chips draw the spark's white streaks longer, closer to a match. | `SPEC-core-07` §4.6 | screens `01`, `16`, `17` |
 
 **Answered 2026-11-02 (~02:4xZ):** Q5 and B11 as recommended; the SDI ×2.0 stretch, the Developer page (N1) and the
 delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage grid. Nothing in this list is open.
@@ -440,19 +489,24 @@ delay popup (N3, slot sets checklist only) as proposed; N5 extended to the stage
 
 ## CPU ownership and hot-slot decisions — 2026-11-02
 
+| F9: newly active entry | Promoted member of CPU rotation |
+| --- | --- |
+| Entry 2 | Next member |
+| Entry 3 | Following member |
+
 ### F9: promote the helper on CPU-count increases
 
 - The 20:5xZ decision supersedes delayed count changes and native setter replay.
 - When the CPU count rises, the helper already occupying newly active entry 2 or 3 becomes that CPU.
 - Retain its body, remove it from the helper pool, and publish matching identity, descriptor, HUD, portrait and name through the existing swap identity path.
 - Exact-Mii identity and Training-reset persistence are required.
-- Entry 2 uses the CPU rotation's next member; entry 3 uses the following member.
+
 - In slow mode, helper seats do not occupy live entries while the CPU count is greater than one; re-adopt them when the count drops.
 
-Acceptance remains open: count 1→2→3→2→1, a helper still loading, exact-Mii
+The November 2 acceptance criteria covered count 1→2→3→2→1, a helper still loading, exact-Mii
 promotion, L+R+A and save/load with two or three CPUs, and zero total Unmapped
 messages in the retained Eden console. This records the behavior decision,
-not implementation or runtime acceptance.
+not runtime acceptance. [The roadmap](ROADMAP.md) records the rc.5 F9 implementation and later Eden seat checks.
 
 ### Hot fighters and Kirby hats: measure before setting defaults
 
@@ -461,11 +515,11 @@ not implementation or runtime acceptance.
 - A maximum of fifteen is conditional on fit.
 - Keep the existing fighter-pool and free-memory guard, with ordinary slow loading beyond available capacity.
 
-- Before fixing the defaults, run one low-priority Eden measurement at ten fighters plus five hats.
+- The November 2 plan called for one low-priority Eden measurement at ten fighters plus five hats.
 - Record fighter-pool capacity, reserve, peak guest memory and zero total Unmapped messages.
 - If the pool or memory cannot hold that configuration, present the measurements for a decision rather than silently lowering it.
 - The measurement must follow resolution of the existing helper-path fault hold.
-- This follow-up is not an RC blocker unless it changes approved behavior; no default has been changed by this documentation.
+- The follow-up was a blocker only if it changed approved behavior. [The roadmap](ROADMAP.md) records ten hot fighters and five hot hats in rc.5, with the first Eden rows in rc.6.
 
 ### F9 live hat/item source: immediate cutover — 2026-11-03
 
@@ -482,17 +536,27 @@ item. Do not hold the seat, stall rotation, or guess at native rebinding.
 - The acceptance checks requested on 2026-11-03 were: charged entry-2-sourced hat, advance rotation, verify entry 2 changes and hat rebuilds with charge reset; repeat with a live thrown item; raise CPU count and verify CPU 2 is the next rotation member.
 - Each row requires no crash and zero total Unmapped in the retained full Eden console.
 - This decision authorized the work; the [roadmap](ROADMAP.md#deferred-operator-decision-2026-11-03) records the cutover that shipped in rc.5.
+
 ## Developer reload processing — primary decision, 2026-11-03
 
-The primary approved counted requests rather than a single dirty bit. With Reload developer config enabled, holding L+R+A on Player 1 in Training queues requests; the menu worker reads `dev.json` in bounded batches. Turning the row or developer page off cancels pending work. A requested read is not a completed read.
+| Request tracking | Primary decision |
+| --- | --- |
+| Count requests individually | Approved |
+| Single dirty bit | Rejected |
+
+With Reload developer config enabled, holding L+R+A on Player 1 in Training queues requests; the menu worker reads `dev.json` in bounded batches. Turning the row or developer page off cancels pending work. A requested read is not a completed read.
 
 `tests/developer_features.rs` checks request counts, completed reads and read errors; it is not a runtime read-count measurement.
 
-
 ## 2026-11-03: RC archive working-buffer residency
 
+| November 3 archive recipes | Capacity before bookkeeping |
+| --- | --- |
+| Per buffer | 1,570,692 bytes |
+| Two buffers | 3,141,384 bytes (about 3.0 MiB) |
+
 - Primary decision relayed in TRAININGROOMS-LEAD-INBOX.md under PRIMARY DECISION ~05:5xZ: keep the two preallocated archive working buffers to avoid allocation in the archive hook.
-- The November 3 recipes required 1,570,692 bytes per buffer: 3,141,384 bytes (about 3.0 MiB) total, before bookkeeping.
+
 - Later recipes use the same [capacity rule](resource-costs.md#clean-room-archive-accounting).
 - Five-second release means logical hand-out retirement and return to the pool; it does not mean heap or RSS reclamation.
 
@@ -500,13 +564,16 @@ The primary approved counted requests rather than a single dirty bit. With Reloa
 - Count the reserved capacity separately from NRO image residency and include it in the 10-fighter plus 5-hat hot-slot memory measurement.
 - Logical payload lengths, requested allocation capacity, allocator residency and host RSS are different measurements; do not add the buffer cost again to a measured heap total that already includes it.
 
-Freeing between loads through qualified off-hook preparation becomes next-version memory work, not an RC blocker. core05.12 closes only on the corrected requirement plus actual runtime evidence; this decision alone is not a PASS.
+On November 3, freeing between loads through qualified off-hook preparation moved to next-version work. Closing core05.12 required runtime evidence for the corrected requirement. The [allocation record](resource-costs.md#clean-room-archive-accounting) describes what shipped.
 
 ## 2026-11-08: Group speed in rc.6 — operator decision
 
-All three group-speed items were chosen for rc.6. This was relayed in
-`artifacts/phase23/INBOX-opus-rc6-hotslots.md`, 2026-11-08, after the console F6 run of release `1e6c6a0e`, in
-which going between groups was found slow.
+| rc.6 group-speed decision | Record |
+| --- | --- |
+| Console test | F6 run of release `1e6c6a0e` |
+| Observed problem | Switching between groups was slow. |
+| Decision | All three items selected for rc.6. |
+| Relay, 2026-11-08 | `artifacts/phase23/INBOX-opus-rc6-hotslots.md` |
 
 1. **Warm exit from a Mii group.** An ordinary fighter in the window a live Mii group displaced is reached by a warm
    exchange instead of a Reload. The Mii switch's publication is put back in the settle tick.
@@ -521,8 +588,10 @@ This records the decision only; the implementation, host tests and Eden proofs a
 
 ## 2026-11-08: Item 3 in rc.6 — groups built in the background (operator decisions)
 
-Relayed in `artifacts/phase23/INBOX-opus-rc6-hotslots.md`. They replace item 3 of "Group speed in rc.6" above
-(pre-built behind the loading screen).
+| November 8 background-build decision | Record |
+| --- | --- |
+| Superseded | Item 3 of "Group speed in rc.6": pre-build behind the loading screen. |
+| Relay | `artifacts/phase23/INBOX-opus-rc6-hotslots.md` |
 
 - **19:12Z, the requirement:** the first group is hot when Training loads, and the rest load automatically in the
   background, so that going between groups is fast for Player 1 and the CPU.
@@ -553,12 +622,16 @@ This records the decisions only; the implementation, host tests and Eden proofs 
 
 ## 2026-11-10: rc.7 — a window rebuild loads the picked fighter first (operator order)
 
+| rc.6 console measurement | Duration |
+| --- | --- |
+| Three-body window | 7.6–7.9 s |
+| Solo Reload | 3.3–3.5 s |
+
 Relayed in `artifacts/phase23/TASK-rc7.md` (item 2) and `TASK-OPUS-rc6.1-followups.md` (section 1), after the
 operator's console play test of rc.6. It extends "2026-11-08: Item 3 in rc.6 — groups built in the background" above.
 
 - **Before:** a switch whose fighter is in neither the live window nor a built group Reloads a window of the fighter and
-  up to two cycle neighbours, and the fighter is playable only when all of them are built. On the console a three-body
-  window took 7.6–7.9 s; a solo Reload took 3.3–3.5 s.
+  up to two cycle neighbours, and the fighter is playable only when all of them are built.
 - **Now, with group swap on:** that Reload builds the picked fighter alone, a one-member window. The members the full
   window would have held become the role's first background group, admitted on the cost the window charged them; the
   rest of the cycle follows as usual. The same rules apply: the live-Kirby rule and the memory admission a window used
@@ -573,8 +646,11 @@ This records the decision only; the implementation, host tests and Eden proofs a
 
 ## 2026-11-10: rc.7 — the Kirby guard removal (D-KIRBY1) as a root fix (operator decision)
 
-- **Ordered about 12:30Z:** rc.7 ships with A's fix, the lock refactor and the Kirby guard removal.
-  The primary (12:32Z): a root fix, not a removed check. Background body construction must never write or
+| rc.7 order | Work included |
+| --- | --- |
+| About 12:30Z | A's fix, the lock refactor and the Kirby guard removal. |
+
+The primary (12:32Z): a root fix, not a removed check. Background body construction must never write or
   read the live Kirby's copy registry, so background builds and prefetches proceed while Kirby is on screen. The Kirby
   cell-0 invariant stays.
 - **The mechanism, by RE** (the docs lane's report, 12:55Z):
@@ -593,7 +669,9 @@ This records the decision only; the implementation, host tests and Eden proofs a
 
 ## rc.10 S2: the product is not behind feature switches (supersedes D11)
 
-2026-11-12, the operator, on the rc.10 code-reduction plan (`docs/CODE-REDUCTION-rc10.md`, S2).
+| Decision date | Authority | Plan |
+| --- | --- | --- |
+| 2026-11-12 | Operator | rc.10 code reduction, `docs/CODE-REDUCTION-rc10.md`, S2 |
 
 - **Before (D11, package 6):** the plugin carried the fork's whole Cargo feature table, and every feature in it had to
   build. 25 of those features were on in every build that shipped.
@@ -613,12 +691,17 @@ This records the decision only; the implementation, host tests and Eden proofs a
 
 ## 2026-11-14: rc.13 — a capsule is drawn as one pill (HB-PILLS, operator decision)
 
+| Before rc.13 | Capsule rendering |
+| --- | --- |
+| Shapes with two centres | Hitboxes, hurtboxes and grab boxes |
+| Discs per row | `ceil(d / (size x 1.75)) + 1`, limited to 2..16 |
+| Panes | One per disc |
+| Appearance | Scalloped edges and darker lenses where discs of the same capsule overlapped. |
+
 The operator approved it for rc.13 after the Ridley mockup (worker B-2's design, beads next to pills from one Eden
 frame). It refines HB-OWN-ORBS (own discs for every fighter sphere, 2026-11-05, on `review/menu-proposal`), which stays:
 the orbs are still the plugin's own panes, articles' hitboxes included.
 
-- **Before:** a shape with two centres (a capsule hitbox, hurtbox or grab box) was a row of `ceil(d / (size x 1.75)) + 1`
-  discs (2..16), one pane each, with scalloped edges and darker lenses where its own discs overlapped.
 - **Now:** a shape is held as its two end spheres (`hitbox::SHAPE_SPHERES`); the board folds them into one orb with a
   tail, and the layout tick draws it as one pill: two half-disc caps on the projected ends and a band between them,
   turned along the projected axis, one size (the two ends' mean projected radius). A point is two caps back to back.
@@ -629,14 +712,18 @@ the orbs are still the plugin's own panes, articles' hitboxes included.
 
 ## rc.14 previews (2026-11-14): Eggs-ercise and Break the Targets
 
-### Eggs-ercise
+| Eggs-ercise preview | 2026-11-14 recording evidence |
+| --- | --- |
+| Three clips approved for content | GIF lane's Eden run on rc.14 core `3084a4ad` |
+| Original notices | Centered over gameplay |
+| Final rc.14 reshoots | Moved notices to a top band |
+| Hardware coverage | Untested |
 
-Three clips from the GIF lane's Eden run on the rc.14 core `3084a4ad` (approved for content). They still show the
-notice mid-screen: it now sits in a band at the top. They are reshot on the final rc.14 build. Untested on hardware.
+### Eggs-ercise
 
 ![Eggs-ercise, 1 minute: the targets launch, Fox breaks them with aerials, and the count and clock run](decisions/rc14-preview-eggs-1-minute.gif)
 
-*1 minute: break as many as you can before the clock runs out.*
+*Break as many targets as possible in one minute.*
 
 ![Eggs-ercise, 10 targets: Fox breaks ten in a row; Done! 10 in 0:17.25 (best 0:17.25)](decisions/rc14-preview-eggs-n-targets.gif)
 
@@ -644,7 +731,7 @@ notice mid-screen: it now sits in a band at the top. They are reshot on the fina
 
 ![Eggs-ercise with the CPU as the target: Fox hits the CPU, the count goes up and the CPU moves to a new spot](decisions/rc14-preview-eggs-cpu-target.gif)
 
-*Target: CPU. The CPU is the target; each hit counts, and it resets to 0 % at a new spot.*
+*Each CPU hit counts; it resets to 0% at a new spot.*
 
 ### Break the Targets
 
@@ -654,38 +741,60 @@ Display is On), and the docs GIFs are shot on the final rc.14 build. Untested on
 
 ![Break the Targets: Practice games › Place targets; the zoomed-out view; three targets placed with A (Place targets 3/10)](decisions/rc14-preview-btt-place.gif)
 
-*Placing: Practice games › Place targets, then A places a target where the cursor is (three placed).*
+*Press A to place targets at the cursor.*
+
+The preview opened Practice games › Place targets and placed three targets.
 
 ![Break the Targets: a run of three targets; the clock starts on the first input, and Done shows the time and the best](decisions/rc14-preview-btt-run.gif)
 
-*A run: Targets 0/3 0:00.00 → 2/3 → "Done! 3 in 0:04.08 (best 0:04.06)".*
+*Three targets in 0:04.08 (best 0:04.06).*
+
+The readout went from Targets 0/3 0:00.00 through 2/3 to Done!
 
 ## Lobby Practice is On by default (2026-11-22): decided
 
-**Decided 2026-11-22 (about 23:38Z).** The operator ordered that Lobby Practice defaults to On, and set a standing
-rule: every feature works the same in Training and in the waiting rooms, and a new feature is assumed to work in both.
-
 | # | Decided |
 | --- | --- |
-| LP1 | Fighters & Stages › Lobby Practice is On on a new install and for a settings file without the key. A stored value is kept, On or Off, in `menu` and in `defaults_menu` |
-| LP2 | The six first-install reminders (Welcome, Open Menu, Save State, Load State, Input Record, Input Playback) show the first time Training or a waiting room's practice opens, once per install as before. In a waiting room they wait until the room's practice session is open |
-| LP3 | Standing rule: a new feature has no waiting-room-only or Training-only gate, label or fallback without the operator's approval |
+| LP1 | Fighters & Stages › Lobby Practice defaults On for new installs and missing keys. |
+| LP1 | Preserve stored On or Off in both `menu` and `defaults_menu`. |
+| LP2 | First-install reminders: Welcome, Open Menu, Save State, Load State, Input Record, Input Playback. |
+| LP2 | Show once per install on first entry to Training or waiting-room practice. |
+| LP2 | In the waiting room, wait for its practice session to open. |
+| LP3 | Standing rule: scene-specific gates, labels or fallbacks for new features require operator approval. |
+| LP3 | Applies to both Training-only and waiting-room-only differences. |
+
+**Decided 2026-11-22 (about 23:38Z).** The operator ordered that Lobby Practice defaults to On, and set a standing
+rule: every feature works the same in Training and in the waiting rooms, and a new feature is assumed to work in both.
 
 Before this, Lobby Practice was Off until the player turned it On in Training, and the reminders showed in Training only.
 No earlier recorded decision set that default.
 
 ## rc.15 practice menu (2026-11-18): decided
 
-**Decided 2026-11-18 (~14:58Z).** The operator approved the practice-games mockup with the four recommended answers
-(`artifacts/rc15-practice-menu/mockup/README.md`, not in this repo). Branch `rc15/practice-menu`.
-
 | # | Decided |
 | --- | --- |
-| PM | Fighters & Stages › Practice games is one row per game: Eggs-ercise, Break the Targets, Tech practice, Mash out (its Off / On row is Start / Stop) and Parry practice (its Off is retired: a stored Off reads as 10 attempts). A opens the game's sub-screen; its rows are the game's rows of today, same labels, controls and order. The separate Tech practice section is the Tech practice sub-screen |
-| Q1 | **A:** only Start starts a game. Closing the menu starts, restarts and stops nothing; a running game keeps running. L+R+A still restarts a run. This reverses rc14-eggs-D9 (c), "reopening the menu and closing it" restarts Eggs-ercise (2026-11-14) |
-| Q2 | **A:** no Off choices. Start / Stop is the switch: Start closes the menu and starts the game (and stops any other); Stop ends it and the menu stays open. The setting keys stay: a stored Off reads as the first mode, and the Break the Targets Off / On row is gone while its `btt` key stays in the file. Saved settings, defaults and layouts load as they are |
-| Q3 | **A:** CPU during a game is shown in the Eggs-ercise and the Break the Targets sub-screens, one setting (`practice_cpu`) |
-| Q4 | **A:** Start is the first row of each sub-screen and the cursor opens on it. While the game runs it reads Stop, with "Running" in green, and the games list shows "Running" on that game's row |
+| PM | Fighters & Stages › Practice games lists one row per game. |
+| PM | Eggs-ercise, Break the Targets, Tech practice, Mash out and Parry practice. |
+| PM | Mash out's Off / On becomes Start / Stop. |
+| PM | Parry practice retires Off; stored Off means 10 attempts. |
+| PM | A opens each game's own rows with existing labels, controls and order. |
+| PM | The separate Tech practice section becomes its sub-screen. |
+| Q1 | **A.** Start starts a game; closing the menu leaves its state unchanged. |
+| Q1 | L+R+A still restarts a run. Closing the menu neither restarts nor stops it. |
+| Q1 | Reverses rc14-eggs-D9 (c), 2026-11-14: reopening and closing the menu previously restarted Eggs-ercise. |
+| Q2 | **A.** Remove Off choices. Start closes the menu, stops another game and starts this one. |
+| Q2 | Stop ends the game and keeps the menu open. |
+| Q2 | Preserve settings keys. Stored Off means the first mode. |
+| Q2 | Remove the Break the Targets Off / On row; retain its `btt` key. |
+| Q2 | Existing saved settings, defaults and layouts still load. |
+| Q3 | **A.** Both Eggs-ercise and Break the Targets show CPU during a game. |
+| Q3 | Both sub-screens use `practice_cpu`. |
+| Q4 | **A.** Every game's sub-screen opens with the cursor on Start, its first row. |
+| Q4 | During play it reads Stop, with green “Running”. |
+| Q4 | The games list also shows “Running” on the active game's row. |
+
+**Decided 2026-11-18 (~14:58Z).** The operator approved the practice-games mockup with the four recommended answers
+(`artifacts/rc15-practice-menu/mockup/README.md`, not in this repo). Branch `rc15/practice-menu`.
 
 - Target speed greys while Break the Targets runs. CPU during a game greys while Tech practice runs. Both read the running game, rather than another game's row.
 - Tech point and Tech wizard start Tech practice with the mode the row shows.
@@ -694,6 +803,61 @@ No earlier recorded decision set that default.
 
 ## rc.14 sweet and sour spots (2026-11-14): decided
 
+| # | Decided |
+| --- | --- |
+| SP1 | Read the game's hitboxes. Label the strongest active hitbox this frame **Sweet**, weaker ones **Sour**. |
+| SP1 | A hit weaker than that move's previous strongest hit is **Late**. |
+| SP1 | Equal or unattributable hitboxes get no label. |
+| SP1-KB | 2026-11-15 ~02:00Z: primary relayed the requested comparison with online treatment of these cases. |
+| SP1-KB | Rank by hardest launch, following SmashWiki's sweet/sour definition and knockback formula. |
+| SP1-KB | Use each hitbox's damage, base knockback, growth and set knockback. |
+| SP1-KB | Use the defender's current percent and weight; damage breaks ties in knockback. |
+| SP1-KB | Late also uses knockback. Ignore launch angle. This replaces SP1's damage ranking. |
+| SP1-KB | Original attribution rule: use knockback received, with damage as a cross-check. |
+| SP1-KB | Implemented 2026-11-15: identify the recorded attack slot; cross-check both knockback and damage. |
+| SP1-KB | Original calculation gate: Spot labels or Match sweet/sour spot On. |
+| SP1-KB | The shipped visualizer ranks hitboxes independently of the strip and combo toggles. |
+| SP1-KB | Without a defender, rank colours against a middleweight at 0%. |
+| SP1-KB | 2026-11-15 ~04:15Z: operator approved no percent limit. |
+| SP1-KB | Rage, knockback ceiling and damage cap follow game code and data. |
+| SP2 | Option On: Sweet keeps the existing red; Sour is light blue; Late is grey. |
+| SP2 | Grab boxes and hurtboxes keep their colours. |
+| SP3 | Input Display labels each hit marker Sweet, Sour or Late on P1 and CPU rows. |
+| SP4 | Each combo link remembers its spot. |
+| SP4 | With “Match sweet/sour spot” On the link counts only on the same spot. |
+| SP5 | Three rows, all Off by default: Hitbox Visualization, Input Display and Recording › Options. |
+| HB-CHECK | 2026-11-14 ~19:50Z, via primary: Hitbox Visualization becomes one checklist. |
+| HB-CHECK | Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles. Each draws independently. |
+| HB-CHECK | Factory checks none. An older On checks the three box types. |
+| HB-CHECK | Replaces SP5's Hitbox Visualization row; Input Display and Recording rows stay. |
+| HB-CHECK | 2026-11-14 ~18:15Z: colours follow Ultimate Frame Data's legend. Strong red, weak pink, grab purple. |
+| HB-CHECK | Hurtboxes: white normally, blue when intangible, green when invincible. |
+| HB-CHECK | 2026-11-14 ~21:22–21:28Z: Windboxes becomes the sixth item, deep blue. |
+| HB-CHECK | The game's no-reaction flag identifies knockback with no hitstun, regardless of damage. |
+| HB-CHECK | Hitboxes also draws a windbox; the shape appears once. |
+| HB-CHECK | 2026-11-14 ~22:00Z, primary: Windboxes includes fighter wind areas, superseding their exclusion for fighter moves. |
+| HB-CHECK | Draw a translucent deep blue box or circle with a white wind direction line. |
+| HB-CHECK | At this date item wind, including Gust Bellows, was still excluded. |
+| HB-WIND-ARTICLES | 2026-11-15 ~04:10Z, via primary (rc.14 wind-articles): draw article and item wind areas like fighters'. |
+| HB-WIND-ARTICLES | Track an article on any of four `AREA_WIND_2ND*` commands, like ATTACK and CATCH. |
+| HB-WIND-ARTICLES | Keep it tracked while its area exists. Track items with live hitboxes or wind areas. |
+| HB-WIND-ARTICLES | Reverses HB-CHECK's item-wind exclusion, including Gust Bellows. |
+| HB-WIND-ARTICLES | 2026-11-15 ~04:15Z, operator via primary: exclude stage hazards' windboxes and stage objects. |
+| HB-WIND-ARTICLES | Pac-Land's fire hydrant is a stage object. |
+| HB-PALETTE | 2026-11-16, next rc.15 update: distinguish visualizer families in both colour modes. |
+| HB-PALETTE | Windboxes remain blue; wind areas become burnt orange. Launch/wind direction lines become silver. |
+| HB-PALETTE | Invulnerable hurtboxes become teal. Detection and checklist filtering stay the same. |
+| HB-PALETTE | The key aligns colours and meanings; all eight attack-ID shades share one row. |
+| HB-PALETTE | Supersedes HB-CHECK's blue wind areas, white direction lines and green invulnerable hurtboxes. |
+| HB-ARTICLE-HURT | 2026-11-15, operator via primary (rc.15): append Article hurtboxes as item 7, bit 64, default Off. |
+| HB-ARTICLE-HURT | Reuse fighter HitModule reader and status colours. An empty group draws nothing. |
+| HB-ARTICLE-HURT | Caps: eight endpoints per object, 24 per batch. Draw whole shapes. |
+| HB-ARTICLE-HURT | Lowest admission and draw priority; attacking objects cannot be displaced. |
+| HB-ARTICLE-HURT | Waiting rooms exclude unknown article owners. |
+| HB-ARTICLE-HURT | Indexed discovery uses a version/64-byte guarded Called seam only on enabled frames. |
+| HB-ARTICLE-HURT | ABI and Pikmin prove feasibility. Gyro/Cypher require one built-diag acceptance boot. |
+| HB-ARTICLE-HURT | Count each object's result only after it visibly spawns. |
+
 Requested about 17:55Z, for the build then in work:
 
 - a sweet spot and sour spot view in the hitbox visualizer, as an option;
@@ -701,19 +865,6 @@ Requested about 17:55Z, for the build then in work:
 - optionally, the spot as part of whether a combo landed.
 
 The SP recommendations below were accepted about 18:07Z.
-
-| # | Decided |
-| --- | --- |
-| SP1 | Automatic from the game's hitbox data: the strongest hitbox out on that frame is **Sweet**, weaker ones **Sour**; a hit weaker than the same move's earlier strongest hit is **Late**. Equal hitboxes, or a hit TR can't attribute, get no label |
-| SP1-KB | 2026-11-15 ~02:00Z, relayed by the primary after the operator asked to follow how such cases are handled online: "strongest" means the hardest launch. A hitbox ranks by the knockback it gives the defender (SmashWiki's sweet/sour spot definition and its knockback formula, from each hitbox's own damage, base knockback, growth and set knockback, against the defender's percent and weight at that moment); damage decides only between equal knockbacks; Late is measured in knockback; the launch angle is not used. A hit is attributed by the knockback the defender received, the damage kept as a cross-check. Spots are worked out only while Spot labels or Match sweet/sour spot is On; with no defender, the colours rank as against a middleweight at 0%. This replaces SP1's ranking by damage. 2026-11-15 ~04:15Z, the operator: no percent limit; rage, the knockback ceiling and the damage cap follow the game's own code and data |
-| SP2 | Hitbox colours with the option On: Sweet keeps today's red, Sour light blue, Late grey; grab boxes and hurtboxes unchanged |
-| SP3 | Input Display: a Sweet / Sour / Late label on each hit marker, Player 1 and CPU rows |
-| SP4 | Combos: each link remembers the spot it landed; with "Match sweet/sour spot" On a link counts only on the same spot |
-| SP5 | Three rows, all Off by default: under Hitbox Visualization, under Input Display, and in Recording › Options |
-| HB-CHECK | 2026-11-14 ~19:50Z, relayed by the primary: Hitbox Visualization becomes one checklist (Hitboxes, Grab boxes, Hurtboxes, Frame data colours, Launch angles), nothing ticked by default, each item drawn on its own; an older On ticks the three boxes. This replaces SP5's row under Hitbox Visualization; the Input Display and Recording rows stay. The frame data colours follow Ultimate Frame Data's legend (2026-11-14 ~18:15Z): strong red, weak pink, grab purple, hurtboxes white, blue when intangible, green when invincible. 2026-11-14 ~21:22-21:28Z: Windboxes is the sixth item, deep blue: a hitbox with knockback whose hit causes no hitstun, by the game's own no-reaction flag (any damage); a windbox is a hitbox, so Hitboxes draws it too, once. 2026-11-14 ~22:00Z, the primary: the fighters' wind areas are drawn under Windboxes too, as a see-through deep blue box or circle with a white line along the wind (this replaces "wind areas are not drawn" above for fighters' moves); items' wind, such as the Gust Bellows, is still not drawn |
-| HB-WIND-ARTICLES | 2026-11-15 ~04:10Z, relayed by the primary (rc.14 wind-articles): the wind areas of articles and items are drawn under Windboxes as the fighters' are. An article is tracked when it runs a wind-area command (the four `AREA_WIND_2ND*`), as ATTACK and CATCH track one, and kept while it has an area; an item is tracked with a live hitbox or a wind area. This reverses HB-CHECK's "items' wind, such as the Gust Bellows, is still not drawn". 2026-11-15 ~04:15Z, the operator via the primary: stage hazards get no windboxes; stage objects are not drawn (Pac-Land's fire hydrant) |
-| HB-PALETTE | 2026-11-16, next rc.15 update: distinct visualizer families in both colour modes. Windboxes stay blue; wind areas become burnt orange; launch/wind direction lines silver; invulnerable hurtboxes teal. The key names each colour and meaning in aligned columns, with all eight attack-ID shades grouped on one row. This supersedes HB-CHECK's shared blue wind area, white direction line and green invulnerable-hurtbox colours; detection and checklist filtering stay the same. |
-| HB-ARTICLE-HURT | 2026-11-15, operator via the primary (rc.15): append Article hurtboxes as item7/bit64, Off by default. Reuse the fighter HitModule reader and status colours; an empty group draws nothing. Caps8 endpoints/object and24/batch, whole shapes, lowest admission/draw priority, never displacing attacking objects. Unknown article owners in waiting rooms remain excluded. Indexed discovery is a version/64-byte guarded Called seam, only on the enabled frame path. ABI and Pikmin prove feasibility; Gyro/Cypher evidence belongs to the one built-diag acceptance boot, with each object visibly spawned before its result counts. |
 
 The spots lane's mockups (drawn, not captured):
 
@@ -725,7 +876,12 @@ The spots lane's mockups (drawn, not captured):
 
 ## Decided (2026-11-14, evening): the setup library
 
-**Decided 2026-11-14 (~18:07Z):** SL1 yes; SL2 the full fix now; SL3 and SL4 added to rc.14.
+| Setup library decision | 2026-11-14, about 18:07Z |
+| --- | --- |
+| SL1 | Approved |
+| SL2 | Full fix now |
+| SL3 and SL4 | Added to rc.14 |
+
 All four go into rc.14: the stage and spots on the list, a full rename with X, a setup's own screen with Delete,
 and "Save setup here". The options and recommendations below stay as the record.
 
@@ -737,8 +893,12 @@ Line counts are the review's estimates; the size gate measures the real ones.
 
 | # | Change | Where it lands |
 | --- | --- | --- |
-| SL-A | Rewrite the docs in plain words: **A moves both fighters to the setup once, Y makes Load go there**; Save setup copies your bound save. Reshoot both GIFs, and add a Y-then-Load GIF, after SL-B | docs now; GIFs after SL-B |
-| SL-B | **S1** show the real key legend (today the hint says "Y delete", which is wrong, and the A / Y line is never drawn); **S2** plain notices; **S4** a true "nothing saved" message; **X minimum** (X no longer leaves a stale id) | rc.14, net about −5 to −1 lines |
+| SL-A | Rewrite docs plainly. A moves both fighters to the setup once. | docs now; GIFs after SL-B |
+| SL-A | Y makes Load go there. Save setup copies your bound save. |  |
+| SL-A | Reshoot both GIFs after SL-B; add a Y-then-Load GIF. |  |
+| SL-B | **S1:** show the real key legend; “Y delete” was wrong and A/Y never appeared. | rc.14, net about −5 to −1 lines |
+| SL-B | **S2:** plain notices. **S4:** a true “nothing saved” message. |  |
+| SL-B | **X minimum:** X no longer leaves a stale id. |  |
 
 ![S1: the list's key legend, now and proposed](decisions/rc14-setup-S1-key-legend.png)
 
@@ -746,10 +906,12 @@ Line counts are the review's estimates; the size gate measures the real ones.
 
 | # | Decision | Cost | Recommendation |
 | --- | --- | --- | --- |
-| SL1 | **S3** show the setup's stage (and the two fighters' spots) on the list | +6 (+6 more for the spots) | **In if the measured total stays ≤ 0**; otherwise the stage goes in the docs only |
+| SL1 | **S3** show the setup's stage (and the two fighters' spots) on the list | +6 (+6 more for the spots) | Include only if measured total stays ≤ 0; otherwise document the stage only. |
 | SL2 | **S5** rename a setup with X | +25 (the minimum fix is +3) | **The minimum now**, rename later |
-| SL3 | **S6** a setup's own screen: Restore here, Make Load use it, Rename, **Delete** (today a setup can't be deleted in the game) | +60 to +100 | not in rc.14 |
-| SL4 | **S7** "Save setup here": keep where the fighters are **now**, without overwriting your bound save (today you must press Save first, and that replaces the bound save) | +40 to +70, medium-high risk | not in rc.14; it also makes setups more like the Recording page's saves |
+| SL3 | **S6:** give setups a screen for Restore here, Make Load use it, Rename and Delete. | +60 to +100 | not in rc.14 |
+| SL3 | At proposal time players could not delete a setup in game. |  |  |
+| SL4 | **S7: Save setup here** stores both fighters' current spots without overwriting the bound save. | +40 to +70, medium-high risk | not in rc.14; it also makes setups more like the Recording page's saves |
+| SL4 | At proposal time, pressing Save first replaced the bound save. |  |  |
 
 ![SL1 / S3: the stage and spots on the list's detail line](decisions/rc14-setup-S3-stage.png)
 
@@ -763,12 +925,17 @@ Line counts are the review's estimates; the size gate measures the real ones.
 
 ## Decisions from November 13–14, 2026
 
+| Decision pictures | How to read them |
+| --- | --- |
+| Recommended option | **Green outline** |
+| Default renderer | `tools/render_decisions_1113.py` |
+| rc13-DI-lines | Author-2's mockup as drawn |
+| rc13-memory | `tools/render_rc13_memory.py` |
+
 - Opened by the primary for the operator from the lanes' reports of 2026-11-13 (rc13-hitbox-pills and rc14-eggs: 2026-11-14).
 - **Every item is now decided**, and each says **Decided** under its heading: TR1–TR9 and OP1–OP8 on 2026-11-13 (~11:50Z, OP3 changed on 11-14), rc13-DI-lines, rc13-memory and rc13-hitbox-pills as dated, and rc14-eggs on 2026-11-14 (~13:00Z).
 - The options and recommendations below stay as the record.
 - Each item says what is being decided, the options with their cost to the player, and a recommendation.
-- In each picture the recommended option has a **green outline**.
-- The pictures are drawn by `tools/render_decisions_1113.py` (rc13-DI-lines: author-2's mockup as drawn; rc13-memory: `tools/render_rc13_memory.py`).
 
 "The held fix" means `c49681c9`: worker A's in-game text fixes, then local, included in rc.12 as `900a1f48`
 (`artifacts/phase23/docs-audit-1113/WORKER-A-TEXT-FIXES.md`). TR1–TR8 come from the docs lane's audit of in-game text
@@ -795,13 +962,16 @@ Line counts are the review's estimates; the size gate measures the real ones.
 | rc14-eggs-D4.5 | (new) Break the Targets | **Decided 11-14: a new mode**: place targets on a zoomed-out stage, then break them |
 | rc14-eggs-D5 | Eggs-ercise: the HUD | **Decided 11-14: (a)**, TR's standing notice |
 | rc14-eggs-D6 | Eggs-ercise: the CPU | **Decided 11-14: (a)**, with Hide CPU (D6.5) |
-| rc14-eggs-D6.5 | (new) Hide CPU | **Decided 11-14: a general Hide CPU**, plus a setting that hides it during a practice game (13:19Z) |
-| rc14-eggs-D7 | Eggs-ercise: the menu place | **Decided 11-14: (b)**, a new group "Practice games"; since 11-18 one row per game, each with its sub-screen (rc.15 practice menu) |
+| rc14-eggs-D6.5 | (new) Hide CPU | **Decided 11-14:** general Hide CPU plus a practice-game hide setting (13:19Z). |
+| rc14-eggs-D7 | Eggs-ercise: the menu place | **Decided 11-14: (b)**, new Practice games group. |
+| rc14-eggs-D7 |  | Since 11-18: one row and sub-screen per game (rc.15 practice menu). |
 | rc14-eggs-D8 | Eggs-ercise: where it works | **Decided 11-14: (a)**, Training and waiting-room practice |
-| rc14-eggs-D9 | Eggs-ercise: restart | **Decided 11-14: (a) and (c)**, L+R+A and reopening the menu. **(c) reversed 11-18** by the rc.15 practice menu (Q1 A): only Start and Stop act; a close restarts no game, Break the Targets included |
+| rc14-eggs-D9 | Eggs-ercise: restart | **Decided 11-14: (a) and (c)**, L+R+A and reopening the menu. |
+| rc14-eggs-D9 |  | **11-18 reversed (c)** under rc.15 practice menu Q1 A. |
+| rc14-eggs-D9 |  | Only Start and Stop act. Closing restarts nothing, including Break the Targets. |
 | OP1 | Push the held doc fixes | **Decided 11-13: A, done 11-13**: Deluxe `5f9759f`, worker A's 17 commits, the four copies reconciled |
 | OP2 | The standalone `libimgui_smash.nro` on the card | **Decided 11-13: A, removed 11-13** (`removed_verified` 11:55:06Z); the standalone updated as imgui-smash 1.2.0 |
-| OP3 | Deluxe's hidden Stages + Counterpick page | **Decided 11-14: B, keep it hidden** (11-13 had said A); the card already has it hidden |
+| OP3 | Deluxe's hidden Stages + Counterpick page | **Decided 11-14: B.** Keep the already-hidden card page hidden, reversing 11-13's A. |
 | OP4 | elite-stages-counterpick and ssbu-cpu-pilot are private | **Decided 11-13: A, both public 11-13** |
 | OP5 | The old Deluxe in Elite's release ZIP | **Decided 11-13: A, dropped 11-13** (release 473) |
 | OP6 | Releases and tags that lag the card | **Decided 11-13: A, released 11-13** |
@@ -968,14 +1138,14 @@ All 5 Forgejo releases (v0.1.0 to v0.2.0-rc.3.1) had a Recording-page "Trigger" 
 Load" stored `[0, 1]`. `d502615d` took the row off the page, but no tag contains that commit, and the value stays in
 `settings.json` for good. No page shows it, so Reset page and Save defaults never touch it.
 
-It has two effects today:
+Before the November 13 decision, the hidden value had two effects:
 - It silently disables the Record chord (`recorder.rs:674`). **V1, the root fix for that, is approved and being
   built:** the chord ignores the hidden row (−4 sloc4, `recording.rs` and `recorder.rs`).
 - If the old file also holds Source = Named Library, every save-state load starts the old named capture. That is TR2's
-  (b)(ii) path. This second effect is what remains to decide.
+  (b)(ii) path. The November 13 V2 decision retired this second path.
 
 The options:
-- **A · V2, retire the row:** nothing reads `record_trigger` any more (−10 sloc4 in all, so −6 beyond V1).
+- **A · V2, retire the row:** the old `record_trigger` value no longer triggers capture; migration reads and discards it (−10 sloc4 in all, so −6 beyond V1).
   `begin_restore` loses its `trigger_save_state` branch. Cost to the player: a player whose old file holds both values
   no longer gets the named capture started on every save-state load. To build: an edit to carried `named_macros.rs`
   (a manifest transform and a regenerated ledger), and a test. It ends (b)(ii)'s last route, so TR2 can then delete the
@@ -1088,12 +1258,14 @@ says otherwise.
 
 | # | Lever | Estimated saving | Effect on features | Evidence or confidence |
 | --- | --- | ---: | --- | --- |
-| L1 | Ready Fighters default 10 → 8. The setting stays, with 2–12 available. | 78 MiB | Two fewer pre-built fighters by default. Those two load when first picked: one swap of ~0.4–1.0 s each, instead of warm (~50 ms). | measured (2,928 vs 2,850) |
-| L2 | Bodies per role default 3 → 2. The setting keeps Off/2/3. | 100–125 MiB | The in-window instant swap covers 2 fighters per role instead of 3. The third goes through a group swap. | derived (~61 per body × 2) |
-| L3 | Build extra groups on first use instead of at Training entry. Groups and their swap are kept. | 100–185 MiB at entry | The first swap into each extra group pays its build (~0.4–1.0 s; first pair ~2.1 s). Later swaps stay warm. | measured deltas (card 112, defaults 184) |
-| L4 | Load hats and helper seats on first use (Ready Hats kept). | 40–50 MiB at entry | The first hat for a fighter is slower (~770 ms vs ~80 ms warm); later ones are warm. | measured deltas |
-| L5 | Stagger the start-up window: build the bank bodies after the scene's own load settles, not inside it. | 150–190 MiB of **transient** peak | Banks are ready a few seconds later after entering Training. The settled use is unchanged. This targets the 11-13 abort, which came 64 ms after the window built 3-member banks. | derived from window headroom steps (−181 MiB at creation, −180 when bound) |
-| L6 | Raise the admission floor from 16 to 512 MiB of headroom. | 0 at entry; up to ~260 MiB at the **peak** (cycle lap 3,034 → ≤ 2,773) | More "waiting for memory" while cycling, with those fighters loading on swap. Nothing is refused for good. | derived from the cycle-lap refusal at a 268 MiB headroom |
+| L1 | Ready Fighters default 10 → 8. The setting stays, with 2–12 available. | 78 MiB | Two fewer prebuilt fighters. Each first pick takes ~0.4–1.0 s versus ~50 ms warm. | measured (2,928 vs 2,850) |
+| L2 | Bodies per role default 3 → 2. The setting keeps Off/2/3. | 100–125 MiB | Instant swaps cover two fighters per role; the third requires a group swap. | derived (~61 per body × 2) |
+| L3 | Build extra groups on first use instead of Training entry; retain groups and group swaps. | 100–185 MiB at entry | Each extra group's first swap pays its build (~0.4–1.0 s; first pair ~2.1 s). | measured deltas (card 112, defaults 184) |
+| L3 |  |  | Subsequent swaps stay warm. |  |
+| L4 | Load hats and helper seats on first use (Ready Hats kept). | 40–50 MiB at entry | First hat per fighter: ~770 ms versus ~80 ms warm. Later hats stay warm. | measured deltas |
+| L5 | Build start-up bank bodies after the scene's own load settles. | 150–190 MiB of **transient** peak | Banks become ready a few seconds after Training entry; settled usage stays unchanged. | derived from window headroom steps (−181 MiB at creation, −180 when bound) |
+| L5 |  |  | Targets the 11-13 abort, 64 ms after the window built three-member banks. |  |
+| L6 | Raise the admission floor from 16 to 512 MiB of headroom. | Zero at entry; up to ~260 MiB at peak (cycle lap 3,034 → ≤ 2,773). | More “waiting for memory” while cycling. Affected fighters load on swap; refusals are temporary. | derived from the cycle-lap refusal at a 268 MiB headroom |
 | L7 | Trim the plugin image and bss (TrainingRooms bss 1.7 MiB, diag ring and stacks). | 1–2 MiB | None | measured NRO header; too small to matter |
 
 B-2's combined estimates: L1 + L3 + L4 brings Training entry to about 2,620–2,700 MiB (585–665 MiB free); L2 on top
@@ -1123,7 +1295,7 @@ judged much cleaner.
 
 Opened 2026-11-14 with the question whether pill shapes are used where they should be. Today, no.
 
-- **Today:** each capsule hitbox or hurtbox (a shape with two centres) is drawn as a row of overlapping discs (2–16).
+- **Before rc.13:** each capsule hitbox or hurtbox (a shape with two centres) was drawn as a row of overlapping discs (2–16).
   Its edges are scalloped, and the discs show darker lenses where they overlap.
 - **The proposal:** each capsule is drawn as one pill: two half-disc caps plus a band between them, in the same colour
   and alpha. A one-centre hitbox stays a disc. The pane count is a wash: 110 → 112 on Ridley vs Ridley, standing.
@@ -1135,10 +1307,10 @@ Opened 2026-11-14 with the question whether pill shapes are used where they shou
 
 The pictures are worker B-2's mockup from an Eden run (`artifacts/rc13-pills/`, with `PILL-DESIGN.md`, in the
 workspace). Ridley vs CPU Ridley, Hitbox Visualization On. Panel 1 is the real Eden frame with today's orbs. Panel 2 is
-today's discs redrawn from the dumped panes. Panel 3 is the same capsules as pills. Every position and size comes from
+the pre-rc.13 discs redrawn from the dumped panes. Panel 3 is the same capsules as pills. Every position and size comes from
 the dump.
 
-![rc13-hitbox-pills, P1 zoomed: the real Eden frame, today's discs redrawn from the dump, and the same capsules as pills](decisions/rc13-hitbox-pills.png)
+![rc13-hitbox-pills, P1 zoomed: the real Eden frame, the pre-rc.13 discs redrawn from the dump, and the same capsules as pills](decisions/rc13-hitbox-pills.png)
 
 ![rc13-hitbox-pills, both fighters: the same three panels](decisions/rc13-hitbox-pills-both.png)
 
@@ -1167,7 +1339,7 @@ Draft built at the recommended defaults; watch for the egg's look (D1), the noti
 | D2 | c |
 | D3 | b |
 | D4 | a and c |
-| D4.5, added | A Break the Targets mode: the stage is zoomed out, the player places the targets and then breaks them |
+| D4.5, added | Break the Targets: zoom out, let the player place targets, then break them. |
 | D5 | a |
 | D6 and D6.5, added | An option to hide the CPU in general; with it, D6 is (a) |
 | D7 | B, practice games |
@@ -1190,13 +1362,14 @@ Melee Training Mode, eggs appear around the stage one at a time and you break as
 
 ##### D1 · The object
 
-**Decided: (a) with hitlag, and (c) as an option.** The disc becomes TR's own bullseye target. P1 freezes on a break, using the game's own hitlag, or 6 frames as seen in Melee. A short break animation of our own plays (13:13Z). A row "Target: Disc / CPU" makes the CPU the target, held still and reset after each hit.
+**Decided: (a) with hitlag, and (c) as an option.** The disc becomes TR's own bullseye target. The proposal allowed native hitlag or a six-frame freeze modelled on Melee. A short break animation of our own plays (13:13Z). A row "Target: Disc / CPU" makes the CPU the target, held still and reset after each hit.
 
+- The [shipped rule](../src/model/eggs_tests.rs) freezes Player 1 for six ticks on fighter breaks. Player 1's articles can break a target without freezing the fighter.
 - **Changed 2026-11-15 (the operator, ~02:20Z):** the CPU target is no longer held still.
 - It flies the disc's flight (launched up, a little drift, one bounce, then it stands where it landed), Target speed applies to it, and in the air it shows the game's own falling pose.
 - Hits count in the air and on the ground as before.
 - This reverses SPEC-eggsercise V2.1's "the CPU stays still" (2026-11-14).
-- The rc.14 preview GIFs of the CPU target show the old, still CPU until their reshoot (`rc14-eggs-cpu-target`).
+- The rc.14 preview GIFs of the CPU target record the stationary CPU from that build (`rc14-eggs-cpu-target`).
 
 D1 target look (B-2, `ab35f8f8`): our own bullseye, plus a cracked frame for the break animation. Eden stills, 2026-11-14 (run `rc14-egg-target-2`, 6/6 PASS):
 
@@ -1216,13 +1389,13 @@ What the player hits.
 - **(c) The CPU as the target,** moved to each spot and held still: real hitlag, but a fighter-sized target, not a
   small egg, and it fights the CPU settings, save states and swaps. About 130–180 lines.
 
-**Original recommendation: (a).** The one gap, no hitlag, is open question Q1 in the spec.
+**Original recommendation: (a).** The draft left hitlag open in Q1. On November 14, D1 added hitlag on a break.
 
 ![rc14-eggs D1: (a) a TR-drawn egg, (b) a real item, (c) the CPU as target](decisions/rc14-eggs-D1-egg-object.png)
 
 ##### D2 · Where eggs appear
 
-**Decided: (c).** The spawn box is the stage's camera range, kept on screen. Targets launch straight up, fall, bounce once and rest, as in Melee, and a "Target speed" row (Normal, Slow, Fast) sets the difficulty (~12:45Z).
+**Decided: (c).** On November 14, the spawn box was limited to the visible camera range. The [November 19 ruling](#spawn-area-2026-11-19) kept In view as the default and added Whole stage. Targets launch straight up, fall, bounce once and rest, as in Melee, and a "Target speed" row (Normal, Slow, Fast) sets the difficulty (~12:45Z).
 
 - **(a) A box around the stage centre:** random in a fixed width and height above the ground. The smallest; wrong on
   very wide or off-centre stages.
@@ -1247,7 +1420,7 @@ rises and falls back to its height, as in Melee.
 - **(c) Hits of 12 % or more,** Melee's default rule. About +15–25 lines. Ultimate's damage differs from Melee's, so
   12 % passes a different set of moves.
 
-Projectiles never break an egg.
+Under the November 14 rule, projectiles could not break an egg. On November 18, TR15-GAMES allowed Player 1's articles to break targets under the selected hit rule.
 
 **Original recommendation: one row, "Eggs break on", default Aerials, with Any attack and Hits of 12%+ as its other values.**
 
@@ -1310,6 +1483,7 @@ the way.
 
 - **Decided: a general Hide CPU.** On, the CPU is invisible, can't be hit, doesn't collide and doesn't act.
 - Off puts it back where it was.
+- The general Hide CPU setting takes precedence over a CPU target. The [practice-only setting](../src/model/eggs_tests.rs) leaves the CPU visible when it is the target.
 - A second setting, "CPU during a game" (Hide or Show), hides it while a practice game runs (asked for at 13:19Z, with the Hide CPU option).
 - When the CPU is the target (D1), a practice game never hides it.
 
@@ -1327,7 +1501,7 @@ the way.
 
 ##### D8 · Where it works
 
-**Decided: (a).** What changes game state (hitlag, Hide CPU, the zoomed camera) is used in a waiting room only after an LDN check.
+**Decided: (a).** What changes game state (hitlag, Hide CPU, the zoomed camera) is used in a waiting room only after an LDN check. The November 15 check cleared hitlag for the waiting room; the [eligibility test](../src/model/eggs_tests.rs) records the result.
 
 - **(a) Training and waiting-room practice,** like every other TR practice feature. The egg is drawn on this console
   only; the others in the room see nothing.
@@ -1523,7 +1697,15 @@ today.
 - Chains remain unchanged.
 - This follows the operator ruling of 2026-11-15; no capture metadata, combo format or grader changes are part of it.
 
-| HB-PALETTE-ONLY | 2026-11-16, operator ruling via primary: remove normal per-ID colours and their toggle; strength colours are the only scheme. Strong red, weak pink, grabs purple, normal hurts grey, invulnerable hurts green, direction lines white. The primary selected yellow for intangible hurtboxes. The November 27 audit confirmed the [shipped palette](../src/model/legend.rs) and its [intangible-colour test](../src/model/legend_tests.rs). Sky-blue windboxes are retained. A primary-authorized systematic search selected olive wind areas (RGB75,85,0): the earlier deep blue was too close to purple under the approved all-pairs CIEDE2000 threshold20. Olive passes that threshold and the unchanged light/dark fill-contrast bounds. This supersedes HB-PALETTE. Keep seven saved slots with retired slot 3 ignored and zeroed; show six choices without shifting surviving saved values. Align colour names and meanings. No dedicated Eden boot: gated release NRO goes to the shared real Switch review session. |
+**HB-PALETTE-ONLY · November 16, 2026**
+
+- The operator ruled through the primary that strength colours replace normal per-ID colours and their toggle. This supersedes HB-PALETTE.
+- Strong hits use red, weak hits pink and grabs purple. Normal hurtboxes use grey and invulnerable ones green. Direction lines are white. The primary chose yellow for intangible hurtboxes.
+- The November 27 audit confirmed the [shipped palette](../src/model/legend.rs) and its [intangible-colour test](../src/model/legend_tests.rs).
+- Windboxes keep sky blue. A systematic search authorized by the primary chose olive (RGB 75, 85, 0) for wind areas. The previous deep blue was too close to purple under the approved all-pairs CIEDE2000 threshold of 20.
+- Olive passes that threshold and the unchanged light- and dark-fill contrast bounds.
+- Keep seven saved slots. Ignore and zero retired slot 3. Show six choices with matching colour names and meanings, preserving all surviving saved values.
+- The gated release NRO goes to the shared real Switch review session. No dedicated Eden boot was requested.
 
 ### TR15-GAMES — Practice games: targets across the stage, P1's articles break them (2026-11-18)
 
@@ -1563,7 +1745,9 @@ today.
 
 ![Eden proving boot of the crop window spike](decisions/rc15-zone-editor-crop-proving-boot.png)
 
-*Eden proving boot, build `2a29baf4`: the spike still draws today's guide inside the zones. It is not the full implementation.*
+*The proving boot still drew the guide inside the zones.*
+
+Eden build `2a29baf4` tested the spike before full implementation.
 
 ### RR1–RR2 — Recording page role tabs (2026-11-22)
 
@@ -1577,6 +1761,15 @@ start both roles at Player; each role persists across menu closes, leaving Train
 
 ## Guard the Edge and Juggler (2026-11-22): the return rule, the crosshair, Player 1's start — decided
 
+| # | Decision | Answer |
+| --- | --- | --- |
+| GJ1 | Count the CPU KO once Player 1 returns | **A.** Stand on a floor or platform, or hold a ledge, within 10 seconds. |
+| GJ1 | Player 1 gets KO'd or times out | Count a miss in the total, reset the streak, record no time. |
+| GJ2 | Guard the Edge wizard: Break the Targets' crosshair in place of the quadrant page | **Approved.** One crosshair page replaces the Area and CPU pages (4 pages become 3) |
+| GJ3 | Juggler wizard: the same crosshair for the CPU spot, and the Percent page | **Approved**; the Percent page is kept (option A) |
+| GJ4 | Player 1's start in the combined proof | **Approved.** Measure the floor's last point on the bridge lineup before choosing A or B. |
+| GJ4 | Between attempts | Wait for a KO'd Player 1. Keep the existing damage rule. |
+
 - **Answered by the operator on 2026-11-22** (tr-primary-2 ledger, 18:32:14Z and 18:37:43Z).
 - Design by the edge-juggle-sol lane on source `7d962416` (the rc.15 round head), after the operator's hand test of the card build, in which the wizard's start mark, the pointer, the remembered start and Player 1's start point all worked.
 - This entry is the design and the answers recorded before implementation; see the [Guard the Edge](guide/guard-the-edge.md) and [Juggler](guide/juggler.md) guides for the implemented rules.
@@ -1584,13 +1777,6 @@ start both roles at Player; each role persists across menu closes, leaving Train
 - The pictures are mockups drawn by `artifacts/phase23/edge-juggle/illustrations/make_gte_next.py` (not in this repo); the chosen option has a **green outline**.
 - Line counts are estimates; the size gate measures the real ones.
 - The wording below carries the reviewer's corrections of 18:22:59Z, 18:23:20Z and 18:23:46Z.
-
-| # | Decision | Answer |
-| --- | --- | --- |
-| GJ1 | Guard the Edge: a KO counts only once Player 1 is back on the stage | **A, agreed.** Back means standing on a floor or a platform, or holding a ledge; a 10 s limit; a Player 1 KO, or the limit, makes the attempt a miss (in the total, streak 0, no time) |
-| GJ2 | Guard the Edge wizard: Break the Targets' crosshair in place of the quadrant page | **Approved.** One crosshair page replaces the Area and CPU pages (4 pages become 3) |
-| GJ3 | Juggler wizard: the same crosshair for the CPU spot, and the Percent page | **Approved**; the Percent page is kept (option A) |
-| GJ4 | Player 1's start: the two defects seen in the combined proof | **As recommended.** Measure the start on the floor's last point first, on the bridge lineup, then A or B by the measurement. The next attempt waits for a KO'd Player 1. Player 1's damage between attempts stays as today |
 
 Added by the operator with the answers: the crosshair is built as one shared component, because the new Recording
 placement wizard (hit-streak-sol lane) uses it too.
@@ -1698,20 +1884,26 @@ on 2026-11-20 (Q1 of the Guard the Edge design).
 
 | Case | Today | With the crosshair |
 | --- | --- | --- |
-| A fighter with nothing remembered on this stage | the wizard opens on Lower left: the fighter's measured start when that lies in the lower-left quadrant, else the quadrant's middle (`:833–835`, `:852–874`). A measured start in the upper quadrant, such as Link's, Lucas's or Sonic's, needs a step to Upper left | the crosshair opens on the left default. A fighter with an upper measured start opens on it; a fighter with a lower one, or with none, opens where it opens today |
-| X | every page: the whole setup returns to its opening values and the Preview opens | CPU page: the crosshair returns to the default of the side it is on. The other pages: as today |
+| Nothing remembered for this fighter and stage | Open Lower left (`:833–835`, `:852–874`). | Open on the left default. |
+| Lower-left measured start | Use the measured point. | Same opening point. |
+| No measured start | Use the lower-left middle. | Same opening point. |
+| Upper measured start (Link, Lucas, Sonic) | Open lower-left middle. Step to Upper left for the measured start. | Open on the upper measured start. |
+| X on the CPU page | Reset the full setup to its opening values and open Preview. | Reset the crosshair to this side's default. |
+| X on other pages | Same full reset and Preview. | Unchanged. |
 | Y | not used | CPU page: the crosshair jumps to the other side's default |
 | A measured start the stage would clip | the middle of the chosen quadrant | the lower middle of that side |
-| The quadrant middles | four, one press each | the lower middle is the default of a side without a measured start; the other middles are reached by moving the crosshair |
+| Quadrant middles | Four middles, one press each. | Without a measured start, default to that side's lower middle. Move to reach other middles. |
 
 **What the drill still needs, and where it comes from.**
 
 | Need | Today | With the crosshair |
 | --- | --- | --- |
-| Side and ledge | the chosen quadrant's side | the point's side of the stage centre, and that side's ledge. The placement and the route code already read them from the point (`:1690`, `src/model/edge_juggle.rs:722`) |
-| Upper or lower | the chosen quadrant. It is the key of both the fastest time and the best streak (`:2061`, `:2219–2223`) | read from the point: upper when its y is at or above its side's ledge height. See the note below |
-| Where a start is allowed | inside the quadrant: at least 1 unit outside the ledge and 1 unit inside the blast line (`src/model/edge_juggle.rs:647–666`) | the same two limits without the quadrant. Over or under the stage, A is refused with `Pick a point off the stage` |
-| Route envelope | each fighter's measured routes test the point itself (`perfect::*::in_region`), and the planner reads the live CPU | unchanged |
+| Side and ledge | Chosen quadrant's side. | Use the point's side of stage centre and that side's ledge. |
+| Existing placement and route readers | Already read side and ledge from the point (`:1690`, `src/model/edge_juggle.rs:722`). | Use those readers. |
+| Upper or lower | Chosen quadrant keys fastest time and best streak (`:2061`, `:2219–2223`). | Upper when point y reaches or exceeds its side's ledge height. See below. |
+| Start limits | Inside quadrant, ≥1 unit outside ledge and ≥1 unit inside blast line (`src/model/edge_juggle.rs:647–666`). | Keep both limits without the quadrant. |
+| A over or under the stage | Outside the quadrant. | Refuse with `Pick a point off the stage`. |
+| Route envelope | Each fighter's measured routes test the point itself (`perfect::*::in_region`). Planner reads live CPU. | Unchanged. |
 
 - **The bests' bucket at the ledge's height.** Today a start at exactly the ledge's height is legal in the upper and in the lower quadrant (`:647–665`), and its bests are keyed by the quadrant chosen.
 - With the crosshair such a start is always in the upper bucket.
@@ -1768,7 +1960,7 @@ today. The pages stay four: CPU spot, Percent, Player 1, Preview. Code: about �
 | | Option | Cost |
 | --- | --- | --- |
 | **A** (chosen) | keep the page as it is: D-pad ±1 and ±10 | none. The D-pad's two uses are on different pages |
-| B | make it a menu row, like Guard the Edge's percent | the wizard has 3 pages like Guard the Edge's; about +40 lines and one new saved setting |
+| B | Make it a menu row, like Guard the Edge's percent. | Three pages like Guard the Edge, about 40 extra lines, one new saved setting. |
 
 **Rework 2026-11-23 (GJ4-8).** The Player cursor returns to the last position with a floor if its move has none underneath. A point whose floor is gone is refused on A; see the [Player cursor rule](design/gj4-8-player-cursor.md).
 
@@ -1800,11 +1992,12 @@ They do not record completed status transitions, a KO callback, a stock change o
 | Frame (first boot) | What the trace has |
 | --- | --- |
 | 23061 | attempt 17 is released with Player 1 on its start, (−68, 0.01) |
-| 23086 | the CPU is back on the stage, 2.8 units from Player 1. Attempt 17 did not end in a CPU KO |
-| 23104–23109 | the CPU asks for jump squat, up smash start and up smash. Player 1's position at that moment, and which hit landed, are not in the trace |
+| 23086 | CPU back on stage, 2.8 units from Player 1. No CPU KO on attempt 17. |
+| 23104–23109 | CPU requests jump squat, up smash start and up smash. |
+| 23104–23109 | Trace omits Player 1's position and which hit landed. |
 | 23181 | Player 1's object asks for Standby at (−77.06, 180.11), above the top of the stage |
-| about 23184 | Ready starts. This frame is calculated (the release less the 60 updates of Ready), not a captured transition |
-| 23185 | Player 1's object asks for Fall at exactly (0, 150); the plugin never writes that point |
+| About 23184 | Ready begins. Inferred from release minus 60 Ready updates; transition uncaptured. |
+| 23185 | Player 1's object requests Fall at exactly (0, 150). Plugin never writes that point. |
 | 23244 | attempt 18 is released with Player 1 at (0, 73.69), falling |
 
 - The second boot has the same request for Fall at (0, 150), at frame 25835, 56 frames before its attempt 18 at
@@ -1850,24 +2043,33 @@ The [crosshair model tests](../src/model/edge_juggle/crosshair_tests.rs) now cov
 
 | Requirement clause | Design | Planned test |
 | --- | --- | --- |
-| Player 1 returns to the stage successfully after a successful edgeguard for it to count | GJ1 rule A: the return window, the 10 s limit, a Player 1 KO or the limit is a miss | model tests of the session for each of the five card texts; a source test of the two native reads |
-| Use the same crosshair as Break the Targets instead of picking a quadrant | GJ2: one crosshair page with the shared controls; side, ledge and upper or lower read from the point | model tests of the allowed region, the two side defaults, the remembered start and the bests' bucket |
+| Count a successful edgeguard after Player 1 returns | GJ1 A: return within 10 seconds; player KO or timeout scores a miss. | Session model tests for five card texts. Source test for both native reads. |
+| Replace quadrant selection with the Break the Targets crosshair | GJ2: one shared-controls page. Read side, ledge and upper/lower from the point. | Model-test allowed region, both side defaults, remembered start and bests' bucket. |
 | For Juggler, reuse the same crosshair when selecting the CPU's area | GJ3: the shared controls and picture on Juggler's CPU page | a model test of the D-pad step on that page |
-| Player 1 starts where the wizard shows it | GJ4: the wait for a KO'd Player 1; the lip start after the measurement | model tests of the wait; the fix for the floor's last point gets its tests after the measurement |
+| Player 1 starts where the wizard shows | GJ4: wait for KO'd Player 1. Choose lip start after measurement. | Model-test the wait; test the last-floor-point fix after measurement. |
 
 The Eden proof of each uses the bridge lineup (tr-primary-2 ledger, 2026-11-22 17:09:54Z) and playbook `b49b4e1` or
 later.
 
 ## Menu lists (2026-11-22): a held Up / Down repeats and quickens; the Recording page jump goes on — decided
 
-- **Decided by the operator on 2026-11-22** (tr-primary-2 ledger, 19:05:48Z: defaults D1 to D3 approved), on the operator's report that holding Down on the Recording lists does not speed up and that the page-down shortcut does not work there.
-- Finding by the preview-vis-sol lane on source `aad616bc`: no menu list sped up on a hold, because the one input adapter every menu screen shares never repeated a D-pad direction and repeated a stick at a constant 21 frames; and the Recording lists had a private copy of the list jump that wrapped inside one list.
-
 | # | Decided |
 | --- | --- |
-| D1 | A held Up or Down, on the D-pad or a stick, repeats on every menu list and quickens: the first repeat after 21 frames, then every 8 frames, every 5 from one second held, every 4 from two seconds. Left and Right keep their rule (a stick repeats every 21 frames, the D-pad does not repeat): they change values. A held ZL + Up / Down repeats every 21 frames and does not quicken |
-| D2 | The D-pad now repeats. A direction that was already held when the menu opened does not repeat until it is released. The same holds for a direction held while the menu was closed, as when the Recording pop-up opens (added by the edge-juggle-sol lane, posted 19:38:36Z) |
-| D3 | On the Recording page's lists ZL + Up / Down move one window (12 rows) and stop on the list's first or last entry; the next jump goes on to the other list, and past the two lists to the page's previous or next section, through the menu's own list jump. The pop-up lists, a file's screen and the chain picker jump a window and wrap, as the menu's other pop-up lists do; the chain picker took no jump before |
+| D1 · vertical | On every menu list, held Up/Down repeats on D-pad and stick. |
+| D1 · timing | First repeat at 21 frames, then every 8 frames. |
+| D1 · acceleration | After one second repeat every 5 frames; after two seconds, every 4. |
+| D1 · horizontal | Left/Right change values. Stick repeats every 21 frames; D-pad does not repeat. |
+| D1 · ZL | Held ZL + Up/Down repeats every 21 frames without acceleration. |
+| D2 · D-pad repeat | Release a direction held when the menu opened before it can repeat. |
+| D2 · closed menu | A hold while closed also needs release, including when the Recording pop-up opens. |
+| D2 · addendum | Edge-juggle-sol lane, posted 19:38:36Z. |
+| D3 · Recording lists | ZL + Up/Down jumps one window (12 rows), stopping at the first or last entry. |
+| D3 · following jump | Continue to the other list, then the previous or next section, using native list jump. |
+| D3 · pop-ups | Recording pop-up lists, file screens and chain picker jump one window and wrap. |
+| D3 · earlier behavior | Other menu pop-ups already wrapped. The chain picker previously ignored the jump. |
+
+- **Decided by the operator on 2026-11-22** (tr-primary-2 ledger, 19:05:48Z: defaults D1 to D3 approved), on the operator's report that holding Down on the Recording lists does not speed up and that the page-down shortcut does not work there.
+- Finding by the preview-vis-sol lane on source `aad616bc`: no menu list sped up on a hold, because the one input adapter every menu screen shares never repeated a D-pad direction and repeated a stick at a constant 21 frames; and the Recording lists had a private copy of the list jump that wrapped inside one list.
 
 The speeds are three constants (`HOLD_QUICKEN`), to be tuned after the operator has tried them. A repeat waits while
 the menu's worker has not taken the previous press, so the cursor does not run on after the release.
@@ -1879,7 +2081,10 @@ For Eden routes: a menu D-pad Up or Down held 21 frames or longer now steps more
 
 ## Guard the Edge and Juggler in the waiting room; parity by default (operator)
 
-**2026-11-22, two requirements:** Juggler and Guard the Edge were not showing in the waiting room, and that is fixed. As a standing rule, every feature works the same in Training and in the waiting room unless decided otherwise.
+| 2026-11-22 requirement | Outcome |
+| --- | --- |
+| Juggler and Guard the Edge missing from the waiting room | Fixed |
+| Feature parity | Training and waiting rooms behave the same unless separately decided. |
 
 - Both games are listed and run in a waiting room's practice as in Training; the opponent is the first training partner.
 - The room has no pause panel, so while a drill runs the plugin sets that partner's control type to the stock CPU with the game's own setter and gives the room's Training Partner Behavior back at Stop, and its level is the drill's.
@@ -1899,11 +2104,20 @@ For Eden routes: a menu D-pad Up or Down held 21 frames or longer now steps more
 
 ## Record placement · RP4 missed-tech face
 
+| Input | Missed-tech facing |
+| --- | --- |
+| X | Select face up or face down. |
+
 DOWN's entry picks the missed-tech face from the fighter's pose. On the same frame, immediately after entry,
 the plugin sets the chosen face flag and restarts that face's bound motion when either differs from the choice.
-X selects face up or face down.
 
 ## Menu lists (2026-11-23): Up / Down wrap in each list
+
+| Recording list control | Action |
+| --- | --- |
+| ZL + Up / Down | Keep D3's section jump. |
+| Left / Right | Switch lists. |
+| L / R | Turn the page. |
 
 The operator reported on hardware that the submenu lists, the save states and the macros among them, do not go round
 from one end to the other. The menu's own lists already wrapped, but the Recording page lists moved on at their ends;
@@ -1911,7 +2125,7 @@ file screens, pickers, saved layouts, Mii lists and the Keep / Switch question s
 
 - Every list's Up / Down wraps through one shared step.
 - On the Recording page each list wraps on its own; an empty list passes to the other list.
-- ZL + Up / Down keep D3's section jump, Left / Right switch lists, and L / R turn the page.
+
 - Grids are unchanged.
 - The Recording page's footer names ZL + Up / Down as the way out of a list.
 
@@ -1920,11 +2134,18 @@ day (ruling of about 12:55Z). The operator may still overrule it.
 
 ## F15 (2026-11-23): the room's partner type after a drill
 
-After a drill that used its own CPU fighter the room's partner kept the stock CPU type instead of the room's Training
-Partner Behavior. The saved type now follows the fighter swap and goes back to the fighter in the slot at the drill's
-end.
+| Drill using its own CPU fighter | Room partner type |
+| --- | --- |
+| Before the fix | Partner retained stock CPU type instead of Training Partner Behavior. |
+| Fighter swap | Saved type follows the swap. |
+| Drill ends | Restore that type to the fighter in the slot. |
 
 ## Recording chain back-out (2026-11-23)
+
+| Picker action | X (Done) |
+| --- | --- |
+| Existing edit | Write the edit. |
+| New chain or sequence | Ask for its name. |
 
 B in the chain picker was "done": on a new chain or sequence it opened the name keyboard, and cancelling that keyboard
 in Training left an unseen name draft open that held both fighters after the Recording menu closed.
@@ -1932,7 +2153,7 @@ in Training left an unseen name draft open that held both fighters after the Rec
 - A1 (tr-primary-2's ruling of 16:05Z; it replaces the edge-juggle-sol default of 16:02:42Z, under which B backed out
   only with nothing numbered): B always backs out.
   - In + New chain, + New sequence, Edit chain and Edit combos, B leaves the picker with no keyboard and nothing saved; an edit keeps the old order.
-  - Done is X: it writes an edit, and asks a new chain or sequence for its name.
+
   - It is X because the menu has no standard done button: A gives a number here. Only closed-menu wizards read +. While the page waits for a name, B cancels it.
 - A2: a cancelled keyboard makes nothing, and the page's name draft is open only while the page waits for it. When the
   page stops waiting (B, the menu closed or lost), the draft is closed and its keyboard job is retired, also while that
@@ -1941,12 +2162,16 @@ in Training left an unseen name draft open that held both fighters after the Rec
 
 ## The open menu holds the CPU; Stop takes effect behind the menu (2026-11-23)
 
+| Fighter | Open-menu hold |
+| --- | --- |
+| Player 1 | Stays unfrozen. |
+
 The menu owned Player 1's input but did not hold the other fighters, so the CPU acted behind it. Stop ended a drill
 at once, but Guard the Edge, Juggler and Mash out could wait for the menu to close before giving the CPU back.
 
 - The open menu now uses the panels' special stop on every fighter but Player 1 that the panels hold: the CPU and extra CPUs in Training, and the practice partner in a waiting room.
 - Both scenes use the same stop; Training does not pause the whole game because the menu's own services, including the keyboard, run on fighter frames.
-- Player 1 is not frozen.
+
 - The hold stands down while something else drives or places the CPU: a preview from any screen (the clip editor's, an input drill's, through its tail), a save-state load, a recording, a macro queued or playing on either fighter, and a fighter that is loading.
 - The Recording pop-up and the close window do not hold the CPU.
 
@@ -1957,18 +2182,27 @@ at once, but Guard the Edge, Juggler and Mash out could wait for the menu to clo
 
 ## Move names (2026-11-24)
 
+| View | Move names |
+| --- | --- |
+| Live | Player 1's moves |
+| Saved, fighter identified | Recorded fighter's move names |
+| Saved, fighter unidentified | Common names |
+
 tr-primary-2's inbox ruling at 17:21:31Z and the operator's green light about 17:22Z, install 4: add an Off-by-default
-move-name toggle. Live views name Player 1's moves; saved views use the recorded fighter or common names when that
-identity is unavailable. Special and Final Smash names come from the message file served by ARCropolis.
+move-name toggle. Special and Final Smash names come from the message file served by ARCropolis.
 
 ## The ACTION model (2026-11-24): one fighter-agnostic model for recorded inputs — decided (operator)
+
+| Input at take start | Recorded event |
+| --- | --- |
+| Button already held | Counts as a press. |
 
 Decided by the operator on 2026-11-24 for the next build (relayed by tr-primary-2, inbox 17:21:31Z):
 
 - The ten-fighter list is eliminated. Aims come from the outcome rule, for every fighter.
 - No aim event in a special's own direction: a straight-up up special has no first-direction mark.
 - A side tilt's or side smash's angle comes from the animation the game chose, not from the stick.
-- A button already held when a take starts still counts as a press.
+
 - Charge: the hold length, from the press to the release of the same button, is recorded and graded within a band.
 - Steering (each travel's path) and an angle-and-deflection toggle are decided too; they are built as a separate
   change.
@@ -1978,10 +2212,14 @@ Design: [design/action-model.md](design/action-model.md).
 
 ## Range sliders and the Recording pop-up (2026-11-24)
 
+| Recording pop-up control | Action |
+| --- | --- |
+| ZR | Toggle Player 1 / CPU role. |
+| ZL, L or R | Switch tabs. |
+
 - Decided by the operator on 2026-11-24 (relayed by tr-primary-2, inbox 23:57:04Z): Up / Down choose the slider handle and, while editing, raise or lower it; Left / Right do nothing.
 - A edits or puts a handle down, and B puts it down or leaves.
 - Damage ranges step by 0.5%; Tech ranges keep their own steps.
-- ZR toggles the Recording pop-up's Player 1 / CPU role, and ZL, L and R switch its tabs.
 
 - The storage form and hold curve were accepted by tr-primary-2 on 2026-11-25 00:08:17Z.
 - Damage rows store `[lower, upper]` in whole percents, or `[lower, upper, lower half, upper half]` with 0 or 1 flags for half-percent ends.
@@ -1992,13 +2230,18 @@ role keys (primary 2026-11-08 15:55Z).
 
 ## Record while an AI plays Player 1 (2026-11-25)
 
+| P1 CPU Control | Behavior |
+| --- | --- |
+| During a take | Keeps playing. |
+| Menu or Playback Slot run | Waits. |
+
 Decided on 2026-11-25 (about 14:05Z, relayed by tr-primary-2, inbox 14:02:10Z): the mod does not block Record
 while an AI plays Player 1. The design was accepted by tr-primary-2 on 2026-11-25 14:15:33Z.
 
 - Record starts while the CPU pilot or P1 CPU Control plays Player 1, from the Record chord, which is the one start
   for the pop-up, Record drill and Record placement, in Training and in waiting rooms.
 - The take holds Player 1's inputs as the game receives them: the mapped record after the pilot or P1 CPU Control
-  wrote it. P1 CPU Control keeps playing through a take; it still waits for a menu and for a Playback Slot run.
+  wrote it.
 - With the Recording role set to CPU, those inputs drive the CPU and fill the take, and Player 1 stands neutral, as
   for a player.
 - The `record_refused` log reasons keep their numbers (1 fighter missing, 2 save state loading, 3 busy); 0 is
@@ -2011,9 +2254,15 @@ had that refusal. This decision recorded host tests, not a gameplay result.
 
 ## Preview stop and Recording chord hints (2026-11-25)
 
+| Input during preview | Effect |
+| --- | --- |
+| B | Stop and drop remaining frames; keep the editor open. |
+| Second B | Close the editor. |
+| X | Stop. |
+| Editor ZR tap | Switch target and stop the preview. |
+
 Decided by the operator on 2026-11-25 (relayed by tr-primary-2, inbox 14:29:24Z): the five preview entry points share
-B as the stop key and `B stop preview` as their hint. B stops and drops the remaining frames without closing the
-editor; a second B closes it. X also stops, and an editor ZR tap switches target and stops a preview.
+B as the stop key and `B stop preview` as their hint.
 
 - The Recording pop-up's first help line shows the configured Record and Play chords.
 - It uses the full names when they fit the pane's UTF-16 capacity and width, then P1 and CPU, then a pointer to the chords screen.
@@ -2021,6 +2270,8 @@ editor; a second B closes it. X also stops, and an editor ZR tap switches target
 - The design was accepted at 14:35:13Z; the hint lifecycle and fit rule were amended after review by rv-hit-streak at 14:36:00Z.
 
 ## Off stage, found from the stage's own lines (2026-11-25): decided (operator)
+
+![The Training stage's collision](decisions/training-stage-offstage/training-01-outline.png)
 
 Reported on 2026-11-25 (about 16:00Z): the Training stage's tracing is off when placement decides
 where off stage is. Training has a wall on its left side, a Battlefield-like stage in the centre
@@ -2032,8 +2283,6 @@ and a long ledge on the right, so off stage is only at the Battlefield part.
   be the one solid under the middle of the camera, which there is the long floor on the right.
 - Its right end (x 620) is past the blast line (x 500), so Guard the Edge and Juggler made no stage and did not start.
 - The eggs Off stage zone reached into the island. Placement's Off stage used no stage shape at all.
-
-![The Training stage's collision](decisions/training-stage-offstage/training-01-outline.png)
 
 ![Where off stage fell on the Training stage before](decisions/training-stage-offstage/training-03-off-stage-today.png)
 
@@ -2054,7 +2303,7 @@ and a long ledge on the right, so off stage is only at the Battlefield part.
 
 | | Choice | A | B |
 | --- | --- | --- | --- |
-| T1 | Placement, when a fighter is switched to Off stage | It goes to the default spot of the nearest ledge with open air; the crosshair then moves freely | Off stage accepts only off-stage points |
+| T1 | Switch a fighter to Off stage | Pick nearest open-air ledge's default spot, then move the crosshair freely. | Off stage accepts only off-stage points. |
 | T2 | Under a solid | Placement accepts it; Guard the Edge keeps refusing it | No feature accepts it |
 | T3 | Guard the Edge, Juggler and the eggs Off stage zone | Move them to the same rule in a later build | Placement only |
 
@@ -2078,7 +2327,10 @@ better, so the build waits for it.
 
 Who builds what is in tr-primary-2's inbox post of 17:06:54Z. The rule lives in the stage-geometry module
 (`artifacts/phase23/stage-geometry/DESIGN.md`).
+
 ## Change placement: the crosshair, on the save itself (2026-11-25): decided (operator)
+
+![The flow: the save's own screen, then Where, then Spot, then A saves](decisions/placement-crosshair/place-next-01-flow.png)
 
 Required on 2026-11-25 about 14:40Z (relayed by tr-primary-2, inbox 14:40:44Z):
 
@@ -2092,20 +2344,29 @@ Required on 2026-11-25 about 14:40Z (relayed by tr-primary-2, inbox 14:40:44Z):
 - Six choices were put to the operator on the review page [decisions/placement-crosshair/README.md](decisions/placement-crosshair/README.md).
 - A green outline in a picture marks the lane's recommendation at the time, which is not always what was decided.
 
-![The flow: the save's own screen, then Where, then Spot, then A saves](decisions/placement-crosshair/place-next-01-flow.png)
-
 **The answers**, 2026-11-25 about 15:50Z (relayed by tr-primary-2, inbox 15:53:07Z), are the table below.
 
 **Decided:**
 
 | | Choice | Decided |
 | --- | --- | --- |
-| PC1 | On stage: how the floor is chosen | **B, the floor hop.** Left / Right move the fighter along its floor; Up / Down step to the floor above or below. The floors are the ones Tech practice's surface walk traces; no second tracer. A stick held diagonally does not change floor. Until the walk is done the fighter stands on the floor under a free crosshair. |
-| PC2 | Where it opens | **All four:** a save's own screen; a macro's or a chain's own screen (it opens the start save); X on a save in the Recording pop-up; and the row in Recording › Replays, which opens the same picker on the active macro's start save. |
-| PC3 | The pages | **All five:** Where, Spot, State, Percent, Preview. **+ saves from any page**; a page you did not visit keeps the save's own values. |
-| PC4 | Place fighters before Record | **A, one wizard for both.** It gets the Where page, the live fighters, the game's magnifier and the range to the blast line. |
-| PC5 | A start save that macros share | **A question.** When macros start from the save, the picker first asks whether to change it for all of them (it says how many) or to copy it. Opened from a macro, the copy becomes that macro's start save; opened from the save's own screen, the copy is a new save no macro uses. An Advanced setting, **Shared start save**, answers it ahead: Prompt (the default), Always change, Always copy. |
-| PC6 | The old offsets and the Momentum key | **A.** The key grid goes. Momentum becomes a row on the macro's own screen. A macro that has an offset shows it in an Offset row there, and A clears it. |
+| PC1 | Floor selection | **B.** Left/Right follow the floor; Up/Down step to the floor above or below. |
+| PC1 | Source | Reuse Tech practice's surface walk. A diagonal stick hold keeps the floor. |
+| PC1 | While tracing | The fighter stands on the floor under a free crosshair. |
+| PC2 | Entry points | **All four routes open the same picker.** |
+| PC2 | Save or macro | Open from the save screen, or edit the start save from a macro/chain screen. |
+| PC2 | Recording pop-up | Press X on a save. |
+| PC2 | Recording › Replays | The row opens the active macro's start save. |
+| PC3 | Pages | **All five.** Where, Spot, State, Percent, Preview. |
+| PC3 | Save | **+ saves from any page.** Unvisited pages keep the save's values. |
+| PC4 | Place fighters before Record | **A.** Share one wizard for both uses. |
+| PC4 | Shared features | Where page, live fighters, game's magnifier and range to the blast line. |
+| PC5 | Shared start save | **Ask first.** Show how many macros use it. Offer change for all or copy. |
+| PC5 | Copy from a macro | That macro uses the new start save. |
+| PC5 | Copy from the save screen | No macro uses the new copy. |
+| PC5 | Advanced setting | **Shared start save** offers Prompt (default), Always change or Always copy. |
+| PC6 | Old key grid | **A.** Remove the grid. Move Momentum to the macro's own screen. |
+| PC6 | Existing macro offset | Show its Offset row. A clears it. |
 
 ![PC1](decisions/placement-crosshair/place-next-PC1-on-stage.png)
 
