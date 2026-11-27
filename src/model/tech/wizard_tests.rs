@@ -40,17 +40,14 @@ fn seed() -> Config {
     }
 }
 fn spot(normal: Vec2) -> Spot {
-    Spot {
-        point: Vec2 { x: 7., y: 11. },
-        line: Line {
+    Spot::near(Line {
             id: 42,
             ends: [Vec2 { x: -20., y: 11. }, Vec2 { x: 20., y: 11. }],
             normal,
             floor: normal.y >= 0.7,
             wall: normal.y == 0.,
             passable: false,
-        },
-    }
+        }, Vec2 { x: 7., y: 11. })
 }
 fn ready() -> Wizard {
     let mut w = Wizard::begin(seed(), false);
@@ -211,7 +208,9 @@ fn wizard_slopes_endpoint_order_and_one_degree_precision() {
     let inward = (-n.y).atan2(-n.x).to_degrees().rem_euclid(360.);
     close(w.world_angle().unwrap(), inward);
     let before = w.config().unwrap();
-    s.line.ends.reverse();
+    let mut reversed = s.line;
+    reversed.ends.reverse();
+    s = Spot::near(reversed, s.point());
     w.set_spot(s);
     assert_eq!(w.config().unwrap(), before);
     for a in 0..=360 {
@@ -242,8 +241,7 @@ fn wizard_rejects_invalid_geometry_without_replacing_selection() {
         assert!(!w.set_spot(spot(normal)));
         assert_eq!(w.selected, original);
     }
-    let mut invalid = original.unwrap();
-    invalid.point.x = f32::NAN;
+    let mut invalid = Spot::at(original.unwrap().line, f32::NAN);
     assert!(!w.set_spot(invalid));
     invalid = original.unwrap();
     invalid.line.ends[1] = invalid.line.ends[0];

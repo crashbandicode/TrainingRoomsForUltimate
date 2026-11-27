@@ -39,7 +39,7 @@ pub fn marks(
             },
         ))
     };
-    out[0] = marker(spot.point, 0.3, 255);
+    out[0] = marker(spot.point(), 0.3, 255);
     let (direction, tail, tip, stem, head) = if let Some(wizard) = wizard {
         let Some(angle) = wizard.world_angle() else {
             return out;
@@ -50,9 +50,9 @@ pub fn marks(
             y: radians.sin(),
         };
         let tail = if matches!(wizard.step, Step::Distance | Step::Hit | Step::Preview) {
-            wizard.start_marker().unwrap_or(spot.point)
+            wizard.start_marker().unwrap_or(spot.point())
         } else {
-            add(spot.point, scale(direction, -7.))
+            add(spot.point(), scale(direction, -7.))
         };
         (direction, tail, add(tail, scale(direction, 7.)), 7., 2.)
     } else {
@@ -62,8 +62,8 @@ pub fn marks(
         let normal = spot.line.normal;
         (
             normal,
-            add(spot.point, scale(normal, 2.5)),
-            add(spot.point, scale(normal, 5.)),
+            add(spot.point(), scale(normal, 2.5)),
+            add(spot.point(), scale(normal, 5.)),
             2.5,
             1.5,
         )

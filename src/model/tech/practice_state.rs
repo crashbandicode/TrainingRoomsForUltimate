@@ -97,7 +97,7 @@ fn spot_kind(spot: Option<Spot>) -> &'static str {
 }
 
 fn spot_point(spot: Option<Spot>) -> Option<[f32; 2]> {
-    spot.map(|spot| [spot.point.x, spot.point.y])
+    spot.map(|spot| [spot.point().x, spot.point().y])
 }
 
 #[cfg(test)]
@@ -162,17 +162,14 @@ mod tests {
         let session = Session::IDLE;
         let fields = |wizard: &Wizard| project_tech_state(&session, View::Wizard(wizard, None));
         assert_eq!((fields(&wizard).wizard_step, fields(&wizard).wizard_point), ("spot", None));
-        assert!(wizard.set_spot(Spot {
-            point: Vec2 { x: 7., y: 11. },
-            line: Line {
+        assert!(wizard.set_spot(Spot::near(Line {
                 id: 42,
                 ends: [Vec2 { x: -20., y: 11. }, Vec2 { x: 20., y: 11. }],
                 normal: Vec2 { x: 0., y: 1. },
                 floor: true,
                 wall: false,
                 passable: false,
-            },
-        }));
+            }, Vec2 { x: 7., y: 11. })));
         let point = fields(&wizard);
         assert_eq!((point.phase, point.wizard_selection, point.wizard_point), ("wizard", "floor", Some([7., 11.])));
         for (step, selection, value) in [

@@ -107,15 +107,20 @@ impl Line {
         let d = sub(self.ends[1], self.ends[0]);
         dot(d, d).sqrt()
     }
-    pub fn snap(self, cursor: Vec2) -> Option<Vec2> {
+    /// The world point at `t` along the line, from its first end, or from its second when `far`.
+    pub fn at(self, t: f32, far: bool) -> Vec2 {
+        let [a, b] = if far { [self.ends[1], self.ends[0]] } else { self.ends };
+        add(a, scale(sub(b, a), t))
+    }
+    /// The parameter (0 to 1, from the first end) of the point of the line nearest `cursor`.
+    pub fn project(self, cursor: Vec2) -> Option<f32> {
         let d = sub(self.ends[1], self.ends[0]);
         let n = dot(d, d);
-        (finite(cursor) && self.valid() && n > 0.0 && n.is_finite()).then(|| {
-            add(
-                self.ends[0],
-                scale(d, (dot(sub(cursor, self.ends[0]), d) / n).clamp(0.0, 1.0)),
-            )
-        })
+        (finite(cursor) && self.valid() && n > 0.0 && n.is_finite())
+            .then(|| (dot(sub(cursor, self.ends[0]), d) / n).clamp(0.0, 1.0))
+    }
+    pub fn snap(self, cursor: Vec2) -> Option<Vec2> {
+        self.project(cursor).map(|t| self.at(t, false))
     }
     /// Endpoints are compared exactly: even a small moved line is excluded.
     pub fn stationary(self, now: Self) -> bool {
@@ -154,7 +159,8 @@ impl RecoverError {
 /// Pure world geometry only: no borrowed collision id survives rediscovery.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RememberedSpot {
-    point: Vec2,
+    /// Where on the line, measured from `ends[0]`.
+    t: f32,
     ends: [Vec2; 2],
     normal: Vec2,
     floor: bool,
@@ -162,10 +168,11 @@ pub struct RememberedSpot {
     passable: bool,
 }
 impl RememberedSpot {
-    pub fn capture(line: Line, point: Vec2) -> Option<Self> {
-        (line.valid() && line.kind().is_some() && finite(point)).then_some(Self {
-            point,
-            ends: line.ends,
+    /// `far`: `t` is measured from the line's second end, which is then kept first.
+    pub fn capture(line: Line, t: f32, far: bool) -> Option<Self> {
+        (line.valid() && line.kind().is_some() && (0.0..=1.0).contains(&t)).then_some(Self {
+            t,
+            ends: if far { [line.ends[1], line.ends[0]] } else { line.ends },
             normal: line.normal,
             floor: line.floor,
             wall: line.wall,
@@ -173,7 +180,9 @@ impl RememberedSpot {
         })
     }
     /// Exact geometry/kind rebinding after fresh discovery; never nearest.
-    pub fn resolve(self, surfaces: &Surfaces) -> Result<(Line, Vec2), RecoverError> {
+    /// The line as read now, the parameter, and whether it is measured from that line's second end (its ends came back
+    /// the other way round).
+    pub fn resolve(self, surfaces: &Surfaces) -> Result<(Line, f32, bool), RecoverError> {
         if surfaces.state != Walk::Closed {
             return Err(RecoverError::Incomplete);
         }
@@ -187,7 +196,7 @@ impl RememberedSpot {
                     && line.passable == self.passable
             })
             .ok_or(RecoverError::MissingSurface)?;
-        Ok((line, self.point))
+        Ok((line, self.t, line.ends != self.ends))
     }
 }
 
@@ -310,14 +319,13 @@ impl Surfaces {
         }
         self.state
     }
-    pub fn nearest(&self, cursor: Vec2, kind: Option<Kind>) -> Option<(Line, Vec2)> {
+    /// The targetable line nearest `cursor`, with the parameter of its nearest point.
+    pub fn nearest(&self, cursor: Vec2, kind: Option<Kind>) -> Option<(Line, f32)> {
+        let away = |(l, t): &(Line, f32)| dot(sub(l.at(*t, false), cursor), sub(l.at(*t, false), cursor));
         self.lines()
             .filter(|l| l.kind().is_some() && (kind.is_none() || l.kind() == kind))
-            .filter_map(|l| l.snap(cursor).map(|p| (l, p)))
-            .min_by(|a, b| {
-                dot(sub(a.1, cursor), sub(a.1, cursor))
-                    .total_cmp(&dot(sub(b.1, cursor), sub(b.1, cursor)))
-            })
+            .filter_map(|l| l.project(cursor).map(|t| (l, t)))
+            .min_by(|a, b| away(a).total_cmp(&away(b)))
     }
 }
 

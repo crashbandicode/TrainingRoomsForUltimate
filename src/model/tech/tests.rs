@@ -75,8 +75,8 @@ fn unclassified_solid_line_keeps_outline_closed() {
 #[test]
 fn point_snaps_to_nearest_surface() {
     let mut stage=Stage::fixture(); let s=stage.walk();
-    assert_eq!(s.nearest(v(45.,-10.),None).map(|(_,p)|p),Some(v(40.,-10.)));
-    assert_eq!(s.nearest(v(0.,-25.),None).map(|(_,p)|p),Some(v(0.,-20.)));
+    assert_eq!(s.nearest(v(45.,-10.),None).map(|(l,t)|l.at(t,false)),Some(v(40.,-10.)));
+    assert_eq!(s.nearest(v(0.,-25.),None).map(|(l,t)|l.at(t,false)),Some(v(0.,-20.)));
     let l=stage.lines[0];
     assert_eq!(l.random_point(l,0.),Some(v(-35.,0.)));
     assert_eq!(l.random_point(l,1.),Some(v(35.,0.)));
@@ -84,7 +84,7 @@ fn point_snaps_to_nearest_surface() {
     assert_eq!(line(9,v(0.,0.),v(9.,0.),v(0.,1.)).random_point(line(9,v(0.,0.),v(9.,0.),v(0.,1.)),0.5),None);
 }
 fn aim<'a>(s:&'a Surfaces,l:Line,target:Vec2)->solver::Aim<'a>{
-    solver::Aim { surfaces:s,line:l,target,knockback:100.,params:FlightParams {brake:0.051,gravity:0.06,fall_speed_cap:1.5},
+    solver::Aim { surfaces:s,spot:picker::Spot::near(l,target),knockback:100.,params:FlightParams {brake:0.051,gravity:0.06,fall_speed_cap:1.5},
         blast:solver::Box2 {min:v(-200.,-200.),max:v(200.,200.)},view:None }
 }
 #[test]

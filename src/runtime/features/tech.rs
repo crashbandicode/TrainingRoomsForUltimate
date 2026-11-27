@@ -36,6 +36,8 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::OnceLock;
 
 const NOTICE: u8 = 0x32;
+/// The drill's stop when none of an attempt's candidates has a start.
+const NO_LAUNCH: &str = "No launch fits these Tech practice values";
 static CONFIG: Published<Option<Config>> = Published::new(None);
 static OPEN: AtomicBool = AtomicBool::new(false);
 static START: AtomicBool = AtomicBool::new(false);
@@ -543,7 +545,7 @@ fn rebuild(run: &mut Practice, view: &mut ViewState) {
                 .then_some(view.picker.selected)
                 .flatten()
         })
-        .and_then(|spot| RememberedSpot::capture(spot.line, spot.point));
+        .and_then(picker::Spot::remember);
     run.retained_sample = sampled.map(|(setup, _, percent)| (setup, percent));
     if let StartHint::Pending(draws) = &mut run.start_hint {
         *draws = MaterialDraws::default();
@@ -776,7 +778,7 @@ pub unsafe fn frame(fighter: usize) {
             .then(|| {
                 view.picker
                     .selected
-                    .and_then(|s| RememberedSpot::capture(s.line, s.point))
+                    .and_then(picker::Spot::remember)
             })
             .flatten();
             run.recovering = false;
@@ -850,9 +852,8 @@ pub unsafe fn frame(fighter: usize) {
             Picker::restore(picker, surfaces);
         }
         if let Some(remembered) = run.remembered.take() {
-            match remembered.resolve(&view.surfaces) {
-                Ok((line, point)) => {
-                    let spot = picker::Spot { line, point };
+            match picker::Spot::recover(remembered, &view.surfaces) {
+                Ok(spot) => {
                     view.picker.selected = Some(spot);
                     if let Some((setup, percent)) = run.retained_sample.take() {
                         run.sampled = Some((setup, spot, percent));
@@ -905,7 +906,7 @@ pub unsafe fn frame(fighter: usize) {
                             let multiplier = super::tech_hitlag::live_multiplier(at).ok()?;
                             let context = plan_context(view, spot, draft, at, multiplier)?;
                             let params = context.params;
-                            let blocked = planner::plan(draft, context, &mut |_| 0).is_none();
+                            let blocked = planner::plan(draft, context, &mut |_| 0).is_err();
                             let mut draws = MaterialDraws::default();
                             if !blocked {
                                 draws.observe(source.damaging_floor(spot.line));
@@ -1010,10 +1011,8 @@ pub unsafe fn frame(fighter: usize) {
             }
         }
         if run.planning_failed {
-            notice(
-                run,
-                Some("Approximate aim has no solution for these values"),
-            );
+            // restriction: tech-no-launch-fits
+            notice(run, Some(NO_LAUNCH));
             return;
         }
         if run.pending {
@@ -1023,50 +1022,64 @@ pub unsafe fn frame(fighter: usize) {
                 return;
             };
             if run.reroll && run.sampled.is_none() {
-                let spot = if run.config.surface == 4 {
-                    if view
-                        .picker
-                        .selected
-                        .is_some_and(|s| !s.current(&mut source))
-                    {
+                enum Ended {
+                    Rebuild,
+                    Choose,
+                    Wait,
+                }
+                let mut why = planner::Refused::Values;
+                let drawn = planner::draw_attempt(|| -> Result<_, Ended> {
+                    let spot = if run.config.surface == 4 {
+                        if view.picker.selected.is_some_and(|s| !s.current(&mut source)) {
+                            return Err(Ended::Rebuild);
+                        }
+                        view.picker.selected.ok_or(Ended::Choose)?
+                    } else {
+                        picker::random_spot(
+                            &view.surfaces,
+                            &mut source,
+                            kind(run.config),
+                            range,
+                            &mut |n| draw(&mut run.rng, n),
+                            &mut |source, line| {
+                                if let StartHint::Pending(draws) = &mut run.start_hint {
+                                    draws.observe(source.damaging_floor(line));
+                                }
+                            },
+                        )
+                        .ok_or(Ended::Rebuild)?
+                    };
+                    view.picker.selected = Some(spot);
+                    let context = plan_context(view, spot, run.config, at, multiplier).ok_or(Ended::Wait)?;
+                    Ok(match planner::plan(run.config, context, &mut |n| draw(&mut run.rng, n)) {
+                        Ok(plan) => Some((plan, spot)),
+                        Err(refused) => {
+                            why = refused;
+                            None
+                        }
+                    })
+                });
+                let (plan, spot) = match drawn {
+                    Ok(Some((taken, _))) => taken,
+                    Ok(None) => {
+                        run.planning_failed = true;
+                        crate::runtime::diag_log::diagnostic(format_args!(
+                            "[Tech] no launch fits: {why:?} on the last of {} candidates",
+                            planner::CANDIDATES
+                        ));
+                        // restriction: tech-no-launch-fits
+                        notice(run, Some(NO_LAUNCH));
+                        return;
+                    }
+                    Err(Ended::Wait) => return,
+                    Err(Ended::Choose) => {
+                        notice(run, Some("Choose a stage surface"));
+                        return;
+                    }
+                    Err(Ended::Rebuild) => {
                         rebuild(run, view);
                         return;
                     }
-                    view.picker.selected
-                } else {
-                    picker::random_spot(
-                        &view.surfaces,
-                        &mut source,
-                        kind(run.config),
-                        range,
-                        &mut |n| draw(&mut run.rng, n),
-                        &mut |source, line| {
-                            if let StartHint::Pending(draws) = &mut run.start_hint {
-                                draws.observe(source.damaging_floor(line));
-                            }
-                        },
-                    )
-                };
-                let Some(spot) = spot else {
-                    if run.config.surface == 4 {
-                        notice(run, Some("Choose a stage surface"));
-                    } else {
-                        rebuild(run, view);
-                    }
-                    return;
-                };
-                view.picker.selected = Some(spot);
-                let Some(context) = plan_context(view, spot, run.config, at, multiplier) else {
-                    return;
-                };
-                let result = planner::plan(run.config, context, &mut |n| draw(&mut run.rng, n));
-                let Some(plan) = result else {
-                    run.planning_failed = true;
-                    notice(
-                        run,
-                        Some("Approximate aim has no solution for these values"),
-                    );
-                    return;
                 };
                 run.sampled = Some((plan.setup, spot, plan.sampled_percent));
                 run.approximate = plan.approximate;
