@@ -62,7 +62,7 @@
   <text x="690" y="310.5" font-size="13" fill="#ffffff">Red: the kept part, from In to Out.</text>
   <circle cx="671" cy="336" r="11" fill="#ffd166"/>
   <text x="671" y="340.5" font-size="12.5" font-weight="bold" text-anchor="middle" fill="#15151a">8</text>
-  <text x="690" y="340.5" font-size="13" fill="#ffffff">The Out handle. R selects it; Y snaps it to a move&#x27;s end.</text>
+  <text x="690" y="340.5" font-size="13" fill="#ffffff">Out: the first frame not kept. R selects the handle; Y snaps it.</text>
   <circle cx="671" cy="366" r="11" fill="#ffd166"/>
   <text x="671" y="370.5" font-size="12.5" font-weight="bold" text-anchor="middle" fill="#15151a">9</text>
   <text x="690" y="370.5" font-size="13" fill="#ffffff">A tick: a move starts here.</text>
@@ -74,6 +74,6 @@
   <text x="690" y="430.5" font-size="13" fill="#ffffff">What the selected handle does, and how to move it faster.</text>
   <circle cx="671" cy="456" r="11" fill="#ffd166"/>
   <text x="671" y="460.5" font-size="12.5" font-weight="bold" text-anchor="middle" fill="#15151a">12</text>
-  <text x="690" y="460.5" font-size="13" fill="#ffffff">The keys that work now.</text>
-  <text x="28" y="514" font-size="12" fill="#cfd3da">With a handle selected, the playhead is on that handle's frame.</text>
+  <text x="690" y="460.5" font-size="13" fill="#ffffff">Key hints. The fighter switch is a known issue in this preview.</text>
+  <text x="28" y="514" font-size="12" fill="#cfd3da">Selecting In shows the first kept frame; selecting Out shows the last kept frame (Out minus one).</text>
 </svg>

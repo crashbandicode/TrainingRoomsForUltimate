@@ -341,17 +341,17 @@ you crop and while a preview plays. The strip shows:
 - one timeline with the In and Out handles, the playhead and a tick for every move.
 
 ![The clip editor's strip with twelve numbered labels: what is open, where the preview plays, the kept part, the move at the handle, the grey and red parts of the timeline, the In and Out handles, a move's tick and band, the help lines and the key line](../diagrams/clip-editor-legend.svg)<br>
-*The strip, labelled. The picture under the labels is one frame of the scrub clip of the preview build `cc71537c` (staged, not installed), with In selected; install 6's strip has the same parts, without "ZL+L / ZL+R: fighters" on its key line.*
+*In is selected at frame 64; Out is 154, so frames 64 through 153 are kept. The picture is from the preview clip, not install 6. Install 6 does not show the fighter-switch hint. [Open the full-size legend](../diagrams/clip-editor-legend.svg).*
 
 | Key | What it does |
 | --- | --- |
 | Up/Down | On a capture with two sides, pick whose inputs to take. Nothing for a saved file. |
-| ZR | A tap (pressed and released with nothing else) swaps where the preview of a macro or a capture plays: the CPU or Player 1, as ZR does on the Recording page. The strip names it ("Plays on CPU", or after a capture's fighter "plays on Player 1"). A recording opened from its own screen starts on its Plays on choice, and Make uses the target the strip shows. During a preview it stops the preview and swaps; X then plays on the other fighter. ZR held with Left/Right is the fast scrub and does not swap. |
-| L / R | L picks In and R picks Out. After browsing with no handle selected (Left/Right or Y), L instead makes the playhead's frame the first kept frame; R makes it the last kept frame (Out is one frame later). The new handle is selected. A playhead at or after Out cannot become In, and one at or before In cannot become Out: the strip reads "Playhead is past Out: set Out first" or "Playhead is at or before In: set In first", and nothing changes. |
-| Left/Right | Move it: frames for replays and macros, whole links for combos, whole steps for drills. A tap moves 1; holding speeds up to 180 a tick, and holding ZL or ZR starts fast. With no handle selected, on a macro or a capture, they move the playhead instead, over the whole take, inside or outside the kept part; In and Out do not change. A combo or a drill has no free playhead: pick a handle first. |
-| Y | With a handle selected, snaps In to a move's start or Out to its end. A move whose end is not known offers the next move's start, or the end of the take. On a Replay window capture, a start in the middle of an action also takes the move's short setup, as ZL + Y does, so X and A work from it; where no move can start there, the strip says why. With no handle selected, on a macro or a capture, Y moves the playhead to the nearest move mark. An unmarked take boundary is not a snap target. |
+| ZR tap | Switch the playback target between Player 1 and the CPU. During preview, this stops playback; X starts it on the new target. Holding ZR for fast scrub does not switch targets. |
+| L / R | Select In / Out. After browsing, set the first / last kept frame instead (see [The free playhead](#the-free-playhead)). |
+| Left/Right | Move the handle by frames (macro or capture), links (combo) or steps (drill). Tap for one; hold to accelerate up to 180 per tick. Hold ZL or ZR to start fast. |
+| Y with In / Out selected | Snap In to a move's start or Out to its end. If the end is unknown, Out uses the next start or the end of the take. On a mid-action capture, snapping In also takes the move's short setup if available; otherwise the strip explains the refusal. |
 | ZL + Y | Replay window captures only: moves In back to the start of the move it sits in, with its short setup. |
-| X | Previews the kept part: a capture on the CPU (or on Player 1 after a ZR tap, or when its Plays on says so), or a macro through Play on the role you opened Crop from (Player view: Player 1; CPU view: the CPU), using its start save when On, or on the other fighter after a ZR tap. No save is needed first. The strip stays up and its playhead follows the inputs; X or B stops it early and drops its remaining frames. Not offered for combos or drills. |
+| X | Preview the kept inputs without saving a new file. The strip stays up and the playhead follows playback. X or B stops it and drops the remaining frames. |
 | A | Names and saves the kept part as a new file of the same kind. An empty name uses the next unused Macro N, Combo N or Drill N. The original stays. |
 | B | Stops a preview or its tail without leaving; the next B closes the editor. B closes at once when the editor is idle. |
 
@@ -359,7 +359,8 @@ What differs by where the editor was opened:
 
 | Opened from | Difference |
 | --- | --- |
-| A capture | The strip names the captured side and where the preview plays. |
+| A capture | The strip names the captured side and playback target. The Replay window starts on the CPU; a capture opened from its own screen uses its **Plays on** choice. Make uses the displayed target. |
+| Crop on a macro | Preview starts on the role you opened Crop from and uses the macro's start save when On. Tap ZR to change the playback target. |
 | A one-side file | No fighter-selection row. |
 | A combo or a drill | No preview button. |
 
@@ -381,6 +382,8 @@ During a preview:
 | No handle selected | "Hold Left or Right to browse the take, or Y for the nearest move." |
 | The playhead has moved | "Playhead moved. L sets the start here, R the end." |
 
+- With no handle selected on a macro or capture, Left/Right browses the whole take without changing the cuts. Y jumps to the nearest move mark, not an unmarked take boundary. Combos and drills require a handle.
+- After browsing, L sets In at the playhead; R sets Out one frame past it. The new handle is selected. At or past Out, L reads "Playhead is past Out: set Out first"; at or before In, R reads "Playhead is at or before In: set In first". Neither refusal changes the range.
 - Starting a preview with X selects the playhead.
 - An accepted A opens the naming prompt; it clears the pending cut at the playhead but does not deselect an In or Out
   handle.
@@ -446,22 +449,22 @@ install 6 behaves as the part above says. The [release notes](../RELEASE-NOTES-r
 
 *Crop on a 154-frame macro recorded on the preview build. With In selected and moved, then Out, both fighters take the pose the take had on that frame, and the strip names Player 1's move there: "27 frames into Flick", "End of Side smash", "6 frames into Side smash". With no handle selected they stand again. Eden, the diagnostic file of `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-clip-scrub-moves.mp4)
 
-On install 6 a scrubbed fighter is moved to its recorded place and keeps the pose it had. On the preview build it
-also shows the move it was doing on that frame:
+Both builds position the fighters relative to where the target stood when the hold began. Install 6 keeps the
+fighter's current pose. The preview can also show a recorded pose:
 
 | Take | While you scrub |
 | --- | --- |
-| A macro recorded on the preview build | Both fighters are shown in the take's place and move. Seen in the clip above. |
-| A macro without recorded moves | Positions only. The key line reads "Play it once to see the moves while scrubbing.". Not seen in Eden for this page. |
-| A capture made before the preview build | Positions only. Seen in the clip below: the CPU keeps the pose it had. |
+| A macro or capture recorded on the preview build | Each fighter shows its recorded move if its fighter kind matches and the frame has a pose. The clip shows this for Mario and Link on one macro. |
+| A macro with positions but no recorded moves | Positions only. The editor can read "Play it once to see the moves while scrubbing." This message was not filmed for this page. |
+| A capture made before the preview build | Positions only. In the snap clip the diagnostic log reported no stored pose for the CPU; the clip shows snapping and playback, not a fighter switch. |
 | Projectiles, items and damage | Not shown, as before. |
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7c00d97bf3abf99b2191b84d54bf130ffe0620ed" autoplay muted loop playsinline controls></video>
 
 *The Replay window on a capture of King K. Rool. In sits 3 frames into an aerial, so X is refused: "In is mid-action. Snap to a move start before previewing or saving." Y moves In to the start of that aerial. X then plays the kept part on the CPU; the key line reads `B stop preview`, then `B back`. Eden, the diagnostic file of `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-clip-snap.mp4)
 
-The preview build also has ZL + L and ZL + R in the editor, which choose the take's fighter or the one on stage for
-each side. They have a known defect and are not described here until it is fixed.
+**Known issue — fighter switch:** the preview editor shows a fighter-switch hint, but the Player 1 request
+timed out and applied only after the editor closed. The CPU side was not tested. [Preview known issues](../RELEASE-NOTES-rc15.md#known-issues).
 
 #### Move marks
 

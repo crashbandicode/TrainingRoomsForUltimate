@@ -446,8 +446,8 @@ The keys are the page's:
 | **Y** | Resets it. |
 | **B** | Goes back to the list. |
 
-- **Start** (the first row; the cursor opens on it) closes the menu and starts the game with the settings shown. Only
-  Start starts a game: closing the menu with **B** starts nothing and stops nothing.
+- **Start** (the first row; the cursor opens on it) closes the menu and starts the game with the settings shown.
+  Backing out with **B** starts nothing and stops nothing. Choosing a saved parry practice is a separate way to start one.
 - One game runs at a time: starting one stops the one that was running.
 - While a game runs, its row on the list shows **Running** in green, and the first row of its screen reads **Stop**.
   **A** on Stop ends the game and the menu stays open; the row reads Start again. **B** closes the menu and the game
@@ -575,9 +575,9 @@ timer.
 
 | Mode | While it runs | At the end |
 | --- | --- | --- |
-| **1 minute** | The notice reads "Eggs 0   1:00" and the clock counts down. | At 0:00 the targets stop and the notice reads "Time! 12 eggs (best 15)" for three seconds. |
-| **10 targets, 20 targets** | The notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths. | The last target stops it, and the notice reads "Done! 10 in 0:18.27 (best 0:16.90)" for three seconds. |
-| **Free practice** | Only the count. | |
+| **1 minute** | The count starts at 0 and the clock counts down from 1:00. | At 0:00 the targets stop. A three-second result shows your count and best, e.g. "Time! 12 eggs (best 15)". |
+| **10 targets, 20 targets** | The count starts at 0/10 or 0/20; the clock counts up in hundredths. | The last target stops the clock. A three-second result shows your time and best, e.g. "Done! 10 in 0:18.27 (best 0:16.90)". |
+| **Free practice** | Only the count. | No timed finish. |
 
 The best is per fighter and per mode, and lasts until the game closes.
 
@@ -625,20 +625,13 @@ keeps your best.
 Check one or more **Moving paths** to have each new target use one selected flight. When the list is empty, targets use
 the ordinary bouncing flight. Target speed changes playback speed.
 
-| Moving path | Note |
-| --- | --- |
-| Richter's Axe | |
-| Pac-Man's Galaxian | |
-| Link's Boomerang | |
-| Samus's Homing Missile | Follows the active player's movement. |
+Choose Richter's Axe, Pac-Man's Galaxian, Link's Boomerang or Samus's Homing Missile.
+The Homing Missile follows the active player's movement.
 
 | Spawn area | Where a moving target stays |
 | --- | --- |
-| **In view** or **Whole stage** | Over the floor it appeared on: it does not pass the ends of that floor and does not drop below it. A flight that needs more room than that is flown smaller. |
+| **In view** or **Whole stage** | Over the floor it appeared on. The flight shrinks to fit, but needs at least a target's width in each direction it moves. If none of the spots tried has room, the target uses Pop up. |
 | **Off stage** | Inside its zone. |
-
-A flight needs at least one target's width of room in each direction it moves: a target appears where a floor gives its
-flight that room, and uses Pop up when none of the spots tried does.
 
 Set **Target expiry** to **Off** or from **1 second** through **10 seconds**. An unhit target then disappears and is
 replaced. Pausing or opening a menu freezes its timer. With **Hit streak** on, an expiry clears the current streak
