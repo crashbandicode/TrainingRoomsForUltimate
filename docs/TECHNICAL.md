@@ -860,12 +860,8 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Miis: what came over from the fork
 
-| # | Behaviour | Fork | Here | Status |
-| --- | --- | --- | --- | --- |
-| 1 | [Open the native Mii editor](#mii--mii-1) | `src/mii_editor_bridge/mod.rs` `request`, `editor_origin.rs` `admit` | `src/runtime/mii/mii_editor_bridge/mod.rs:146` `request`, `editor_origin.rs:14`; `NATIVE_EDITOR_AVAILABLE = true` (`src/model/mii_root/mii_menu.rs:12`) | present |
-
 The Mii code is the fork's own (M5q stage, `parked-reuse175/refactor/stages/m5q/stage`), ported directly. The pkg6
-carry records (`docs/provenance/pkg6-carry-manifest.json`, `pkg6-carry-ledger.md`, checked by
+carry records (`docs/provenance/pkg6-carry-manifest.json`, [pkg6 carry ledger](../tools/provenance-data/pkg6-carry-ledger.txt), checked by
 `python3 -I tools/carry_pkg6.py verify`) name the fork file behind every carried file and every exact-text change.
 This page is the parity checklist of 2026-11-05 (branch `p23/mii-editor`). "Fork" paths are relative to the M5q
 stage; "Here" paths to this repository.
