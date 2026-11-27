@@ -6,7 +6,7 @@
 
 | While waiting | What to do |
 |---|---|
-| <a id='lobby-practice-is-on-by-default'></a>Enter practice | Enable [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) in Training before entering wireless or Quickplay. |
+| <a id='lobby-practice-is-on-by-default'></a>Enter practice | Join wireless or Quickplay. If practice is missing, check [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) in Training. |
 | Set the partners | Close TrainingRooms, press Plus, then choose Training Partners and Training Partner Behavior. |
 | <a id='what-works-there'></a>Pick a tool | [Practise a game](../menu/practice-games.md), [record inputs](recording.md), or [change practice speed](game-speed.md). |
 | <a id='what-is-different-or-refused'></a>An AI plays Player 1 | Record captures its inputs; take control back before Play on Player 1 or Quick Reset. |

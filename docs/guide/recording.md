@@ -36,13 +36,14 @@
 | Preview an input drill | X on its row plays its available take on Player 1; B stops it. |
 | <a id='sequences-and-the-one-drill'></a>Chain hit combos into a drill | **+ New sequence** numbers hit combos; a drop takes you back to the first. |
 | Share a combo | [Copy its JSON file](combos.md) without sharing the rest of your library. |
-| <a id='crop'></a>Open the editor | **Crop** opens a saved file; **Replay window** opens a saved match capture. |
+| <a id='crop'></a>Open the editor | Choose **Crop** on a file, or select a capture from **Replay window**. |
+| Delete a match capture | Press Y on the highlighted capture **in the list**. No confirmation; exported clips stay. |
 | Browse before cutting | With neither handle selected, Left/Right moves the playhead; Y seeks a move mark. |
 | Cut at the playhead | After browsing, L makes this the first kept frame; R makes it the last. |
 | Set the cut | L selects In; R selects Out. Move the selected handle with Left/Right. |
 | Snap selected handles | Y snaps In toward move starts or zero; Out includes move ends and take end. |
 | If no move end is known | Out uses the next start or the end of the take. |
 | Preview without saving | X previews a macro or capture; B stops it without closing the editor. |
-| Delete a match capture | Y in Replay window removes it immediately, without confirmation. Exported clips stay. |
+| X refuses a mid-action capture | Select In and press Y. If the move can start there, try X again. |
 | Keep the result | A names a new file; the original stays. Combos crop by link, drills by step. |
 | More controls | [Replay window](../menu/recording.md#replay-window) and [playback options](../menu/recording.md#options). |
