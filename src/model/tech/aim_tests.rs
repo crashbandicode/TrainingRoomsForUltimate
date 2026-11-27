@@ -143,3 +143,29 @@ fn factory_draws_on_a_flat_floor_have_a_start() {
     }
     assert_eq!(unsolved, 0, "{report}");
 }
+
+/// Measurement for the design: is the line's snap a fixed point on the points the producers hand to the solver?
+#[test]
+fn snap_outputs_measured_over_every_picker_position() {
+    let mut report = String::new();
+    for (name, a, b) in [("flat", v(85., 0.), v(-85., 0.)), ("sloped", v(-37.3, 12.9), v(61.7, -8.45))] {
+        let line = Line { id: 1, ends: [a, b], normal: v(0., 1.), floor: true, wall: false, passable: false };
+        let d = sub(b, a);
+        let low = 5.0 / line.length();
+        let (mut lerp_off, mut snap_off, mut cursor_off, mut twice_off) = (0u32, 0u32, 0u32, 0u32);
+        for unit in 0..=65535u32 {
+            let p = add(a, scale(d, low + (1.0 - 2.0 * low) * unit as f32 / 65535.0));
+            let q = line.snap(p).unwrap();
+            if q != p { lerp_off += 1; }
+            if line.snap(q) != Some(q) { snap_off += 1; }
+            if line.snap(q).and_then(|r| line.snap(r).map(|s| s != r)) == Some(true) { twice_off += 1; }
+            // A cursor above the line, as the wizard's picker gives to `nearest`.
+            let c = line.snap(add(p, v(0.37, 3.1))).unwrap();
+            if line.snap(c) != Some(c) { cursor_off += 1; }
+        }
+        report.push_str(&format!(
+            "\n{name}: of 65536 positions: the drawn point is not its own snap {lerp_off}; a snap is not its own snap {snap_off}; \
+             a second snap still moves {twice_off}; a cursor's snap is not its own snap {cursor_off}"));
+    }
+    panic!("{report}");
+}
