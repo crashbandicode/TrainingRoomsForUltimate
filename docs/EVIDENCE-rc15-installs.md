@@ -1,6 +1,6 @@
-# rc.15 installs 1 to 6 and the preview build: what was installed and what was tested
+# rc.15: what was installed and what was tested
 
-2026-11-25. The receipts behind [the rc.15 release notes](RELEASE-NOTES-rc15.md) and the status on
+Through 2026-11-27. The receipts behind [the rc.15 release notes](RELEASE-NOTES-rc15.md) and the status on
 [Current release](CURRENT-RELEASE.md). Three claims are kept apart:
 
 - **Installed:** the plugin file on the card was read back and matched the build. This is a deployment check.
@@ -11,6 +11,15 @@
 Paths starting with `artifacts/` are in the shared workspace (`/home/intpa/smash-training-lobby/`), not in this
 repository. "Inbox" is `artifacts/phase23/INBOX-opus-rc6-integration.md`; an entry is named by its time (UTC) and
 author. Times are UTC.
+
+## Fixed build
+
+| Check | Result | Source |
+| --- | --- | --- |
+| Card readback, 2026-11-27 10:36 UTC | `dc5302f1`, release SHA-256 `1bc8e7b87780a9f4801679c9bb25db43223ac6f27110d9c2fa67a6478a66a8b7`; replaced install 6. | `artifacts/phase23/card-install/20261127-1036Z-card-dc5302f1/verify.json` |
+| Eden, same release | 20 counted Tech attempts; Guard the Edge help and scrub-pose smoke passed. | `final-head-yoga-01`; inbox 10:35:35Z |
+
+The card readback verifies the installed file, not play on the console.
 
 ## Summary
 
@@ -131,10 +140,10 @@ plugins are left out, except the first, which was made in Training and turned ou
 | 2026-11-25 13:30 | install 4 | The move names Jab 1 and Jab 2 are fine. | – |
 | 2026-11-25 14:38 | install 4 | Playback took a second or more to start. Placement changes and a Delete for replay captures were asked for. | A change for the wait is in install 5 (`445d1100`); its smoke boot played one take, and the start was not timed then; it was timed in Eden on 2026-11-26 ([Install 6](#install-6-5df3d9dc)). A change to placement is in install 5 (`6dcf5c40`); its smoke boot checked the Off stage switch only. The Delete is in install 5 (`3fd708bc`), host-tested only. |
 | 2026-11-25 about 23:33 | install 5 | In the clip editor, the refusal that In is mid-action kept showing after a snap to the move start, so the clip could not be previewed or saved. | Not fixed in install 5. On `58c9ccb5`, with install 5's snap code, 4 of 24 host editor cases failed, including plain Y; the held-modifier control passed (`artifacts/phase23/clip-snap/gate-red-7982989b/logs/test.log`; inbox 23:49:51Z). Install 4 has the same snap code. The fix merged as `dbded2d1` (pin `3990f50e`; six gate steps exit 0). The install 5 smoke boot only previewed a take without moving a handle. Later, the release snap row on `eb39d6bc` showed Y resolving In so X previewed and A saved. This was a test capture, not the operator's own take. The fix is on the card since install 6 (2026-11-26). |
-| 2026-11-26 about 11:53 | install 5 | Placement on a save: a fighter switched from on stage to off stage floats, as it should. If it is then moved into the ground it lands, and it stays on the ground as the crosshair moves. The operator called it mostly a nit; switching On stage and Off stage again puts it right. | Not fixed in install 6 (merge 17). Assigned for the following build (inbox 11:57:13Z, with the operator's words). A code review identified why the hold may not lift a landed fighter; this still needs confirmation in Eden (12:09:32Z). |
+| 2026-11-26 about 11:53 | install 5 | Moving an Off stage fighter into the ground left it grounded as the crosshair moved away. | Still present in install 6. The [preview smoke test](#smoke-tests-on-the-release-file) observed the fighter lift again. |
 | 2026-11-26 about 11:53 | install 5 | Guard the Edge: the fighter sometimes starts slightly off the chosen spot, and not the same way each round. With one off-stage spot over ten rounds, the first two were in one place, the third slightly lower, the fourth higher again. | The [Eden comparison](#guard-the-edge-release-points) found different first inputs and camera framing, not different release coordinates. It did not measure the operator's console rounds. |
 | 2026-11-26 12:29 | install 6 | The game crashed right after A on the title screen; the operator guessed it is intermittent. | No TrainingRooms frame is in the crash, and its owner is not established. The game's resource inflate thread faulted in the game's own copy into a fresh block, for a stock file; ARCropolis only forwards that call. The block's first page could not be written, and what left the heap in that state is not known (inbox 13:35:17Z, tr-primary-2; `artifacts/phase23/hw-crash-20261126-1229Z/SUMMARY.md`). A May 25 report predating TrainingRooms has the same signature. Under investigation by another lane; no fix was tested. Not listed as a TrainingRooms issue. |
-| 2026-11-26 about 12:41 | install 6 | In Create macro from, moving the playhead moved the fighters in space but did not show their moves. The operator also asked to choose the recorded or current character separately for Player 1 and the CPU. | Install 6 stores positions but not move animation frames. Both requested changes are in design, not in this build (inbox 12:41:51Z, tr-primary-2). No cause for the reported uneven movement was established. |
+| 2026-11-26 about 12:41 | install 6 | Scrubbing showed positions, not moves. A recorded/current fighter choice was requested for each side. | Both followed install 6: [preview results](#smoke-tests-on-the-release-file), [fixed editor](RELEASE-NOTES-rc15.md#fixed-build). Uneven movement wasn't diagnosed. |
 
 ### Guard the Edge release points
 

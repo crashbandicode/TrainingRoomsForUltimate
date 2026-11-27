@@ -10,7 +10,7 @@ Current release: rc.15
 
 | | |
 | --- | --- |
-| Last verified console install | Install 6, built from `5df3d9dc`, installed 2026-11-26 and read back |
+| Last verified console install | `dc5302f1`, installed and [read back](EVIDENCE-rc15-installs.md#fixed-build) on 2026-11-27 |
 | Shipping behavior (not a console receipt) | [Clip editor](guide/recording.md#crop), [Loading](menu/fighters-and-stages.md#loading) and [Tech practice](guide/tech-practice.md) describe the fixes. |
 | Preview install cancelled | `cc71537c` was never installed: [preview notes](RELEASE-NOTES-rc15.md#preview-build) |
 | Changes | [Release notes](RELEASE-NOTES-rc15.md) |
@@ -22,6 +22,7 @@ The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
 
 | The tag ends with | Build | Installed |
 | --- | --- | --- |
+| `dc5302f1` | Fixed build | 2026-11-27 |
 | `cc71537c` | Preview build | Never installed |
 | `5df3d9dc` | Install 6 | 2026-11-26 |
 | `b7a382e4` | Install 5 | 2026-11-25 |
@@ -35,6 +36,7 @@ The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
 
 | Build | In short | More |
 | --- | --- | --- |
+| Fixed build | Fighter switching, return after scrubbing, menu help and Tech practice launches | [Notes](RELEASE-NOTES-rc15.md#fixed-build) |
 | Preview | Scrubbing shows saved poses on matching fighters | [Notes](RELEASE-NOTES-rc15.md#preview-build) |
 | Install 6 | Y on In, a free playhead, fighters shown while you scrub | [Notes](RELEASE-NOTES-rc15.md#install-6) |
 | Install 5 | Record under an AI, Delete for captures, Change placement, Guard the Edge options | [Notes](RELEASE-NOTES-rc15.md#install-5) |
