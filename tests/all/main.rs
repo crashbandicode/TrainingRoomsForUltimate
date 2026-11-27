@@ -204,6 +204,8 @@ mod native_service_wiring;
 mod native_wrappers;
 #[path = "../no_nro_hook.rs"]
 mod no_nro_hook;
+#[path = "../nro_load.rs"]
+mod nro_load;
 #[path = "../no_spin_locks.rs"]
 mod no_spin_locks;
 #[path = "../p1_core.rs"]

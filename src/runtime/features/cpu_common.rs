@@ -2,10 +2,8 @@
 //! (`FighterStatusDamage__correctDamageVectorCommon`), the tech status change
 //! (`L2CFighterBase::change_status`) and the out-of-shield decision (`L2CFighterCommon::sub_guard_cont`).
 //!
-//! The module loads after the plugin, so the hooks install when the loader reports it. The notification
-//! comes from `libnro_hook`'s `add_nro_load_hook`, looked up by symbol (the playbook's provider pattern,
-//! docs/HOOK-SHARING.md): a card without the provider loses these three features and the install line
-//! says `cpu_common=not_installed reason=no_nro_hook`. Each function's 64 bytes are compared with the
+//! The module loads after the plugin, so the hooks install when TrainingRooms' `nro_loaded` site sees it.
+//! A refused site guard gives `cpu_common=not_installed reason=no_nro_load`. Each function's 64 bytes are compared with the
 //! owned 13.0.5 module's (`model::sites_pkg2::COMMON_SITES`) before it is hooked; a mismatch leaves that
 //! function alone. One more line in `events.log` says what was installed when the module loaded.
 //!
@@ -14,10 +12,10 @@
 //! declaration uses to make the compiler follow that convention. NOT YET SWITCH-RUN.
 
 use std::fmt::Write as _;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use skyline::hooks::A64HookFunction;
-use skyline::nn::ro::{LookupModuleSymbol, LookupSymbol};
+use skyline::nn::ro::LookupModuleSymbol;
 
 use crate::model::guard::GUARD_BYTES;
 use crate::model::sites_pkg2::COMMON_SITES;
@@ -175,47 +173,35 @@ extern "C" fn sub_guard_cont_hook(fighter: usize) -> L2CValue {
     result
 }
 
-/// The nro-load provider's registration function: it takes the callback (`fn(&NroInfo)`, a Rust-ABI
-/// function pointer) as one pointer-sized argument.
-type AddNroLoadHook = extern "C" fn(usize);
+static WANTED: AtomicBool = AtomicBool::new(false);
 
-/// Ask the provider to tell us when the `common` module loads. `None` when the hook is registered (the
-/// install happens at load), otherwise the install line's reason.
+/// Arm the consumer for the `common` module and return the install line's reason.
 pub fn register() -> Option<&'static str> {
-    let mut address = 0usize;
-    // SAFETY: the name is a NUL-terminated literal; the loader writes one address.
-    unsafe { LookupSymbol(&mut address, b"add_nro_load_hook\0".as_ptr()) };
-    if address == 0 {
-        return Some("no_nro_hook");
+    if !crate::runtime::nro_load::installed() {
+        return Some("no_nro_load");
     }
-    // SAFETY: the provider exports `add_nro_load_hook(callback)` (docs/HOOK-SHARING.md).
-    let add: AddNroLoadHook = unsafe { std::mem::transmute(address) };
-    add(on_nro_load as *const () as usize);
+    WANTED.store(true, Ordering::Release);
     Some("awaiting_common_nro")
 }
 
-fn is_common(name: &str) -> bool {
-    name == "common" || name == "lua2cpp_common" || name.ends_with("lua2cpp_common.nro")
-}
-
-extern "Rust" fn on_nro_load(info: &skyline::nro::NroInfo) {
-    if is_common(info.name) {
+pub(crate) fn on_nro_load(name: &str, module: *mut skyline::nn::ro::Module) {
+    if WANTED.load(Ordering::Acquire) && crate::model::nro_load::is_common(name) {
         // M3 Set observer C9: the qualifier word follows the mapped common module (retracted on scene change).
-        let object = info.module.ModuleObject;
+        let object = unsafe { (*module).ModuleObject };
         if !object.is_null() {
             // SAFETY: the loader's module object for the module it just mapped.
             let base = unsafe { (*object).module_base as usize };
             crate::runtime::features::mashout::clatter_set::publish_common(base);
         }
-        install(info);
+        install(name, module);
     }
 }
 
 /// Compare each function's 64 bytes with the owned module's; only when every one matches are the hooks
 /// written (all or nothing: the three hooks share state). One line says what happened.
-fn install(info: &skyline::nro::NroInfo) {
+fn install(name: &str, module: *mut skyline::nn::ro::Module) {
     let mut line = FixedPath::<640>::new();
-    let _ = write!(line, "{} plugin=training_rooms/{} cpu_common_load module={}", clock::uptime_ms(), env!("CARGO_PKG_VERSION"), info.name);
+    let _ = write!(line, "{} plugin=training_rooms/{} cpu_common_load module={}", clock::uptime_ms(), env!("CARGO_PKG_VERSION"), name);
     let mut addresses = [0usize; COMMON_SITES.len()];
     let mut all = true;
     for (slot, site) in addresses.iter_mut().zip(&COMMON_SITES) {
@@ -225,7 +211,7 @@ fn install(info: &skyline::nro::NroInfo) {
         if name.len() < symbol.len() {
             symbol[..name.len()].copy_from_slice(name);
             // SAFETY: NUL-terminated stack buffer; the module pointer is the loader's.
-            unsafe { LookupModuleSymbol(&mut address, info.module as *const _ as *const _, symbol.as_ptr()) };
+            unsafe { LookupModuleSymbol(&mut address, module as *const _, symbol.as_ptr()) };
         }
         let usable = address != 0 && {
             let mut window = [0u8; GUARD_BYTES];

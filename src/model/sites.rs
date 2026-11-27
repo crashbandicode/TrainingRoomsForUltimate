@@ -88,10 +88,10 @@ features! {
     /// The run-time texture helper's rows (`sites_u4.rs`, `runtime/ui/texture.rs`): a unit of its own (they are the Ui feature's rows in
     /// their table), so the menu does not depend on a helper that is optional (R2-1 merge with u4).
     UiTexture => "ui_texture",
-    /// The hooks in the `common` script module (DI, tech status change, out of shield), installed when
-    /// that module loads through the `libnro_hook` provider.
     /// SPEC-cpu-01 and SPEC-cpu-06: the mash's command flags, aerial kind and attack angle.
     CpuMash => "cpu_mash",
+    /// The hooks in the `common` script module (DI, tech status change, out of shield), installed when
+    /// that module loads, seen at `nro_loaded`.
     CpuCommon => "cpu_common",
     /// Package 6: the CPU-as-P1 fallback's game calls (sites_pkg6.rs); its hook is the carried seam row cpu_pilot.ai_process_begin.
     P1Cpu => "p1_cpu",
@@ -109,6 +109,9 @@ features! {
     /// SPEC-cpu-04's fixed camera: the stage id, the stage table and the two camera hooks.
     CpuCamera => "cpu_camera",
     DeveloperDebug => "developer_debug",
+    /// The game's module-load site (main, after its only `nn::ro::LoadModule` call): a unit of its own,
+    /// so the `common` hooks and turnip identity each degrade apart; no provider plugin.
+    NroLoad => "nro_load",
 }
 
 /// One guarded site.

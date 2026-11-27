@@ -26,7 +26,7 @@ use crate::model::{developer_ini, settings_file, sites_hitbox, sites_mashout, si
 use crate::runtime::alloc::hook_allocations;
 use crate::runtime::diag_log::{self, diagnostic};
 use crate::runtime::features::{chords, cpu, cpu_common, hitbox, hud_draw, input_delay, input_display, lra_reset, mashout, notices, recorder, reset_hub, stage_hazards as hazards, states, writer};
-use crate::runtime::{clock, game, import, install, lobby, mii, p1, published, roster, scene, state_boot, ui};
+use crate::runtime::{clock, game, import, install, lobby, mii, nro_load, p1, published, roster, scene, state_boot, ui};
 
 const SITE_COUNT: usize = SITES.len();
 
@@ -293,6 +293,12 @@ fn run_inner() {
         mark("on_init_slot", Written::Far);
     }
     let hazards_on = install_hazards(&usable, &mut mark);
+    let nro_load_on = sites::feature_usable(Feature::NroLoad, &usable);
+    if nro_load_on {
+        skyline::install_hook!(nro_load::nro_loaded_hook);
+        nro_load::mark_installed();
+        mark("nro_loaded", Written::Near);
+    }
     let (cpu_core_on, cpu_defence_on, cpu_ledge_on, cpu_tech_on, cpu_shield_on, cpu_common_reason, cpu_shield_damage_on, cpu_camera_on) = install_cpu(&usable, &mut mark);
     let tech_practice_on = cpu_core_on && capabilities::unit_usable(Feature::TechPractice, &usable);
     crate::runtime::features::tech_adapter::set_ready(tech_practice_on);
@@ -509,6 +515,7 @@ fn run_inner() {
         FeatureReport { feature: "deluxe_row", installed: deluxe_on, reason: deluxe_reason, site: None },
         FeatureReport { feature: "macros_port", installed: false, reason: Some(crate::runtime::macros::port::install_report()), site: None },
         FeatureReport { feature: Feature::Roster.name(), installed: roster_on, reason: (!roster_on).then_some("site_guard"), site: None },
+        report(Feature::NroLoad, nro_load_on, None),
     ];
     feature_reports_fit(&features);
     // Every boot write is in place: record what our writes left (before the drill's "after" stand-ins, which play another plugin).
@@ -621,8 +628,7 @@ fn install_cpu(usable: &dyn Fn(&sites::Site) -> bool, mark: &mut dyn FnMut(&str,
             mark(name, Written::Far);
         }
     }
-    // The hooks in the `common` script module install when that module loads, through the nro-load
-    // provider (`libnro_hook`); the install line names why they are not installed yet, or at all.
+    // The hooks in the `common` script module install when `nro_loaded` observes that module.
     let common = if sites::feature_usable(Feature::CpuCommon, usable) { cpu_common::register() } else { Some("site_guard_failed") };
     // The game's CommonParams object, for the shield damage multiplier (SPEC-cpu-05 section 4).
     let shield_damage = sites::feature_usable(Feature::CpuShieldDamage, usable);

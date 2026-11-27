@@ -17,17 +17,18 @@ struct Image { object: usize, base: usize, text: usize, generation: u64 }
 struct Images { current: Option<Image>, generation: u64 }
 static IMAGE: Mutex<Images> = Mutex::new(Images { current: None, generation: 0 });
 
-/// Called from the existing native NRO load callback. Only retain item code
+/// Called from TrainingRooms' module-load hook. Only retain item code
 /// identity; no fighter/item/agent/tree pointer survives a read callback.
-pub unsafe fn on_load(nro: &skyline::nro::NroInfo<'_>) {
-    if nro.name != "item" { return; }
+pub unsafe fn on_load(name: &str, module: *mut skyline::nn::ro::Module) {
+    if name != "item" { return; }
     let generation = {
         let mut state = IMAGE.lock().unwrap();
         state.current = None;
         state.generation = state.generation.wrapping_add(1);
         state.generation
     };
-    let object = nro.module.ModuleObject;
+    if module.is_null() { return; }
+    let object = (*module).ModuleObject;
     if object.is_null() { return; }
     let image = Image { object: object as usize, base: (*object).module_base as usize,
         text: 0x9f1000, generation };

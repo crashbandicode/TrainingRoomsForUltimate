@@ -974,8 +974,6 @@ const GAME_ENTRIES: &[&str] = &[
     "cpu_common::di_hook",
     "cpu_common::change_status_hook",
     "cpu_common::sub_guard_cont_hook",
-    "cpu_common::on_nro_load",
-    "roster::on_nro_load",
     "reset_hub::on_init",
     "native_service::training_mod_native_service_dispatch",
     "mii_ordinary_gate::mii_ordinary_gate_decide",
@@ -1649,7 +1647,7 @@ fn unfollowed_ambiguous(ctx: &Ctx, s: &Scan) -> BTreeMap<(String, String), BTree
 #[test]
 fn every_function_handed_to_the_game_is_listed() {
     let handed = handed_out(&runtime_graph());
-    for known in ["cpu::on_frame", "cpu_common::on_nro_load", "native_service::training_mod_native_service_dispatch", "imp::detached"] {
+    for known in ["cpu::on_frame", "native_service::training_mod_native_service_dispatch", "imp::detached"] {
         assert!(handed.contains(known), "the scan of handed-out functions misses {known}: {handed:?}");
     }
     let listed: BTreeSet<String> =
