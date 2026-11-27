@@ -33,17 +33,15 @@ One refused draw then ended the session (`tech.rs`, `planning_failed`).
    (`planner::draw_attempt`, `CANDIDATES`). The bound: values of the player's own can leave no draw a start, and with
    every value fixed each draw is the same, so the loop must end; each candidate is at most 73 passes of the solver on
    the game frame.
-3. **After the eighth the drill stops** with "No launch fits these Tech practice values", restriction
+3. **The drill stops if all eight candidates lack a launch.** The message is "No launch fits these Tech practice values", restriction
    `tech-no-launch-fits` (`docs/RESTRICTIONS.md`). Factory settings never reach it.
 4. **The planner says why** (`planner::Refused`: values, aim, start); only the diagnostic log shows it.
 
 ## Limits
 
-- Host tests and builds only. The flat and sloped stages of the tests are solid blocks of my own, not a stage's
-  measured lines.
-- With every value fixed, the eight candidates are the same draw: the stop comes after eight tries of it.
-- A "Good to know" row for the stop is the docs lane's on the joined docs; `docs/guide/tech-practice.md`'s caption still
-  quotes the old line of an old film.
+- The original host tests used synthetic flat and sloped stages, not measured stage geometry.
+- A chosen point and fixed launch values can repeat the same rejected candidate.
+- The [Tech practice guide](../guide/tech-practice.md) explains how to restart after the stop.
 
 ## Requirement trace
 
