@@ -4,7 +4,7 @@
 - The tables below record what this design used.
 
 - On 2026-11-23, F14 added Player 1's move direction to the existing frame strip in Training and waiting-room practice.
-- The F14 design and requirement trace used base `152629cd`.
+- The F14 design and requirement trace is recorded in `artifacts/phase23/fix-round-20261123/f14/DESIGN.md` at base `152629cd`.
 
 ## Strip and font in F14
 

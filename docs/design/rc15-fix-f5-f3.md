@@ -28,8 +28,8 @@ flowchart LR
 - The game never meets this: its own setter runs only with the menu open.
 
 **Eden, the card build, one boot (`rc15-docs-17060a5e-yoga-2`, eggs-offstage-sol):**
-- Pause menu never opened in the session, chord to 1 Frame: `1 Frame (Press )`. Historical take: `repro-r5`.
-- One open and close of the game's pause menu, then chord to x1 and back to 1 Frame: `1 Frame (Press ZL)` with the glyph. Historical take: `repro-r5-native-pause`.
+- Pause menu never opened in the session, chord to 1 Frame: `1 Frame (Press )`. Still: `artifacts/phase23/fix-round-20261123/f5-f3/repro/repro-r5/1-frame-top-right-1080p.png`.
+- One open and close of the game's pause menu, then chord to x1 and back to 1 Frame: `1 Frame (Press ZL)` with the glyph. Still: `artifacts/phase23/fix-round-20261123/f5-f3/repro/repro-r5-native-pause/1-frame-top-right-1080p.png`.
 
 ### Fix
 

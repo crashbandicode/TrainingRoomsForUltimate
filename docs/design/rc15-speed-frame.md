@@ -141,14 +141,14 @@ On 2026-11-21, rc.15 added [1 Frame](../guide/game-speed.md#1-frame) to the spee
 | (c) Match found | Both reach x1. No slot, match-class hold or state difference at matched frames. |
 | (d) Roles swapped | Optional repeat with host and guest reversed. |
 
-### Later paired-console result
+### Later paired Eden result
 
 | Run | Observed result |
 | --- | --- |
 | `rc15-ldn-xps-2` | 15/15 rows passed with TrainingRooms host and vanilla guest. |
 | Practice | Held world froze. Ten taps and held ZL advanced it; chord-owned ZL gave no step. |
-| Match | All 2,105 match-class records per console had x22=0. |
-| Detector | Both consoles ended at frame 2,426 with `desync_seen=0`. |
+| Match | All 2,105 match-class records per instance had x22=0. |
+| Detector | Both instances ended at frame 2,426 with `desync_seen=0`. |
 | Return | Both reached room fighter select. Waiting-area x1 after return was outside this run. |
 
 Run receipts: `artifacts/phase23/1f-save-hold/ldn-pair/rc15-ldn-xps-2` in the campaign workspace.
