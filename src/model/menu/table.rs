@@ -467,7 +467,7 @@ pub static ROWS: [Row; 175] = [
     r(LOADING, "Ready Fighter Bodies", "cycle_preload_bank_members", Control::Dropdown(&o::BODIES),
       "How many fighters each role keeps in its own slot, counting\nthe one on screen. More means quicker swaps. Off: no groups."),
     r(LOADING, "Group Swap", "cycle_preload_group_swap", TOGGLE,
-      "On: each role keeps extra groups ready besides its own slot.\nOff: no extra groups. The two bank entries below stay as set."),
+      "On: each role can keep extra groups beyond its own slot.\nOff: no extra groups. The two bank entries below stay as set."),
     r(LOADING, "Swap groups", "", Control::SwapGroups,
       "Which swaps are done as a group. A greyed entry says why.\nPT / Aegis groups need free Ready Fighters: PT 3, Aegis 2."),
     // Display & Controls > On screen
