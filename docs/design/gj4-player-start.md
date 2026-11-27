@@ -1,5 +1,10 @@
 # Guard the Edge and Juggler: Player 1's start
 
+![Left: 24 of 26 releases on the floor's last point end in an edge-teeter wait and 2 hang on the ledge. Right: at attempt 18 Player 1 is written above the stage centre](../decisions/gte-next-GJ4-player-start.png)
+
+*The two measured defects, drawn from trace values; not game footage. This page is about where Player 1 is placed.
+When a KO counts is a separate decision: GJ1 in [Decisions](../DECISIONS.md), which also holds GJ4.*
+
 ## Measured cause
 
 On release `83eecc32`, Sonic's 26 Guard the Edge releases used the last point of Final Destination's main floor,
@@ -37,7 +42,7 @@ use the same rule.
 
 Clauses are the decided GJ4 of `docs/DECISIONS.md` (2026-11-22); the item was ordered into the fix build on 2026-11-23.
 
-| Operator clause | Design | Test |
+| Requirement clause | Design | Test |
 | --- | --- | --- |
 | The next attempt waits for a KO'd Player 1 | KO status restarts placement, waking a held CPU | `placement_waits_for_a_knocked_out_player`, `edge_juggle_waits_for_a_knocked_out_player` |
 | Player 1 starts where the wizard shows it | Guard the Edge uses the same 1.25-unit inset for cursor and placement, with a midpoint for a narrow floor | `guard_player_point_stops_outside_the_teeter_range_of_each_floor_end`, `a_main_floor_narrower_than_two_insets_keeps_the_player_on_its_middle`, `a_crosshair_below_a_platform_finds_the_floor_under_it` |

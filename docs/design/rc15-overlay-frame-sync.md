@@ -47,7 +47,7 @@ The phase-8 hook is a replace hook at the entry of `BattleObjectManager::process
 
 ## Requirement trace
 
-| Operator clause | Design | Test |
+| Requirement clause | Design | Test |
 | --- | --- | --- |
 | Correct the previous-frame drawing across overlays | Phase-8 snapshot for attacks, grabs, hurtboxes, wind and angles, article geometry, and practice discs | `overlay_board_exposes_only_the_completed_simulation_frame` |
 | Preserve the defined shapes and their draw rules | Use the shared world placement and HUD projection | `a_capsules_two_ends_are_one_orb`, `an_articles_wind_area_is_drawn_and_keeps_it_tracked`, `a_live_targets_hurtbox_is_its_picture_disc` |

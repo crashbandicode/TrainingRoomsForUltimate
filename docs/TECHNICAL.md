@@ -3,9 +3,7 @@
 The detail behind the [README](../README.md): how TrainingRooms is installed and built, how each feature behaves, and
 where every clip in the README was recorded (build, commit and what the run checked). Release notes are the
 `RELEASE-NOTES-rc*.md` files in this folder: rc.5, rc.6, rc.8, rc.9 and [rc.15](RELEASE-NOTES-rc15.md)
-(rc.7, rc.10 and rc.11 have none); rc.12's,
-rc.13's and rc.14's are on their Forgejo release pages, linked from [CURRENT-RELEASE.md](CURRENT-RELEASE.md) and
-[Status](#status).
+(rc.7, rc.10 and rc.11 have none). [Earlier releases](CURRENT-RELEASE.md#earlier-releases) links the rc.12, rc.13 and rc.14 release pages.
 
 Practice tools for Training mode and the online waiting rooms of Super Smash Bros. Ultimate 13.0.5, as a Skyline plugin.
 
@@ -182,13 +180,13 @@ Options, Plugins or a plugin's own page) if Deluxe uses its D-pad there.
 | A Save or Load press that doesn't happen | Says why in a notice (Saves › Save States) |
 | On a GameCube controller | Deluxe's L + R is both triggers: the ZL/ZR chords and the two chords above don't fire while both triggers are held, and one trigger works as before |
 
-### Combos
+### Combos, in short
 
 *+ Save last combo…* (Recording › Combos & Sequences) saves a combo you landed, and the combo helper grades your next
 attempts against it, link by link. A sequence of combos is drilled the same way, one combo after another. Each saved
 combo is a small JSON file in `sd:/ultimate/TrainingRooms/combos/`. You can edit it, copy it to another card or share
-it, and any fighter can practise it; [COMBOS.md](guide/combos.md) describes the format. The clip is under Combos
-below.
+it, and any fighter can practise it; [COMBOS.md](guide/combos.md) describes the format. The clip is under
+[Combos: the clip and the files](#combos-the-clip-and-the-files).
 
 ### CPU reactions
 
@@ -246,6 +244,11 @@ platform at the top. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 Named save states (one bound to Save and Load at a time), mirroring and damage on load (Saves page). *Respawn on platform* (Fighters & Stages ›
 Stages) chooses between the game's respawn platform (above) and the instant respawn.
 
+![The Respawn on platform row and its help text; what happened after a KO with Save States On and Off; choice A keep the link, choice B work with Save States Off](decisions/TR5-respawn.png)
+
+*Design picture of decision TR5 (2026-11-13), not footage. Its middle panel shows rc.11, where the row was ignored
+with Save States Off. B was decided: since rc.12 the row works whatever Save States says. [Decisions](DECISIONS.md)*
+
 ### Recording and playback
 
 A save state only warps, and Load starts nothing. Each role has one active macro, a recording or a chain, and
@@ -254,6 +257,15 @@ nothing. X cycles the selected role's loop count in MACROS. On a drill with a sa
 a preview on Player 1. It does not interrupt a Play already queued or running for Player 1.
 The [Recording guide](guide/recording.md) is how to use it. The pop-up and the Recording page are in that doc.
 What rc.6 changes is [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
+
+While a macro plays on the CPU, the recording wins over the CPU's DI, SDI, air-dodge, tech and throw settings.
+The advanced row [Settings override playback](menu/recording.md#settings-override-playback), Off by default, turns
+that round.
+
+![A recorded air dodge Down In with the Airdodge Direction setting on Up: under A the setting changes it to Up, under B the CPU air-dodges Down In as recorded](decisions/B5-playback-vs-settings.png)
+
+*Design picture of decision B5 (2026-11-01), not footage: B, the recording wins, with the advanced row for A.
+[Decisions](DECISIONS.md)*
 
 Where the recording code is (moved here from the Recording guide; named by function, not line, because the lines move):
 
@@ -299,7 +311,7 @@ Player 1's inputs as the game receives them, the AI's included, and TrainingRoom
 through the take. Play on Player 1 and the waiting room's Quick Reset are refused ("P1 is controlled by an AI: Play
 on Player 1 is off", "… Quick Reset is off"), and Player 1's input is left to the pilot.
 
-### Combos
+### Combos: the clip and the files
 
 **Clip** [`rc7-combo-helper.gif`](media/rc7-combo-helper.gif): The combo helper grading a drilled combo: Combo 1, jab → jab, TRUE −5, on time
 
@@ -516,44 +528,7 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Status
 
-The current release is **rc.15**. Its newest build is install 6 (`5df3d9dc`, on the test console's card since
-2026-11-26): **installed and read back; its own Eden checks are in progress**. A preview build (`cc71537c`) is
-staged for the card and not installed ([release notes](RELEASE-NOTES-rc15.md#preview-build)). The
-[console reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console) distinguish a title-screen
-crash with no TrainingRooms frame from issues reported in TrainingRooms.
-[Current release](CURRENT-RELEASE.md) says what it adds, how to install it and what is known not to work;
-[the rc.15 release notes](RELEASE-NOTES-rc15.md) list installs 1 to 6, and [Install evidence](EVIDENCE-rc15-installs.md)
-names the runs behind each claim. The menu footer reads `0.2.0-rc.15 · rc15` and then the commit it was built from, so
-the commit tells the rc.15 builds apart: from rc.14 the version number is the release's own name, the same as its tag.
-Builds before it kept the version `0.2.0-rc.6` from rc.6 on, and the build name after it (rc8 to rc13) told them apart.
-
-[rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13) (`ed0d7a35`,
-2026-11-14, Eden-tested and untested on hardware; footer `0.2.0-rc.6 · rc13 ed0d7a35`) adds Aerial Drift,
-Taunts, Wario's bike in Give item, Training opening on the stage you pick, and Left / Right on On/Off rows; its delay
-rows and Input Delay count game frames at every Game speed; Hitbox Visualization draws long boxes as pills, gives
-projectiles and thrown items their own orbs and shows grab boxes in magenta; and a CPU on Mash Triggers Always no longer
-gets stuck in its first dodge. [rc.12](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.12)
-(`83b72d7d`, 2026-11-13, also Eden-tested and untested on hardware) changes CPU options, Saves and Recording; its
-release notes list them. rc.11 (`0c628724`) moves TrainingRooms' own threads off core 0 and hides the frame strip while
-a waiting room's own menu is open; rc.10 is a code reduction with no change in behaviour.
-
-0.2.0-rc.6 follows 0.2.0-rc.3.1: 0.2.0-rc.5 was withdrawn before players ran it, and there is no separate 0.2.0-rc.4. What it changes is
-[RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md), on top of [RELEASE-NOTES-rc5.md](RELEASE-NOTES-rc5.md).
-The builds after it, rc.8 and rc.9, are in [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md) and
-[RELEASE-NOTES-rc9.md](RELEASE-NOTES-rc9.md): rc.9 fixes the shortcut conflicts with Online Deluxe, the CPU
-pilot and imgui_smash.
-
-**0.2.0-rc.3** (2026-11-05) is the previous console test build. It adds to rc.2:
-- the **frame strip** input display, replacing the 15-row input log;
-- **Change Stage**: a row that switches the stage now, in Training and in waiting rooms;
-- **menu navigation**: ZL + Up/Down jumps sections, the menu reopens where you left it, ZR no longer resets a page by
-  accident, and *Reset page to defaults* asks first;
-- **own hitbox discs** for every fighter sphere, never refused (projectiles keep the effect spheres; the discs trail
-  the camera by one to two frames, a known limit).
-
-rc.2 added the pause-helper fix, the Solo Popo mark placement and the Kirby hat-request endings. Limitations kept from
-the fork are listed in [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md); planned work is in the
-[ROADMAP](ROADMAP.md). 0.1.0 crashes at console boot; use a newer build: the current release is [rc.15](CURRENT-RELEASE.md) (installed, with its own Eden checks in testing; see the [install evidence](EVIDENCE-rc15-installs.md)).
+See [Current release](CURRENT-RELEASE.md) for the installed build, changes and known issues in rc.15.
 
 ## Build
 

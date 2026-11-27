@@ -2,6 +2,12 @@
 
 2026-11-22. Report from the card: with Moving paths checked, a target sometimes flies off the stage and stops where the fighter cannot get to it.
 
+![The Training stage from its collision file: three solids, their floors in yellow, three platforms, two gaps open to the bottom blast line, the camera range and the blast lines](../decisions/training-stage-offstage/training-01-outline.png)
+
+*A stage's floors, drawn from the Training stage's own file; not game footage. A target is put on one floor (a
+yellow line). The rule on this page adds that a moving path stays over that floor: it does not fly over a gap or
+out to the camera range. [Decisions](../DECISIONS.md) has the stage pictures.*
+
 ## Cause
 
 In view and Whole stage put a new target on one of the stage's floors. A moving path (Axe, Galaxian, Boomerang, Homing Missile) was then fitted into a box that is larger than the stage: the screen for In view, the stage's camera range for Whole stage, each cut only by the blast lines. `Motion::new` moved the start until the path's whole envelope fitted that box, and the flight ran to the envelope's end: up to 180 units sideways (Galaxian) and about 74 units below its start (Axe), where the target then rests. Nothing compared the flight with the floors. An on-stage flight has no outline check either: only an Off stage flight carries a side for it.
@@ -109,7 +115,7 @@ The seeds named in `a_spot_with_room_among_the_thirty_two_wins_and_pop_up_is_for
 
 ## Requirement trace
 
-| Operator clause | Design | Test |
+| Requirement clause | Design | Test |
 | --- | --- | --- |
 | Moving paths are restricted to the stage | The box a moving path is fitted into is cut to the floor line the target appeared over, a radius in from its ends and a radius above it | `moving_paths_stay_over_the_stage`, `moving_paths_keep_to_their_own_floor_across_a_gap` |
 | A target does not end up off the stage where it cannot be reached | The flight is scaled and its start moved to fit that box, the start is held inside it and every tick is kept inside it, so the rest is over the target's own floor | `a_boomerang_rests_over_the_floor_it_appeared_over`, `moving_paths_keep_to_their_own_floor_across_a_gap`, `a_flight_starts_inside_its_box` |

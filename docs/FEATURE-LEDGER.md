@@ -1,4 +1,4 @@
-# Feature ledger: Eden and Switch tests per feature (rc.11, shipped as `0c628724`; the rc.13 section is at the end)
+# Feature ledger: Eden and Switch tests per feature (rc.11, shipped as `0c628724`; sections for rc.13 and install 4 follow)
 
 Operator 2026-11-09 (memory `feature-ledger-gif-after-ship`): after each card ship, one row per feature with its Eden
 and Switch tests and a GIF that shows the effect. Brought current to rc.11 `0c628724`, the shipped build, by the
@@ -208,4 +208,4 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 | # | Feature | Cat | Eden rows | Eden verified (build, run) | Switch | Clip |
 | --- | --- | --- | --- | --- | --- | --- |
-| 112 | Frame strip scrollback: hold R3 and D-pad Left / Right, release R3 to return live | install 4 | not yet assigned | not run | untested | not captured |
+| 112 | Frame strip scrollback: hold R3 and D-pad Left / Right, release R3 to return live | install 4 | not yet assigned | no test row. Seen in the install 4 film of 2026-11-25 on `a945b0c1`: the strip scrolls back and returns live ([release notes](RELEASE-NOTES-rc15.md#the-input-display)) | untested | `i4-scrollback-zoom.mp4`, filmed with the test overlay showing; no clean clip |

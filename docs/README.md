@@ -1,88 +1,21 @@
 # TrainingRooms documentation
 
-Start with the [README](../README.md) for installing and the buttons. Each page of the in-game menu has its own doc
-below, with every option on it; the guides explain a topic across pages.
+Start with [installation and controls](../README.md), or choose a menu page, guide or technical reference.
 
-## Start here
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b5760c58e2de36d18ee1fc677043ffb7c7376dce" autoplay muted loop playsinline controls></video>
 
-| Page | Covers |
-| --- | --- |
-| [Getting started](guide/getting-started.md) | What you need, installing, the first start, opening the menu, a first look around, and how to read the build tag. |
-| [Current release](CURRENT-RELEASE.md) | Which release is current, which build is the newest, what is tested, what's new, how to install it and its known issues. |
-| [rc.15 release notes](RELEASE-NOTES-rc15.md) | What each rc.15 build changed: installs 1 to 6. |
-| [Troubleshooting](guide/troubleshooting.md) | What you may see, why, and what to do: the plugin or the menu not loading, greyed rows, the notices that say no, slow fighter loading, waiting rooms, settings, and where the logs are. |
+*Hitboxes, grab boxes and hurtboxes drawn. Eden, 5df3d9dc.* [Open the clip](media/tut-hitbox-visualization.mp4)
 
-## The menu, page by page
-
-Open the menu with B + D-pad Up (or Minus). L and R turn the pages.
-
-| Page | What's on it |
-| --- | --- |
-| [CPU](menu/cpu.md) | How the CPU reacts: mash and followups, DI and SDI, ledge and tech options, shield, attacks and movement, letting a CPU play as Player 1, the CPU's level. |
-| [Saves](menu/saves.md) | Save states: mirroring, auto-load on death, damage on load, buffs; the setup library. |
-| [Recording](menu/recording.md) | Your saves, macros, combos and sequences; replays; playback and combo helper options; the Recording pop-up. |
-| [Fighters & Stages](menu/fighters-and-stages.md) | Fighters for you and the CPU, character cycles, Kirby hats, items, Mii fighters, stages, waiting-room practice, loading options. |
-| [Display & Controls](menu/display-and-controls.md) | The HUD, hitboxes, frame advantage, the input display, input delay; button chords, reset, menu shortcuts. |
-| [Practice games](menu/practice-games.md) | Start and configure the practice games under Fighters & Stages. |
-
-## Guides
-
-| Guide | Covers |
-| --- | --- |
-| [Using the menu](guide/using-the-menu.md) | Opening it, moving around, each kind of option, saving your defaults, resetting. |
-| [Controls](guide/controls.md) | Every button chord, its default and how to change it; GameCube controllers; Online Deluxe and the CPU pilot. |
-| [CPU behaviour](guide/cpu-behaviour.md) | How mash, followups, triggers and overrides combine; the direction grids; delays. |
-| [Save states](guide/save-states.md) | Saving and loading, what a state keeps, damage, mirroring, buffs, the setup library. |
-| [Recording](guide/recording.md) | Recording, playback, the pop-up, macros, combos, input drills, sequences and replays. |
-| [Combos](guide/combos.md) | Combo and input-drill files: sharing, writing and reading them. |
-| [Frame strip](guide/frame-strip.md) | The input display's lanes, chips and readouts; scroll-back and freeze. |
-| [Game speed](guide/game-speed.md) | Speed in Training and waiting rooms, 1 Frame and the Training HUD stopwatch. |
-| [Fighter cycles](guide/fighter-cycles.md) | Cycling fighters, the Character Cycles editor, Solo Popo, Kirby hats, loading. |
-| [Stages](guide/stages.md) | Change Stage, forms, custom stages, Lobby Stages, stage rotation and hazards. |
-| [Waiting rooms](guide/waiting-rooms.md) | Practising in online and local waiting rooms: what works there and what doesn't. |
-| [Mii fighters](guide/mii.md) | Picking a saved Mii, making a new one, replay Miis. |
-| [Parry practice](guide/parry-practice.md) | Record a CPU attack, practise parries and save a practice. |
-| [Mash out](guide/mash-out.md) | Choose a capture and mash to escape it. |
-| [Break the Targets](guide/break-the-targets.md) | Place targets, break them and manage saved layouts. |
-| [Tech practice](guide/tech-practice.md) | Choose a surface or use the wizard, then practise tech timing. |
-| [Eggs-ercise](guide/eggs-ercise.md) | Break flying targets and choose the session and target settings. |
-
-## rc.15 features
-
-| Feature | Button or row | See it |
+| Group | For | Pages |
 | --- | --- | --- |
-| Crop macros, combos and input drills into new files while keeping the originals. | A on the file's Crop; L/R, Left/Right, A save. | [Macro GIF](media/rc15-crop-editor.gif), [drill GIF](media/rc15-input-drill.gif), [editor keys](menu/recording.md#replay-window). |
-| Record a no-hit movement drill or make one from a no-hit macro. | A on DRILLS > → + Record drill…, then the Record chord; or Make combo. | [Drill Crop GIF](media/rc15-input-drill.gif), [how to record](menu/recording.md#input-drills); no recording/conversion GIF yet. |
-| Draw the hurtboxes of hittable articles and items. | Hitbox Visualization → Article hurtboxes, A tick. | [Pikmin GIF](media/rc15-article-hurtboxes.gif), [drawing options](menu/display-and-controls.md#hitbox-visualization). |
-| Read a colour key that explains what you ticked. | A on Hitbox Visualization. | [Earlier normal still](media/rc15-colour-legend-normal.png), [earlier frame-data still](media/rc15-colour-legend-frame-data.png); updated palette awaiting hardware review; no GIF yet. |
-
-## Reference
-
-- [Technical notes](TECHNICAL.md): how it's installed and built, how each feature works inside,
-  [the hidden Developer page](TECHNICAL.md#the-developer-page), the build status.
-- [Feature ledger](FEATURE-LEDGER.md): every feature with the test runs and clips that show it working: rc.11, and
-  a section for rc.13 (Eden-tested, untested on hardware); rc.12 has no rows in it.
-- [Media](MEDIA.md): where each GIF was recorded.
-- [Restrictions](RESTRICTIONS.md): every message that refuses something, and the approval behind it.
-- [Building](BUILD.md) and [differences from the Training Modpack](DIFFERENCES-FROM-THE-FORK.md).
-- [Install evidence](EVIDENCE-rc15-installs.md): for each rc.15 install, the card readback, the gate, the Eden runs
-  with their verdicts, and what was not run.
-- Release notes: [rc.5](RELEASE-NOTES-rc5.md), [rc.6](RELEASE-NOTES-rc6.md), [rc.8](RELEASE-NOTES-rc8.md),
-  [rc.9](RELEASE-NOTES-rc9.md) and [rc.15](RELEASE-NOTES-rc15.md) in this folder; rc.12's, rc.13's and rc.14's are on their
-  [release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases). rc.7, rc.10 and rc.11 have
-  none; see [Status](TECHNICAL.md#status).
-
-## Project records
-
-Kept for the history of decisions and measurements; they describe the build of their date, not necessarily this one.
-
-- [Decisions](DECISIONS.md) and [decisions/](decisions/), [design/](design/), [the menu redesign](menu-redesign.md),
-  [the menu mockup](menu-mockup/), the [roadmap](ROADMAP.md).
-- [Mii developer notes](MII.md).
-- [Input drill acceptance](EVIDENCE-rc15-input-drill.md): native recording, cropping, no-hit conversion and grading on the rc.15 feature build.
-- [Crop editor acceptance](EVIDENCE-rc15-crop-editor.md): the clip editor's crop of macros, combos and drills on the rc.15 feature build.
-- [Indexed article native seam](native/article-hurtboxes.md): ABI, version and guard evidence.
-- Measurements: [code reduction (rc.10)](CODE-REDUCTION-rc10.md), [coverage (rc.9)](COVERAGE-rc9.md),
-  [size plan](SIZE-PLAN.md), [test cuts (rc.9)](TEST-CUT-LEDGER-rc9.md), [resource costs](resource-costs.md),
-  [asset reproduction](ASSET-REPRODUCTION-R15.md).
-- Provenance: [provenance/](provenance/), [test-provenance/](test-provenance/).
+| Menu | Every option of a menu page | [CPU](menu/cpu.md), [Saves](menu/saves.md), [Recording](menu/recording.md), [Fighters & Stages](menu/fighters-and-stages.md), [Display & Controls](menu/display-and-controls.md), [Practice games](menu/practice-games.md) |
+| Guides | Starting out | [Getting started](guide/getting-started.md), [Using the menu](guide/using-the-menu.md), [Controls](guide/controls.md), [Troubleshooting](guide/troubleshooting.md) |
+| Guides | Practice tools | [Save states](guide/save-states.md), [Recording](guide/recording.md), [Combos](guide/combos.md), [CPU behaviour](guide/cpu-behaviour.md), [Game speed](guide/game-speed.md), [Frame strip](guide/frame-strip.md) |
+| Guides | Fighters and rooms | [Fighter cycles](guide/fighter-cycles.md), [Mii](guide/mii.md), [Stages](guide/stages.md), [Waiting rooms](guide/waiting-rooms.md) |
+| Guides | Practice games | [Tech practice](guide/tech-practice.md), [Parry practice](guide/parry-practice.md), [Mash out](guide/mash-out.md), [Eggs-ercise](guide/eggs-ercise.md), [Break the Targets](guide/break-the-targets.md), [Guard the Edge](guide/guard-the-edge.md), [Juggler](guide/juggler.md) |
+| Technical | This release | [Current release](CURRENT-RELEASE.md), [rc.15 notes](RELEASE-NOTES-rc15.md), [Install evidence](EVIDENCE-rc15-installs.md), [Drill evidence](EVIDENCE-rc15-input-drill.md), [Crop evidence](EVIDENCE-rc15-crop-editor.md) |
+| Technical | Older notes | [rc.5](RELEASE-NOTES-rc5.md), [rc.6](RELEASE-NOTES-rc6.md), [rc.8](RELEASE-NOTES-rc8.md), [rc.9](RELEASE-NOTES-rc9.md), [release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases) |
+| Technical | How it works | [Technical notes](TECHNICAL.md), [Build](BUILD.md), [Mii](MII.md), [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md), [Resource costs](resource-costs.md), [Article hurtboxes](native/article-hurtboxes.md) |
+| Technical | Decisions | [Decisions](DECISIONS.md), [pictures](decisions/), [design pages](design/), [Restrictions](RESTRICTIONS.md), [Roadmap](ROADMAP.md), [Menu redesign](menu-redesign.md), [mockup](menu-mockup/) |
+| Technical | Records | [Feature ledger](FEATURE-LEDGER.md), [Media](MEDIA.md), [Asset reproduction](ASSET-REPRODUCTION-R15.md), [Code reduction](CODE-REDUCTION-rc10.md), [Coverage](COVERAGE-rc9.md), [Test cuts](TEST-CUT-LEDGER-rc9.md), [Size plan](SIZE-PLAN.md) |
+| Technical | Provenance | [Carried files](provenance/), [tests](test-provenance/) |

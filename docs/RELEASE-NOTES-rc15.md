@@ -5,12 +5,12 @@ Notes for players. rc.15 is one release name for a line of builds. Each build's 
 ([Which build you have](guide/getting-started.md#which-build-you-have)).
 
 Six of these builds were installed on the project's test console one after another, and are called install 1 to 6.
-The preview build is staged for the card; install 6 is still the newest installed build.
+The preview install was cancelled; install 6 remains on the test console.
 Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
-| [Preview build](#preview-build) | Not installed; staged 2026-11-27 | `cc71537c` | Scrubbing shows each fighter's recorded move; fixes to install 6's scrubbing and to a save's placement |
+| [Preview build](#preview-build) | Install cancelled 2026-11-27 | `cc71537c` | Scrubbing shows recorded poses on matching fighters; fixes to scrubbing and save placement |
 | [Install 6](#install-6) | 2026-11-26 | `5df3d9dc` | The clip editor: Y on In makes a capture previewable, a free playhead, and the fighters shown while you scrub |
 | [Install 5](#install-5) | 2026-11-25 | `b7a382e4` | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
@@ -29,14 +29,13 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 
 ## Preview build
 
-An in-between build for the operator to play while two defects are fixed. It is **staged for the card and not
-installed**, and it is not the next release.
+This preview was tested in Eden. Its planned console install was cancelled; it is not the next release.
 
 | Preview | Details |
 | --- | --- |
 | Built from | `cc71537c` (the footer ends with it) |
 | Release file | `78db86f5…`, 5,419,008 bytes |
-| Replaces | Install 6, when it is installed |
+| On the test console | Install 6; the preview did not replace it |
 
 ### Scrubbing shows the recorded moves
 
@@ -77,7 +76,7 @@ Both are to be fixed before the next release.
 
 | Check | Preview build |
 | --- | --- |
-| Installed | No. The file is staged with its approval record |
+| Installed | No. The staged copy was removed when the install was cancelled |
 | Host | Tests and all builds passed on `cc71537c`. Refusing a fighter pushed by a wall, and captures keeping their animation, are host-tested only |
 | Eden, on the release file, first boot | No crash. Passed: a long take, snapped X, the refusal at a point inside the stage, a save's fighter floating again, the settings check, and the menu in a waiting room as host. Scrub poses showed for both fighters |
 | Eden, on the release file, second boot | No crash. Snapped X, scrub poses and the settings check passed again. The fighter choice failed as above |
@@ -99,7 +98,7 @@ All three changes are in the clip editor of the [Replay window](menu/recording.m
 
 ### Y on In makes a capture previewable
 
-*Clip coming: it is held until the known issue with X after a snap is fixed.*
+No install 6 clip shows a successful match-capture preview after this snap. The [later preview-build clip](media/tut-clip-snap.mp4) shows Y snapping In and X playing the capture.
 
 On a match capture, plain Y could leave In in the middle of an action, and X and A were then refused. The operator
 found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CURRENT-RELEASE.md#known-issues).
@@ -232,7 +231,7 @@ The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.
 
 ### Record works while an AI plays Player 1
 
-*Clip coming.*
+*No clip: Record under an AI is not filmed.*
 
 An AI here is the CPU pilot plugin, or TrainingRooms' own Player 1 control.
 
@@ -256,7 +255,7 @@ More: [Combo files › The format](guide/combos.md#the-format).
 
 ### B stops a preview, and the pop-up shows its chords
 
-*Clip coming.*
+*No clip: B stopping a preview is not filmed.*
 
 | When | The key line reads | What happens |
 | --- | --- | --- |
@@ -271,7 +270,7 @@ More: [Recording › Replay window](menu/recording.md#replay-window) and
 
 ### Delete for replay captures
 
-*Clip coming.*
+*No clip: deleting a capture is not filmed.*
 
 | Where | How |
 | --- | --- |
@@ -315,7 +314,7 @@ More: [Playback delay](menu/recording.md#playback-delay).
 
 ### Guard the Edge and Juggler start from the floor you stand on
 
-*Clip coming for the choice of floor. Each drill's set-up is filmed in its guide:
+*No clip of the choice of floor. Each drill's set-up is filmed in its guide:
 [Guard the Edge](guide/guard-the-edge.md) and [Juggler](guide/juggler.md).*
 
 | Rule | What it means |
@@ -337,7 +336,7 @@ More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stage
 
 ### Two Guard the Edge options
 
-*Clip coming.*
+*No clip: the two options are not filmed.*
 
 | Option | Default | The other setting |
 | --- | --- | --- |
@@ -354,7 +353,7 @@ More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stage
 
 ### Eggs-ercise's off-stage zone follows the stage
 
-*Clip coming.*
+*No clip: the zone on another stage is not filmed.*
 
 | The off-stage zone | Install 5 |
 | --- | --- |
@@ -368,7 +367,7 @@ More: [Fighters & Stages › Eggs-ercise](menu/fighters-and-stages.md#eggs-ercis
 
 ### A save's placement is changed with the crosshair
 
-*Clip coming.*
+*No clip: Change placement is not filmed.*
 
 **Change placement** moves where a save state puts the fighters. The menu closes and a picker opens on the live
 game: move the fighters with the crosshair.
@@ -419,20 +418,18 @@ More: [Recording › Change placement](menu/recording.md#change-placement) and
 | Build | `a945b0c1` |
 
 The clips below were recorded in Eden on the installed build, not on the console. Where a clip is a close-up, the effect sits on a
-small panel that cannot be read at full-screen size. The yellow BRIDGE LIVE banner in some frames is the test
-tool's, not TrainingRooms'.
+small panel that cannot be read at full-screen size. Ten takes showed the test tool's yellow banner. They are not
+embedded; each is described where it stood.
 
 ### Drills and combos
 
 **Drill steps are listed by move**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/cd0b8b07aa26c3e00a692faedd589d16126e5410" autoplay muted loop playsinline controls></video><br>
-*DRILLS, with a three-step drill selected: its help line reads S1 jab, S2 side tilt, S3 up b. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-drill-step-names.mp4)
+The selected drill lists S1 jab, S2 side tilt and S3 up b.
 
 **Move names Off and On**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/edd9787940d24d0eb09d0a71f1ea68de4f58267b" autoplay muted loop playsinline controls></video><br>
-*With Move names Off the drill reads jab, side tilt, up b. With it On it reads Jab 1, Forward tilt, Final Cutter. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-move-names-toggle.mp4)
+Move names changes the labels from jab, side tilt and up b to Jab 1, Forward tilt and Final Cutter.
 
 **Match angle and deflection, Off**
 
@@ -461,13 +458,11 @@ tool's, not TrainingRooms'.
 
 **A get-up attack, recorded**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/cbc8cd75b8b22c99acd1e03fc910fb5efdf3ca5f" autoplay muted loop playsinline controls></video><br>
-*Place fighters starts Kirby lying down, and his get-up attack is recorded. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-edge-getup-record.mp4)
+Place fighters starts Kirby lying down; Record captures his get-up attack.
 
 **A get-up attack, played back**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/016231d178e57592cfe067807f46bbf627cc48f1" autoplay muted loop playsinline controls></video><br>
-*Playing the take puts Kirby down again and repeats the get-up attack. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-edge-getup-play.mp4)
+Playing the take puts Kirby down again and repeats the get-up attack.
 
 **L + R + A by itself**
 
@@ -479,7 +474,7 @@ tool's, not TrainingRooms'.
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/ffcc3cfe7871855d69a43591dbbcfef92944d0ef" autoplay muted loop playsinline controls></video><br>
 *Close-up of the drill panel. A failed attempt adds a red square, and the reset after it leaves that square in place. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-reset-after-fail-zoom.mp4)
 
-**A ledge attack:** Clip coming. The trip attack is filmed like the get-up attack and kept with the test records.
+**A ledge attack:** not filmed. The trip attack is filmed like the get-up attack and kept with the test records.
 
 | Change | What it does | More |
 | --- | --- | --- |
@@ -498,23 +493,19 @@ tool's, not TrainingRooms'.
 
 **The clip editor over the game**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/99f4cf63a17f837c9077eecda13bb9a267650d8b" autoplay muted loop playsinline controls></video><br>
-*Crop opens the editor as a strip under the fighters. The End handle moves in, and Y snaps it to the end of the jab. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-replay-editor-timeline.mp4)
+Crop opens a strip below the fighters; Y snaps the End handle to the end of the jab.
 
 **Preview on Player 1, then on the CPU**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7029a8b5915102970c6af108e1d3909f5e614645" autoplay muted loop playsinline controls></video><br>
-*X previews the kept part on Player 1. A ZR tap switches to the CPU and X previews it there. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-replay-editor-preview.mp4)
+X previews the cut on Player 1. After a ZR tap, X previews it on the CPU.
 
 **Recordings**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f5b8891b2eb0285ad5178ed34f668f765a5d28ce" autoplay muted loop playsinline controls></video><br>
-*RECORDINGS lists a Quick Play capture. A opens its screen: Inputs from, Plays on, Play back and the three Make rows. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-vault-recordings-menu.mp4)
+Opening a Quick Play capture shows Inputs from, Plays on, Play back and the three Make rows.
 
 **Playing a capture back**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a743aae1c8bfe6267175ce653776bd89eccd3da0" autoplay muted loop playsinline controls></video><br>
-*Play back runs the captured King K. Rool on the CPU, with the timeline of its moves under the game. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-vault-playback.mp4)
+Play back runs King K. Rool on the CPU, with the capture's timeline below.
 
 **Trim: Off, Start, End and Both**
 
@@ -538,8 +529,7 @@ tool's, not TrainingRooms'.
 
 **Scrolling the input display back**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/16db06e0ff5b07c584ded3173e52cfade51d4dfa" autoplay muted loop playsinline controls></video><br>
-*Close-up of the input display. With R3 held, D-pad Left scrolls back (the label reads -0.2 s, then -5.0 s), and the display then returns to now. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-scrollback-zoom.mp4)
+R3 and D-pad Left scroll back to -0.2 s, then -5.0 s, before the strip returns to live.
 
 | Change | What it does | More |
 | --- | --- | --- |
@@ -549,8 +539,7 @@ tool's, not TrainingRooms'.
 
 **Damage range sliders**
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/04dbf0b9d7e33489a3bd051e0ffb1d49efaffc74" autoplay muted loop playsinline controls></video><br>
-*CPU damage range: Min goes 0, 0.5, 3, 8% and Max 150, 148.5, 144%, by taps and a hold. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-cpu-damage-range.mp4)
+Taps and a hold move Min from 0 through 0.5 and 3 to 8%, and Max from 150 through 148.5 to 144%.
 
 | Change | What it does | More |
 | --- | --- | --- |
@@ -558,7 +547,7 @@ tool's, not TrainingRooms'.
 
 ### Waiting rooms
 
-*Clip coming.*
+*No clip: install 4's waiting-room changes are not filmed.*
 
 | Change | What it does | More |
 | --- | --- | --- |

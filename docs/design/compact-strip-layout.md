@@ -39,8 +39,8 @@ verdict and can run under it.
 
 ## Requirement trace
 
-| Operator clause | Design | Test |
+| Requirement clause | Design | Test |
 | --- | --- | --- |
-| “I would go with C with link history on/off switch” | Compact readouts, a corner card with three stacked sequence chips, and a separate link-cell band | `a_drilled_sequence_draws_the_corner_card_and_helper_cells`, `the_current_combo_is_always_in_a_window_of_three` |
+| Layout C, with an On/Off switch for link history | Compact readouts, a corner card with three stacked sequence chips, and a separate link-cell band | `a_drilled_sequence_draws_the_corner_card_and_helper_cells`, `the_current_combo_is_always_in_a_window_of_three` |
 | Link history defaults On and Off folds the latest follow-up into LINK | Persist the Display & Controls choice and reclaim the LAST row when disabled | `legacy_settings_default_link_history_to_on`, `link_history_choices_persist`, `link_history_hides_the_last_row_and_folds_the_newest_moves` |
-| “Its layout should be abstracted away from its functionality” | One spec for the archived panes and live placement. The integration rows check native clearance and inherited alpha. | `runtime_and_archive_share_the_strip_layout`, `the_same_content_can_be_placed_in_a_second_layout`, `compact_bounds_and_fade_follow_the_scene_and_visible_rows` |
+| The layout is separate from the function | One spec for the archived panes and live placement. The integration rows check native clearance and inherited alpha. | `runtime_and_archive_share_the_strip_layout`, `the_same_content_can_be_placed_in_a_second_layout`, `compact_bounds_and_fade_follow_the_scene_and_visible_rows` |

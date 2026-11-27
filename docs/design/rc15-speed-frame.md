@@ -96,8 +96,8 @@ So the native step button is **ZL** (GameCube L), press = one frame, hold = run 
      pressed between steps counts only if it is still held on the step's update (native 1 Frame holds it).
    - **The online match is never touched:** another class (`0x5061460`), checked per call, and the hook acts only while
      the practice's live flag is armed.
-3b. **Reuse check (operator 2026-11-21 16:37Z: "it should be reusing the code we wrote that we showed was desync safe
-   right? That plus basically the zl trigger").** Re-read against the entry's code (`.135ca00`–`.135cc80`).
+3b. **Reuse check (required 2026-11-21 16:37Z: reuse the code already shown to be desync-safe, plus the ZL
+   trigger).** Re-read against the entry's code (`.135ca00`–`.135cc80`).
    - **Reused unchanged:** the bind and its pop-up, the lobby's wanted speed and `LobbyPlan` dispatch, the live flag armed
      by Player 1's frame, the slot release, both resets (`practice_changed`, `session_clear`), and the rule that the lobby
      never writes the rate words.
@@ -140,11 +140,11 @@ So the native step button is **ZL** (GameCube L), press = one frame, hold = run 
 
 ## 3. Requirement trace
 
-| Operator clause | Design | Test |
+| Requirement clause | Design | Test |
 | --- | --- | --- |
-| "we should have the single frame option for the speed toggle" | §2.1–2.4 | `the_scale_has_one_frame_slowest_and_stops_at_both_ends`, `one_frame_pop_up_reads_one_frame`, `leaving_one_frame_resumes_the_training_pause`, `the_lobby_step_lets_exactly_one_entry_run_per_press`, `holding_the_step_button_runs_from_the_eighteenth_poll`, `the_training_step_is_the_mode_objects_and_its_button_is_zl`, `a_plain_step_press_steps_the_lobby_once`, `a_plain_held_step_button_still_runs_from_the_eighteenth_update`, `a_held_save_state_chord_never_steps`, `a_held_save_state_chord_never_steps_when_a_repeated_poll_finds_the_edges_cleared`, `the_kept_step_button_is_marked_in_the_previous_set`, `a_release_the_poll_did_not_see_is_not_a_held_step_button`, `a_skipped_poll_forgets_the_kept_step_button`, `an_exposed_release_keeps_the_games_release_edge`, `a_bare_step_press_after_a_gap_is_a_press`, `a_kept_step_button_does_not_follow_a_controller_handoff`, `a_session_clear_on_the_same_pad_keeps_the_chords_step_button`, `an_open_speed_hold_does_not_follow_a_controller_handoff`, `a_speed_chord_pressed_after_a_handoff_opens_the_hold_again`, `pending_requests_survive_a_re_entry`, `a_re_entry_close_and_a_refused_save_fall_on_the_same_poll`, `holding_the_speed_chord_never_steps` |
-| "you'll need to test that one doesn't desync against vanilla" | §2.3: a held entry, no global or room write; Eden (b) | `the_lobby_path_never_writes_the_update_rate_words`, `the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice`, `a_step_press_under_the_speed_hold_is_not_a_frame_step` |
-| "and doesn't stay enabled into a match" | §2.5; Eden (c) | `every_reset_returns_the_lobby_to_x1_and_ends_the_hold`, `the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice` |
+| The speed toggle has a single-frame option | §2.1–2.4 | `the_scale_has_one_frame_slowest_and_stops_at_both_ends`, `one_frame_pop_up_reads_one_frame`, `leaving_one_frame_resumes_the_training_pause`, `the_lobby_step_lets_exactly_one_entry_run_per_press`, `holding_the_step_button_runs_from_the_eighteenth_poll`, `the_training_step_is_the_mode_objects_and_its_button_is_zl`, `a_plain_step_press_steps_the_lobby_once`, `a_plain_held_step_button_still_runs_from_the_eighteenth_update`, `a_held_save_state_chord_never_steps`, `a_held_save_state_chord_never_steps_when_a_repeated_poll_finds_the_edges_cleared`, `the_kept_step_button_is_marked_in_the_previous_set`, `a_release_the_poll_did_not_see_is_not_a_held_step_button`, `a_skipped_poll_forgets_the_kept_step_button`, `an_exposed_release_keeps_the_games_release_edge`, `a_bare_step_press_after_a_gap_is_a_press`, `a_kept_step_button_does_not_follow_a_controller_handoff`, `a_session_clear_on_the_same_pad_keeps_the_chords_step_button`, `an_open_speed_hold_does_not_follow_a_controller_handoff`, `a_speed_chord_pressed_after_a_handoff_opens_the_hold_again`, `pending_requests_survive_a_re_entry`, `a_re_entry_close_and_a_refused_save_fall_on_the_same_poll`, `holding_the_speed_chord_never_steps` |
+| It does not desync against the unmodified game, and that is tested | §2.3: a held entry, no global or room write; Eden (b) | `the_lobby_path_never_writes_the_update_rate_words`, `the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice`, `a_step_press_under_the_speed_hold_is_not_a_frame_step` |
+| It does not stay enabled into a match | §2.5; Eden (c) | `every_reset_returns_the_lobby_to_x1_and_ends_the_hold`, `the_hold_overrides_only_the_waiting_area_entry_of_the_live_practice` |
 
 ## 4. Eden proof (planned)
 
