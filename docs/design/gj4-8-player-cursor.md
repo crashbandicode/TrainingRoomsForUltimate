@@ -12,7 +12,7 @@ Both [Guard the Edge](../guide/guard-the-edge.md) and [Juggler](../guide/juggler
 | Juggler, Yoga | Successive reads were −64, −78 and −78. |
 | Guard the Edge, same boot | Successive reads were −66 and −78.9856. |
 
-The receipts are listed in `artifacts/phase23/fix-round-20261123/gj4/gj4-8/CAUSE.md`.
+The original record named the external `gj4-8/CAUSE.md` receipt. The published [GJ4 decision](../DECISIONS.md) preserves the placement history.
 
 ## Shipped cursor rule
 

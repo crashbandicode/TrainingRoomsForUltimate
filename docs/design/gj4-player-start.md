@@ -18,8 +18,7 @@ The shipped placement rules apply to [Guard the Edge](../guide/guard-the-edge.md
 | First attempt, A came through as a jab on the point | 1 | Fall requested one frame into Ready, then ledge hang |
 
 On release `83eecc32`, Sonic's 26 Guard the Edge releases used the last point of Final Destination's main floor,
-x −79.9856. The re-read is
-`/home/intpa/smash-training-lobby/artifacts/phase23/edge-juggle/evidence/cp1a-sonic-83ee-1/p1-before-release.txt`.
+x −79.9856. The original record identified the external trace as `cp1a-sonic-83ee-1/p1-before-release.txt`.
 
 - Both falls began after Ready started. The trace omitted facing and speed, so it cannot establish the cause.
 - The Lucas traces in GJ4 suggest a Player 1 KO. Standby preceded Fall at (0, 150), and the next release showed Player 1 falling.
