@@ -707,6 +707,18 @@ mod tests {
         Spot { kind: recorded.start.fighter_kind, pose: recorded.pose, ..spot(x, y, facing) }
     }
 
+    #[test]
+    fn release_published_inside_last_callback_cannot_split_the_held_pair() {
+        let block = Block::new();
+        let delta = spot(2.0, 0.0, 1.0);
+        block.set_ask(Ask::Group { target: 0, deltas: [Some(delta); 2] });
+        // Last callback of the tick. Publish B after reading the group but before resolving its body point.
+        let partner_still_held = !super::super::scrub_pose::lets_partner_go(&block);
+        let own = block.point(1, |_| { block.set_ask(Ask::None); Some([0.0; 2]) }, |_| None);
+        assert_eq!([partner_still_held, own.is_some()], [true, true], "split at the pair test");
+        assert_eq!(block.point(1, |_| None, |_| None), None, "B applies on the next callback");
+    }
+
     fn capture(tracks: usize) -> ClipEditor {
         let tracks = (0..tracks).map(|fighter| ReplayTrack { fighter: None, entry: fighter as i32,
             frames: (0..10).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: i, ..InputFrame::default() }, ..state(fighter, i) }).collect(),
