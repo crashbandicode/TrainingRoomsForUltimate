@@ -85,7 +85,7 @@ In Player view, the Combo helper grades combos, input drills and sequences ([Com
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/290448eb4f0df99be8dd578410f0ed32594febce" autoplay muted loop playsinline controls></video>
 *Loop at 3 plays the macro three times.* [Open the clip](../media/rc12-loop.mp4)
 
-Choose playback and grading settings.
+Playback and grading settings.
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
