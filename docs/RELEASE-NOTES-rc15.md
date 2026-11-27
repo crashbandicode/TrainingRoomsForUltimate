@@ -70,7 +70,7 @@ Guard the Edge's uneven start is not changed by this build.
 | Fighter switch times out | After ZL + L the editor waits, then reads "The fighter did not load; the editor keeps the current one". The open editor blocks the roster from applying the switch. After 600 worker passes it gives up without withdrawing the request. In Eden, Player 1 changed fighters only after the editor closed; the CPU side was not tested | None established | Not fixed in this preview |
 | Fighters slide apart after B | Both fighters return to their places, but their push boxes can keep the width of the scrubbed pose for a few ticks. The boxes still overlap, so the game pushes the fighters apart. A quick B left each about 0.6 units off in four of six tries | None established | Not fixed in this preview |
 
-Both are to be fixed before the next release.
+These results describe the cancelled preview, not the [clip editor in the fixed build](guide/recording.md#crop).
 
 ### Tested
 
@@ -674,5 +674,4 @@ that day. What they reported, and what came of it:
 
 Each report with its time and the build it was made on: [Install evidence](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console).
 
-Earlier releases: [rc.9](RELEASE-NOTES-rc9.md), and rc.12 to rc.14 on their
-[release pages](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases).
+See [Earlier releases](CURRENT-RELEASE.md#earlier-releases) for the notes and published release pages.

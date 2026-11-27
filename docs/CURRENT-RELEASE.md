@@ -53,8 +53,8 @@ Copy `libtraining_rooms.nro` and `libnro_hook.nro` into the Skyline plugins fold
 | Scrubbing shows places, not moves | By design | Poses when recorded; older captures show positions only |
 | A save's Off stage fighter stays grounded | Open; switch On stage, then Off stage | Fixed |
 | Guard the Edge rounds can diverge after release | Open; measured release coordinates matched | Unchanged |
-| The recorded-fighter switch times out in the editor | Not in this build | Open; fix in work |
-| Fighters slide apart after B from a posed frame | Not in this build | Open; fix in work |
+| The recorded-fighter switch timed out in the preview | Not in this build | Affected preview only; the fix waits for the roster |
+| Fighters slid apart after B from a posed frame | Not in this build | Seen in preview; [leaving the editor](guide/recording.md#crop) describes the fixed behavior |
 
 Details: [release notes](RELEASE-NOTES-rc15.md#known-issues), [Install evidence](EVIDENCE-rc15-installs.md).
 
@@ -73,5 +73,5 @@ Details: [release notes](RELEASE-NOTES-rc15.md#known-issues), [Install evidence]
 | --- | --- |
 | rc.15, build by build | [rc.15 release notes](RELEASE-NOTES-rc15.md) |
 | rc.5, rc.6, rc.8, rc.9 | [rc.5](RELEASE-NOTES-rc5.md), [rc.6](RELEASE-NOTES-rc6.md), [rc.8](RELEASE-NOTES-rc8.md), [rc.9](RELEASE-NOTES-rc9.md) |
-| rc.12, rc.13, rc.14 | [rc.12](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.12), [rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13), [rc.14](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.14) |
-| rc.7, rc.10, rc.11 | No separate release notes |
+| rc.12, rc.13 | [rc.12](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.12), [rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13) |
+| rc.7, rc.10, rc.11, rc.14 | No separate release notes |

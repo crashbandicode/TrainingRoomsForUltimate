@@ -1588,7 +1588,7 @@ start both roles at Player; each role persists across menu closes, leaving Train
 **Answered by the operator on 2026-11-22** (tr-primary-2 ledger, 18:32:14Z and 18:37:43Z). Design by the
 edge-juggle-sol lane on source `7d962416` (the rc.15 round head), after the operator's hand test of the card build, in
 which the wizard's start mark, the pointer, the remembered start and Player 1's start point all worked. This entry is
-the design and the answers; the code is next-build work and is not in this commit. No Eden measurement was made for
+the design and the answers recorded before implementation; see the [Guard the Edge](guide/guard-the-edge.md) and [Juggler](guide/juggler.md) guides for the implemented rules. No Eden measurement was made for
 this page; the numbers in GJ4 are read from the rc.15 combined-proof traces. The pictures are mockups drawn by
 `artifacts/phase23/edge-juggle/illustrations/make_gte_next.py` (not in this repo); the chosen option has a
 **green outline**. Line counts are estimates; the size gate measures the real ones. The wording below carries the
@@ -2019,7 +2019,7 @@ while an AI plays Player 1. The design was accepted by tr-primary-2 on 2026-11-2
   and the CPU settings never apply to entry 0.
 
 This reverses the Record half of B4 (2026-11-01: "Record is refused with a notice"). Vault and match captures never
-had that refusal. Host tests only; not yet seen in a game.
+had that refusal. This decision recorded host tests, not a gameplay result.
 
 ## Preview stop and Recording chord hints (2026-11-25)
 
@@ -2172,4 +2172,4 @@ Tech practice traces, and walks it there when it is not traced yet.
 **Followed:** one shared crosshair (Guard the Edge and Juggler, 2026-11-22, above); Training and the waiting room
 alike (2026-11-22, above); no per-stage and no per-fighter table.
 
-Host tests only; not yet seen in a game.
+At the time of the decision, only host tests had run. Later [placement observations](EVIDENCE-rc15-installs.md#preview-build-cc71537c) distinguish the builds and checks.
