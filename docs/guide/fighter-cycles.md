@@ -67,8 +67,9 @@ Hold **B** with the left stick at rest, then click the **left stick** for your K
 stick** for the CPU's. This chord is fixed. Kirby takes the hat when standing or falling, not during a move; if Kirby
 lost its hat, the next click gives that hat back before moving on.
 
-<!-- CLIP: tut-kirby-hat.mp4 | Kirby as Player 1: hold B, click the left stick → the next hat, twice -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0858b8e26cf6db1c8d16f3d935c486380ffa303f" autoplay muted loop playsinline controls></video>
+
+*Kirby as Player 1: after B is held and the left stick clicked, Kirby wears Mario's cap. One hat is shown. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-kirby-hat.mp4)
 
 Choose the order in Fighters & Stages › [Kirby Hats](../menu/fighters-and-stages.md#kirby-hats). ZR switches the Player
 and CPU lists; A adds a hat, All takes everyone, R removes one, X previews a shared slot's form, and B goes back. Each

@@ -62,9 +62,9 @@ On. See [Controls](docs/guide/controls.md) for GameCube and Online Deluxe.
 
 Hold R + D-pad Up, then tap Left for slower or Right for faster. Release R to keep the speed. See [Game speed](docs/guide/game-speed.md), including 1 Frame.
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35ffa4077d05c46d16bd34ef5b7bf93c4ac2fba2" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d4df993d500e229bdcaee85defab1e2f3d5c2d48" autoplay muted loop playsinline controls></video>
 
-*Hold R + D-pad Up and tap Left: the label steps through 2/3, 1/2 and 1/4 to “1 Frame (Press ZL)”. This clip shows the label only, not a move played slowly. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-game-speed.mp4)
+*A forward smash at normal speed. Hold R + D-pad Up and tap Left: the label steps to 1/4, and the same forward smash plays slowly. The label steps back to normal speed at the end. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](docs/media/tut-game-speed.mp4)
 
 ## The menu
 
@@ -125,8 +125,9 @@ cycle the CPU. See [Fighter cycles](docs/guide/fighter-cycles.md).
 
 To change stage, open **Change Stage** with A, choose a stage and form, then press A. See [Stages](docs/guide/stages.md).
 
-<!-- CLIP: tut-stage-change.mp4 | Fighters & Stages › Change Stage → the grid → Battlefield in its Ω form loads with both fighters -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e0de6dbeba09dd60aa5dc2ec3c5fbde73470d79a" autoplay muted loop playsinline controls></video>
+
+*Fighters & Stages › Change Stage: the grid, Y for the Ω form, A on Battlefield. The stage is swapped and both fighters stand on Battlefield's Ω form. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](docs/media/tut-stage-change.mp4)
 
 Choose and start a game under [Practice games](docs/menu/practice-games.md).
 

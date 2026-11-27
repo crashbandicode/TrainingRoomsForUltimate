@@ -41,6 +41,18 @@ Rules (a problem's rule name is the first word of its line):
                    as "save again" and "load again". Comments and char literals of the Rust source do not count. This
                    proves the wording exists in shipped code, not that the notice shows in the situation the page describes.
                    Texts built from pieces at run time go in `NOTICE_OK` with the reason.
+  wall             a wall of text on a menu or guide page (`WALL_PAGES`): a caption (a block that starts with one `*`)
+                   of more than 120 visible characters, its "Open the clip" link not counted; a paragraph or list item
+                   of more than two sentences, or of more than 300 visible characters; a list item that starts with
+                   **Values:**, **Default:** or **How:**. Table rows, headings, code blocks, HTML and an image's alt
+                   text are not read. A page still to be rewritten is in `WALL_PENDING` with its count, which only falls.
+  budget           a menu or guide page over its word budget (`BUDGET_WORDS`): more than 1,500 words on a menu page or
+                   800 on a guide page, counted as the file's text split on white space, its visuals (video lines,
+                   images, captions) left out; a table cell of more than 15
+                   words; a caption of more than 60 visible characters; a section (the text under one heading) with
+                   more than one sentence of prose; a second "Good to know" heading, or more than five rows under it;
+                   a `##` section of a menu page that does not open with a clip or picture; a guide page with none.
+                   A page not yet cut is in `BUDGET_PENDING` with its word count, which only falls.
   allowlist-stale  an entry of the lists below that matches no file, or whose sentence or text is gone.
 
 Anchors follow the slug rules of the forge's Markdown renderer (Forgejo). They are NOT GitHub's: GitHub drops punctuation
@@ -127,7 +139,6 @@ NOTICE_OK = [
     ("docs/TECHNICAL.md", "Same as 格斗, nothing new saved", "the notice with a Mii's name filled in: src/model/notify.rs joins 'Same as ', the name and ', nothing new saved'"),
     ("docs/guide/cpu-behaviour.md", "Selected: Up x3, In x1", "a help line built per chip: src/model/ui/screens.rs writes 'Selected: ' then '<direction> x<weight>' for each"),
     ("docs/menu/cpu.md", "Selected: Up x2, Out x1", "the same help line, built per chip in src/model/ui/screens.rs"),
-    ("docs/menu/fighters-and-stages.md", "1/3 Layout 2 · Battlefield: 6", "the Saved layouts notice, built from the position, the layout's name and its target count"),
     ("docs/RESTRICTIONS.md", "Combos work in Training", "a retired restriction: the row says the string is gone from src/"),
 ]
 
@@ -153,6 +164,90 @@ CLAIM_WORDS = re.compile(
 RELEASE_TOKEN = re.compile(r"(?<![A-Za-z0-9])rc\.?(\d+)(?:\.\d+)*(?![A-Za-z0-9])", re.I)
 
 
+# Walls of text (`wall`): the player pages the rule reads, its limits, and the pages not yet rewritten.
+# Ordered 2026-11-27 (operator, through tr-primary-2 02:33:44Z): a caption is one short line, a paragraph is at most
+# two short sentences, a setting's Values / Default / How bullets are a table.
+WALL_PAGES = ["docs/menu/*.md", "docs/guide/*.md"]
+WALL_CAPTION = 120
+WALL_SENTENCES = 2
+WALL_CHARS = 300
+WALL_BULLETS = re.compile(r"^\*\*(?:Values|Default|How):\*\*")
+# page -> the number of `wall` problems it may still have while the pages are rewritten one by one. A page with more
+# fails with every one of them listed; a page with fewer fails as `allowlist-stale`, so a number only falls and a
+# finished page leaves the list. An empty list means every page is held to the rule.
+WALL_PENDING = {
+    # Counted on 2026-11-27 at the commit that added the rule (739 on 27 pages). Rewritten in this order: the menu pages
+    # (Fighters & Stages first), then the guide.
+    "docs/guide/break-the-targets.md": 3,
+    "docs/guide/combos.md": 13,
+    "docs/guide/controls.md": 9,
+    "docs/guide/cpu-behaviour.md": 13,
+    "docs/guide/eggs-ercise.md": 3,
+    "docs/guide/fighter-cycles.md": 8,
+    "docs/guide/frame-strip.md": 9,
+    "docs/guide/game-speed.md": 6,
+    "docs/guide/getting-started.md": 4,
+    "docs/guide/guard-the-edge.md": 4,
+    "docs/guide/juggler.md": 4,
+    "docs/guide/mash-out.md": 3,
+    "docs/guide/mii.md": 8,
+    "docs/guide/parry-practice.md": 1,
+    "docs/guide/recording.md": 76,
+    "docs/guide/save-states.md": 9,
+    "docs/guide/stages.md": 7,
+    "docs/guide/tech-practice.md": 3,
+    "docs/guide/troubleshooting.md": 2,
+    "docs/guide/using-the-menu.md": 8,
+    "docs/guide/waiting-rooms.md": 4,
+    "docs/menu/cpu.md": 134,
+    "docs/menu/display-and-controls.md": 69,
+    "docs/menu/practice-games.md": 3,
+    "docs/menu/saves.md": 47,
+}
+
+
+# Word budgets (`budget`). Ordered 2026-11-27 (operator, through tr-primary-2 03:16:29Z): the pages were too long.
+# Words are counted as the order counted them: the file's text split on white space, tables and links included.
+BUDGET_WORDS = [("docs/menu/*.md", 1500), ("docs/guide/*.md", 800)]
+BUDGET_CELL = 15
+BUDGET_CAPTION = 60
+BUDGET_SENTENCES = 1
+BUDGET_GOOD_ROWS = 5
+# Visuals (operator, through tr-primary-2 03:32:34Z): on a menu page every `##` section opens with one embedded clip or
+# picture; a guide page has at least one. A visual (its video or image line and its caption) is not counted as words.
+BUDGET_VISUALS = {"docs/menu/*.md": "sections", "docs/guide/*.md": "page"}
+# page -> its word count, for the pages not yet cut to the budget. Such a page is not held to the rule, but it may not
+# grow, a shorter page lowers its number, and a page that meets the budget leaves the list. Empty before a release.
+BUDGET_PENDING = {
+    "docs/guide/break-the-targets.md": 215,
+    "docs/guide/combos.md": 2192,
+    "docs/guide/controls.md": 841,
+    "docs/guide/cpu-behaviour.md": 1060,
+    "docs/guide/eggs-ercise.md": 307,
+    "docs/guide/fighter-cycles.md": 733,
+    "docs/guide/frame-strip.md": 983,
+    "docs/guide/game-speed.md": 367,
+    "docs/guide/getting-started.md": 518,
+    "docs/guide/guard-the-edge.md": 263,
+    "docs/guide/juggler.md": 246,
+    "docs/guide/mash-out.md": 133,
+    "docs/guide/mii.md": 582,
+    "docs/guide/parry-practice.md": 157,
+    "docs/guide/recording.md": 6118,
+    "docs/guide/save-states.md": 848,
+    "docs/guide/stages.md": 584,
+    "docs/guide/tech-practice.md": 230,
+    "docs/guide/troubleshooting.md": 1408,
+    "docs/guide/using-the-menu.md": 647,
+    "docs/guide/waiting-rooms.md": 605,
+    "docs/menu/cpu.md": 3764,
+    "docs/menu/display-and-controls.md": 3394,
+    "docs/menu/practice-games.md": 1589,
+    "docs/menu/recording.md": 9606,
+    "docs/menu/saves.md": 2195,
+}
+
+
 class Problem(NamedTuple):
     rule: str
     path: str
@@ -171,6 +266,11 @@ class Config(NamedTuple):
     notice_ok: list = NOTICE_OK
     notice_pages: list = NOTICE_PAGES
     notice_columns: dict = NOTICE_COLUMNS
+    wall_pages: list = WALL_PAGES
+    wall_pending: dict = WALL_PENDING
+    budget_words: list = BUDGET_WORDS
+    budget_pending: dict = BUDGET_PENDING
+    budget_visuals: dict = BUDGET_VISUALS
 
 
 class Link(NamedTuple):
@@ -907,6 +1007,139 @@ def check_notices(tree, config, problems, used):
             problems.append(Problem("notice-text", rel, line, f'"{quote}" is not a text in src/ (a reworded notice, or one built from pieces: NOTICE_OK)'))
 
 
+def walls(text):
+    """(line, what is wrong) of each wall of text on a page: a long caption, a long paragraph, a settings bullet."""
+    for line, block in blocks(text):
+        body = re.sub(r"!\[.*?\]\([^)]*\)(?:<br>)?", "", block).strip()
+        body = re.sub(r"^(?:[-*+]|\d+[.)])\s+", "", body)
+        if not body or body.startswith(("|", "#", "<")):
+            continue
+        if body.startswith("*") and not body.startswith("**"):
+            shown = claim_text(re.sub(r"\[Open [^\]]*\]\([^)]*\)", "", body)).replace("*", "").strip()
+            if len(shown) > WALL_CAPTION:
+                yield line, f"a caption of {len(shown)} characters (at most {WALL_CAPTION}: one short line; the clip shows the rest)"
+            continue
+        if WALL_BULLETS.match(body):
+            yield line, "a Values / Default / How bullet (make it a table: Value | What it does)"
+            continue
+        shown = claim_text(body).replace("*", "").strip()
+        count = len(list(sentences(shown)))
+        if count > WALL_SENTENCES:
+            yield line, f"a paragraph of {count} sentences (at most {WALL_SENTENCES}: put options, keys and results in a table)"
+        elif len(shown) > WALL_CHARS:
+            yield line, f"a paragraph of {len(shown)} characters (at most {WALL_CHARS})"
+
+
+def check_walls(tree, config, problems):
+    for rel in tree.files:
+        if not any(fnmatch.fnmatchcase(rel, pattern) for pattern in config.wall_pages):
+            continue
+        found = list(walls(tree.text(rel)))
+        allowed = config.wall_pending.get(rel)
+        if allowed is None or len(found) > allowed:
+            problems.extend(Problem("wall", rel, line, text) for line, text in found)
+            if allowed is not None:
+                problems.append(Problem("wall", rel, 1, f"{len(found)} walls of text; the page was pending at {allowed}, and that number only falls"))
+        elif len(found) < allowed:
+            fix = f"lower it to {len(found)}" if found else "remove the entry"
+            problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"wall_pending entry for {rel} is {allowed} but the page has {len(found)}: {fix}"))
+    for rel in config.wall_pending:
+        if rel not in tree.files:
+            problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"wall_pending entry `{rel}` matches no page"))
+
+
+def shown_words(text):
+    """The words a reader sees in a table cell or a line: link targets, HTML tags and emphasis marks gone."""
+    return claim_text(re.sub(r"<[^>]+>", "", text)).replace("*", "").split()
+
+
+def counted_words(text):
+    """The words that count toward a page's budget: its visuals (video lines, images and caption lines) left out."""
+    kept = []
+    for line in text.split("\n"):
+        bare = line.strip()
+        if bare.startswith("<video") or re.match(r"^\*[^*\s]", bare):
+            continue
+        kept.append(re.sub(r"!\[[^\]]*\]\([^)]*\)(?:<br>)?", "", line))
+    return len(" ".join(kept).split())
+
+
+def is_visual(block):
+    return block.startswith(("<video", "!["))
+
+
+def budget(text, limit, visuals=None):
+    """(line, what is wrong) of each way a page is over its word budget or lacks its visuals."""
+    words = counted_words(text)
+    if words > limit:
+        yield 1, f"the page has {words} words (at most {limit})"
+    found = blocks(text)
+    if visuals == "page" and not any(is_visual(block) for _, block in found):
+        yield 1, "the page has no clip or picture (a guide page has at least one)"
+    if visuals == "sections":
+        for index, (line, block) in enumerate(found):
+            if block.startswith("## ") and not (index + 1 < len(found) and is_visual(found[index + 1][1])):
+                yield line, "the section does not open with a clip or picture"
+    for number, line in enumerate(mask_blocks(text).split("\n"), 1):
+        if not line.lstrip().startswith("|") or re.match(r"^\s*\|[\s:|-]+$", line):
+            continue
+        for cell in line.replace("\\|", " ").strip().strip("|").split("|"):
+            count = len(shown_words(cell))
+            if count > BUDGET_CELL:
+                yield number, f"a table cell of {count} words (at most {BUDGET_CELL})"
+    heading, prose, good, rows = 1, 0, [], {}
+    for line, block in blocks(text):
+        body = re.sub(r"!\[.*?\]\([^)]*\)(?:<br>)?", "", block).strip()
+        if block.startswith("#"):
+            if prose > BUDGET_SENTENCES:
+                yield heading, f"{prose} sentences of prose in this section (at most {BUDGET_SENTENCES}, before its table, clip or picture)"
+            heading, prose = line, 0
+            if re.search(r"good to know", block, re.I):
+                good.append(line)
+            continue
+        if body.startswith("|"):
+            if good and heading == good[-1] and not re.match(r"^\|[\s:|-]+$", body):
+                rows[heading] = rows.get(heading, 0) + 1
+            continue
+        body = re.sub(r"^(?:[-*+]|\d+[.)])\s+", "", body)
+        if not body or body.startswith("<"):
+            continue
+        if body.startswith("*") and not body.startswith("**"):
+            shown = claim_text(re.sub(r"\[Open [^\]]*\]\([^)]*\)", "", body)).replace("*", "").strip()
+            if len(shown) > BUDGET_CAPTION:
+                yield line, f"a caption of {len(shown)} characters (at most {BUDGET_CAPTION})"
+            continue
+        prose += len(list(sentences(claim_text(body).replace("*", "").strip())))
+    if prose > BUDGET_SENTENCES:
+        yield heading, f"{prose} sentences of prose in this section (at most {BUDGET_SENTENCES}, before its table, clip or picture)"
+    for line in good[1:]:
+        yield line, "a second \"Good to know\" table (at most one on a page)"
+    for line, count in rows.items():
+        if count - 1 > BUDGET_GOOD_ROWS:
+            yield line, f"a \"Good to know\" table of {count - 1} rows (at most {BUDGET_GOOD_ROWS})"
+
+
+def check_budgets(tree, config, problems):
+    for rel in tree.files:
+        limit = next((words for pattern, words in config.budget_words if fnmatch.fnmatchcase(rel, pattern)), None)
+        if limit is None:
+            continue
+        text = tree.text(rel)
+        visuals = next((kind for pattern, kind in config.budget_visuals.items() if fnmatch.fnmatchcase(rel, pattern)), None)
+        found, words, allowed = list(budget(text, limit, visuals)), counted_words(text), config.budget_pending.get(rel)
+        if allowed is None:
+            problems.extend(Problem("budget", rel, line, what) for line, what in found)
+        elif words > allowed:
+            problems.append(Problem("budget", rel, 1, f"the page has {words} words; it was pending at {allowed}, and that number only falls"))
+        elif not found:
+            problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"budget_pending entry for {rel}: the page meets its budget, remove the entry"))
+        elif words < allowed:
+            problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"budget_pending entry for {rel} is {allowed} but the page has {words} words: lower it to {words}"))
+    for rel in config.budget_pending:
+        if rel not in tree.files:
+            problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"budget_pending entry `{rel}` matches no page"))
+
+
 def check_allowlists(tree, config, used, problems):
     for name, entries in (("historical", config.historical), ("orphan_ok", config.orphan_ok)):
         for pattern, _ in entries:
@@ -931,6 +1164,8 @@ def check(root, config=None, used=None):
     check_orphans(tree, config, problems, graph, used)
     check_versions(tree, config, problems, used)
     check_notices(tree, config, problems, used)
+    check_walls(tree, config, problems)
+    check_budgets(tree, config, problems)
     check_allowlists(tree, config, used, problems)
     return sorted(set(problems), key=lambda p: (p.path, p.line, p.rule, p.text))
 

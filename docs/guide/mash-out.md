@@ -1,8 +1,8 @@
 # Mash out
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/c25b4d13565e31831425853cb80ea40a67f94bb3" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/48415ed2d8d2476130d914666584abf824135ae4" autoplay muted loop playsinline controls></video>
 
-*Practice games › Mash out › Start: the CPU grabs Mario again and again. Nobody mashes here, so each result at the top left reads “Poor · 90f”. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-mash-out.mp4)
+*Practice games › Mash out › Start: the CPU grabs Mario. Mashing A, B and the stick ends the first hold after 30 frames, and the result at the top left reads “Good · 30f”. The next hold runs its full 90 frames and reads “Poor · 90f”. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-mash-out.mp4)
 
 Works in Training and in the [waiting room](waiting-rooms.md). Choose **Fighter and move** in [Practice games](../menu/practice-games.md#mash-out), then **Start**. The CPU performs the chosen capture; mash to escape and see your result.
 

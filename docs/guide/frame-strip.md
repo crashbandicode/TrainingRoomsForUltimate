@@ -3,8 +3,9 @@
 The input display's frame strip shows about one second of game frames for Player 1 and the CPU: your inputs, their
 action states and the timing of your follow-up. It works in Training and waiting-room practice.
 
-<!-- CLIP: tut-input-display.mp4 | Input Display on: two jabs fill the lanes, the ADVANTAGE and LINK readouts update -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d0bf47fda93c3d22e02adf41433160fe425fd865" autoplay muted loop playsinline controls></video>
+
+*Input Display set to Frame strip: two jabs hit the CPU for 4.9%. Both lanes fill, the last-link line reads “TRUE -6  Jab > Jab” and the readout “TRUE combo”. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-input-display.mp4)
 
 ## Turning it on and off
 
@@ -56,8 +57,9 @@ direction each frame, or a blank for neutral.
 The strip can also mark a special's recognised directed travel with an arrow on Player 1's lane. It does not put a
 travel arrow on every special: the mark depends on what the movement detector observes.
 
-<!-- CLIP: tut-input-special-direction.mp4 | A neutral special, then a side and an up special: the strip's special carries its direction mark -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5de5ecb9c2be1df35919a4e2d0fc3030ce0ee126" autoplay muted loop playsinline controls></video>
+
+*Mario's neutral special, side special and up special in a row with the frame strip on; the cape hits Link for 8.8%. The direction mark on the strip is too small to read in this clip. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-input-special-direction.mp4)
 
 ### Spot labels
 

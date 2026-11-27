@@ -2,9 +2,9 @@
 
 Slow down or speed up practice without opening a menu. The same controls work in Training and waiting rooms.
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35ffa4077d05c46d16bd34ef5b7bf93c4ac2fba2" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d4df993d500e229bdcaee85defab1e2f3d5c2d48" autoplay muted loop playsinline controls></video>
 
-*Hold R + D-pad Up and tap Left: the label steps through 2/3, 1/2 and 1/4 to “1 Frame (Press ZL)”. This clip shows the label only, not a move played slowly. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-game-speed.mp4)
+*A forward smash at normal speed. Hold R + D-pad Up and tap Left: the label steps to 1/4, and the same forward smash plays slowly. The label steps back to normal speed at the end. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-game-speed.mp4)
 
 ## Changing the speed
 
@@ -24,8 +24,9 @@ On a GameCube controller use Z + D-pad Up. You can change the chord at Display &
 
 ## 1 Frame
 
-<!-- CLIP: tut-one-frame.mp4 | Speed stepped to 1 Frame: the label names its button → ZL steps frame by frame through a jab -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e5abb4fd2c63e89d58d681a1895fca97024b6388" autoplay muted loop playsinline controls></video>
+
+*The speed label changes to “1 Frame (Press ZL)”. Mario's stance changes in small steps before normal speed returns. The clip does not show a jab connecting or a counter for individual frames. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-one-frame.mp4)
 
 1. Hold R + D-pad Up and tap Left until the pop-up reads 1 Frame.
 2. Let go of the chord. Press ZL once to advance one frame, or hold it to keep advancing after the initial delay.
