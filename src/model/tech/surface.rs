@@ -169,15 +169,15 @@ pub struct RememberedSpot {
 }
 impl RememberedSpot {
     /// `far`: `t` is measured from the line's second end, which is then kept first.
-    pub fn capture(line: Line, t: f32, far: bool) -> Option<Self> {
-        (line.valid() && line.kind().is_some() && (0.0..=1.0).contains(&t)).then_some(Self {
+    pub(super) fn capture(line: Line, t: f32, far: bool) -> Self {
+        Self {
             t,
             ends: if far { [line.ends[1], line.ends[0]] } else { line.ends },
             normal: line.normal,
             floor: line.floor,
             wall: line.wall,
             passable: line.passable,
-        })
+        }
     }
     /// Exact geometry/kind rebinding after fresh discovery; never nearest.
     /// The line as read now, the parameter, and whether it is measured from that line's second end (its ends came back

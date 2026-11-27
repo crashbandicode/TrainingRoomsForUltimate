@@ -91,12 +91,23 @@ fn factory_floor() -> crate::model::tech_settings::Config {
 
 #[test]
 fn factory_draws_on_a_flat_floor_never_need_a_second_candidate() {
+    for params in [PARAMS, FlightParams { gravity: 0.085, fall_speed_cap: 1.85, ..PARAMS }] {
+        factory_first_candidates(params);
+    }
+}
+fn factory_first_candidates(params: FlightParams) {
     let surfaces = block(v(85., 0.), v(-85., 0.));
     // Every frame count the factory time range can draw, over the floor.
-    let grid = (20..=38u16)
-        .flat_map(|frames| (0..=65535u32).step_by(97).map(move |unit| (frames, unit)))
-        .filter(|(frames, unit)| !solved(&surfaces, drawn(&surfaces, *unit), *frames))
-        .count();
+    for unit in (0..=65535u32).step_by(97) {
+        let spot = drawn(&surfaces, unit);
+        for frames in 20..=38u16 {
+            let attempt: Result<_, ()> = planner::draw_attempt(|| {
+                let ctx = planner::Context { params, ..context(&surfaces, spot) };
+                Ok(planner::plan(factory_floor(), ctx, &mut |n| if n == 19 { u32::from(frames - 20) } else { 0 }).ok())
+            });
+            assert_eq!(attempt.unwrap().map(|(p, nth)| (p.contact_frames, nth)), Some((frames, 1)), "picker unit {unit}");
+        }
+    }
     // As played: 1,000 attempts, each a spot from the picker and a plan from the planner, on one seeded stream.
     let mut seed = 0x2545_f491u32;
     let mut draw = |n: u32| {
@@ -108,11 +119,11 @@ fn factory_draws_on_a_flat_floor_never_need_a_second_candidate() {
         let attempt: Result<_, ()> = planner::draw_attempt(|| {
             let spot = picker::random_spot(&surfaces, &mut Still(&surfaces), Some(Kind::Floor), CAMERA, &mut draw, &mut |_, _| {})
                 .expect("a floor spot");
-            Ok(planner::plan(factory_floor(), context(&surfaces, spot), &mut draw).ok())
+            Ok(planner::plan(factory_floor(), planner::Context { params, ..context(&surfaces, spot) }, &mut draw).ok())
         });
         redraws += u32::from(attempt.unwrap().expect("a plan within the candidates").1) - 1;
     }
-    assert_eq!((grid, redraws), (0, 0), "of the grid's 12,844 draws without a start; second candidates in 1,000 attempts");
+    assert_eq!(redraws, 0, "second candidates in 1,000 seeded attempts");
 }
 
 #[test]
@@ -126,13 +137,13 @@ fn every_position_of_every_producer_is_a_target_the_solver_takes() {
             let cursor = chosen(&surfaces, add(spot.point(), v(0.37, 3.1)));
             off[0] += u32::from(!spot.on_segment());
             off[1] += u32::from(!solved(&surfaces, spot, 20));
-            off[2] += u32::from(!cursor.on_segment() || unit % 16 == 0 && !solved(&surfaces, cursor, 20));
-            off[3] += u32::from(!restored(&surfaces, cursor).on_segment());
+            off[2] += u32::from(!solved(&surfaces, cursor, 20));
+            off[3] += u32::from(!solved(&surfaces, restored(&surfaces, cursor), 20));
         }
         if off != [0; 4] {
             report.push_str(&format!(
                 "\n{name}, of 65536 positions: drawn and not on its line {}; drawn and without a start {}; \
-                 chosen and refused {}; restored and not on its line {}", off[0], off[1], off[2], off[3]));
+                 chosen and refused {}; restored and refused {}", off[0], off[1], off[2], off[3]));
         }
     }
     assert!(report.is_empty(), "{report}");

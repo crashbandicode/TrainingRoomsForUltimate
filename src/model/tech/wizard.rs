@@ -62,9 +62,8 @@ pub struct Wizard {
 fn valid_spot(spot: Spot) -> bool {
     // The surface reader supplies native normals. Use their direction for the
     // angle and preserve their exact values for the existing start model.
-    spot.line.valid()
+    spot.on_segment()
         && spot.line.kind().is_some()
-        && finite(spot.point())
         && dot(spot.line.normal, spot.line.normal).is_finite()
         && dot(spot.line.normal, spot.line.normal) > 0.
 }

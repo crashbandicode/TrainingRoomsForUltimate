@@ -1,6 +1,6 @@
 //! BTT placing controls over the complete camera rectangle, including undersides.
 use super::surface::{Kind, Line, RecoverError, RememberedSpot, Source, Surfaces, END_MARGIN};
-use super::{add, dot, finite, scale, sub, Vec2};
+use super::{add, scale, sub, Vec2};
 use crate::model::btt::placing_motion;
 use crate::model::btt::Pad;
 use crate::model::chords::logical::{A, X, ZL};
@@ -19,7 +19,7 @@ impl Spot {
     }
     /// The cursor's nearest point on a targetable line of `kind`.
     pub fn nearest(surfaces: &Surfaces, cursor: Vec2, kind: Option<Kind>) -> Option<Self> {
-        surfaces.nearest(cursor, kind).map(|(line, t)| Self::at(line, t))
+        surfaces.nearest(cursor, kind).map(|(line, t)| Self::at(line, t)).filter(|s| s.on_segment())
     }
     #[cfg(test)]
     pub fn near(line: Line, point: Vec2) -> Self {
@@ -32,15 +32,17 @@ impl Spot {
     /// The one rule for "this target is on its line": a parameter from 0 to 1 on a line with a length. No position
     /// is compared: a line's snap of its own point is not that point bit for bit.
     pub fn on_segment(self) -> bool {
-        (0.0..=1.0).contains(&self.t) && self.line.snap(self.point()).is_some()
+        (0.0..=1.0).contains(&self.t) && self.line.valid()
     }
     pub fn remember(self) -> Option<RememberedSpot> {
-        RememberedSpot::capture(self.line, self.t, self.far)
+        (self.on_segment() && self.line.kind().is_some()).then(|| RememberedSpot::capture(self.line, self.t, self.far))
     }
     /// The remembered spot on the stage's lines as read again: the same world point, whichever way the line's ends
     /// come back.
     pub fn recover(remembered: RememberedSpot, surfaces: &Surfaces) -> Result<Self, RecoverError> {
-        remembered.resolve(surfaces).map(|(line, t, far)| Self { line, t, far })
+        let (line, t, far) = remembered.resolve(surfaces)?;
+        let spot = Self { line, t, far };
+        spot.on_segment().then_some(spot).ok_or(RecoverError::MissingSurface)
     }
     /// A moved line invalidates the old point rather than silently dragging it.
     pub fn current(self, source: &mut impl Source) -> bool {
@@ -242,6 +244,5 @@ pub fn random_spot<S: Source>(
         return None;
     }
     let spot = Spot::at(line, low + (high - low) * unit as f32 / 65535.0);
-    let point = spot.point();
-    (finite(point) && dot(sub(point, line.ends[0]), sub(point, line.ends[0])).is_finite()).then_some(spot)
+    spot.on_segment().then_some(spot)
 }

@@ -77,6 +77,7 @@ pub fn plan(
     context: Context<'_>,
     draw: &mut impl FnMut(u32) -> u32,
 ) -> Result<Plan, Refused> {
+    if !context.spot.on_segment() { return Err(Refused::Aim); }
     let multiplier = context
         .damage_multiplier
         .filter(|m| m.is_finite() && *m > 0.)
