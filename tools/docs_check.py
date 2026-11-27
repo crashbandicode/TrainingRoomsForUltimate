@@ -135,7 +135,6 @@ CLAIM_OK = [
 # (path, the quoted text, reason). An entry whose text is gone from the page fails as `allowlist-stale`.
 NOTICE_OK = [
     ("docs/TECHNICAL.md", "Same as 格斗, nothing new saved", "the notice with a Mii's name filled in: src/model/notify.rs joins 'Same as ', the name and ', nothing new saved'"),
-    ("docs/guide/cpu-behaviour.md", "Selected: Up x3, In x1", "a help line built per chip: src/model/ui/screens.rs writes 'Selected: ' then '<direction> x<weight>' for each"),
     ("docs/menu/cpu.md", "Selected: Up x2, Out x1", "the same help line, built per chip in src/model/ui/screens.rs"),
     ("docs/RESTRICTIONS.md", "Combos work in Training", "a retired restriction: the row says the string is gone from src/"),
 ]
@@ -176,27 +175,6 @@ WALL_BULLETS = re.compile(r"^\*\*(?:Values|Default|How):\*\*")
 WALL_PENDING = {
     # Counted on 2026-11-27 at the commit that added the rule (739 on 27 pages). Rewritten in this order: the menu pages
     # (Fighters & Stages first), then the guide.
-    "docs/guide/break-the-targets.md": 3,
-    "docs/guide/combos.md": 13,
-    "docs/guide/controls.md": 9,
-    "docs/guide/cpu-behaviour.md": 13,
-    "docs/guide/eggs-ercise.md": 3,
-    "docs/guide/fighter-cycles.md": 8,
-    "docs/guide/frame-strip.md": 9,
-    "docs/guide/game-speed.md": 6,
-    "docs/guide/getting-started.md": 4,
-    "docs/guide/guard-the-edge.md": 4,
-    "docs/guide/juggler.md": 4,
-    "docs/guide/mash-out.md": 3,
-    "docs/guide/mii.md": 8,
-    "docs/guide/parry-practice.md": 1,
-    "docs/guide/recording.md": 76,
-    "docs/guide/save-states.md": 9,
-    "docs/guide/stages.md": 7,
-    "docs/guide/tech-practice.md": 3,
-    "docs/guide/troubleshooting.md": 2,
-    "docs/guide/using-the-menu.md": 8,
-    "docs/guide/waiting-rooms.md": 4,
     "docs/menu/cpu.md": 134,
     "docs/menu/display-and-controls.md": 69,
     "docs/menu/practice-games.md": 3,
@@ -214,27 +192,6 @@ BUDGET_GOOD_ROWS = 5
 # page -> its word count, for the pages not yet cut to the budget. Such a page is not held to the rule, but it may not
 # grow, a shorter page lowers its number, and a page that meets the budget leaves the list. Empty before a release.
 BUDGET_PENDING = {
-    "docs/guide/break-the-targets.md": 257,
-    "docs/guide/combos.md": 2259,
-    "docs/guide/controls.md": 922,
-    "docs/guide/cpu-behaviour.md": 1241,
-    "docs/guide/eggs-ercise.md": 309,
-    "docs/guide/fighter-cycles.md": 838,
-    "docs/guide/frame-strip.md": 1153,
-    "docs/guide/game-speed.md": 474,
-    "docs/guide/getting-started.md": 552,
-    "docs/guide/guard-the-edge.md": 319,
-    "docs/guide/juggler.md": 304,
-    "docs/guide/mash-out.md": 200,
-    "docs/guide/mii.md": 682,
-    "docs/guide/parry-practice.md": 159,
-    "docs/guide/recording.md": 7517,
-    "docs/guide/save-states.md": 919,
-    "docs/guide/stages.md": 711,
-    "docs/guide/tech-practice.md": 284,
-    "docs/guide/troubleshooting.md": 1455,
-    "docs/guide/using-the-menu.md": 729,
-    "docs/guide/waiting-rooms.md": 635,
     "docs/menu/cpu.md": 4895,
     "docs/menu/display-and-controls.md": 4116,
     "docs/menu/practice-games.md": 1589,
