@@ -467,7 +467,7 @@ pub static ROWS: [Row; 175] = [
     r(LOADING, "Ready Fighter Bodies", "cycle_preload_bank_members", Control::Dropdown(&o::BODIES),
       "How many fighters each role keeps in its own slot, counting\nthe one on screen. More means quicker swaps. Off: no groups."),
     r(LOADING, "Group Swap", "cycle_preload_group_swap", TOGGLE,
-      "The master switch of the group swaps below.\nOff turns every group off."),
+      "On: each role can keep extra groups beyond its own slot.\nOff: no extra groups. The two bank entries below stay as set."),
     r(LOADING, "Swap groups", "", Control::SwapGroups,
       "Which swaps are done as a group. A greyed entry says why.\nPT / Aegis groups need free Ready Fighters: PT 3, Aegis 2."),
     // Display & Controls > On screen
@@ -503,7 +503,7 @@ pub static ROWS: [Row; 175] = [
     r(DEV, "Preload Samples", "cycle_preload_measurements", TOGGLE,
       "Writes sparse timing and memory samples of preloads\nto the diagnostics file."),
     r(DEV, "Reload developer config", "dev_reload_config", TOGGLE,
-      "While on, holding L+R+A on Player 1 re-reads the\ndeveloper config file every frame."),
+      "On: hold L+R+A on Player 1 in Training to reload dev.json.\nThe reads are queued and done off the game's thread."),
     r(DEV, "Debug hooks", "dev_debug_hooks", TOGGLE,
       "Turns on the debug watch on the Kirby backshield\nwork float."),
     // CPU > Level (rc.6; its group was appended to `GROUPS`, so its row follows the others here)
