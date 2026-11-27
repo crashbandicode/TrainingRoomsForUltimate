@@ -160,6 +160,12 @@ def main():
                 feature, g["disposition"], len(g["files"]), o.get("ours-new", 0), o.get("mixed", 0), o.get("upstream-identical", 0), other,
                 g["fork_only_lines"], g["retained"]))
         f.write("\n## Mixed files by feature (fork-only ranges are stage line numbers)\n\n")
+        f.write("| Feature | Mixed files |\n| --- | ---: |\n")
+        for feature in order:
+            count = groups.get(feature, {}).get("origins", {}).get("mixed", 0)
+            if count:
+                f.write(f"| {feature} | {count} |\n")
+        f.write("\n")
         for feature in order:
             g = groups.get(feature)
             if not g:
@@ -173,9 +179,9 @@ def main():
             f.write("\n")
         un = groups.get("UNMAPPED")
         if un:
-            f.write("## Unmapped\n\n")
+            f.write("## Unmapped\n\n| File | Origin |\n| --- | --- |\n")
             for r in un["files"]:
-                f.write("- `%s` (%s)\n" % (r["path"], r["origin"]))
+                f.write("| `%s` | %s |\n" % (r["path"], r["origin"]))
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump({k: {"disposition": v["disposition"], "origins": v["origins"], "files": [r["path"] for r in v["files"]]} for k, v in groups.items()}, f, indent=1)
     for feature in order:

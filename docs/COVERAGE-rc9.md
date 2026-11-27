@@ -1,9 +1,10 @@
 # rc.9 line coverage
 
-2026-11-12. Line coverage of the `training_rooms` crate's host-compiled product code, measured with `cargo llvm-cov` 0.9.1
-(rustc 1.98.1, LLVM 22) at `a25fbbc6`. The order was 95% if possible with at most 1,000 tests. **Reached: 91.54% with 865 tests.**
-What blocks the rest is under "Why not 95%". **Then reduced on the operator's choice to the cases that add coverage: 90.18% with 821 test
-functions and 1,689 cases** (the last section, "Option (b)"); the sections before it describe the state before that reduction.
+- 2026-11-12.
+- Line coverage of the `training_rooms` crate's host-compiled product code, measured with `cargo llvm-cov` 0.9.1 (rustc 1.98.1, LLVM 22) at `a25fbbc6`.
+- The order was 95% if possible with at most 1,000 tests.
+- **Reached: 91.54% with 865 tests.** What blocks the rest is under "Why not 95%".
+- **Then reduced on the operator's choice to the cases that add coverage: 90.18% with 821 test functions and 1,689 cases** (the last section, "Option (b)"); the sections before it describe the state before that reduction.
 
 ## Figures
 
@@ -20,11 +21,15 @@ functions and 1,689 cases** (the last section, "Option (b)"); the sections befor
 
 ## How it was raised
 
-- **The cut tests came back as cases.** `tools/test_cut.py` (`tabulate_region`) turns the `#[test]` functions of a module into
-  the rows of one `#[test] fn case_table()`. Each case is the test function it was, unchanged, and asserts what it asserted.
-  `src/test_table.rs` runs each case on its own thread, as the harness did, runs every case even after one fails, and names
-  the failed ones. A test under `cfg`, `ignore` or `should_panic`, and one that re-executes the test binary by its own name
-  (`current_exe`), stays a plain test.
+| Coverage change | What the suite retained |
+| --- | --- |
+| Restored cases | Original assertions in table-driven tests |
+| Special harness behavior | Tests using `ignore` or `should_panic` stayed standalone |
+
+- **The cut tests came back as cases.** `tools/test_cut.py` (`tabulate_region`) turns the `#[test]` functions of a module into the rows of one `#[test] fn case_table()`.
+  - Each case is the test function it was, unchanged, and asserts what it asserted.
+  - `src/test_table.rs` runs each case on its own thread, as the harness did, runs every case even after one fails, and names the failed ones.
+  - A test under `cfg`, `ignore` or `should_panic`, and one that re-executes the test binary by its own name (`current_exe`), stays a plain test.
   - The unit-test modules of `src/` are back (the 199 of the cut, and the 59 it kept are tables now too): 233 tables in 221 files.
   - 37 integration files are back as one table each: the menu model (`core02_menu`, `menu_nav`), the state detail rows
     (`state02`–`state04`), `input05`, `input_named`, `migration`, the Mii suites, `p1_core` and others. The seven CPU spec-row
@@ -40,6 +45,10 @@ functions and 1,689 cases** (the last section, "Option (b)"); the sections befor
   (written for the earlier `input` signature) stay cut.
 
 ## Scope and exclusions
+
+| Counted | Excluded |
+| --- | --- |
+| Instrumented host-product lines in `src/` | Test code, vendored crates, the layout builder and uncompiled Switch-only paths |
 
 - **Counted:** every line llvm-cov instruments in a `src/` file compiled into a host test build (the lib's test binary and
   the by-path test crates), outside test code.
@@ -89,6 +98,12 @@ A dash: the module was not compiled into that state's host test builds.
 
 ## Why not 95%
 
+| 95% target on 39,457 lines | Observed |
+| --- | --- |
+| Maximum uncovered | 1,972 lines |
+| Actual uncovered | 3,339 lines |
+| Gap | 1,367 lines |
+
 95% of 39,457 lines leaves at most 1,972 uncovered; 3,339 are. The other 1,367 lines are not blocked by the 1,000 limit
 (135 tests of headroom; 83 with the vendored crates counted). They are blocked by what they are:
 
@@ -116,6 +131,11 @@ The per-file table of every uncovered line count is reproducible with the comman
 
 ## Reproduce
 
+| Reproduction input | Why it matters |
+| --- | --- |
+| Fresh target directory | Avoid stale binaries with zero counts |
+| LCOV export | Include product files reached through by-path test crates |
+
 ```text
 rustup component add llvm-tools                      # into the project's RUSTUP_HOME (toolchain 1.98.1)
 cargo install cargo-llvm-cov --locked                # 0.9.1, into the project's CARGO_HOME
@@ -131,22 +151,26 @@ A target directory reused from an earlier commit also skews the export (old bina
 
 ## Product code
 
-No product behaviour change. The release and diag NROs built at the commit before this work (`ef4113c2`) and at this commit have
-the same size and differ in 56 bytes each: the 32-byte build id, 7 characters of the commit in the build tag and 17 bytes of line
-numbers in 16 panic locations. The test cut's re-gates of `swap/mod.rs`, `stages/mod.rs` and `rr_host.rs` and its removed
-`#[cfg(test)]` helpers are back as they were at `28082c29`, because their tests are back; the import edit in `compat/menu.rs` stays
-(the two names are imported by its test module). `docs/TEST-CUT-LEDGER-rc9.md` describes the cut as it was made; where it says a
-module's tests are removed, this file says how they returned.
+| NRO comparison with `ef4113c2` | Bytes changed per NRO |
+| --- | --- |
+| Build ID | 32 |
+| Commit tag | 7 |
+| Panic line numbers | 17 |
+
+- No product behaviour change.
+- Release and diag NRO sizes stayed unchanged. Each differed in 56 bytes, including line numbers at 16 panic locations.
+- The test cut's re-gates of `swap/mod.rs`, `stages/mod.rs` and `rr_host.rs` and its removed `#[cfg(test)]` helpers are back as they were at `28082c29`, because their tests are back; the import edit in `compat/menu.rs` stays (the two names are imported by its test module).
+- `docs/TEST-CUT-LEDGER-rc9.md` describes the cut as it was made; where it says a module's tests are removed, this file says how they returned.
 
 ## Option (b): only the cases that add coverage (2026-11-12)
-
-The table tests above put the cut tests back as rows: 863 test functions, but 2,894 cases. The operator chose to keep only the
-cases that add coverage nothing else gives, with at most a 1.5-point drop.
 
 | | Test functions | Cases | Line coverage |
 | --- | ---: | ---: | ---: |
 | Before (`b1e27e5a`) | 863 | 2,894 | 91.53% (36,116 of 39,457) |
 | After | 821 | 1,689 | 90.18% (35,583 of 39,457) |
+
+The table tests above put the cut tests back as rows: 863 test functions, but 2,894 cases. The operator chose to keep only the
+cases that add coverage nothing else gives, with at most a 1.5-point drop.
 
 - A case is one row of a `case_table` or one plain `#[test]`. After: 1,113 rows in 245 tables and 576 plain tests.
 - With the two vendored crates' own gates the test functions are 873. The limit is 1,000.
@@ -178,10 +202,10 @@ cases that add coverage nothing else gives, with at most a 1.5-point drop.
 
 ### What was dropped, and why it is redundant
 
-All but a few dropped cases cover only product lines that the kept cases also cover: measured, case by case. The few that
-covered more account for the cost: 533 lines (1.35 points) that only dropped cases covered. This is redundancy of coverage,
-not of assertions: a dropped case may have asserted a different outcome on the same lines. None is in a required group or
-names an rc.8/rc.9 fix.
+- All but a few dropped cases cover only product lines that the kept cases also cover: measured, case by case.
+- The few that covered more account for the cost: 533 lines (1.35 points) that only dropped cases covered.
+- This is redundancy of coverage, not of assertions: a dropped case may have asserted a different outcome on the same lines.
+- None is in a required group or names an rc.8/rc.9 fix.
 
 | Area | Cases dropped | Files | What they were |
 | --- | ---: | ---: | --- |

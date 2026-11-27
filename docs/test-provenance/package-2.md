@@ -1,17 +1,15 @@
 # Test provenance, package 2 (CPU behaviour)
 
-`Requirement | spec § | host test | Eden row planned | status`. Host tests run with `cargo test`
-(`tests/cpu_core.rs`, `tests/cpu02.rs`, `tests/cpu03.rs`, `tests/cpu_sites.rs`; the model's unit tests are
-compiled into each by-path binary, so per-binary counts overlap). Eden row labels are the specs' own and are
-batched per boot in `eden/EDEN-PACKAGE-2-PLAN.md`; no Eden run has happened. Status: **host pass** = test exists
-and passes; **runtime, unrun** = the hook is written and Switch-compiled but not run on Eden; **blocked** = needs
-an input the implementer does not have (reason in the row); **later** = the spec row belongs to a later milestone
-of this package.
+Package 2 test record opened 2026-11-01 (`fa8b77d3`). Each status records the evidence available at that stage.
 
-Design facts the tests rest on (all in `src/model/cpu/`): one `Cpu` value (settings, the plugin's own generator,
-the constant table, the role table, one state per fighter body); every hook reads the game first, takes the one
-lock for a pure decision, releases it and applies the answer; no status, term or work id is written down: they are
-asked from the game's constant table by name at run time (`hash.rs`, `ids.rs`).
+- `Requirement | spec § | host test | Eden row planned | status`.
+- Host tests run with `cargo test` (`tests/cpu_core.rs`, `tests/cpu02.rs`, `tests/cpu03.rs`, `tests/cpu_sites.rs`; the model's unit tests are compiled into each by-path binary, so per-binary counts overlap).
+- Eden row labels are the specs' own and are batched per boot in `eden/EDEN-PACKAGE-2-PLAN.md`; no Eden run has happened.
+- Status: **host pass** = test exists and passes; **runtime, unrun** = the hook is written and Switch-compiled but not run on Eden; **blocked** = needs an input the implementer does not have (reason in the row); **later** = the spec row belongs to a later milestone of this package.
+
+- Design facts the tests rest on (all in `src/model/cpu/`): one `Cpu` value (settings, the plugin's own generator, the constant table, the role table, one state per fighter body).
+- Each hook reads the game first, takes the one lock for a pure decision, releases it and applies the answer.
+- No status, term or work id is written down: they are asked from the game's constant table by name at run time (`hash.rs`, `ids.rs`).
 
 ## Shared by the CPU specs (SPEC-cpu-01 §3/§5, SPEC-cpu-07 §5, decisions B4, B5/N4, B6)
 
@@ -151,11 +149,15 @@ state against the spec's roughly 128 bytes for one shared table; the clock still
 
 ## Not in this milestone
 
-The fixed camera (stage table) and the shield damage multiplier are open (IMPLEMENTATION-PROGRESS-pkg2.md (removed after v0.2.0-rc.1; see that tag), "Still open").
+| Package-2 milestone | Status at handoff |
+| --- | --- |
+| Fixed camera stage table | Open |
+| Shield damage multiplier | Open |
+
+The original handoff is under “Still open” in `IMPLEMENTATION-PROGRESS-pkg2.md` at `v0.2.0-rc.1`.
+The November 2 update records the later results.
 
 ## Update 2026-11-02 (successor worker): Eden runs s2-01..s2-04 on the Ally, the two open items closed
-
-Evidence and raw lines: `eden/EDEN-PACKAGE-2.md`. Rows whose status changed:
 
 | Requirement | § | Host test | Eden row | Status |
 | --- | --- | --- | --- | --- |
@@ -169,3 +171,5 @@ Evidence and raw lines: `eden/EDEN-PACKAGE-2.md`. Rows whose status changed:
 | Mash, each action | cpu-01 §5 | `cpu01_action_flags_table` | `cpu-01-mash-each-action` | **Eden pass** for 16 of 18 actions |
 | Playback request word | cpu-03 §5 | `cpu03_playback_request_word_round_trips_for_every_slot` | - | host pass |
 | Install line fits its buffer | core-01 §7 | `the_install_line_of_every_site_and_feature_fits_its_buffer_with_room_to_spare` | `cpu-0N-install-line` | host pass; found by Eden (line cut at 2048 bytes) |
+
+Evidence and raw lines: `eden/EDEN-PACKAGE-2.md`. Rows whose status changed:

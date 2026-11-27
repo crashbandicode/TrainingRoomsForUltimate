@@ -1,5 +1,7 @@
 # Test provenance, package 4 (recording, input display, chords, notifications)
 
+Package 4 test record opened 2026-11-01 (`b9d6497d`). Each status records the evidence available at that stage.
+
 Stream `stream/pkg4` (Claude Sonnet 5.5 high under lead `0caa72b8`). Playbook followed: `009c9ac`. Host tests are in
 `tests/input01.rs` (SPEC-input-01), `tests/input02.rs` (SPEC-input-02), `tests/input04.rs` (SPEC-input-04),
 `tests/input05.rs` (SPEC-input-05) and `tests/input_sites.rs` (sites against the owned 13.0.5 ELF); the carried files
@@ -38,6 +40,12 @@ carry their own unit tests (`src/model/menu_shortcuts.rs`, `src/model/capture_se
 
 ## Not testable on the host or not built in this stream (stated, not implied)
 
+| Package-4 test boundary | Dependency at handoff |
+| --- | --- |
+| Pane writes | Package 5 layout and anchors |
+| Mash-triggered playback | Package 2 trigger evaluation |
+| Record-on-load | Package 3 restore completion |
+
 - Pane writes of the input display and the notice slot, the Combo Display consumer and the damage helper's pane writes wait for
   package 5's layout and anchors (SPEC-core-05); the plan and the model are built and tested, `write_plan` / `write_panes`
   report to the diagnostics only.
@@ -49,9 +57,6 @@ carry their own unit tests (`src/model/menu_shortcuts.rs`, `src/model/capture_se
 
 ## Online review (read-only rules, hook by hook; SPEC-input-01 §4, playbook CHECKLIST "Online")
 
-The package's hooks act only when `is_training_mode()` is true and, for the recorder, only on the CPU entry's own controller; in an online match every hook
-returns before it reads or writes anything beyond that predicate.
-
 | Hook | Reads | Writes | Draws game RNG / skips native code |
 | --- | --- | --- | --- |
 | P1 poll note (`input_caller_*_note`, shared with Input Delay) | the player's `Controller` | Plus bits of that controller only for a modal owner or an accepted Plus shortcut (never in an online match: no Training) | no |
@@ -59,6 +64,9 @@ returns before it reads or writes anything beyond that predicate.
 | `ai_epilogue` (`main+0x2dbc38`) | AI object, CPU entry, status, facing | the CPU entry's own controller fields (buttons, stick, clamped stick), the cliff rest timer, the model colour blend: Training only, CPU entry only | no (the plugin's own generator picks slots) |
 | `combo_display_a/b` | w20 / w8 (the byte the game just loaded) | the plugin's own atomic | no |
 | `stale_moves_toggle` | the menu object pointer | one byte at `PauseMenu+0xb60` in Training only | no |
+
+The package's hooks act only when `is_training_mode()` is true and, for the recorder, only on the CPU entry's own controller; in an online match every hook
+returns before it reads or writes anything beyond that predicate.
 
 Replay A/B with the desync detector and the two-console online rows are not run (lead's to schedule); the plugin never writes simulated state outside Training.
 

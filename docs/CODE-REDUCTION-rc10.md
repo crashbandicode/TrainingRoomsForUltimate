@@ -5,24 +5,30 @@ slice as it lands on `rc10`. Done so far: **S3**, **S1**, **S2**, **S4** and **S
 
 ## The short answer
 
-- **Upstream is 24,325 lines. TrainingRooms is 129,593 non-test lines** (122,707 product, 6,755 diagnostic-only,
-  131 host-only), plus 48,930 test lines.
+| Baseline | Raw non-test lines |
+| --- | --- |
+| Upstream | 24,325 |
+| TrainingRooms | 129,593 |
+| Estimated TrainingRooms floor | 110,000 to 117,000 |
+
+- The TrainingRooms count includes 122,707 product, 6,755 diagnostic-only and 131 host-only lines.
+  The 48,930 test lines are separate.
 - **The target of about 24k is not reachable with every feature kept.** The parts of TrainingRooms that do what
   upstream also does are already larger than all of upstream, and the features upstream doesn't have are about 79k
   more.
-- **The realistic floor is about 110–117k non-test lines** (4.5–4.8 times upstream), a cut of 12–19k (9–15%).
+- The estimated floor was 4.5–4.8 times upstream, a cut of 12–19k lines (9–15%).
   About 12–16k of that is low risk and leaves the release NRO's code unchanged.
-- Three items need the primary's or the operator's word before I start them: collapsing the Cargo feature table
-  (S2), deleting unused diagnostic probes (S4), and whether the guard tables may live in a data file (S1).
+- At the planning stage, three changes needed approval: collapsing the Cargo feature table (S2),
+  deleting unused diagnostic probes (S4) and moving guard tables into data files (S1).
 
 ## How the lines were counted
-
-Two counters, both on the same tree.
 
 | Counter | Rule | TrainingRooms | Upstream `077a8e4` | Ratio |
 | --- | --- | --- | --- | --- |
 | Raw (the task's rule) | non-blank, non-comment lines of `*.rs` outside `target/`, `tests/`, `third_party/`, `vendor/`; test code separated | **129,593** non-test | **24,325** | 5.3× |
 | `tools/sloc.py` (the repo's own, rustfmt-normalized `rustfmt-sloc4`) | every file formatted with the pinned rustfmt first, then the same rule | **165,931** | **24,343** | 6.8× |
+
+Two counters, both on the same tree.
 
 - The raw counter is `tools/loc_raw.py` (`python3 -I tools/loc_raw.py . --depth 2`). It classifies each line by the
   innermost `#[cfg]` item around it:
@@ -78,8 +84,6 @@ The ten largest files hold 18% of the product lines:
 
 ## Where the size is
 
-Measured over the product lines.
-
 | Finding | Lines | What it means |
 | --- | --- | --- |
 | Generated guard tables | 8,413 in 21 files | 962 rows (690 `Seam`, 272 `Site`), 8 to 13 lines each: a label, an offset and 64 bytes. This is data written as code. |
@@ -92,15 +96,14 @@ Measured over the product lines.
 | Label tables (`X => "text"`) | 557 arms | Spread over the menu, recording pop-up and macro panel. |
 | Lines that are only closing brackets | 22,905 (18.7%) | Normal for Rust (upstream: 30.4%). Not a reduction target. |
 
+Measured over the product lines.
+
 What I looked for and did not find in quantity:
 - settled `const … : bool = true` switches (5 in the tree);
 - `#[allow]` attributes in product code (4, in `hos-lock` and the layout tool);
 - large copy-pasted modules, apart from the two Mii role files.
 
 ## The slice plan
-
-Ranked by safe saving. "Identical NRO" means the rc.9 test-cut method: the release and diag NROs differ from the
-base only in the build id, the commit tag and panic line numbers.
 
 | # | Slice | Saving (raw lines) | Risk | How its behaviour is verified |
 | --- | --- | --- | --- | --- |
@@ -112,6 +115,9 @@ base only in the build id, the commit tag and panic line numbers.
 | S6 | One Mii role owner for Player 1 and the CPU | −800 | High | Model tests; Eden Mii rows for both roles (cycle to a saved Mii, Add New, the Replay window's Mii switch, a Local Wireless room). |
 | S7 | Menu and pop-up label and handler tables | −1,000 to −2,000 | Medium | The existing menu, panel and screen tests (0.9–1.5k lines per file); an Eden menu tour compared frame by frame with rc.9. |
 | S8 | Fold the `compat` menu shim into `Settings` | −500 | High | Only if asked for. Touches most carried runtime files; needs the full Eden pass. |
+
+Ranked by safe saving. "Identical NRO" means the rc.9 test-cut method: the release and diag NROs differ from the
+base only in the build id, the commit tag and panic line numbers.
 
 **Total:** −12,250 to −15,700 for S1–S4; −14,850 to −19,300 with S5–S8.
 
@@ -217,8 +223,10 @@ Getting near 24k would mean removing features or the guard and test structure. I
 
 ## S3: done (2026-11-12)
 
-Code that no Switch build uses is deleted, or sits behind `#[cfg(test)]` when only tests use it, wherever that leaves
-the NROs unchanged and adds no warning.
+| S3 inclusion rule | Decision |
+| --- | --- |
+| Unused by the Switch and tests | Remove only if the NROs stay unchanged and no warning appears |
+| Used only by tests | Gate with `#[cfg(test)]` under the same condition |
 
 **What moved**
 
@@ -253,18 +261,15 @@ the NROs unchanged and adds no warning.
 
 **The NROs are the same**
 
-Release and diag NROs built from the S3 commit against those built from `f5146184`: `.text` is byte-identical in
-both. Of the 4,136,960 and 4,329,472 bytes, 557 and 563 differ: the 32-byte build id, the 8 characters of the commit
-in the build tag, and the line numbers of 500 and 506 panic locations, which moved because lines above them were
-added or removed.
+- Release and diag NROs built from the S3 commit against those built from `f5146184`: `.text` is byte-identical in both.
+- Of the 4,136,960 and 4,329,472 bytes, 557 and 563 differ: the 32-byte build id, the 8 characters of the commit in the build tag, and the line numbers of 500 and 506 panic locations, which moved because lines above them were added or removed.
 
 **Why dead types stayed, and what touches them**
 
-- A first attempt also removed or gated the 132 dead types with their impl blocks (−5,428 product lines). Its NROs
-  had the same size and the same sections, and every function was the same once addresses were masked, but 83
-  functions had another mangled name and the functions were laid out in another order. An impl block, written or
-  derived, is numbered among the impls of its module, and that number is part of the name of everything in the later
-  impls. So removing a type renames code that stays.
+- A first attempt also removed or gated the 132 dead types with their impl blocks (−5,428 product lines).
+  - Its NROs had the same size and the same sections, and every function was the same once addresses were masked, but 83 functions had another mangled name and the functions were laid out in another order.
+  - An impl block, written or derived, is numbered among the impls of its module, and that number is part of the name of everything in the later impls.
+  - So removing a type renames code that stays.
 - A second attempt kept the types and gated their methods (−4,169). Its `.text` was identical, but the kept types'
   fields and variants were then unused in the Switch builds: 16 new `dead_code` warnings.
 - So S3 keeps every dead type, and everything dead that touches one, as it was. A file that is test-only as a whole
@@ -291,6 +296,12 @@ added or removed.
 - `build.rs` still names the build `rc9`.
 ## S1: done (2026-11-12)
 
+| S1 change | Measured result |
+| --- | --- |
+| Guard tables | 23 tables converted to data files |
+| Raw product lines | 119,817 to 111,612 |
+| NRO comparison | Only build identity changed |
+
 The rows of the 23 guard tables are data files, `data/tables/*.tsv` (format: `data/tables/README.md`). `build.rs`
 turns each file into the array its source file includes, so the tables are the same Rust values in the same order.
 
@@ -311,6 +322,11 @@ turns each file into the array its source file includes, so the tables are the s
 - The 86 rows of removed and non-shipped probes are still in the tables, so the install line is unchanged. S4 drops
   the rows of the probes it removes.
 ## S2: done (2026-11-12)
+
+| S2 change | Measured result |
+| --- | --- |
+| Always-enabled Cargo features | 25 removed as switches |
+| Raw product lines | 111,612 to 110,367 |
 
 The 25 Cargo features that every shipped build enabled are not switches any more (`docs/DECISIONS.md`, "the product
 is not behind feature switches", which supersedes D11).
@@ -344,6 +360,12 @@ is not behind feature switches", which supersedes D11).
   thread as diag-only, which it is).
 ## S4: done (2026-11-12)
 
+| S4 change | Measured result |
+| --- | --- |
+| Unused probes | Five removed |
+| Diagnostic-only lines | 6,750 to 5,692 |
+| Installer | 15 fewer seam rows |
+
 The five probes nothing used are deleted (the operator's Group A): `mii-ldn-qualification-probe`,
 `native-unlink-probe`, `texture-probe`, `console-swap-trace` and `automation-results-native`. Group B stays
 (`console-practice-trace`, `named-input-trace`, `hang-trace` with `stall_watch`, `plugin-heap-meter`).
@@ -369,14 +391,17 @@ The five probes nothing used are deleted (the operator's Group A): `mii-ldn-qual
   one word. `cargo check --features named-input-trace` is now a gate of every slice (`docs/BUILD.md`, "Probe check";
   the `named-input-trace` row of `tools/feature_matrix.py`'s core set). Two of the probe's functions have no caller
   (`trace_write`, `trace_close_input`); they are left as they are.
-- **Eden boot** (run `rc10-s4-fb028a9b-g2`, the Surface, diag NRO `d2d39f02…` of `fb028a9b`, the GDB stub on before
-  the load, tracing off): the plugin installed (`result=installed heap_allocations=0`); 11 rows passed: the stub and
-  the load, boot to Training, the old settings, the migration, a chord, the CPU fighter through the menu, five hot
-  switches, a held item, the Replay window and a named Mii. One row failed, `acc-hook` (no `hook_stats` line in the
-  log); it failed the same way on the base build in the integration lane's last run of this set
-  (`final-rc8-surface-1-eca14e4b`). The console has no panic, abort, crash or unmapped-access line. This boot is also
-  S2's check: S2's binary was not byte-identical, and the build under test contains it.
+- **Eden boot** (run `rc10-s4-fb028a9b-g2`, the Surface, diag NRO `d2d39f02…` of `fb028a9b`, the GDB stub on before the load, tracing off): the plugin installed (`result=installed heap_allocations=0`).
+  - Eleven rows passed: the stub and the load, boot to Training, the old settings, the migration, a chord, the CPU fighter through the menu, five hot switches, a held item, the Replay window and a named Mii.
+  - One row failed, `acc-hook` (no `hook_stats` line in the log); it failed the same way on the base build in the integration lane's last run of this set (`final-rc8-surface-1-eca14e4b`).
+  - The console has no panic, abort, crash or unmapped-access line.
+  - This boot is also S2's check: S2's binary was not byte-identical, and the build under test contains it.
 ## S3b: done (2026-11-12)
+
+| S3b change | Acceptance method |
+| --- | --- |
+| Dead types and their implementations | Remove after function-by-function comparison, not a byte-identity claim |
+| Runtime coverage | Include the change in the final rc.10 Eden pass |
 
 The dead code S3 left in place is removed: the dead types, their impl blocks and what touched them. The operator's
 and the primary's answer (2026-11-12 05:25Z) was to take it, with a function-by-function proof in place of byte
@@ -413,6 +438,11 @@ lane's evidence folder). Release and diag ELFs of `83e91989` against `2c728893`:
   bytes each and sum to the same size.
 - The stack table, svc and game-thread checks pass on both ELFs.
 ## S3c: dead fields and variants, tried and not taken (2026-11-12)
+
+| Trial | Decision |
+| --- | --- |
+| 16 product lines saved | Patch retained outside rc.10 |
+| About 90 affected release functions | Changed instructions or sizes; byte identity did not hold |
 
 After S3b, 34 enum variants and 37 struct fields are still dead in every Switch build. The order was to remove those
 in plain Rust types (no `repr`, never across FFI), with the same function-by-function proof.

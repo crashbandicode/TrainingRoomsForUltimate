@@ -6,206 +6,248 @@ This is the frozen source-stage graph; F7 retires its `src/replay_preview.rs` de
 
 ## Layer 0
 
-- `src/character_memory.rs` [Hot-swap engin]
-- `src/heap_metrics.rs` [Diagnostics]
-- `src/native_fields.rs` [Seam guards]
-- `src/native_keyboard/inline_keyboard.rs` [Mii fighters]
-- `src/native_unlink_core.rs` [Seam guards]
-- `src/practice_trace_core.rs` [Diagnostics]
-- `src/replay_capture.rs` [Named macros]
-- `src/replay_preview.rs` [Named macros]
-- `src/replay_store.rs` [Named macros]
-- `src/source_lifetime.rs` [Hot-swap engin]
-- `src/training/named_macros.rs` [Named macros]
-- `src/turnip_face_caller_probe.rs` [Diagnostics]
-- `training_mod_consts/src/body_bank/memory.rs` [Hot-swap engin]
-- `training_mod_consts/src/body_bank/memory_table.rs` [Hot-swap engin]
-- `training_mod_consts/src/capacity_creation.rs` [Hot-swap engin]
-- `training_mod_consts/src/character_forms.rs` [Hot-swap engin]
-- `training_mod_consts/src/character_items.rs` [Character item]
-- `training_mod_consts/src/cycle_admission_grace.rs` [Cycle preload]
-- `training_mod_consts/src/cycle_preload_capacity.rs` [Cycle preload]
-- `training_mod_consts/src/menu_json.rs` [Setup library ]
-- `training_mod_consts/src/native_seams/mod.rs` [Seam guards]
-- `training_mod_consts/src/native_seams/rows_a1.rs` [Seam guards]
-- `training_mod_consts/src/native_seams/rows_a3.rs` [Seam guards]
-- `training_mod_consts/src/source_load.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/mod.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/native_model.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/request_bit.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/special_articles.rs` [Hot-swap engin]
-- `training_mod_macros/src/lib.rs` [Named macros]
-- `training_mod_macros/src/ui_anchor.rs` [Named macros]
-- CYCLE: `training_mod_mii/src/draft.rs` [Mii fighters] | `training_mod_mii/src/inventory.rs` [Mii fighters] | `training_mod_mii/src/lifetime.rs` [Mii fighters] | `training_mod_mii/src/native_values.rs` [Mii fighters] | `training_mod_mii/src/selection.rs` [Mii fighters]
-- `training_mod_mii/src/ldn_handshake.rs` [Mii fighters]
-- `training_mod_mii/src/lib.rs` [Mii fighters]
-- `training_mod_mii/src/mii_setup.rs` [Mii fighters]
-- `training_mod_tui/src/macro_panel.rs` [Named macros]
-- `training_mod_tui/src/resume.rs` [Named macros]
-- `training_mod_tui/src/roster_grid.rs` [Hot-swap engin]
-- `training_mod_tui/src/stage_forms.rs` [Practice stage]
+| Carry unit | Source file | Feature (short label) |
+| --- | --- | --- |
+| File 1 | `src/character_memory.rs` | Hot-swap engin |
+| File 2 | `src/heap_metrics.rs` | Diagnostics |
+| File 3 | `src/native_fields.rs` | Seam guards |
+| File 4 | `src/native_keyboard/inline_keyboard.rs` | Mii fighters |
+| File 5 | `src/native_unlink_core.rs` | Seam guards |
+| File 6 | `src/practice_trace_core.rs` | Diagnostics |
+| File 7 | `src/replay_capture.rs` | Named macros |
+| File 8 | `src/replay_preview.rs` | Named macros |
+| File 9 | `src/replay_store.rs` | Named macros |
+| File 10 | `src/source_lifetime.rs` | Hot-swap engin |
+| File 11 | `src/training/named_macros.rs` | Named macros |
+| File 12 | `src/turnip_face_caller_probe.rs` | Diagnostics |
+| File 13 | `training_mod_consts/src/body_bank/memory.rs` | Hot-swap engin |
+| File 14 | `training_mod_consts/src/body_bank/memory_table.rs` | Hot-swap engin |
+| File 15 | `training_mod_consts/src/capacity_creation.rs` | Hot-swap engin |
+| File 16 | `training_mod_consts/src/character_forms.rs` | Hot-swap engin |
+| File 17 | `training_mod_consts/src/character_items.rs` | Character item |
+| File 18 | `training_mod_consts/src/cycle_admission_grace.rs` | Cycle preload |
+| File 19 | `training_mod_consts/src/cycle_preload_capacity.rs` | Cycle preload |
+| File 20 | `training_mod_consts/src/menu_json.rs` | Setup library  |
+| File 21 | `training_mod_consts/src/native_seams/mod.rs` | Seam guards |
+| File 22 | `training_mod_consts/src/native_seams/rows_a1.rs` | Seam guards |
+| File 23 | `training_mod_consts/src/native_seams/rows_a3.rs` | Seam guards |
+| File 24 | `training_mod_consts/src/source_load.rs` | Hot-swap engin |
+| File 25 | `training_mod_consts/src/swap_model/mod.rs` | Hot-swap engin |
+| File 26 | `training_mod_consts/src/swap_model/native_model.rs` | Hot-swap engin |
+| File 27 | `training_mod_consts/src/swap_model/request_bit.rs` | Hot-swap engin |
+| File 28 | `training_mod_consts/src/swap_model/special_articles.rs` | Hot-swap engin |
+| File 29 | `training_mod_macros/src/lib.rs` | Named macros |
+| File 30 | `training_mod_macros/src/ui_anchor.rs` | Named macros |
+| CYCLE 31 | `training_mod_mii/src/draft.rs` | Mii fighters |
+| CYCLE 31 | `training_mod_mii/src/inventory.rs` | Mii fighters |
+| CYCLE 31 | `training_mod_mii/src/lifetime.rs` | Mii fighters |
+| CYCLE 31 | `training_mod_mii/src/native_values.rs` | Mii fighters |
+| CYCLE 31 | `training_mod_mii/src/selection.rs` | Mii fighters |
+| File 32 | `training_mod_mii/src/ldn_handshake.rs` | Mii fighters |
+| File 33 | `training_mod_mii/src/lib.rs` | Mii fighters |
+| File 34 | `training_mod_mii/src/mii_setup.rs` | Mii fighters |
+| File 35 | `training_mod_tui/src/macro_panel.rs` | Named macros |
+| File 36 | `training_mod_tui/src/resume.rs` | Named macros |
+| File 37 | `training_mod_tui/src/roster_grid.rs` | Hot-swap engin |
+| File 38 | `training_mod_tui/src/stage_forms.rs` | Practice stage |
 
 ## Layer 1
 
-- `src/cycle_preload_policy.rs` [Cycle preload]
-- `src/kirby_hat_cycle.rs` [Kirby hats]
-- `src/mii_auto_init.rs` [Mii fighters]
-- `src/mii_editor_bridge/inline_keyboard.rs` [Mii fighters]
-- `src/mii_editor_bridge/native.rs` [Mii fighters]
-- `src/mii_editor_bridge/ui_resume.rs` [Mii fighters]
-- `src/mii_identity_binding.rs` [Mii fighters]
-- `src/mii_native_access.rs` [Mii fighters]
-- `src/mii_saved_file_probe.rs` [Diagnostics]
-- `src/native_hud_refresh.rs` [Hot-swap engin]
-- `src/native_keyboard.rs` [Mii fighters]
-- `src/native_reload_pose.rs` [Hot-swap engin]
-- `src/native_source_actors.rs` [Hot-swap engin]
-- `src/native_unlink_guard.rs` [Seam guards]
-- `src/preload_metrics.rs` [Cycle preload]
-- `src/source_owner_probe.rs` [Diagnostics]
-- `src/swap_native/heap_fields.rs` [Hot-swap engin]
-- `src/swap_native/special_articles.rs` [Hot-swap engin]
-- `src/training/ui/layout_registry.rs` [Lobby practice]
-- CYCLE: `training_mod_consts/src/body_bank.rs` [Hot-swap engin] | `training_mod_consts/src/swap_model/capabilities.rs` [Hot-swap engin] | `training_mod_consts/src/swap_model/ledger.rs` [Hot-swap engin] | `training_mod_mii/src/backend.rs` [Mii fighters] | `training_mod_mii/src/capacity.rs` [Mii fighters] | `training_mod_mii/src/identity.rs` [Mii fighters] | `training_mod_mii/src/ordinary_cpu.rs` [Mii fighters] | `training_mod_mii/src/ordinary_player.rs` [Mii fighters] | `training_mod_mii/src/replay.rs` [Mii fighters] | `training_mod_mii/src/role_owner.rs` [Mii fighters]
-- `training_mod_consts/src/native_seams/drill.rs` [Diagnostics]
-- `training_mod_consts/src/native_seams/report.rs` [Seam guards]
-- `training_mod_consts/src/swap_model/hud_model.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/scope.rs` [Hot-swap engin]
-- `training_mod_consts/src/trio.rs` [Hot-swap engin]
-- `training_mod_consts/tests/swap_replay.rs` [Hot-swap engin]
-- `training_mod_mii/src/auto_init.rs` [Mii fighters]
-- `training_mod_mii/src/draft_store.rs` [Mii fighters]
-- `training_mod_mii/src/remembered.rs` [Mii fighters]
-- `training_mod_mii/src/role_adapter.rs` [Mii fighters]
-- `training_mod_mii/src/saved.rs` [Mii fighters]
-- `training_mod_mii/tests/ldn_handshake.rs` [Mii fighters]
-- `training_mod_mii/tests/mii_setup_preflight.rs` [Mii fighters]
-- `training_mod_mii/tests/source_provenance.rs` [Mii fighters]
-- `training_mod_tui/src/stage_menu.rs` [Practice stage]
+| Carry unit | Source file | Feature (short label) |
+| --- | --- | --- |
+| File 1 | `src/cycle_preload_policy.rs` | Cycle preload |
+| File 2 | `src/kirby_hat_cycle.rs` | Kirby hats |
+| File 3 | `src/mii_auto_init.rs` | Mii fighters |
+| File 4 | `src/mii_editor_bridge/inline_keyboard.rs` | Mii fighters |
+| File 5 | `src/mii_editor_bridge/native.rs` | Mii fighters |
+| File 6 | `src/mii_editor_bridge/ui_resume.rs` | Mii fighters |
+| File 7 | `src/mii_identity_binding.rs` | Mii fighters |
+| File 8 | `src/mii_native_access.rs` | Mii fighters |
+| File 9 | `src/mii_saved_file_probe.rs` | Diagnostics |
+| File 10 | `src/native_hud_refresh.rs` | Hot-swap engin |
+| File 11 | `src/native_keyboard.rs` | Mii fighters |
+| File 12 | `src/native_reload_pose.rs` | Hot-swap engin |
+| File 13 | `src/native_source_actors.rs` | Hot-swap engin |
+| File 14 | `src/native_unlink_guard.rs` | Seam guards |
+| File 15 | `src/preload_metrics.rs` | Cycle preload |
+| File 16 | `src/source_owner_probe.rs` | Diagnostics |
+| File 17 | `src/swap_native/heap_fields.rs` | Hot-swap engin |
+| File 18 | `src/swap_native/special_articles.rs` | Hot-swap engin |
+| File 19 | `src/training/ui/layout_registry.rs` | Lobby practice |
+| CYCLE 20 | `training_mod_consts/src/body_bank.rs` | Hot-swap engin |
+| CYCLE 20 | `training_mod_consts/src/swap_model/capabilities.rs` | Hot-swap engin |
+| CYCLE 20 | `training_mod_consts/src/swap_model/ledger.rs` | Hot-swap engin |
+| CYCLE 20 | `training_mod_mii/src/backend.rs` | Mii fighters |
+| CYCLE 20 | `training_mod_mii/src/capacity.rs` | Mii fighters |
+| CYCLE 20 | `training_mod_mii/src/identity.rs` | Mii fighters |
+| CYCLE 20 | `training_mod_mii/src/ordinary_cpu.rs` | Mii fighters |
+| CYCLE 20 | `training_mod_mii/src/ordinary_player.rs` | Mii fighters |
+| CYCLE 20 | `training_mod_mii/src/replay.rs` | Mii fighters |
+| CYCLE 20 | `training_mod_mii/src/role_owner.rs` | Mii fighters |
+| File 21 | `training_mod_consts/src/native_seams/drill.rs` | Diagnostics |
+| File 22 | `training_mod_consts/src/native_seams/report.rs` | Seam guards |
+| File 23 | `training_mod_consts/src/swap_model/hud_model.rs` | Hot-swap engin |
+| File 24 | `training_mod_consts/src/swap_model/scope.rs` | Hot-swap engin |
+| File 25 | `training_mod_consts/src/trio.rs` | Hot-swap engin |
+| File 26 | `training_mod_consts/tests/swap_replay.rs` | Hot-swap engin |
+| File 27 | `training_mod_mii/src/auto_init.rs` | Mii fighters |
+| File 28 | `training_mod_mii/src/draft_store.rs` | Mii fighters |
+| File 29 | `training_mod_mii/src/remembered.rs` | Mii fighters |
+| File 30 | `training_mod_mii/src/role_adapter.rs` | Mii fighters |
+| File 31 | `training_mod_mii/src/saved.rs` | Mii fighters |
+| File 32 | `training_mod_mii/tests/ldn_handshake.rs` | Mii fighters |
+| File 33 | `training_mod_mii/tests/mii_setup_preflight.rs` | Mii fighters |
+| File 34 | `training_mod_mii/tests/source_provenance.rs` | Mii fighters |
+| File 35 | `training_mod_tui/src/stage_menu.rs` | Practice stage |
 
 ## Layer 2
 
-- `src/mii_managed_helper.rs` [Mii fighters]
-- `src/mii_native_adapter.rs` [Mii fighters]
-- `src/mii_ordinary_cpu_native.rs` [Mii fighters]
-- `src/mii_ordinary_native.rs` [Mii fighters]
-- `src/mii_replay.rs` [Mii fighters]
-- `src/mii_saved_native.rs` [Mii fighters]
-- `src/mii_selector_native.rs` [Mii fighters]
-- `src/mii_source_provenance.rs` [Mii fighters]
-- `src/model.rs` [Hot-swap engin]
-- `src/native_source.rs` [Hot-swap engin]
-- `src/process_memory.rs` [Diagnostics]
-- `src/swap_native/mii_setup.rs` [Mii fighters]
-- `src/swap_native/observe.rs` [Diagnostics]
-- `src/swap_native/r_handle.rs` [Hot-swap engin]
-- `src/swap_native/seam_drill.rs` [Diagnostics]
-- `training_mod_consts/src/body_bank/window_share.rs` [Hot-swap engin]
-- `training_mod_consts/src/cycle_preload_config.rs` [Cycle preload]
-- `training_mod_consts/src/identity_view.rs` [Hot-swap engin]
-- `training_mod_consts/src/lobby_stages.rs` [Practice stage]
-- `training_mod_consts/src/mii_cycle.rs` [Mii fighters]
-- `training_mod_consts/src/mii_menu_tests.rs` [Mii fighters]
-- `training_mod_consts/src/ordered_roster.rs` [Hot-swap engin]
-- `training_mod_consts/src/practice_setup.rs` [Lobby practice]
-- `training_mod_consts/src/swap_model/copy_registry.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/fallback.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/lifecycle.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/occupancy.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/order_replay.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/pair_after_objects.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/target.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/tests.rs` [Hot-swap engin]
-- `training_mod_consts/tests/scope_callbacks.rs` [Hot-swap engin]
-- `training_mod_mii/src/catalog_request.rs` [Mii fighters]
-- `training_mod_mii/src/editor_row.rs` [Mii fighters]
-- `training_mod_mii/src/transition.rs` [Mii fighters]
-- `training_mod_mii/tests/helper147_headgear.rs` [Mii fighters]
-- `training_mod_mii/tests/ldn_backend.rs` [Mii fighters]
-- `training_mod_mii/tests/mii_bank_groups.rs` [Mii fighters]
-- `training_mod_mii/tests/mii_bank_publication.rs` [Mii fighters]
-- `training_mod_mii/tests/player146_headgear_ownership.rs` [Mii fighters]
-- `training_mod_mii/tests/replay185_headgear.rs` [Mii fighters]
-- `training_mod_mii/tests/role_adapter.rs` [Mii fighters]
-- `training_mod_tui/src/mii_menu.rs` [Mii fighters]
+| Carry unit | Source file | Feature (short label) |
+| --- | --- | --- |
+| File 1 | `src/mii_managed_helper.rs` | Mii fighters |
+| File 2 | `src/mii_native_adapter.rs` | Mii fighters |
+| File 3 | `src/mii_ordinary_cpu_native.rs` | Mii fighters |
+| File 4 | `src/mii_ordinary_native.rs` | Mii fighters |
+| File 5 | `src/mii_replay.rs` | Mii fighters |
+| File 6 | `src/mii_saved_native.rs` | Mii fighters |
+| File 7 | `src/mii_selector_native.rs` | Mii fighters |
+| File 8 | `src/mii_source_provenance.rs` | Mii fighters |
+| File 9 | `src/model.rs` | Hot-swap engin |
+| File 10 | `src/native_source.rs` | Hot-swap engin |
+| File 11 | `src/process_memory.rs` | Diagnostics |
+| File 12 | `src/swap_native/mii_setup.rs` | Mii fighters |
+| File 13 | `src/swap_native/observe.rs` | Diagnostics |
+| File 14 | `src/swap_native/r_handle.rs` | Hot-swap engin |
+| File 15 | `src/swap_native/seam_drill.rs` | Diagnostics |
+| File 16 | `training_mod_consts/src/body_bank/window_share.rs` | Hot-swap engin |
+| File 17 | `training_mod_consts/src/cycle_preload_config.rs` | Cycle preload |
+| File 18 | `training_mod_consts/src/identity_view.rs` | Hot-swap engin |
+| File 19 | `training_mod_consts/src/lobby_stages.rs` | Practice stage |
+| File 20 | `training_mod_consts/src/mii_cycle.rs` | Mii fighters |
+| File 21 | `training_mod_consts/src/mii_menu_tests.rs` | Mii fighters |
+| File 22 | `training_mod_consts/src/ordered_roster.rs` | Hot-swap engin |
+| File 23 | `training_mod_consts/src/practice_setup.rs` | Lobby practice |
+| File 24 | `training_mod_consts/src/swap_model/copy_registry.rs` | Hot-swap engin |
+| File 25 | `training_mod_consts/src/swap_model/fallback.rs` | Hot-swap engin |
+| File 26 | `training_mod_consts/src/swap_model/lifecycle.rs` | Hot-swap engin |
+| File 27 | `training_mod_consts/src/swap_model/occupancy.rs` | Hot-swap engin |
+| File 28 | `training_mod_consts/src/swap_model/order_replay.rs` | Hot-swap engin |
+| File 29 | `training_mod_consts/src/swap_model/pair_after_objects.rs` | Hot-swap engin |
+| File 30 | `training_mod_consts/src/swap_model/target.rs` | Hot-swap engin |
+| File 31 | `training_mod_consts/src/swap_model/tests.rs` | Hot-swap engin |
+| File 32 | `training_mod_consts/tests/scope_callbacks.rs` | Hot-swap engin |
+| File 33 | `training_mod_mii/src/catalog_request.rs` | Mii fighters |
+| File 34 | `training_mod_mii/src/editor_row.rs` | Mii fighters |
+| File 35 | `training_mod_mii/src/transition.rs` | Mii fighters |
+| File 36 | `training_mod_mii/tests/helper147_headgear.rs` | Mii fighters |
+| File 37 | `training_mod_mii/tests/ldn_backend.rs` | Mii fighters |
+| File 38 | `training_mod_mii/tests/mii_bank_groups.rs` | Mii fighters |
+| File 39 | `training_mod_mii/tests/mii_bank_publication.rs` | Mii fighters |
+| File 40 | `training_mod_mii/tests/player146_headgear_ownership.rs` | Mii fighters |
+| File 41 | `training_mod_mii/tests/replay185_headgear.rs` | Mii fighters |
+| File 42 | `training_mod_mii/tests/role_adapter.rs` | Mii fighters |
+| File 43 | `training_mod_tui/src/mii_menu.rs` | Mii fighters |
 
 ## Layer 3
 
-- `src/lobby_stage_cycle.rs` [Practice stage]
-- `src/swap_native/body_graph.rs` [Hot-swap engin]
-- `src/swap_native/seam_install.rs` [Hot-swap engin]
-- `src/training/ui/stage_grid.rs` [Practice stage]
-- `training_mod_consts/src/roster_menu_tests.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/copy_packages.rs` [Hot-swap engin]
-- `training_mod_consts/src/swap_model/presentation.rs` [Hot-swap engin]
-- `training_mod_consts/tests/stage_forms_restore.rs` [Practice stage]
-- `training_mod_consts/tests/training_rotation_restore.rs` [Practice stage]
-- `training_mod_mii/tests/quickplay_backend.rs` [Mii fighters]
-- `training_mod_tui/tests/test_mii_catalog.rs` [Mii fighters]
+| Carry unit | Source file | Feature (short label) |
+| --- | --- | --- |
+| File 1 | `src/lobby_stage_cycle.rs` | Practice stage |
+| File 2 | `src/swap_native/body_graph.rs` | Hot-swap engin |
+| File 3 | `src/swap_native/seam_install.rs` | Hot-swap engin |
+| File 4 | `src/training/ui/stage_grid.rs` | Practice stage |
+| File 5 | `training_mod_consts/src/roster_menu_tests.rs` | Hot-swap engin |
+| File 6 | `training_mod_consts/src/swap_model/copy_packages.rs` | Hot-swap engin |
+| File 7 | `training_mod_consts/src/swap_model/presentation.rs` | Hot-swap engin |
+| File 8 | `training_mod_consts/tests/stage_forms_restore.rs` | Practice stage |
+| File 9 | `training_mod_consts/tests/training_rotation_restore.rs` | Practice stage |
+| File 10 | `training_mod_mii/tests/quickplay_backend.rs` | Mii fighters |
+| File 11 | `training_mod_tui/tests/test_mii_catalog.rs` | Mii fighters |
 
 ## Layer 4
 
-- `src/automation_helper/native.rs` [Lobby practice]
-- `src/automation_helper/observer.rs` [Lobby practice]
-- `src/common/game_mode.rs` [Lobby practice]
-- `src/console_load_probe.rs` [Diagnostics]
-- `src/kirby_resource_probe.rs` [Diagnostics]
-- `src/mii_editor_bridge/native_default.rs` [Mii fighters]
-- `src/mii_identity_probe.rs` [Diagnostics]
-- `src/mii_ordinary_gate.rs` [Mii fighters]
-- `src/mii_preview_observer.rs` [Diagnostics]
-- `src/mii_quit_observer.rs` [Diagnostics]
-- `src/mii_saved_fingerprints.rs` [Mii fighters]
-- `src/native_gc_guard.rs` [Seam guards]
-- `src/practice_stage_request_policy.rs` [Practice stage]
-- `src/practice_trace.rs` [Diagnostics]
-- `src/source_lifecycle_probe.rs` [Diagnostics]
-- `src/swap_native/copy_packages.rs` [Hot-swap engin]
-- `src/swap_native/identity_view.rs` [Hot-swap engin]
-- `src/training/seams.rs` [Seam guards]
-- `src/training_stage_rotation_policy.rs` [Practice stage]
-- `src/turnip_identity.rs` [Hot-swap engin]
+| Carry unit | Source file | Feature (short label) |
+| --- | --- | --- |
+| File 1 | `src/automation_helper/native.rs` | Lobby practice |
+| File 2 | `src/automation_helper/observer.rs` | Lobby practice |
+| File 3 | `src/common/game_mode.rs` | Lobby practice |
+| File 4 | `src/console_load_probe.rs` | Diagnostics |
+| File 5 | `src/kirby_resource_probe.rs` | Diagnostics |
+| File 6 | `src/mii_editor_bridge/native_default.rs` | Mii fighters |
+| File 7 | `src/mii_identity_probe.rs` | Diagnostics |
+| File 8 | `src/mii_ordinary_gate.rs` | Mii fighters |
+| File 9 | `src/mii_preview_observer.rs` | Diagnostics |
+| File 10 | `src/mii_quit_observer.rs` | Diagnostics |
+| File 11 | `src/mii_saved_fingerprints.rs` | Mii fighters |
+| File 12 | `src/native_gc_guard.rs` | Seam guards |
+| File 13 | `src/practice_stage_request_policy.rs` | Practice stage |
+| File 14 | `src/practice_trace.rs` | Diagnostics |
+| File 15 | `src/source_lifecycle_probe.rs` | Diagnostics |
+| File 16 | `src/swap_native/copy_packages.rs` | Hot-swap engin |
+| File 17 | `src/swap_native/identity_view.rs` | Hot-swap engin |
+| File 18 | `src/training/seams.rs` | Seam guards |
+| File 19 | `src/training_stage_rotation_policy.rs` | Practice stage |
+| File 20 | `src/turnip_identity.rs` | Hot-swap engin |
 
 ## Layer 5
 
-- `src/body_bank_probe.rs` [Diagnostics]
-- `src/console_map_probe.rs` [Diagnostics]
-- `src/hang_trace.rs` [Diagnostics]
-- `src/mii_backend.rs` [Mii fighters]
-- `src/mii_fullconfig_probe.rs` [Diagnostics]
-- `src/mii_hud_portrait.rs` [Mii fighters]
-- `src/mii_saved_alpha.rs` [Mii fighters]
-- `src/native_service.rs` [Seam guards]
-- `src/native_unlink_probe.rs` [Diagnostics]
-- `src/swap_native/scope_gate.rs` [Hot-swap engin]
-- `src/training/ui/native_menu.rs` [Lobby practice]
-- `src/training_stage_rotation.rs` [Practice stage]
+| Carry unit | Source file | Feature (short label) |
+| --- | --- | --- |
+| File 1 | `src/body_bank_probe.rs` | Diagnostics |
+| File 2 | `src/console_map_probe.rs` | Diagnostics |
+| File 3 | `src/hang_trace.rs` | Diagnostics |
+| File 4 | `src/mii_backend.rs` | Mii fighters |
+| File 5 | `src/mii_fullconfig_probe.rs` | Diagnostics |
+| File 6 | `src/mii_hud_portrait.rs` | Mii fighters |
+| File 7 | `src/mii_saved_alpha.rs` | Mii fighters |
+| File 8 | `src/native_service.rs` | Seam guards |
+| File 9 | `src/native_unlink_probe.rs` | Diagnostics |
+| File 10 | `src/swap_native/scope_gate.rs` | Hot-swap engin |
+| File 11 | `src/training/ui/native_menu.rs` | Lobby practice |
+| File 12 | `src/training_stage_rotation.rs` | Practice stage |
 
 ## Layer 6
 
-- CYCLE: `src/character_items.rs` [Character item] | `src/character_lifecycle.rs` [Hot-swap engin] | `src/character_roster.rs` [Hot-swap engin] | `src/cycle_preload.rs` [Cycle preload] | `src/cycle_preload_config.rs` [Cycle preload] | `src/kirby_hats.rs` [Kirby hats] | `src/lobby_stage_probe.rs` [Diagnostics] | `src/practice_stage_observer.rs` [Practice stage] | `src/practice_stage_request.rs` [Practice stage] | `src/swap_native/presentation.rs` [Hot-swap engin] | `src/training/lobby.rs` [Lobby practice] | `src/training/practice.rs` [Lobby practice]
-- `src/native_unlink_install.rs` [Seam guards]
-- `src/training/ui/anchors.rs` [Lobby practice]
+| Carry unit | Source file | Feature (short label) |
+| --- | --- | --- |
+| CYCLE 1 | `src/character_items.rs` | Character item |
+| CYCLE 1 | `src/character_lifecycle.rs` | Hot-swap engin |
+| CYCLE 1 | `src/character_roster.rs` | Hot-swap engin |
+| CYCLE 1 | `src/cycle_preload.rs` | Cycle preload |
+| CYCLE 1 | `src/cycle_preload_config.rs` | Cycle preload |
+| CYCLE 1 | `src/kirby_hats.rs` | Kirby hats |
+| CYCLE 1 | `src/lobby_stage_probe.rs` | Diagnostics |
+| CYCLE 1 | `src/practice_stage_observer.rs` | Practice stage |
+| CYCLE 1 | `src/practice_stage_request.rs` | Practice stage |
+| CYCLE 1 | `src/swap_native/presentation.rs` | Hot-swap engin |
+| CYCLE 1 | `src/training/lobby.rs` | Lobby practice |
+| CYCLE 1 | `src/training/practice.rs` | Lobby practice |
+| File 2 | `src/native_unlink_install.rs` | Seam guards |
+| File 3 | `src/training/ui/anchors.rs` | Lobby practice |
 
 ## Layer 7
 
-- `src/character_sources.rs` [Hot-swap engin]
-- `src/cpu_pilot.rs` [CPU-as-P1 hand]
-- `src/item_state_probe.rs` [Diagnostics]
-- `src/mii_cpu_adapter.rs` [Mii fighters]
-- `src/mii_editor_bridge/mod.rs` [Mii fighters]
-- `src/mii_ldn_qualification.rs` [Mii fighters]
-- `src/mii_native_cpu_scope.rs` [Mii fighters]
-- `src/mii_ordinary_cpu.rs` [Mii fighters]
-- `src/mii_ordinary_player.rs` [Mii fighters]
-- `src/mii_origin_observer.rs` [Diagnostics]
-- `src/mii_pool_observer.rs` [Diagnostics]
-- `src/native_body_bank.rs` [Hot-swap engin]
-- `src/native_source_capacity.rs` [Hot-swap engin]
-- `src/training/ui/roster_grid.rs` [Hot-swap engin]
+| Carry unit | Source file | Feature (short label) |
+| --- | --- | --- |
+| File 1 | `src/character_sources.rs` | Hot-swap engin |
+| File 2 | `src/cpu_pilot.rs` | CPU-as-P1 hand |
+| File 3 | `src/item_state_probe.rs` | Diagnostics |
+| File 4 | `src/mii_cpu_adapter.rs` | Mii fighters |
+| File 5 | `src/mii_editor_bridge/mod.rs` | Mii fighters |
+| File 6 | `src/mii_ldn_qualification.rs` | Mii fighters |
+| File 7 | `src/mii_native_cpu_scope.rs` | Mii fighters |
+| File 8 | `src/mii_ordinary_cpu.rs` | Mii fighters |
+| File 9 | `src/mii_ordinary_player.rs` | Mii fighters |
+| File 10 | `src/mii_origin_observer.rs` | Diagnostics |
+| File 11 | `src/mii_pool_observer.rs` | Diagnostics |
+| File 12 | `src/native_body_bank.rs` | Hot-swap engin |
+| File 13 | `src/native_source_capacity.rs` | Hot-swap engin |
+| File 14 | `src/training/ui/roster_grid.rs` | Hot-swap engin |
 
 ## Layer 8
 
-- `src/mii_catalog_request.rs` [Mii fighters]
-- `src/source_capacity_probe.rs` [Diagnostics]
-- `src/source_ldn_capacity_probe.rs` [Diagnostics]
+| Carry unit | Source file | Feature (short label) |
+| --- | --- | --- |
+| File 1 | `src/mii_catalog_request.rs` | Mii fighters |
+| File 2 | `src/source_capacity_probe.rs` | Diagnostics |
+| File 3 | `src/source_ldn_capacity_probe.rs` | Diagnostics |

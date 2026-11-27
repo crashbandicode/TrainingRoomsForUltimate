@@ -1,10 +1,11 @@
 # Test provenance, package 3 (save states, charges, buffs, items, fighter-specific restore, first-boot import)
 
-`Requirement | spec § | host test | Eden row | status`. Host tests run with `cargo test` (`tests/state01_json.rs`,
-`state01_machine.rs`, `state01_setup.rs`, `state02_charges.rs`, `state03_buffs.rs`, `state04_convert.rs`,
-`state04_items.rs`, `state05_restore.rs`, `state_sites.rs`, `migration_run.rs`; each by-path binary also runs the model's unit tests, so
-per-binary counts overlap). Eden labels `s3-NN` (results in `eden/EDEN-PACKAGE-3.md`). Status: **host pass**,
-**Eden pass**, **runtime, unrun** (written and Switch-compiled, no Eden row yet), **not built** (reported).
+Package 3 test record opened 2026-11-02 (`00d84b9e`). Each status records the evidence available at that stage.
+
+- `Requirement | spec § | host test | Eden row | status`.
+- Host tests run with `cargo test` (`tests/state01_json.rs`, `state01_machine.rs`, `state01_setup.rs`, `state02_charges.rs`, `state03_buffs.rs`, `state04_convert.rs`, `state04_items.rs`, `state05_restore.rs`, `state_sites.rs`, `migration_run.rs`; each by-path binary also runs the model's unit tests, so per-binary counts overlap).
+- Eden labels `s3-NN` (results in `eden/EDEN-PACKAGE-3.md`).
+- Status: **host pass**, **Eden pass**, **runtime, unrun** (written and Switch-compiled, no Eden row yet), **not built** (reported).
 
 ## SPEC-state-01 save / load core
 

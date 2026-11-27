@@ -1,10 +1,10 @@
 # Replay editor: what came from the fork (2026-11-24)
 
-The crop and preview editor of install 4 (`feat/replay-editor`, base `b5177cdb`) copies no fork code. The fork-own
-hunks it uses were already in this repository through the package-4 carry of 2026-11-02 (`tools/carry_pkg4.py`, stage
-m5q, ledger `pkg4-carry-ledger.md`). This table lists them by the fork commit that added them. Fork worktree:
-`UltimateTrainingModpack-lobby-parity`; line ranges are the added lines at that commit. "Verbatim" counts the added
-lines of more than 14 characters found unchanged in this repository at `b5177cdb`.
+- The crop and preview editor of install 4 (`feat/replay-editor`, base `b5177cdb`) copies no fork code.
+- The fork-own hunks it uses were already in this repository through the package-4 carry of 2026-11-02 (`tools/carry_pkg4.py`, stage m5q, ledger `pkg4-carry-ledger.md`).
+- This table lists them by the fork commit that added them.
+- Fork worktree: `UltimateTrainingModpack-lobby-parity`; line ranges are the added lines at that commit.
+- "Verbatim" counts the added lines of more than 14 characters found unchanged in this repository at `b5177cdb`.
 
 | Fork commit | Fork file | Added lines | Here | Verbatim |
 | --- | --- | --- | --- | --- |
