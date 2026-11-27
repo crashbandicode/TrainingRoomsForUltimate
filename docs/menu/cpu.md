@@ -28,7 +28,7 @@ On the [direction grid](../guide/cpu-behaviour.md#direction-chips), In means tow
 | Setting | Choices; default in bold | What it does |
 | --- | --- | --- |
 | <a id="airdodge-direction"></a>Airdodge Direction | Weighted directions; **none** | Picks a direction for an air dodge out of hitstun. |
-| <a id="di-direction"></a>DI Direction | Weighted directions; **none** | Changes launch direction per hit; empty leaves DI to the game. |
+| <a id="di-direction"></a>DI Direction | Weighted directions; **none** | Keeps one direction throughout hitstun. An empty selection leaves DI to the game. |
 | <a id="sdi-direction"></a>SDI Direction | Weighted directions; **none** | Nudges the CPU during hitlag; needs SDI Strength. |
 | <a id="sdi-strength"></a>SDI Strength | **None**, Normal, Medium, High | Nudges every 8, 6 or 4 frames respectively when enabled. |
 | <a id="clatter-strength"></a>Clatter Strength | **None**, Normal, Medium, High | Mashes out of holds every 8, 5 or 2 frames when enabled. |
@@ -72,11 +72,11 @@ Use [delay rows](../guide/cpu-behaviour.md#delay-rows) to select individual valu
 | Setting | Choices; default in bold | What it does |
 | --- | --- | --- |
 | <a id="attack-angle"></a>Attack Angle | Neutral, Up, Down; **none** | Angles supported attacks, including forward tilt and forward smash. |
-| <a id="throw"></a>Throw | **None**, Forward, Backward, Up, Down | Chooses a throw after a grab; None lets the grab end. |
+| <a id="throw"></a>Throw | **None**, Forward Throw, Backward Throw, Up Throw, Down Throw | Picks one ticked option per grab. None allows pummels until the opponent escapes. |
 | <a id="throw-delay"></a>Throw Delay | 0-150 frames, step 5; **no wait** | Waits before throwing. |
 | <a id="pummel-delay"></a>Pummel Delay | 0-150 frames, step 5; **no pummels** | Waits before each pummel, including the first. |
 | <a id="falling-aerials"></a>Falling Aerials | Yes, **No**, Random | Waits until falling before starting an aerial. |
-| <a id="aerial-drift"></a>Aerial Drift | None, In, Out, Forward, Back; **none ticked** | Drifts during a mashed aerial until landing. |
+| <a id="aerial-drift"></a>Aerial Drift | None, In, Out, Forward, Back; **none ticked** | Holds the chosen drift while the mashed aerial is active and the CPU is airborne. |
 | <a id="aerial-delay"></a>Aerial Delay | 0-30 frames; **no wait** | Waits before starting an aerial. |
 | <a id="full-hop"></a>Full Hop | **Yes**, No, Random | Chooses full or short hops, including jumps before aerials. |
 | <a id="fast-fall"></a>Fast Fall | Yes, **No**, Random | Fast falls after reaching the jump's peak. |
