@@ -137,7 +137,7 @@ The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#eden-on-inst
 
 | Found in testing the preview build | What happens | Workaround | Status |
 | --- | --- | --- | --- |
-| Fighter switch times out | The open editor blocks the roster. After 600 editor passes it stops waiting but leaves the switch pending. In Eden, ZL + L changed Player 1 only after the editor closed. The CPU side was not tested. | None established. | Not fixed in this preview. |
+| Fighter switch times out | After ZL + L the editor waits, then reads "The fighter did not load; the editor keeps the current one". The open editor blocks the roster. After 600 worker passes it stops waiting but leaves the switch pending. In Eden, ZL + L changed Player 1 only after the editor closed. The CPU side was not tested. | None established. | Not fixed in this preview. |
 | Fighters slide apart after B | The fighters are back at their places, but their push boxes can keep the scrubbed pose's width for a few ticks. The overlap pushes them apart. | None established. | Not fixed in this preview. |
 
 The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#preview-build-cc71537c).

@@ -49,7 +49,7 @@ shows the recorded move when that frame has a pose and the fighter matches the t
 | A match capture or a Vault recording made on this build | Keeps each frame's animation too |
 | A macro without recorded moves | Still loads and plays. The editor reads "Play it once to see the moves while scrubbing." |
 | An older capture | Still loads. It shows positions only |
-| Fighter choice | ZL + L requests a switch for Player 1; ZL + R requests one for the CPU. The Player 1 switch did not finish in the editor; the CPU switch was not tested |
+| Fighter choice | Each side shows the fighter on stage or the take's recorded fighter. ZL + L requests the switch for Player 1; ZL + R requests it for the CPU. The Player 1 switch did not finish in the editor; the CPU switch was not tested |
 | Not shown | Projectiles, items and damage, as before |
 
 ### Fixes to install 6
@@ -68,7 +68,7 @@ Guard the Edge's uneven start is not changed by this build.
 
 | Issue | What happens | Way round | Status |
 | --- | --- | --- | --- |
-| Fighter switch times out | The open editor blocks the roster from applying the switch. After 600 editor passes it gives up without withdrawing the request. In Eden, Player 1 changed fighters only after the editor closed; the CPU side was not tested | None established | Not fixed in this preview |
+| Fighter switch times out | After ZL + L the editor waits, then reads "The fighter did not load; the editor keeps the current one". The open editor blocks the roster from applying the switch. After 600 worker passes it gives up without withdrawing the request. In Eden, Player 1 changed fighters only after the editor closed; the CPU side was not tested | None established | Not fixed in this preview |
 | Fighters slide apart after B | Both fighters return to their places, but their push boxes can keep the width of the scrubbed pose for a few ticks. The boxes still overlap, so the game pushes the fighters apart. A quick B left each about 0.6 units off in four of six tries | None established | Not fixed in this preview |
 
 Both are to be fixed before the next release.
