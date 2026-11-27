@@ -2,7 +2,7 @@
 
 ## Open, change and close
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b4aebb02d593833384f793c0b2801120ccd5c543" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/da832776fdc03e33bd4d0a18a5386bfa6766991a" autoplay muted loop playsinline controls></video>
 
 *Change Crouch, close the menu and watch the CPU.* [Open the clip](../media/tut-menu-change-option.mp4)
 
