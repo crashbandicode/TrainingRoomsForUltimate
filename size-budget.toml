@@ -3256,3 +3256,11 @@ ceiling = 209091
 date = "2026-11-26"
 reason = "Scrub moves, P5b of the next build, the join of its three parts on rc-next 4da7f807 (208329): the positions file version 2 with 44-byte rows and the rule by which a playback gives an older file its moves (part A, with the shared names and the capture crop fix), the recorded animation drawn on a held fighter without its script lines (part B), and the per-fighter toggle on ZL+L and ZL+R (part C). +762 in all, measured by the size step on the joined head: part A +233, part B +134, part C +395."
 approved_by = "tr-primary-2 2026-11-26 20:51:11Z and 21:24:01Z (P5b pre-approved up to +900 lines in all on rc-next's 208329; one joined entry by place-t1a) and 21:42:46Z (release NRO at most +16,384 B on merge 17 5df3d9dc, at most +12,288 B on 4da7f807; release raw .bss +0; the 8-byte reply word of part C accepted at 21:45:17Z wherever it lands)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 209116
+date = "2026-11-27"
+reason = "The slide after a release (place-t1a's proof rows 2026-11-26 23:19Z and 23:46Z, its traces 2026-11-27 00:35Z and 01:06Z, and rv-preview-vis's read B: a fighter the clip editor's scrub had posed was let go with the plain animation blending in from the pose and its push box made from the posed joints), on rc-next cc71537c (209091): +25, measured by the size step of the gate on ce5a09b3. The posed body's release sets facing and situation first, arms MotionModule::set_next_no_comp right before the plain change, calls GroundModule::update_shape(true), then writes the place as before: two guarded calls of the placement unit, no state, no push switch and no write to a field."
+approved_by = "tr-primary-2 2026-11-27 01:40:58Z (budget entry granted at the measured count, up to +40 lines; the NRO sizes are unchanged)."
