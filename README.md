@@ -3,14 +3,14 @@
 TrainingRooms adds practice tools to Super Smash Bros. Ultimate's Training mode and to the waiting rooms of online and
 local play: hitboxes, save states, recordings, combo drills, game speed and more, all from one menu.
 
-**Current release: [rc.15](docs/CURRENT-RELEASE.md).** Its newest build, install 6 (`5df3d9dc`, 2026-11-26), is
-installed and read back. Its Eden checks are in progress. A preview build (`cc71537c`) is staged for the card and
-not installed. What's new, how to install it and what is known not to work
-are on that page; each build's changes are in the [release notes](docs/RELEASE-NOTES-rc15.md). New here? Start with [Getting started](docs/guide/getting-started.md). Something not
-working? See [Troubleshooting](docs/guide/troubleshooting.md).
+![The menu opens over Training, turns through its five pages and closes; practice goes on](docs/media/readme-menu-tour.gif)<br>
+*B + D-pad Up opens the menu, R turns through the five pages, B closes it and practice goes on. Eden, 2026-11-25, rc.15.*
 
-![The menu's five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, both fighters' hurtbox pills and a neutral air's red hitbox](docs/media/rc14-menu-tour.gif)<br>
-*The menu's five pages, then Hitbox Visualization: A ticks Hitboxes, Grab boxes and Hurtboxes, and both fighters are drawn as hurtbox pills (yellow in this clip; grey in the current colours). Eden, rc.14 (untested on hardware).*
+**Current release: [rc.15](docs/CURRENT-RELEASE.md).** That page says what is new, how to install it and what is
+known not to work. Each build's changes are in the [release notes](docs/RELEASE-NOTES-rc15.md).
+
+- New here? Start with [Getting started](docs/guide/getting-started.md).
+- Something not working? See [Troubleshooting](docs/guide/troubleshooting.md).
 
 [Stage tech practice](docs/menu/fighters-and-stages.md#stage-tech-practice): pick a spot and practise techs with launch settings, grades and sessions.
 
@@ -106,7 +106,7 @@ To drill a combo, land it, then choose **Recording › Combos & Sequences › + 
 your next attempts.
 
 <!-- CLIP: tut-combo-save-drill.mp4 | Kirby lands jab into side tilt → Recording › Combos & Sequences › + Save last combo… → the next try is graded on the link cells -->
-*Clip coming.*
+*No clip: saving a combo and its first graded try are not filmed.*
 
 Cut a macro, combo or drill into a new file with [Crop](docs/guide/recording.md#crop).
 
@@ -147,7 +147,7 @@ Practise while waiting for a local wireless or Quickplay match. With **Fighters 
 open the room menu with B + D-pad Up. See [Waiting rooms](docs/guide/waiting-rooms.md).
 
 <!-- CLIP: tut-lobby-practice-menu.mp4 | A Local Wireless waiting room (one member): B + D-pad Up opens the room menu, Hurtboxes ticked, both practice fighters drawn as pills -->
-*Clip coming.*
+*No clip: the menu in a waiting room is not filmed for this page.*
 
 ## License
 

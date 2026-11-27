@@ -52,16 +52,17 @@ Open the menu with B + D-pad Up (or Minus). L and R turn the pages.
 | Feature | Button or row | See it |
 | --- | --- | --- |
 | Crop macros, combos and input drills into new files while keeping the originals. | A on the file's Crop; L/R, Left/Right, A save. | [Macro GIF](media/rc15-crop-editor.gif), [drill GIF](media/rc15-input-drill.gif), [editor keys](menu/recording.md#replay-window). |
-| Record a no-hit movement drill or make one from a no-hit macro. | A on DRILLS > → + Record drill…, then the Record chord; or Make combo. | [Drill Crop GIF](media/rc15-input-drill.gif), [how to record](menu/recording.md#input-drills); no recording/conversion GIF yet. |
+| Record a no-hit movement drill or make one from a no-hit macro. | A on DRILLS > → + Record drill…, then the Record chord; or Make combo. | [Drill Crop GIF](media/rc15-input-drill.gif), [how to record](menu/recording.md#input-drills), [guide](guide/recording.md#input-drills). Making a drill from a macro is not filmed. |
 | Draw the hurtboxes of hittable articles and items. | Hitbox Visualization → Article hurtboxes, A tick. | [Pikmin GIF](media/rc15-article-hurtboxes.gif), [drawing options](menu/display-and-controls.md#hitbox-visualization). |
-| Read a colour key that explains what you ticked. | A on Hitbox Visualization. | [Earlier normal still](media/rc15-colour-legend-normal.png), [earlier frame-data still](media/rc15-colour-legend-frame-data.png); updated palette awaiting hardware review; no GIF yet. |
+| Read a colour key that explains what you ticked. | A on Hitbox Visualization. | [Legend clip](media/tut-hitbox-colour-legend.mp4). Stills of the earlier palette: [normal](media/rc15-colour-legend-normal.png), [frame data](media/rc15-colour-legend-frame-data.png). The updated palette awaits hardware review. |
 
 ## Reference
 
 - [Technical notes](TECHNICAL.md): how it's installed and built, how each feature works inside,
   [the hidden Developer page](TECHNICAL.md#the-developer-page), the build status.
 - [Feature ledger](FEATURE-LEDGER.md): every feature with the test runs and clips that show it working: rc.11, and
-  a section for rc.13 (Eden-tested, untested on hardware); rc.12 has no rows in it.
+  sections for rc.13 (Eden-tested, untested on hardware) and install 4 (one row, seen in Eden only); rc.12 has no
+  rows in it.
 - [Media](MEDIA.md): where each GIF was recorded.
 - [Restrictions](RESTRICTIONS.md): every message that refuses something, and the approval behind it.
 - [Building](BUILD.md) and [differences from the Training Modpack](DIFFERENCES-FROM-THE-FORK.md).

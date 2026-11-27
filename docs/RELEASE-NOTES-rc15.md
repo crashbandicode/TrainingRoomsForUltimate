@@ -99,7 +99,7 @@ All three changes are in the clip editor of the [Replay window](menu/recording.m
 
 ### Y on In makes a capture previewable
 
-*Clip coming: it is held until the known issue with X after a snap is fixed.*
+*No clip: it is held until the known issue with X after a snap is fixed.*
 
 On a match capture, plain Y could leave In in the middle of an action, and X and A were then refused. The operator
 found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CURRENT-RELEASE.md#known-issues).
@@ -232,7 +232,7 @@ The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.
 
 ### Record works while an AI plays Player 1
 
-*Clip coming.*
+*No clip: Record under an AI is not filmed.*
 
 An AI here is the CPU pilot plugin, or TrainingRooms' own Player 1 control.
 
@@ -256,7 +256,7 @@ More: [Combo files › The format](guide/combos.md#the-format).
 
 ### B stops a preview, and the pop-up shows its chords
 
-*Clip coming.*
+*No clip: B stopping a preview is not filmed.*
 
 | When | The key line reads | What happens |
 | --- | --- | --- |
@@ -271,7 +271,7 @@ More: [Recording › Replay window](menu/recording.md#replay-window) and
 
 ### Delete for replay captures
 
-*Clip coming.*
+*No clip: deleting a capture is not filmed.*
 
 | Where | How |
 | --- | --- |
@@ -315,7 +315,7 @@ More: [Playback delay](menu/recording.md#playback-delay).
 
 ### Guard the Edge and Juggler start from the floor you stand on
 
-*Clip coming for the choice of floor. Each drill's set-up is filmed in its guide:
+*No clip of the choice of floor. Each drill's set-up is filmed in its guide:
 [Guard the Edge](guide/guard-the-edge.md) and [Juggler](guide/juggler.md).*
 
 | Rule | What it means |
@@ -337,7 +337,7 @@ More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stage
 
 ### Two Guard the Edge options
 
-*Clip coming.*
+*No clip: the two options are not filmed.*
 
 | Option | Default | The other setting |
 | --- | --- | --- |
@@ -354,7 +354,7 @@ More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stage
 
 ### Eggs-ercise's off-stage zone follows the stage
 
-*Clip coming.*
+*No clip: the zone on another stage is not filmed.*
 
 | The off-stage zone | Install 5 |
 | --- | --- |
@@ -368,7 +368,7 @@ More: [Fighters & Stages › Eggs-ercise](menu/fighters-and-stages.md#eggs-ercis
 
 ### A save's placement is changed with the crosshair
 
-*Clip coming.*
+*No clip: Change placement is not filmed.*
 
 **Change placement** moves where a save state puts the fighters. The menu closes and a picker opens on the live
 game: move the fighters with the crosshair.
@@ -479,7 +479,7 @@ tool's, not TrainingRooms'.
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/ffcc3cfe7871855d69a43591dbbcfef92944d0ef" autoplay muted loop playsinline controls></video><br>
 *Close-up of the drill panel. A failed attempt adds a red square, and the reset after it leaves that square in place. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-reset-after-fail-zoom.mp4)
 
-**A ledge attack:** Clip coming. The trip attack is filmed like the get-up attack and kept with the test records.
+**A ledge attack:** not filmed. The trip attack is filmed like the get-up attack and kept with the test records.
 
 | Change | What it does | More |
 | --- | --- | --- |
@@ -558,7 +558,7 @@ tool's, not TrainingRooms'.
 
 ### Waiting rooms
 
-*Clip coming.*
+*No clip: install 4's waiting-room changes are not filmed.*
 
 | Change | What it does | More |
 | --- | --- | --- |
