@@ -12516,12 +12516,32 @@
    "dest": "src/runtime/roster/turnip_identity.rs",
    "crate": "root",
    "src_sha256": "561334326aa4eb2c73c713a7cba8d9defc48e2340124f15167fc39176e88649f",
-   "dest_sha256": "810764597d3ebaba2d32abc102961b287f4298bdbd0fe368fd881ca09d99090d",
+   "dest_sha256": "060de636846d87ce7c5940fc5f8ed8941a032cc4cc394664bc1364d916af46f2",
    "edits": [
     {
      "delete_from": "pub fn on_unload(",
      "delete_to": "fn image_current(",
      "reason": "`on_unload` removed: the nro-load provider (`libnro_hook`) has no unload callback, so nothing can call it; a stale item image is refused by the per-read ITEM_CODE check of `held_face` (its own contract) and by the generation counter at the next `on_load`"
+    },
+    {
+     "reason": "No NRO-load provider (order of 2026-11-27): the item module's load arrives from TrainingRooms' own nro_loaded site as (name, module), not the provider's NroInfo",
+     "old": "/// Called from the existing native NRO load callback. Only retain item code",
+     "new": "/// Called from TrainingRooms' module-load hook. Only retain item code"
+    },
+    {
+     "reason": "No NRO-load provider (order of 2026-11-27): the item module's load arrives from TrainingRooms' own nro_loaded site as (name, module), not the provider's NroInfo",
+     "old": "pub unsafe fn on_load(nro: &skyline::nro::NroInfo<'_>)",
+     "new": "pub unsafe fn on_load(name: &str, module: *mut skyline::nn::ro::Module)"
+    },
+    {
+     "reason": "No NRO-load provider (order of 2026-11-27): the item module's load arrives from TrainingRooms' own nro_loaded site as (name, module), not the provider's NroInfo",
+     "old": "if nro.name != \"item\"",
+     "new": "if name != \"item\""
+    },
+    {
+     "reason": "No NRO-load provider (order of 2026-11-27): the item module's load arrives from TrainingRooms' own nro_loaded site as (name, module), not the provider's NroInfo",
+     "old": "    let object = nro.module.ModuleObject;",
+     "new": "    if module.is_null() { return; }\n    let object = (*module).ModuleObject;"
     }
    ]
   },
