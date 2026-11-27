@@ -2,7 +2,10 @@
 
 Tested source: **2eb3903e6eb66aedafc3e4dff6d802e9b856fdd7**, base `400e2c69`. This evidence commit changes no Rust source. Release NRO SHA256 `d694d5e1a2d040062197deb8a32a356d8ef5f1b12935d1107a7ae943ba8ab95f`; tested diagnostic NRO SHA256 `181a6518c7f7b896e0a8519f6035fb49b33cbd1014cdab70f01653d9631624ea`.
 
-All six Yoga gate steps ran. Release, diag, clippy and no-default-features passed, with zero clippy warnings. Host tests: 2,202 passed, one failed (size only), four ignored across 102 binaries. Standalone size 148,141 was 220 over 147,921 and 66 over 148,075; no ceiling was changed in this lane. Net 410 versus imported crop3549ee3f. The integration owner took responsibility for the combined size. Gate receipts: `/home/intpa/smash-training-lobby/artifacts/rc15-input-drill/gate-2eb3903e/`.
+- All six Yoga gate steps ran. Release, diag, clippy and no-default-features passed, with zero clippy warnings.
+- Host tests: 2,202 passed, one failed (size only), four ignored across 102 binaries.
+- Standalone size 148,141 was 220 over 147,921 and 66 over 148,075; no ceiling was changed in this lane. Net 410 versus imported crop3549ee3f. The integration owner took responsibility for the combined size.
+- Gate receipts: `/home/intpa/smash-training-lobby/artifacts/rc15-input-drill/gate-2eb3903e/`.
 
 - The first native boot, `rc15-input-drill-1b134e51`, exposed an idle input flag incorrectly becoming Jump: an empty take saved a phantom Jump and the four-dash take saved five steps.
 - Both files and the failing host regression remain.
@@ -10,7 +13,9 @@ All six Yoga gate steps ran. Release, diag, clippy and no-default-features passe
 - Full host library 302/0 passes.
 - Hit-link event capture, tolerances, guards and file schemas were not changed by the repair.
 
-The authorized replacement was `rc15-input-drill-2eb3903e` on Yoga, one copied profile from g, display 72. Eden AppImage SHA256 `2f315fc4b7d9658afef84f4ba3cb80a3d0b33292eaef66a802ef837222a247b9`, actual game 13.0.5, muted volume 0, memory_layout_mode 0 and GDB stub enabled before game.load. Start reached the actual main menu, visually checked. The real CPU was Min Min despite the inherited setup helper calling it Mario. No waiting-room pair or hardware test was performed.
+- The authorized replacement was `rc15-input-drill-2eb3903e` on Yoga, one copied profile from g, display 72.
+- Eden AppImage SHA256 `2f315fc4b7d9658afef84f4ba3cb80a3d0b33292eaef66a802ef837222a247b9`, actual game 13.0.5, muted volume 0, memory_layout_mode 0 and GDB stub enabled before game.load.
+- Start reached the actual main menu, visually checked. The real CPU was Min Min despite the inherited setup helper calling it Mario. No waiting-room pair or hardware test was performed.
 
 The table records the November 15 observations. Its paths name the original captures. The shared workspace retains the build gate and the final run summary in `artifacts/rc15-input-drill/HANDOFF.md`. The raw drill JSON and grading stills were unavailable for the November 27 audit.
 
