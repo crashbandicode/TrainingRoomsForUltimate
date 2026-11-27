@@ -528,7 +528,7 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 | --- | --- |
 | Training starts | Each role starts with the fighters its preload settings allow |
 | During practice | Eligible groups build in the background within the Ready Fighters limit. |
-| Historical timing | [rc.6 Eden measurements](RELEASE-NOTES.md#release-notes-rc6--fighters-load-hot) timed ready switches at 50–70 ms. |
+| Historical timing | [rc.6 Eden measurements](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/src/commit/f2378a22adf98748f0e7445062c0626686eef932/docs/RELEASE-NOTES.md#release-notes-rc6--fighters-load-hot) timed ready switches at 50–70 ms. |
 | A cycle changes in Training | Preloading starts for eligible newcomers; they are not necessarily ready on that frame |
 | Fighters leave a cycle | Retired groups are freed when you next open the pause menu. |
 | Memory pressure | Newcomers needing their room force immediate release and a brief pause. |

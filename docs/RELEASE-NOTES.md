@@ -137,11 +137,11 @@ To uninstall, remove only `libtraining_rooms.nro`. Keep saved data and shared ho
 
 | Feature | Hardware | Eden |
 | --- | --- | --- |
-| D-pad chord separation (verified in rc.10 and rc.11) | no | yes |
+| D-pad chord separation | no | no |
 | Suppress TrainingRooms chords when both GameCube triggers are held | no | no |
-| CPU Pilot shortcut refusals (verified in rc.10) | no | yes |
+| CPU Pilot shortcut refusals | no | no |
 
-“No” means a passing run is unconfirmed for this release.
+A passing run on rc.9 is unconfirmed. Eden verified D-pad separation on rc.10 and rc.11, and CPU Pilot shortcut refusals on rc.10.
 
 ### Known limits
 
