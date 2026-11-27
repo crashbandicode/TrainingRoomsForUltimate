@@ -1,6 +1,6 @@
 # Single-frame speed in Training and waiting-room practice
 
-On 2026-11-21, rc.15 added **1 Frame** to the speed chord in both modes. See the [game speed guide](../guide/game-speed.md#1-frame).
+On 2026-11-21, rc.15 added [1 Frame](../guide/game-speed.md#1-frame) to the speed chord in both modes.
 
 ## Decision and sources
 

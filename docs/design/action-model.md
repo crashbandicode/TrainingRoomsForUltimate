@@ -124,8 +124,9 @@ flowchart LR
     n0x0["Special begins"] --> n0x1["Own-status onset"] --> n0x2["Stick follows movement"] --> n0x3["Heading differs from special"] --> n0x4["Aim part"]
 ```
 
-`aim::Rule` decides an aim from what the fighter did and what the stick asked for. It reads no fighter kind and holds
-no table of statuses. The letters are those of REPORT-2 §2.2 and of the recorded decisions:
+- `aim::Rule` decides an aim from what the fighter did and what the stick asked for.
+- It reads no fighter kind and holds no table of statuses.
+- The letters are those of REPORT-2 §2.2 and of the recorded decisions:
 
 - **A, inside a special:** from an engine-common special start status (neutral, side, up or down) through the
   fighter's own statuses to the next common status. The start gives the special's own direction: up for an up
@@ -179,9 +180,8 @@ flowchart LR
     n0x0["Accepted aim"] --> n0x1["Record stick and path"] --> n0x2["Attach travel"] --> n0x3["Compare reference and attempt"]
 ```
 
-`action::Travel` is what one travel part measured: the deciding stick (angle in tenths of a degree, deflection in
-percent), the heading and straight-line distance of the whole part (tenths of a degree, tenths of a unit) and eight
-path points in game units from where the part began. Everything is facing-relative: 0° is forward, 90° is up.
+- `action::Travel` is what one travel part measured: the deciding stick (angle in tenths of a degree, deflection in percent), the heading and straight-line distance of the whole part (tenths of a degree, tenths of a unit) and eight path points in game units from where the part began.
+- Everything is facing-relative: 0° is forward, 90° is up.
 
 - **Measured by the rule.** When `aim::Rule` reports an onset as a part it opens that part: its base position, the special's facing and the deciding stick, which is the newest stick sample since the onset before it (or the press) that points along the heading (`aim::follows`, `action::stick_of`).
   - It keeps up to 16 positions.
@@ -211,8 +211,8 @@ flowchart LR
     n0x0["Special begins"] --> n0x1["Sample movement"] --> n0x2["First aim or special ends"] --> n0x3["Attach travel to opening press"]
 ```
 
-Rule D gives a special that goes its own way no aim event, so a steered special (an up special bent a little to one
-side) left nothing to grade. The rule now also measures the special's own travel, as part 0.
+- Rule D gives a special that goes its own way no aim event, so a steered special (an up special bent a little to one side) left nothing to grade.
+- The rule now also measures the special's own travel, as part 0.
 
 - **What it is.** Player 1's positions from the frame before the special's start status until the special ends, a new special starts or its first aim part opens, in whatever status the fighter moves.
   - While an entry into an own status may still turn out to be an aim part, it does not sample.
@@ -292,9 +292,9 @@ flowchart LR
 100. Without `path` the other three keys are ignored. No schema version changes. A Special press or a C-stick event
 that keeps the special's own travel writes and reads the same four keys; such a drill stays version 2.
 
-Versions 1 and 3 are hit combos, 2 and 4 are input drills; 3 and 4 allow aim events. The writer selects 1 or 2
-when the combo has no aim, 3 or 4 when it has one. A source-backed write retains its original fields but writes the
-selected version and name.
+- Versions 1 and 3 are hit combos, 2 and 4 are input drills; 3 and 4 allow aim events.
+- The writer selects 1 or 2 when the combo has no aim, 3 or 4 when it has one.
+- A source-backed write retains its original fields but writes the selected version and name.
 
 ## Changes against the build before it
 

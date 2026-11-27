@@ -13,17 +13,15 @@ The [Eggs-ercise guide](../guide/eggs-ercise.md) covers the shipped editor.
 
 *Design 3 crop-window model.*
 
-[Decisions](../DECISIONS.md) includes the proving-boot still.
+- [Decisions](../DECISIONS.md) includes the proving-boot still.
 
 - The world view uses up to 19 rectangles: five dims, two limit lines, eight edges and four handle rectangles.
 - The inset adds up to ten more limits and edges, for at most **29 of the 176 roster stripes**. These are existing menu rectangles, not added panes or textures.
 - Up to **10 target pictures** use the practice picture pool. The inset backing and traced contour use at most **65 of the 172 orb bands**; the world guide no longer uses bands.
 - The **170-pill cap** is unchanged.
 
-With the editor up and the menu closed, `view::Crop` hides the menu's panes,
-shows its container with only the crop rectangles, and restores the pane
-table's starting visibility on leave or re-resolution. The rectangles use
-`p::linear`; the dim ink is `[10, 15, 27, 140]`.
+- With the editor up and the menu closed, `view::Crop` hides the menu's panes, shows its container with only the crop rectangles, and restores the pane table's starting visibility on leave or re-resolution.
+- The rectangles use `p::linear`; the dim ink is `[10, 15, 27, 140]`.
 
 - The proving boot observed this draw order, back to front: the game's HUD, the plugin's orb bands and practice pictures, the menu rectangles, and the plugin's notice and frame strip.
 - Consequently the HUD is dimmed outside the zones and clear inside. The inset's backing and contour are under the dim; its zone edges are opaque rectangles over it.
@@ -31,22 +29,18 @@ table's starting visibility on leave or re-resolution. The rectangles use
 - A hole in the dim was considered but not taken: it would leave a pale patch in the dim and show Training's panel through it, with the same contour contrast.
 - On a black background the dim reads lighter than the window: outside black becomes `(7, 7, 19)`, while the inside remains `(0, 0, 0)`.
 
-The inset's contour is still translucent bands, so it can be pale on a bright
-stage as today. Drawing it with turned menu rectangles could make it opaque;
-the 2026-11-22 design retained the band contour.
+- The inset's contour is still translucent bands, so it can be pale on a bright stage as today.
+- Drawing it with turned menu rectangles could make it opaque; the 2026-11-22 design retained the band contour.
 
 - The pane count and pill cap are pinned by `the_pane_table_keeps_the_count_the_game_loaded` and `the_orb_pools_keep_the_pill_cap`.
 - The layout builder's `the_built_layouts_keep_the_counts_the_game_loaded` needs both stock archives and pins Training to 1,824 panes / 132 materials / 89 textures and Waiting to 1,710 / 85 / 137.
 - It runs in `tools/layout-builder` with both stock archives (`UI_STOCK_FIXTURE`) when a recipe is rebuilt, not in the gate's test step.
 - The gate's `the_committed_recipes_were_built_from_this_pane_table` ties the committed recipes to the pane table, so a recipe cannot change unseen. Any change to these counts needs a boot that reaches Training.
 
-The proving boot was `rc15-zone-crop-2a29baf4-yoga-1`, release
-`b53469ea190a68b34dd720b5c846be03a42a936dc9e046280ca7c27210b3cc49`,
-build `2a29baf4`. Its record is
-`/home/intpa/smash-training-lobby/artifacts/phase23/zone-editor-crop/boot1/RESULTS.md`.
-That boot tested the spike, not this implementation. A bright stage, the
-Inner, Outer and Preview steps, the inset's new appearance, a zone's window
-over the inset's place, Apply and console use fell outside that spike’s evidence.
+- The proving boot was `rc15-zone-crop-2a29baf4-yoga-1`, release `b53469ea190a68b34dd720b5c846be03a42a936dc9e046280ca7c27210b3cc49`, build `2a29baf4`.
+- Its record is `/home/intpa/smash-training-lobby/artifacts/phase23/zone-editor-crop/boot1/RESULTS.md`.
+- That boot tested the spike, not this implementation.
+- A bright stage, the Inner, Outer and Preview steps, the inset's new appearance, a zone's window over the inset's place, Apply and console use fell outside that spike’s evidence.
 
 ## What the optional `tr.menu/1` test bridge reads
 

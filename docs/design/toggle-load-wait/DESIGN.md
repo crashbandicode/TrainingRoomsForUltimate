@@ -1,6 +1,6 @@
 # Clip editor fighter switch and roster loading
 
-The [clip editor](../../guide/recording.md) waits for the roster’s outcome when switching fighters. B can cancel until the roster commits the change.
+When switching fighters, the [clip editor](../../guide/recording.md) waits for the roster’s outcome and accepts B until the roster commits.
 
 ## Design history
 

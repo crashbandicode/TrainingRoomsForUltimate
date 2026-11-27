@@ -1,6 +1,6 @@
 # rc.8 binds: the input display toggle and the game speed (design, 2026-11-11)
 
-The display and speed chords shipped in rc.8. The [game speed guide](../guide/game-speed.md) covers the current scale, including **1 Frame**.
+The display and speed chords shipped in rc.8, and the [game speed guide](../guide/game-speed.md) covers the later addition of **1 Frame**.
 
 - **Scope:** rc.8 §1–§3 (`artifacts/phase23/TASK-rc8.md`).
 - **Owner and branch:** the docs lane, branch `p23/rc8-binds` from `p23/rc7-final` `722525a5`.

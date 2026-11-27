@@ -1,6 +1,6 @@
 # Overlay frame sync
 
-The shipped overlay projects the completed simulation frame. See [Display & Controls](../menu/display-and-controls.md).
+The shipped [Display & Controls](../menu/display-and-controls.md) overlay projects the completed simulation frame.
 
 ## Native order
 
@@ -55,7 +55,8 @@ flowchart LR
 | Rebound reset | `hitbox.rs:1634–1656` | Call original, read status, clear cached spheres under STORE. Board clearing uses try-lock. |
 | Phase-8 overlay sampling | `hitbox.rs:1374,1658–1664` | Run the original task first, then try BOARD, STORE and ARTICLES. |
 
-The combat-store and article mutexes are private to `src/runtime/features/hitbox.rs`. The coordinates are from the stock 13.0.5 image.
+- The combat-store and article mutexes are private to `src/runtime/features/hitbox.rs`.
+- The coordinates are from the stock 13.0.5 image.
 
 - The reset hub patches Fighter vtable slot `+0x30` at `main+0x4f80240` and runs the original `main+0x60dfa0` before retiring the cache.
 - Stock virtual dispatch `main+0x656f88..0x656f94` reaches that slot from the task at `main+0x354a7dc` via `main+0x135dd70`, `main+0x14de860` and `main+0x656134`.
@@ -149,4 +150,6 @@ flowchart LR
     n1x0["GREEN plan"] --> n1x1["Integrated candidate session"]
 ```
 
-The original RED reproduction used release `3448686c` with the stock Training step input. The plan assigned GREEN to the integrated candidate’s combined Eden session. The artifact ledger records the NRO identities, native and plugin traces, stills, and card scan.
+- The original RED reproduction used release `3448686c` with the stock Training step input.
+- The plan assigned GREEN to the integrated candidate’s combined Eden session.
+- The artifact ledger records the NRO identities, native and plugin traces, stills, and card scan.

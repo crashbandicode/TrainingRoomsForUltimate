@@ -2,13 +2,15 @@
 
 Shipped behavior and settings are in the [Eggs-ercise guide](../guide/eggs-ercise.md).
 
-2026-11-22 card report: with Moving paths checked, a target sometimes flies off the stage and stops where the fighter cannot get to it.
+- 2026-11-22 card report: with Moving paths checked, a target sometimes flies off the stage and stops where the fighter cannot get to it.
 
 ![The Training stage from its collision file: three solids, their floors in yellow, three platforms, two gaps open to the bottom blast line, the camera range and the blast lines](../decisions/training-stage-offstage/training-01-outline.png)
 
 *Training stage floors from its collision file.*
 
-A target uses one floor, shown in yellow. Its moving path stays above that floor and clear of gaps. [Decisions](../DECISIONS.md) includes the stage pictures.
+- A target uses one floor, shown in yellow.
+- Its moving path stays above that floor and clear of gaps.
+- [Decisions](../DECISIONS.md) includes the stage pictures.
 
 ## Cause on the original build
 
@@ -21,7 +23,7 @@ A target uses one floor, shown in yellow. Its moving path stays above that floor
 | Rest | Up to 180 units sideways (Galaxian) or about 74 below the start (Axe). |
 | Clearance | Only Off stage carried the side used for an outline check. |
 
-So the direction, the scale and the outline check are not the cause. The box is.
+- The box caused the failure. The measured direction, scale and outline checks passed.
 
 First failing position on main `7d962416`, from the first red run of `moving_paths_stay_over_the_stage` as it stood in `70ff45f4` (a floor from x −50 to 50 at height 0, a platform from −40 to −10 at height 30, the screen 137 units wide, the camera range ±100 and −60 to 90):
 
@@ -29,7 +31,8 @@ First failing position on main `7d962416`, from the first red run of `moving_pat
 left the stage: area 0 target 0 path 0 seed 0 tick 41: (-46.3392, 25.237444), floor from -50 to 50 at 0
 ```
 
-A probe of the same fixture (first target of seed 0; `probe-main.log` in `artifacts/phase23/eggs-paths-on-stage/`) has that Axe come to rest at (−62.7, −12.8) on main: 12.7 units past the ledge and 12.8 below the floor line. On Whole stage the Axe rests at (−93.1, −50.2) and the Galaxian at (−90.6, 3.7), 40.6 units past the ledge.
+- A probe of the same fixture (first target of seed 0; `probe-main.log` in `artifacts/phase23/eggs-paths-on-stage/`) has that Axe come to rest at (−62.7, −12.8) on main: 12.7 units past the ledge and 12.8 below the floor line.
+- On Whole stage the Axe rests at (−93.1, −50.2) and the Galaxian at (−90.6, 3.7), 40.6 units past the ledge.
 
 ## The first fix and why it failed review
 
@@ -66,7 +69,7 @@ a_pop_up_fallback_takes_the_same_random_draws_as_a_flight: assertion `left == ri
 
 tr-primary-2 ruled on 2026-11-22 (15:46:34Z, option A of four): a path flies only where its box has at least 2 × `RADIUS` (8 units) of room on each axis it uses; among the 32 sampled spots one with room wins; Pop up only when none has it.
 
-The recorded failures on `0e1e78f6` of the tests written for that ruling:
+- The recorded failures on `0e1e78f6` of the tests written for that ruling:
 
 ```text
 an_axe_with_a_hair_of_height_pops_up: an Axe in a box 0.0000076293945 high would be scaled to nothing and stay at one point: Pop up
@@ -160,7 +163,8 @@ an_off_stage_spawn_takes_the_draws_it_took_on_main: assertion `left == right` fa
 - **Height is unchanged.** A flight may start and rest well above its floor: an Axe starts up to 80 units times its scale above the floor and comes down to it, and a Homing Missile climbs toward Player 1.
 - **Original host evidence.** The host tests use made-up floors: one main floor with a platform, two floors with a gap, floors at and just under the top of the box alone and beside a floor with room, a short floor with room, and narrow ranges with no floor. The 2026-11-22 host report included no Eden run.
 
-The seeds named in `a_spot_with_room_among_the_thirty_two_wins_and_pop_up_is_for_none` come from `rare-room.py` (with the evidence in `artifacts/phase23/eggs-paths-on-stage/`): a separate arithmetic model of the generator and of the draws each candidate takes. It does not read the product code.
+- The seeds named in `a_spot_with_room_among_the_thirty_two_wins_and_pop_up_is_for_none` come from `rare-room.py` (with the evidence in `artifacts/phase23/eggs-paths-on-stage/`): a separate arithmetic model of the generator and of the draws each candidate takes.
+- It does not read the product code.
 
 ## Requirement trace
 

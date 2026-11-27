@@ -24,7 +24,8 @@ flowchart LR
 | No other menu code stores a 32-bit value to `+0x30`. | `0x1bb0000`–`0x1bc8000`; `re/peek.py find-store` |
 | The other speeds' labels take no argument (`0x377a120(pane, label)`), so only 1 Frame shows it | `.1bbbda8`–`.1bbbe30` |
 
-So with the game's pause menu never opened in the Training session, the bind's call draws the button with glyph style 0, which is no glyph. The game never meets this: its own setter runs only with the menu open.
+- So with the game's pause menu never opened in the Training session, the bind's call draws the button with glyph style 0, which is no glyph.
+- The game never meets this: its own setter runs only with the menu open.
 
 **Eden, the card build, one boot (`rc15-docs-17060a5e-yoga-2`, eggs-offstage-sol):**
 - Pause menu never opened in the session, chord to 1 Frame: `1 Frame (Press )`. Historical take: `repro-r5`.
@@ -43,11 +44,12 @@ The bind lends the text call Player 1's glyph style, the value the menu's open s
 
 5. Without a lend the call is made as before.
 
-Not changed: the stored speed, the stopwatch show and hide, the apply, the pop-up, the waiting room (it has no stopwatch).
+- Not changed: the stored speed, the stopwatch show and hide, the apply, the pop-up, the waiting room (it has no stopwatch).
 
 ### Guards
 
-F5 added the 31st data file, `data/tables/rows_speed_label.ROWS.tsv`, written by `tools/gen_rows_speed_label.py`, group `speed_label`, all `Relied`, read-only, not per frame. The historical digests stay unchanged.
+- F5 added the 31st data file, `data/tables/rows_speed_label.ROWS.tsv`, written by `tools/gen_rows_speed_label.py`, group `speed_label`, all `Relied`, read-only, not per frame.
+- The historical digests stay unchanged.
 
 | Row | Offset | What it holds |
 | --- | --- | --- |
@@ -57,7 +59,10 @@ F5 added the 31st data file, `data/tables/rows_speed_label.ROWS.tsv`, written by
 | `speed_label.style_store` | `0x13e4e4c` | the table `main+0x4753de0`, `bl 0x1bb8b20`, `str w22,[x21,#0x30]` |
 | `speed_label.glyph_styles` | `0x4753de0` | the table `1,2,3,4,5,6,6` |
 
-The gate `LABEL_ROWS` is its own: when a row fails, nothing is lent and the label is written as before. The bind and 1 Frame do not depend on it. No hook, no called function added. Card scan (2026-11-23, playbook `scan-offsets.py`, `card-scan.txt`): none of the card's other 20 plugins references the five offsets or the three functions around them.
+- The gate `LABEL_ROWS` is its own: when a row fails, nothing is lent and the label is written as before.
+- The bind and 1 Frame do not depend on it.
+- No hook, no called function added.
+- Card scan (2026-11-23, playbook `scan-offsets.py`, `card-scan.txt`): none of the card's other 20 plugins references the five offsets or the three functions around them.
 
 ## 2. F3: the recording indicator
 
@@ -74,7 +79,8 @@ flowchart LR
 
 ### Design: the compact HUD row
 
-In the shipped build, playback can also appear between the recording label and the target line. The top-left compact row that Break the Targets uses (`TrBtt`: a dark plate, a 32-unit picture chip, one text) shows the take:
+- In the shipped build, playback can also appear between the recording label and the target line.
+- The top-left compact row that Break the Targets uses (`TrBtt`: a dark plate, a 32-unit picture chip, one text) shows the take:
 
 | State | Text | Text and chip colour | Box |
 | --- | --- | --- | --- |
@@ -97,7 +103,8 @@ In the shipped build, playback can also appear between the recording label and t
 
 ### Design: the recorded fighter's tint
 
-While its take records, the recorded fighter has its role's hue, the scheme the chip uses: Player 1 red, the CPU blue. The CPU's two phases before its take records keep hues of their own.
+- While its take records, the recorded fighter has its role's hue, the scheme the chip uses: Player 1 red, the CPU blue.
+- The CPU's two phases before its take records keep hues of their own.
 
 | Take | Phase | Fighter | Before | Shipped |
 | --- | --- | --- | --- | --- |
@@ -132,12 +139,14 @@ flowchart LR
     n1x0["F3 recording role"] --> n1x1["HUD, bridge and tint checks"]
 ```
 
-F5:
+**F5**
+
 - `the_one_frame_label_is_lent_player_ones_glyph_style` (`game_speed_tests`): a table of value, controller style and rows against the lend.
 - `the_glyph_styles_are_the_games_table`, `the_frame_label_reads_the_menus_glyph_style`, `the_frame_label_sets_both_texts_with_the_button_code`, `the_menus_open_step_stores_the_glyph_style_of_the_controller`, `every_label_row_is_gated` (`speed_label_rows_tests`): each constant the runtime uses decoded from the guard words.
 - `the_training_write_lends_the_glyph_style_around_the_text_call` (source test over `runtime/features/game_speed.rs`): the lend is written before the text call and the old value after it, and `on_hold` keeps the style. Red on `17060a5e`.
 
-F3:
+**F3**
+
 - `a_take_shows_rec_in_the_roles_colour`, `no_take_and_no_line_hides_the_row`, `the_targets_line_alone_is_drawn_as_before`, `a_take_during_the_targets_run_shares_the_line`, `the_rec_row_is_short_and_holds_its_text`, `a_notice_stacks_under_the_rec_row`, `the_rec_row_keeps_clear_of_the_lobbys_panels` (`hud_row_tests`).
 - `the_hud_draw_shows_the_open_take_in_training_and_the_waiting_room` covers `runtime/features/hud_draw.rs`, `runtime/bridge_state.rs` and `runtime/ui/view.rs`.
   - Both layouts read `rr_host::capture_take` and use role colours for chip and text. The menu hides the row. The roster uses the same colours.

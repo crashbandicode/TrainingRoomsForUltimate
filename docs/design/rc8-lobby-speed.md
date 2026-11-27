@@ -1,10 +1,13 @@
 # rc.8 R2: 2/3 and x1.5 in the waiting-room practice
 
-2026-11-11, QCF (`tr-opus-qcf`), branch `p23/rc8-lobby-speed` from `9626926c`. Scope: `artifacts/phase23/TASK-rc8.md`
-"SCOPE REOPENED" R2 and R9. Research: `quickplay-cancel-fix-work/RESEARCH-rc8-speed.md` §9 (static RE, Eden pairs
-`qcf-spd04y` and `qcf-spd05y`). The bind itself (the chord, the pop-up, Training) is in the [rc.8 bind design](rc8-binds.md).
+- 2026-11-11, QCF (`tr-opus-qcf`), branch `p23/rc8-lobby-speed` from `9626926c`.
+- Scope: `artifacts/phase23/TASK-rc8.md` "SCOPE REOPENED" R2 and R9.
+- Research: `quickplay-cancel-fix-work/RESEARCH-rc8-speed.md` §9 (static RE, Eden pairs `qcf-spd04y` and `qcf-spd05y`).
+- The bind itself (the chord, the pop-up, Training) is in the [rc.8 bind design](rc8-binds.md).
 
-The five-speed design shipped in rc.8. By 2026-11-27, [1 Frame](rc15-speed-frame.md) preceded those five speeds in both Training and waiting-room practice. See the [Game speed guide](../guide/game-speed.md).
+- The five-speed design shipped in rc.8.
+- By 2026-11-27, [1 Frame](rc15-speed-frame.md) preceded those five speeds in both Training and waiting-room practice.
+- See the [Game speed guide](../guide/game-speed.md).
 
 ## 1. Why the waiting room used a separate clock
 

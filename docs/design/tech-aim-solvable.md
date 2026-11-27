@@ -1,6 +1,6 @@
 # Tech practice aim and retry limits
 
-Shipped 2026-11-27. The [Tech practice guide](../guide/tech-practice.md) covers restarting after a stop.
+The 2026-11-27 fix shipped with the retry and stop behavior described in the [Tech practice guide](../guide/tech-practice.md).
 
 | Design record | Detail |
 | --- | --- |

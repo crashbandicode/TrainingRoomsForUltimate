@@ -4,7 +4,8 @@
 
 *Two placement defects reconstructed from trace values.*
 
-The shipped placement rules apply to [Guard the Edge](../guide/guard-the-edge.md) and [Juggler](../guide/juggler.md). [Decisions](../DECISIONS.md) records GJ4 for placement and GJ1 for KO scoring.
+- The shipped placement rules apply to [Guard the Edge](../guide/guard-the-edge.md) and [Juggler](../guide/juggler.md).
+- [Decisions](../DECISIONS.md) records GJ4 for placement and GJ1 for KO scoring.
 
 ## Measured cause
 
@@ -17,8 +18,8 @@ The shipped placement rules apply to [Guard the Edge](../guide/guard-the-edge.md
 | Wait inside at x −75.13 | 1 | Fall requested at x −81.9956 two frames into Ready, then ledge hang |
 | First attempt, A came through as a jab on the point | 1 | Fall requested one frame into Ready, then ledge hang |
 
-On release `83eecc32`, Sonic's 26 Guard the Edge releases used the last point of Final Destination's main floor,
-x −79.9856. The original record identified the external trace as `cp1a-sonic-83ee-1/p1-before-release.txt`.
+- On release `83eecc32`, Sonic's 26 Guard the Edge releases used the last point of Final Destination's main floor, x −79.9856.
+- The original record identified the external trace as `cp1a-sonic-83ee-1/p1-before-release.txt`.
 
 - Both falls began after Ready started. The trace omitted facing and speed, so it cannot establish the cause.
 - The Lucas traces in GJ4 suggest a Player 1 KO. Standby preceded Fall at (0, 150), and the next release showed Player 1 falling.
@@ -26,9 +27,9 @@ x −79.9856. The original record identified the external trace as `cp1a-sonic-8
 
 ### The teeter range (2026-11-23 rework)
 
-The game's `GroundModule::is_ottotto` checks the floor end the fighter faces at 0.86 + 0.1 + 0.1 = 1.06 units.
-Within that range it moves the fighter to 0.96 from the end. In fix-build flight `755d9936`, both hosts wrote
-x −78.9856 and rested at −79.025604 (−79.9856 + 0.96), status 126 in Training and 127 in the waiting room.
+- The game's `GroundModule::is_ottotto` checks the floor end the fighter faces at 0.86 + 0.1 + 0.1 = 1.06 units.
+- Within that range it moves the fighter to 0.96 from the end.
+- In fix-build flight `755d9936`, both hosts wrote x −78.9856 and rested at −79.025604 (−79.9856 + 0.96), status 126 in Training and 127 in the waiting room.
 
 ## Rule
 

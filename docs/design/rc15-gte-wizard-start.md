@@ -18,7 +18,8 @@ The shipped setup is documented in [Guard the Edge](../guide/guard-the-edge.md) 
 - The largest step in one update was 3.01 units.
 - In the other 70 attempts the write found Player 1 in another status, and it was on the point at the release.
 
-The speed that outlives the write is not identified. The three late starts had not moved for the three updates before the write; that they were in hit freeze is an inference, the trace has no hit-freeze flag.
+- The speed that outlives the write is not identified.
+- The three late starts had not moved for the three updates before the write; that they were in hit freeze is an inference, the trace has no hit-freeze flag.
 
 ## Placement and bound
 
@@ -33,9 +34,13 @@ The speed that outlives the write is not identified. The three late starts had n
 - When the floor cannot be read, nothing is shown: a Player 1 that is not in hit freeze is not written, and Ready may start as before (tr-primary-2 ledger, 2026-11-22 07:20:07Z).
 - Hit freeze is written again whatever the floor read says. Any other status is left alone.
 
-Ready starts on the first update on which the CPU is in Fall and nothing was written. The rewrites of one attempt are counted against `Drill::ready_frames()` (60 in Guard the Edge, 45 in Juggler); after that many the drill goes on as before. Rule and bound were approved in the tr-primary-2 ledger at 2026-11-22 05:45:52Z.
+- Ready starts on the first update on which the CPU is in Fall and nothing was written.
+- The rewrites of one attempt are counted against `Drill::ready_frames()` (60 in Guard the Edge, 45 in Juggler); after that many the drill goes on as before.
+- Rule and bound were approved in the tr-primary-2 ledger at 2026-11-22 05:45:52Z.
 
-A start write that finds Player 1 idle is not watched and follows the existing path on the same frame as before. Nothing holds Player 1 through Ready. No hook site and no native site is added; every native used is an existing granted row.
+- A start write that finds Player 1 idle is not watched and follows the existing path on the same frame as before.
+- Nothing holds Player 1 through Ready.
+- No hook site and no native site is added; every native used is an existing granted row.
 
 ## Requirement trace
 
@@ -67,7 +72,8 @@ A start write that finds Player 1 idle is not watched and follows the existing p
 - On a plain Start, a start saved without an edit follows the current fighter's default for its area, and a percent-dependent default follows the current percent.
 - A start saved with an edit, and Juggler's saved start, stay exactly where they were. Set up… always opens on the current fighter's defaults.
 
-The 2026-11-22 review had no flight evidence for the chevron’s projection or appearance. F11 superseded its normal off-screen use on 2026-11-23.
+- The 2026-11-22 review had no flight evidence for the chevron’s projection or appearance.
+- F11 superseded its normal off-screen use on 2026-11-23.
 
 ## 2026-11-23: the CPU waits at its start (fix round, item F11)
 
@@ -76,7 +82,8 @@ The 2026-11-22 review had no flight evidence for the chevron’s projection or a
 | Original design | Five-dot border chevron. |
 | F11, 2026-11-23 | Show the held CPU’s native magnifier when available. |
 
-The game shows that magnifier only for a fighter that is itself out of the camera's view: its per-fighter cursor update (`main+0x1556dc0`..`0x1557010` in 13.0.5) asks the fighter's camera module first, and only then `FLAG_LOUPE` or `FLAG_FORCE_LOUPE`. No picker moved a body, so a CPU start outside the picker's Fixed camera had nothing of the game's at it.
+- The game shows that magnifier only for a fighter that is itself out of the camera's view: its per-fighter cursor update (`main+0x1556dc0`..`0x1557010` in 13.0.5) asks the fighter's camera module first, and only then `FLAG_LOUPE` or `FLAG_FORCE_LOUPE`.
+- No picker moved a body, so a CPU start outside the picker's Fixed camera had nothing of the game's at it.
 
 - While the Guard the Edge or Juggler picker is up, the CPU now waits at its picked start: placed awake with a Fall request for `PREVIEW_SETTLE` frames, then held asleep there, with the placement the drill's own start uses (`model::crosshair::CpuPreview`, `placement::preview`).
 - In view the game draws the CPU under the crosshair; out of view it draws its magnifier with the direction pointer.
@@ -111,7 +118,8 @@ Before 2026-11-25, the recording start picker kept its chevron: its spots are cl
 - So the original came back at the picked start: off the stage for Guard the Edge, where it had to recover or was KO'd (early install 2 boot, Yoga, run `rc15-i2e-e1b5cf15-yoga-1`, row `f11-t1`: Zero Suit Samus came in at Donkey Kong's held point and was KO'd 164 frames after B).
 - Before F11 no picker moved the body, so the roster handed the original place back.
 
-The service now reads the slot through `picker::observable`. While nothing is selected and a left picker has not let go of the CPU (`edge_juggle::leaving_picker`: B's menu request is still to be taken, or the engine still holds the preview; a busy engine reads as held), the roster is not read and the original is not asked for.
+- The service now reads the slot through `picker::observable`.
+- While nothing is selected and a left picker has not let go of the CPU (`edge_juggle::leaving_picker`: B's menu request is still to be taken, or the engine still holds the preview; a busy engine reads as held), the roster is not read and the original is not asked for.
 
 - B reopens the menu on Player 1's next poll, and the roster does not change the CPU under an open menu.
 - So after B the drill's fighter stands at the CPU's place under the menu, and the Training CPU returns when the menu closes, as it does after Stop from the menu.
@@ -122,7 +130,9 @@ The service now reads the slot through `picker::observable`. While nothing is se
 | Restore the Training CPU after B | Wait for the picker to restore the body and release it before requesting a swap. | `the_original_is_not_asked_for_while_a_picker_holds_the_cpu`, `the_original_cpu_comes_back_after_the_picker_put_the_body_back` |
 | A drill's own choice is still compared while its picker holds it | `picker::observable` asks about the hold only when nothing is selected | `a_selection_is_compared_whatever_the_picker_holds` |
 
-Not changed: stopping a running drill that has its own fighter. The original takes over wherever the drill's fighter is, also at the off-stage start during Ready. The 2026-11-23 follow-up report did not cover this change in Eden (rows `f11-t4` and `f11-w4` in `eden/f11-magnifier/`).
+- Not changed: stopping a running drill that has its own fighter.
+- The original takes over wherever the drill's fighter is, also at the off-stage start during Ready.
+- The 2026-11-23 follow-up report did not cover this change in Eden (rows `f11-t4` and `f11-w4` in `eden/f11-magnifier/`).
 
 ## Limits and proof
 

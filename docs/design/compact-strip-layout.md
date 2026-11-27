@@ -2,14 +2,13 @@
 
 The shipped [Display & Controls menu](../menu/display-and-controls.md) includes the link-history setting.
 
-`src/model/ui/strip_layout` holds the shipped layout. The `C` spec composes the
-strip and card geometry. It also owns the waiting-room drop, the space reserved
-for Link history and the condition and opacity for fading the whole panel.
+- `src/model/ui/strip_layout` holds the shipped layout.
+- The `C` spec composes the strip and card geometry.
+- It also owns the waiting-room drop, the space reserved for Link history and the condition and opacity for fading the whole panel.
 
-Adjust the strip and card positions, widths, row spacing and heights in this
-module. `frame_strip_plan` and `combo_plan` supply the text, visibility, colours
-and state for each pane. Keep move names, verdicts, grades and sequence state
-in those plans.
+- Adjust the strip and card positions, widths, row spacing and heights in this module.
+- `frame_strip_plan` and `combo_plan` supply the text, visibility, colours and state for each pane.
+- Keep move names, verdicts, grades and sequence state in those plans.
 
 - The same layout module supplies the pane recipe builder and the live HUD.
 - After changing the geometry, rebuild both the Training and waiting-room recipes with the commands in [Building](../BUILD.md).
@@ -30,15 +29,12 @@ flowchart LR
 - The longest line is a reason of 37 units.
 - To make another line long, add it to its bar's table and rebuild both recipes.
 
-A reason wider than the card's content width wraps to a second line
-(`Text::fitted`, the notice box's wrap). The card grows by one line pitch
-(`CardSpec::grown`): the reason's first line stays on its row, a sequence's
-statistics move down, and the fade uses the grown plate. The 2026-11-24 text-length record provided host evidence for wrapping and growth.
+- A reason wider than the card's content width wraps to a second line (`Text::fitted`, the notice box's wrap).
+- The card grows by one line pitch (`CardSpec::grown`): the reason's first line stays on its row, a sequence's statistics move down, and the fade uses the grown plate.
+- The 2026-11-24 text-length record provided host evidence for wrapping and growth.
 
-Lines whose place cannot grow keep 24 units (`SHORT_UNITS`): a name on the card
-(the title, a sequence's name, chips, `landed` and `dropped`), Parry's pills and
-the LAST row's moves. The mark under a step shares its row with a hit combo's
-verdict and can run under it.
+- Lines whose place cannot grow keep 24 units (`SHORT_UNITS`): a name on the card (the title, a sequence's name, chips, `landed` and `dropped`), Parry's pills and the LAST row's moves.
+- The mark under a step shares its row with a hit combo's verdict and can run under it.
 
 ## Requirement trace
 

@@ -1,9 +1,10 @@
 # Direction marks in the frame strip (design, 2026-11-23)
 
-Superseded on 2026-11-24 by [the ACTION model](action-model.md): the travel table, `travel_status`, the fighter read
-for aims and the check `the_travel_statuses_are_the_traces` are removed. The tables below record what this design used.
+- Superseded on 2026-11-24 by [the ACTION model](action-model.md): the travel table, `travel_status`, the fighter read for aims and the check `the_travel_statuses_are_the_traces` are removed.
+- The tables below record what this design used.
 
-On 2026-11-23, F14 added Player 1's move direction to the existing frame strip in Training and waiting-room practice. The F14 design and requirement trace used base `152629cd`.
+- On 2026-11-23, F14 added Player 1's move direction to the existing frame strip in Training and waiting-room practice.
+- The F14 design and requirement trace used base `152629cd`.
 
 ## Strip and font in F14
 
@@ -12,14 +13,13 @@ flowchart LR
     n0x0["Six motion hashes"] --> n0x1["Side-attack angle"] --> n0x2["Cardinal arrow glyphs"]
 ```
 
-The strip names a move in LAST and LINK, but side tilts and smashes have the same name at every angle and a fighter's
-own status is named `Move`. Four existing label boxes per lane show long runs or hit spots. LAST holds 24 UTF-16 units
-and LINK 32; neither the panes nor the layout archive change.
+- The strip names a move in LAST and LINK, but side tilts and smashes have the same name at every angle and a fighter's own status is named `Move`.
+- Four existing label boxes per lane show long runs or hit spots.
+- LAST holds 24 UTF-16 units and LINK 32; neither the panes nor the layout archive change.
 
-The `nintendo64` font's character maps in
-`artifacts/phase23/rc5-combined/glyphs/fonts-bfotf-{2c46f6bb68,2d24073d3a,2d58bc0c11}.cmap.txt`
-include U+2190–U+2195 but not the diagonal arrows. Diagonals are written as two cardinal arrows, as in the drill list.
-The motion names and hashes from `artifacts/enhancements/stage-assets/ParamLabels.csv` are:
+- The `nintendo64` font's character maps in `artifacts/phase23/rc5-combined/glyphs/fonts-bfotf-{2c46f6bb68,2d24073d3a,2d58bc0c11}.cmap.txt` include U+2190–U+2195 but not the diagonal arrows.
+- Diagonals are written as two cardinal arrows, as in the drill list.
+- The motion names and hashes from `artifacts/enhancements/stage-assets/ParamLabels.csv` are:
 
 | Motion | Hash | Angle |
 | --- | --- | --- |
@@ -37,12 +37,13 @@ flowchart LR
     n0x0["Fighter ID"] --> n0x1["Travel-status table"] --> n0x2["Movement heading"] --> n0x3["Mark at entry frame"]
 ```
 
-The per-frame P1 sample reads `motion_kind` only for side tilt or side smash, behind `ANGLE_ON`, which boot sets only
-when the CPU mash unit is usable. Behind `AIM_ON` (the Recording unit's `pos_x` and `pos_y` rows) and `p1_fighter`
-(`KIND_ON`), it reads position while the fighter is in its travel status. A gate that is off leaves its field empty.
+- The per-frame P1 sample reads `motion_kind` only for side tilt or side smash, behind `ANGLE_ON`, which boot sets only when the CPU mash unit is usable.
+- Behind `AIM_ON` (the Recording unit's `pos_x` and `pos_y` rows) and `p1_fighter` (`KIND_ON`), it reads position while the fighter is in its travel status.
+- A gate that is off leaves its field empty.
 
-The travel table (`model::aim`) holds the ten fighters from F13 trace boot `f13-trace-0a17-1`, REPORT.md §1. Kinds
-come from the game's `FIGHTER_KIND_*` constants. Each entry into the fighter's travel status is one part:
+- The travel table (`model::aim`) holds the ten fighters from F13 trace boot `f13-trace-0a17-1`, REPORT.md §1.
+- Kinds come from the game's `FIGHTER_KIND_*` constants.
+- Each entry into the fighter's travel status is one part:
 
 | Fighter | Kind | Travel status |
 | --- | --- | --- |
@@ -57,8 +58,8 @@ come from the game's `FIGHTER_KIND_*` constants. Each entry into the fighter's t
 | Falco | `0x14` | `0x1e2` |
 | Wolf | `0x2f` | `0x1e1` |
 
-In the trace, movement matched the direction the game used within one degree in every cast; the immediately preceding
-stick sample did not give the direction Fox, Falco and Wolf flew. The travel count is not used.
+- In the trace, movement matched the direction the game used within one degree in every cast; the immediately preceding stick sample did not give the direction Fox, Falco and Wolf flew.
+- The travel count is not used.
 
 - The tracker retains four `Aim { frame, dir }` marks.
 - An angle transition marks the swing frame.
@@ -79,11 +80,11 @@ stick sample did not give the direction Fox, Falco and Wolf flew. The travel cou
 - A line that does not fit drops spaces around `>` and before the arrows.
 - The bridge publishes `strip.aims`, oldest first: only marks whose label box exists in the layout, and nothing on a stale or hidden pass.
 
-Scrollback also publishes `strip.scroll` (columns behind) and `strip.back_ms` (frames behind in milliseconds).
-Both are 0 on a live, hidden or stale pass.
+- Scrollback also publishes `strip.scroll` (columns behind) and `strip.back_ms` (frames behind in milliseconds).
+- Both are 0 on a live, hidden or stale pass.
 
-Chips, the stick row, combo grading, saved combos, the drill list, pane capacities and the layout archive are
-unchanged. No hook or native site is added; the angle and fighter reads use existing guarded rows.
+- Chips, the stick row, combo grading, saved combos, the drill list, pane capacities and the layout archive are unchanged.
+- No hook or native site is added; the angle and fighter reads use existing guarded rows.
 
 ## Risks and checks
 
