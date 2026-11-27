@@ -109,7 +109,7 @@ pub fn discard_external_name(token: u64) {
 
 pub fn suspended() -> bool { SUSPENDED.load(Ordering::Acquire) }
 #[derive(Clone, Copy)]
-enum Lifecycle { Suspend, SceneChanged { discard: bool }, Clear { keep: bool } }
+enum Lifecycle { Suspend, SceneChanged { discard: bool }, Clear { keep: bool, keep_clip: bool } }
 static LIFECYCLE: hos_lock::Mailbox<Lifecycle, 32> = hos_lock::Mailbox::new();
 
 fn post_lifecycle(event: Lifecycle) {
@@ -146,7 +146,7 @@ pub fn worker_lifecycle() {
                 crate::runtime::macros::replay_capture::discard_waiting();
             }
         }
-        Lifecycle::Clear { keep } => {
+        Lifecycle::Clear { keep, keep_clip } => {
             retire_name(keep);
             *lock_write(&CONFIRMED_NAME) = None;
             *lock_write(&LIST_ACTION) = None;
@@ -154,7 +154,7 @@ pub fn worker_lifecycle() {
             *lock_write(&LIST_RENAME) = None;
             if !keep {
                 lock_write(&UI).close_transient();
-                crate::runtime::macros::replay_capture::close_editor();
+                if !keep_clip { crate::runtime::macros::replay_capture::close_editor(); }
             }
         }
     });
@@ -680,12 +680,12 @@ fn practice_ready() -> bool {
 }
 
 /// Close the panel while retaining the loaded recording.
-pub fn clear_session() {
+pub fn clear_session(keep_clip: bool) {
     // Game-owned input guard must not survive scene cleanup.
     crate::runtime::macros::replay_capture::owns_close_input(false, false);
     SESSION_GENERATION.fetch_add(1, Ordering::Relaxed);
     crate::engine::rr_host::drop_preview_home();
-    post_lifecycle(Lifecycle::Clear { keep: suspended() });
+    post_lifecycle(Lifecycle::Clear { keep: suspended(), keep_clip });
 }
 
 pub fn offer_replay_recording(recording: MacroRecording) {

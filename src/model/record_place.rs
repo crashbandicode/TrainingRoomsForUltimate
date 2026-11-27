@@ -977,7 +977,7 @@ mod tests {
         let clip_previewing = publish.split("let clip_previewing =").nth(1).unwrap().split(';').next().unwrap();
         assert!(clip_previewing.contains("rr_host::preview_away()"));
         assert!(!named.contains("fn begin_restore()"));
-        let clear = named.split("fn clear_session()").nth(1).unwrap().split("\n}").next().unwrap();
+        let clear = named.split("fn clear_session(").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(clear.contains("rr_host::drop_preview_home()"));
         let hold = named.split("pub unsafe fn hold_panel_fighter(").nth(1).unwrap().split("\n}").next().unwrap();
         assert!(hold.contains("clip_previewing"));

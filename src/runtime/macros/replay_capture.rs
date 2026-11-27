@@ -55,7 +55,7 @@ struct Browser { ui: ClipBrowser, revision: u64, request: Option<crate::engine::
 /// `switch` is set only by an answered Switch prompt: the recorded fighter is then
 /// requested once, and cleared when that request settles, fails or is cancelled. An
 /// editor without it never changes the CPU, whatever fighter the track recorded.
-struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, source:Option<(String,bool)>, request:Option<crate::engine::macro_ui::recordings::OpenRequest> }
+struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, fighter_generation:u64, source:Option<(String,bool)>, request:Option<crate::engine::macro_ui::recordings::OpenRequest> }
 impl std::ops::Deref for Editor {type Target=ClipEditor;fn deref(&self)->&ClipEditor {&self.clip}}
 impl std::ops::DerefMut for Editor {fn deref_mut(&mut self)->&mut ClipEditor {&mut self.clip}}
 impl Editor {
@@ -332,7 +332,7 @@ pub fn open_file_editor(id: &str, combo: bool, player: bool) {
     let editor = match result { Ok(editor) => editor, Err(error) => { notify(error); return; } };
     if !capture_ready() { return; }
     *EDITOR.lock().unwrap() = Some(Editor { clip: editor,
-        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, source: Some((id.to_owned(), player)), request: None });
+        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, fighter_generation:0, source: Some((id.to_owned(), player)), request: None });
     PENDING.lock().unwrap().take();
     SELECTION_REVISION.fetch_add(1, Ordering::AcqRel);
     REVISION.fetch_add(1, Ordering::Relaxed);
@@ -462,7 +462,7 @@ fn install_capture_source(source: CaptureSource, revision: u64, id: &str) -> Res
                 editor.select_kind(current);
             }
             *EDITOR.lock().unwrap() = Some(Editor {clip:editor.with_name(name).with_previous(previous),
-                association,resolved:[None;8],resolve_failed:0,switch:false,source:None,request});
+                association,resolved:[None;8],resolve_failed:0,switch:false,fighter_generation:0,source:None,request});
             PENDING.lock().unwrap().take();
             browser.take();
             drop(browser);
@@ -1011,15 +1011,17 @@ fn service_wanted_fighter() {
             if matches!(told, FighterOutcome::Refused | FighterOutcome::Withdrawn) { roster_requests::clear_clip(); }
             refused = told == FighterOutcome::Refused;
         }
-        let wanted = if editor.wanted_fighter().is_some() && SLOT.released() { editor.take_wanted_fighter() } else { None };
+        let wanted = if editor.wanted_fighter().is_some() && SLOT.released() {
+            editor.take_wanted_fighter().map(|(player,kind)|(player,kind,editor.fighter_generation))
+        } else { None };
         (wanted, refused)
     };
     if refused {
         notify(FIGHTER_REFUSED.into());
     }
-    if let Some((player, kind)) = wanted {
+    if let Some((player, kind, generation)) = wanted {
         // restriction: clip-fighter-by-kind
-        roster_requests::request_clip_kind(player, kind as u32);
+        roster_requests::request_clip_kind(player, kind as u32, generation);
         crate::runtime::diag_log::diagnostic(format_args!(
             "[Scrub] fighter role={} kind={kind}: the roster is asked", if player { "p1" } else { "cpu" }));
     }
@@ -1191,6 +1193,9 @@ fn apply_action_as(action: ClipAction, playback: bool) {
         let source = editor.as_ref().and_then(|editor| editor.source.clone());
         let requested = editor.as_ref().is_some_and(|editor| editor.request.is_some());
         let effect = editor.as_mut().map(|editor| {
+            if let ClipAction::ToggleFighter { player } = action {
+                if !editor.fighter_load() { editor.fighter_generation = roster_requests::clip_generation(player); }
+            }
             if file || !matches!(action, ClipAction::Confirm) { return editor.on_action(action); }
             let view = editor.view();
             let configuration = editor.target_for(view.entry, editor.crop_kind(), view.previous_selected).ok().flatten().and_then(Target::configuration);

@@ -641,10 +641,10 @@ pub fn on_reset(cause: crate::model::input_delay::Clear) {
 }
 
 /// Session clear: leaving Training, a hot swap, a lobby change.
-pub fn session_clear() {
+pub fn session_clear(keep_clip: bool) {
     super::record_place::session_clear();
     rr_host::slot_stop();
-    named_macros::clear_session();
+    named_macros::clear_session(keep_clip);
     LAST_PHASE.store(Phase::Idle as u8, Ordering::Release);
     chords::session_clear();
     notices::session_clear();

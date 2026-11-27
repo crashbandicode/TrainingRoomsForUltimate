@@ -1591,7 +1591,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
         kinds: forms.kinds,
         actor_count: forms.actor_count,
     });
-    training::clear_session_state();
+    training::clear_session_state(super::roster_requests::owns_install(role == Role::Player, target.kind()));
     trace!("[CharacterRoster] install owner={} entry=0x{:x} from=0x{:x} to=0x{:x} slot={:?} epoch={} mode=0x{:x}",
         owner, entry as usize, current, target.kind(), slot.map(|i| i+1), active.epoch, active.scope.mode);
     if owner == 0 {

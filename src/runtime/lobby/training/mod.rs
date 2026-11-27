@@ -67,10 +67,10 @@ pub(crate) fn session_open() -> bool {
 
 /// Every per-session state the plugin keeps ends with the departure from the practice scene (recorder, chords, notices, input
 /// display and the menu session: package 4's `session_clear` runs all of them).
-pub(crate) fn clear_session_state() {
+pub(crate) fn clear_session_state(keep_clip: bool) {
     crate::runtime::features::cpu::scene_departed();
     crate::runtime::features::states::clear_session();
-    crate::runtime::features::recorder::session_clear();
+    crate::runtime::features::recorder::session_clear(keep_clip);
     crate::runtime::features::egg_zone::reset();
     SESSION_OPEN.store(crate::runtime::scene::lobby_active(), Ordering::Release);
 }

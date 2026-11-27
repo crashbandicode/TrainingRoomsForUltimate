@@ -893,7 +893,7 @@ fn egg_zone_runtime_enters_and_leaves_through_the_shared_path() {
     let left = frame.split_once("if !scene::is_training()").unwrap().1.split_once("return;").unwrap().0;
     assert!(left.contains("close();"), "leaving Training closes on the next frame");
     let departure = src("src/runtime/lobby/training/mod.rs");
-    assert!(item(&departure, "pub(crate) fn clear_session_state()").contains("egg_zone::reset()"), "scene departure");
+    assert!(item(&departure, "pub(crate) fn clear_session_state(keep_clip:").contains("egg_zone::reset()"), "scene departure");
 }
 
 #[test]

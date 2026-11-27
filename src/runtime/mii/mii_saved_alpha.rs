@@ -18,7 +18,7 @@ static ENABLED: AtomicBool = AtomicBool::new(false);
 static WORK: AtomicBool = AtomicBool::new(false);
 static MENU_EPOCH: AtomicU64 = AtomicU64::new(1);
 static OWNER_EPOCH: [AtomicU64; 2] = [AtomicU64::new(1), AtomicU64::new(1)];
-pub(super) fn current_generation(owner: u32) -> u64 {
+pub(crate) fn current_generation(owner: u32) -> u64 {
     OWNER_EPOCH[owner as usize].load(Ordering::Acquire)
 }
 struct Owner {
@@ -683,7 +683,7 @@ unsafe fn submit_saved_intent(
     }
     let descriptor = native_fighter_install::Descriptor::copy_from(entry);
     trace!("[MiiSavedAlpha] install owner={owner} epoch={epoch} operation={:?} kind={:#x} saved_files_written=false",tx.operation(),tx.after().canonical().class as u32);
-    training::clear_session_state();
+    training::clear_session_state(false);
     reload_at_pose(
         BASE.load(Ordering::Acquire),
         entry,

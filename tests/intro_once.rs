@@ -33,8 +33,8 @@ fn the_waiting_rooms_hud_feeds_the_first_install_notices() {
     assert!(!hud.contains("hud_tick(!waiting"), "waiting-room HUD is not excluded");
 
     let training = src("src/runtime/lobby/training/mod.rs");
-    let clear = item(&training, "pub(crate) fn clear_session_state()");
-    let recorder = clear.find("recorder::session_clear();").expect("recorder clears the notices");
+    let clear = item(&training, "pub(crate) fn clear_session_state(keep_clip:");
+    let recorder = clear.find("recorder::session_clear(keep_clip);").expect("recorder clears the notices");
     let store = clear.find("SESSION_OPEN.store(crate::runtime::scene::lobby_active(),").expect("session follows lobby flag");
     assert!(recorder < store, "the session flag is published after the recorder clears");
     let end_store = store + clear[store..].find(';').expect("end of session store") + 1;
@@ -47,7 +47,7 @@ fn the_waiting_rooms_hud_feeds_the_first_install_notices() {
     let edge = &update[update.find("if now != previous {").expect("activation edge")..];
     let edge = &edge[..edge.find("\n    }\n").expect("end of activation edge")];
     let set_lobby = edge.find("set_lobby(now)").expect("activation updates CPU scene");
-    let clear = edge.find("super::clear_session_state();").expect("activation clears the session");
+    let clear = edge.find("super::clear_session_state(false);").expect("activation clears the session");
     assert!(set_lobby < clear, "set_lobby precedes the session clear");
     assert!(!lobby.contains("SESSION_OPEN"), "the carried file does not own the session flag");
 

@@ -499,7 +499,7 @@ extern "C" fn on_frame(a0: usize, a1: usize, a2: usize, a3: usize, a4: usize, a5
             }
             (receipt, retired)
         }).unwrap_or((None, false));
-        if retired { recorder::session_clear(); }
+        if retired { recorder::session_clear(false); }
         receipt
     };
     // SAFETY: `ORIGINAL_FRAME` holds the guarded original on-frame address (set by `install_frame`).
@@ -612,7 +612,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
         });
         // Package 4's session state (recorder, chords, notices) goes with it; outside the CPU lock.
         if cleared == Some(true) {
-            recorder::session_clear();
+            recorder::session_clear(false);
         }
         return;
     }

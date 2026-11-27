@@ -24,6 +24,11 @@ pub mod runtime {
 /// The roster as the ticket sees it: a role takes its own fighter (6 for Player 1, 7 for the CPU) while nothing waits.
 mod character_roster {
     use std::sync::Mutex;
+    pub mod mii_saved_alpha {
+        use std::sync::atomic::{AtomicU64,Ordering};
+        pub static EPOCH: [AtomicU64;2] = [const { AtomicU64::new(0) };2];
+        pub fn current_generation(slot:u32)->u64 { EPOCH[slot as usize].load(Ordering::Acquire) }
+    }
     pub static PENDING: Mutex<[Option<u32>; 2]> = Mutex::new([None; 2]);
     pub static BEGUN: Mutex<[bool; 2]> = Mutex::new([false; 2]);
     pub fn player_kind() -> Option<u32> { Some(6) }
@@ -50,7 +55,7 @@ mod character_roster {
 enum FighterOutcome { Loading, Committed, Refused, Withdrawn }
 const FIGHTER_REFUSED: &str = "The roster refused the fighter switch";
 #[derive(Default)]
-struct Editor { wanted: Option<(usize, i32)>, loading: Option<(usize, i32)>, notice: String, committed: bool, withdrawing: bool }
+struct Editor { wanted: Option<(usize, i32)>, loading: Option<(usize, i32)>, notice: String, committed: bool, withdrawing: bool, fighter_generation:u64 }
 impl Editor {
     fn note_fighter_outcome(&mut self, outcome: FighterOutcome) -> bool {
         match outcome {
@@ -74,7 +79,7 @@ static EDITOR: Mutex<Option<Editor>> = Mutex::new(None);
 fn notify(message: String) { EDITOR.lock().unwrap().as_mut().unwrap().notice = message; }
 // WORKER
 fn ask(role: usize, kind: i32) {
-    *EDITOR.lock().unwrap() = Some(Editor { wanted: Some((role, kind)), ..Editor::default() });
+    *EDITOR.lock().unwrap() = Some(Editor { wanted: Some((role, kind)), fighter_generation:roster_requests::clip_generation(role==0), ..Editor::default() });
     service_wanted_fighter();
 }
 /// B in the editor while a switch is asked, as `replay_capture::on_input` does it.
@@ -89,6 +94,13 @@ fn pending(role: usize) -> Option<u32> { character_roster::PENDING.lock().unwrap
 fn toggle_cases(role: usize, kind: i32, failed: &mut Vec<String>) {
     let mut check = |name: &str, ok: bool| if !ok { failed.push(format!("role {role}: {name}")); };
     let admitted = || { character_roster::reset(); ask(role, kind); roster_requests::service(); service_wanted_fighter(); };
+    character_roster::reset();
+    *EDITOR.lock().unwrap()=Some(Editor{wanted:Some((role,kind)),fighter_generation:roster_requests::clip_generation(role==0),..Editor::default()});
+    character_roster::mii_saved_alpha::EPOCH[role].fetch_add(1,Ordering::AcqRel);
+    service_wanted_fighter();
+    roster_requests::service();
+    service_wanted_fighter();
+    check("old wanted fighter dispatched after role replacement is refused", pending(role).is_none() && loading().is_none() && notice()==FIGHTER_REFUSED);
     // The worker can post between the game frame's mailbox drain and scene teardown.
     character_roster::reset();
     ask(role, kind);
@@ -116,6 +128,9 @@ fn toggle_cases(role: usize, kind: i32, failed: &mut Vec<String>) {
     service_wanted_fighter();
     check("an unrelated handoff does not hide B", !EDITOR.lock().unwrap().as_ref().unwrap().committed);
     check("commit immediately wins before any B", roster_requests::commit_direct(role == 0, kind as u32));
+    check("only the committed role and target may preserve the editor",
+        roster_requests::owns_install(role==0,kind as u32) && !roster_requests::owns_install(role!=0,kind as u32)
+        && !roster_requests::owns_install(role==0,kind as u32+1));
     service_wanted_fighter();
     check("the worker learns of commit without a B or another game-frame drain",
         EDITOR.lock().unwrap().as_ref().unwrap().committed);

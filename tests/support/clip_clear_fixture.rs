@@ -47,4 +47,9 @@ fn main() {
         assert_eq!(OPEN.load(Ordering::Relaxed),expected_open,"own install: {own}; scene departure must still close");
         assert!(TRANSIENT_CLOSED.load(Ordering::Relaxed),"other transient state still resets");
     }
+    OPEN.store(true,Ordering::Relaxed);
+    clear_for_test(true);
+    clear_for_test(false);
+    worker_lifecycle();
+    assert!(!OPEN.load(Ordering::Relaxed),"a real departure wins even if an own clear is queued");
 }

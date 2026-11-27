@@ -326,12 +326,24 @@ const FIXTURE: &str = include_str!("support/roster_request_handoff_fixture.rs");
 
 #[test]
 fn only_the_own_install_clear_preserves_the_editor() {
+    let training = include_str!("../src/runtime/lobby/training/mod.rs");
+    let recorder = include_str!("../src/runtime/features/recorder.rs");
+    assert!(block(training, "pub(crate) fn clear_session_state(keep_clip:").contains("recorder::session_clear(keep_clip)"));
+    assert!(block(recorder, "pub fn session_clear(").contains("named_macros::clear_session(keep_clip)"));
+    for (production, sites) in [
+        (include_str!("../src/runtime/roster/character_roster.rs"), 1),
+        (include_str!("../src/runtime/mii/mii_ordinary_player.rs"), 2),
+        (include_str!("../src/runtime/mii/mii_ordinary_cpu.rs"), 2),
+    ] {
+        let clears: Vec<_> = production.lines().filter(|l| l.contains("training::clear_session_state(")).collect();
+        assert_eq!(clears.len(), sites);
+        assert!(clears.iter().all(|l| l.contains("roster_requests::owns_install(")));
+    }
     let named = include_str!("../src/runtime/macros/named_macros.rs");
     let event = named.lines().find(|l| l.starts_with("enum Lifecycle ")).unwrap();
     let producer = block(named, "pub fn clear_session(");
-    let adapter = if producer.starts_with("pub fn clear_session()") { "clear_session();" } else { "clear_session(own);" };
     let source = include_str!("support/clip_clear_fixture.rs").replace("// EVENT", event)
-        .replace("// PRODUCER", &format!("{producer}\nfn clear_for_test(own:bool){{{adapter}}}"))
+        .replace("// PRODUCER", &format!("{producer}\nuse clear_session as clear_for_test;"))
         .replace("// DRAIN",block(named,"pub fn worker_lifecycle()"));
     let scratch = crate::test_scratch::Scratch::new("clip-install-clear");
     let src = scratch.join("clear.rs");

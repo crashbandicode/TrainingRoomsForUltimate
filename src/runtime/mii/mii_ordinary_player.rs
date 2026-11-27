@@ -1014,7 +1014,7 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
     };
     // Outgoing FE is still untouched. INSTALL copies the separately staged 0x70-byte descriptor.
     let staged=native_fighter_install::Descriptor::from_bytes(&track.descriptor);
-    training::clear_session_state();
+    training::clear_session_state(crate::runtime::roster::roster_requests::owns_install(true,track.reload_target().kind));
     trace!("[MiiOrdinaryPlayer] submit ticket={:?} outgoing={:#x} target={:#x} index={} bank_build={} resource_before={:02x?} saved_files_written=false",
         track.ticket,live_kind(entry,&current.descriptor),track.reload_target().kind,current.binding.record_index,
         track.bank,&current.record[88..104]);
@@ -1076,7 +1076,7 @@ unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
         bank_refused(&b,"bank member switch refused before the native request",false);
         return false;
     }
-    training::clear_session_state();
+    training::clear_session_state(crate::runtime::roster::roster_requests::owns_install(true,b.logical));
     trace!("[MiiOrdinaryPlayer] bank switch ticket={:?} outgoing={:#x} target={:#x} index={} mii={}",
         b.ticket,outgoing,b.logical,b.before.binding.record_index,b.publish.is_some());
     true

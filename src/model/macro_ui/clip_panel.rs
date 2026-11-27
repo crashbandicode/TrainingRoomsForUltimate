@@ -1224,7 +1224,7 @@ mod tests {
         let release = service.find("SLOT.released()").expect("release report");
         let take = service.find("take_wanted_fighter()").expect("take wanted fighter");
         assert!(release < take);
-        assert!(service.contains("roster_requests::request_clip_kind(player, kind as u32)"));
+        assert!(service.contains("roster_requests::request_clip_kind(player, kind as u32, generation)"));
         assert!(service.contains("roster_requests::clip_outcome()"));
         let worker = source.split("fn worker_preview_notices(").nth(1).unwrap();
         let play = worker.find("service_wanted_play();").expect("wanted play");
@@ -1331,6 +1331,7 @@ mod tests {
         // Asked: B goes to the roster, and the editor keeps loading until the roster says it is withdrawn.
         let (mut e, _) = asked_switch(0);
         assert!(e.cancel_fighter(), "the worker posts the withdraw");
+        assert_eq!(clip_help(&e.view(), "ZL/ZR", "ZL", 1).primary, "Loading Kirby…");
         assert_eq!((e.fighter_loading(), e.fighter_word(0)), (Some((0, 6)), "loading"));
         assert!(!e.cancel_fighter(), "one withdraw for one switch");
         assert!(e.note_fighter_outcome(FighterOutcome::Withdrawn));

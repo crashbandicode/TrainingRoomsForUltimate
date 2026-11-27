@@ -1240,7 +1240,7 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
         {*bank=Some((plan,pose));return false;}
     };
     let staged=native_fighter_install::Descriptor::from_bytes(&track.descriptor);
-    training::clear_session_state();
+    training::clear_session_state(crate::runtime::roster::roster_requests::owns_install(false,track.reload_target().kind));
     trace!("[MiiOrdinaryCpu] submit ticket={:?} outgoing={:#x} target={:#x} index={} cursor={:?} resource_before={:02x?} saved_files_written=false",
         track.ticket,live_kind(entry,current.binding.owner,&current.descriptor),track.reload_target().kind,current.index,
         track.destination.cursor,&current.record[88..104]);
@@ -1311,7 +1311,7 @@ unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
         bank_refused(&b,"CPU bank member switch refused before the native request",false);
         return false;
     }
-    training::clear_session_state();
+    training::clear_session_state(crate::runtime::roster::roster_requests::owns_install(false,b.logical));
     trace!("[MiiOrdinaryCpu] bank switch ticket={:?} outgoing={:#x} target={:#x} index={} cursor={:?} mii={}",
         b.ticket,outgoing,b.logical,b.before.index,b.destination.cursor,b.publish.is_some());
     true

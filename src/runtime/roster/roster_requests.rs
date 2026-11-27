@@ -46,25 +46,25 @@ static CLIP_REPLY: AtomicU64 = AtomicU64::new(0);
 /// Player 1's fighter kind as the roster last observed it (`NONE` before a practice entry), as of the last game frame.
 static PLAYER_KIND: AtomicU32 = AtomicU32::new(NONE);
 
-fn post(what: u64, kind: u32) {
-    REQUESTS.push_with_drop([what, u64::from(kind)], |[evicted, _]| {
+fn post(what: u64, payload: u64) {
+    REQUESTS.push_with_drop([what, payload], |[evicted, _]| {
         if evicted >= SEQ { step(evicted, &[ASKED], DROPPED); }
     });
 }
 
 /// The worker: ask the roster to change the CPU to `kind` (`character_roster::request_cpu_kind`, on the next game frame).
 pub(crate) fn request_cpu_kind(kind: u32) {
-    post(CPU, kind);
+    post(CPU, kind.into());
 }
 
 /// The worker: ask the roster to change Player 1 to `kind` (`character_roster::request_player_kind`, on the next game frame).
 pub(crate) fn request_player_kind(kind: u32) {
-    post(PLAYER, kind);
+    post(PLAYER, kind.into());
 }
 
 /// The worker: [`request_player_kind`], answered through [`take_reply`] with whether the roster queued it.
 pub(crate) fn request_player_kind_replied(kind: u32) {
-    post(PLAYER_REPLIED, kind);
+    post(PLAYER_REPLIED, kind.into());
 }
 
 /// The worker: the next answer, `(fighter kind, queued)`.
@@ -90,11 +90,15 @@ pub(crate) enum ClipOutcome {
 }
 
 /// Worker only. A new ticket: a late answer for an earlier switch cannot answer this one, even for the same kind.
-pub(crate) fn request_clip_kind(player: bool, kind: u32) {
+pub(crate) fn request_clip_kind(player: bool, kind: u32, generation: u64) {
     let sequence = ((CLIP_REPLY.load(Ordering::Relaxed) & SEQUENCE).wrapping_add(SEQ) & SEQUENCE).max(SEQ);
     let ticket = sequence | if player { 0 } else { ROLE_CPU };
     CLIP_REPLY.store((u64::from(kind) << 32) | ticket | BUSY | ASKED, Ordering::Release);
-    post(ticket, kind);
+    post(ticket, generation);
+}
+
+pub(crate) fn clip_generation(player: bool) -> u64 {
+    super::character_roster::mii_saved_alpha::current_generation(u32::from(!player))
 }
 
 /// Worker. Ask to take the current ticket's request back. The game frame answers: withdrawn, or committed.
@@ -123,6 +127,12 @@ pub(crate) fn clip_outcome() -> Option<ClipOutcome> {
 pub(crate) fn clip_can_settle() -> bool {
     let word = CLIP_REPLY.load(Ordering::Acquire);
     matches!(word & STATE, ADMITTED | COMMITTED) && word & BUSY == 0
+}
+
+/// Only a native reload of the committed role and target may retain the requesting editor.
+pub(crate) fn owns_install(player: bool, kind: u32) -> bool {
+    let w = CLIP_REPLY.load(Ordering::Acquire);
+    w & STATE == COMMITTED && (w & ROLE_CPU == 0) == player && (w >> 32) as u32 == kind
 }
 
 /// Worker. Forget the ticket: its last state was shown, or the load ended on the fighter the game has.
@@ -178,8 +188,8 @@ pub(crate) fn player_kind() -> Option<u32> {
 pub(crate) fn service() {
     PLAYER_KIND.store(super::character_roster::player_kind().unwrap_or(NONE), Ordering::Release);
     let mut replied = false;
-    while let Some([what, kind]) = REQUESTS.pop() {
-        let kind = kind as u32;
+    while let Some([what, payload]) = REQUESTS.pop() {
+        let kind = payload as u32;
         match what {
             CPU => _ = super::character_roster::request_cpu_kind(kind),
             PLAYER => _ = super::character_roster::request_player_kind(kind),
@@ -189,8 +199,14 @@ pub(crate) fn service() {
                 replied = true;
             }
             ticket => {
+                if payload != clip_generation(ticket & ROLE_CPU == 0) {
+                    replied |= step(ticket, &[ASKED], DROPPED);
+                    continue;
+                }
                 // Admitted before the roster hears it, so a drop the roster marks at once is kept.
-                if step(ticket, &[ASKED], ADMITTED) {
+                let asked = CLIP_REPLY.load(Ordering::Acquire);
+                if asked & TICKET == ticket && step(ticket, &[ASKED], ADMITTED) {
+                    let kind = (asked >> 32) as u32;
                     let queued = if ticket & ROLE_CPU == 0 { super::character_roster::request_player_kind(kind) }
                         else { super::character_roster::request_cpu_kind(kind) };
                     if !queued { step(ticket, &[ADMITTED], REFUSED); }

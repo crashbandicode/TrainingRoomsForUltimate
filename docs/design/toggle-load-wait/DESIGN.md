@@ -73,6 +73,11 @@ one frame in which the strip could still promise cancellation after commitment. 
 an already-active direct selection, or a generic direct reload about to start arbitrates against B on the existing
 ticket. B wins before commitment; after it, the worker follows the roster without a B prompt. No lock is added.
 
+The native reload also clears the recording session. At that call, only the committed role and fighter can mark
+the clear as the editor's own. The event preserves the clip draft, not the rest of the transient UI. A real entry or
+scene departure still clears normally. A toggle waiting for scrub release saves the role's existing entry generation;
+the game checks it at admission even if the worker did not post the request until after a departure.
+
 ## Requirement trace
 
 The clauses are tr-primary-2's orders of 2026-11-27 00:40:25Z and 01:02:26Z.

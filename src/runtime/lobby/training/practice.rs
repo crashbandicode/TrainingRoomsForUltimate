@@ -86,7 +86,7 @@ pub fn owned() -> bool { OWNED.lock().active() }
 pub fn retire() {
     let owned = OWNED.lock().retire();
     if owned || crate::engine::rr_host::previewing() || super::recording_or_playback() {
-        super::clear_session_state();
+        super::clear_session_state(false);
     }
 }
 
@@ -123,7 +123,7 @@ pub fn scene_departed() {
 fn depart_session() {
     practice_policy::depart_session(
         || { OWNED.lock().retire(); },
-        super::clear_session_state,
+        || super::clear_session_state(false),
     );
 }
 
