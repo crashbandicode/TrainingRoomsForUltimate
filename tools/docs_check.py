@@ -201,7 +201,6 @@ WALL_PENDING = {
     "docs/guide/troubleshooting.md": 2,
     "docs/guide/using-the-menu.md": 8,
     "docs/guide/waiting-rooms.md": 4,
-    "docs/menu/practice-games.md": 3,
 }
 
 
@@ -239,7 +238,6 @@ BUDGET_PENDING = {
     "docs/guide/troubleshooting.md": 1408,
     "docs/guide/using-the-menu.md": 647,
     "docs/guide/waiting-rooms.md": 605,
-    "docs/menu/practice-games.md": 1589,
 }
 
 

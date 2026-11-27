@@ -1,115 +1,118 @@
 # Practice games
 
-Find **Practice games** on **Fighters & Stages**. Works in Training and in the [waiting room](../guide/waiting-rooms.md).
+On Fighters & Stages, A on a game opens its screen: Start first, then the settings below.
 
-Press **A** on a game below to open its settings. **Start** starts that game and closes the menu; while it runs, **Stop** ends it with the menu open. Only one game runs at a time. Closing the menu with **B** leaves the current game running.
+## Eggs-ercise
 
-- **Choice:** Left/Right changes the value on the row. To choose from the list, press A, move with Up/Down and confirm with A.
-- **Checklist:** A opens the list; A on an item checks or unchecks it.
-- **Range:** A opens it. Up/Down chooses Min or Max; press A to edit that end. Up/Down changes its value; A or B finishes the edit.
+![Practice games: A on Eggs-ercise opens its screen with Start first; A on Start closes the menu and the run begins](../media/rc15-practice-menu-start.gif)<br>
+*A on Eggs-ercise, then A on Start. Eden, build 9aa51374.*
 
-B goes back and Y resets a setting. Hold Up/Down to scroll faster or use ZL + Up/Down to jump through a list; see
-[Using the menu](../guide/using-the-menu.md).
+Break the targets that appear ([guide](../guide/eggs-ercise.md)).
 
-Starting or stopping a game does not flash the game's pause screen, except that Guard the Edge and Juggler may briefly open it when changing or restoring CPU Behavior involving **Control** or a non-CPU-controlled fighter.
-
-**Hit streak** is available separately in Eggs-ercise and Break the Targets. When On, it shows the current streak and
-session best; a whiff resets the current streak. It applies at the next Start. In Eggs-ercise, an expired target also
-resets the streak.
-
-## [Eggs-ercise](../guide/eggs-ercise.md)
-
-| Option | What it does | Values; default |
+| Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| Start / Stop | Starts or stops Eggs-ercise. | Action; **A** |
-| Eggs-ercise | Sets the goal or time limit. | 1 minute, 10 targets, 20 targets, Free practice; **1 minute** |
-| Breaks on | Chooses which attacks, including projectiles, break targets. | Any attack, Aerials, Hits of 12%+; **Any attack** |
-| Target | Chooses a disc or the CPU as the target; CPU page Hide CPU On uses a disc instead. | Disc, CPU; **Disc** |
-| Target speed | Changes target flight speed. | Normal, Slow, Fast; **Normal** |
-| Spawn area | Chooses where targets appear; an empty list uses In view. | In view, Whole stage, Off stage; **In view** |
-| Off-stage zone… | Opens the editor for this stage's off-stage target area. | Stage-specific area; **A** opens |
-| Moving paths | Chooses target flight paths; an empty list uses Pop up. | Richter's Axe, Pac-Man's Galaxian, Link's Boomerang, Samus's Homing Missile, Pop up; **Pop up** |
-| Target expiry | Replaces an unhit target after the chosen time. | Off, 1–10 seconds; **Off** |
-| Hit streak | See Hit streak above. | Off, On; **Off** |
-| CPU during a game | Hides or shows the CPU; a CPU target stays visible. | Hide, Show; **Hide** |
+| Start, Stop | | Starts the game and closes the menu. Stop ends it. |
+| Eggs-ercise | **1 minute**, 10 targets, 20 targets, Free practice | The goal or the time limit. |
+| Breaks on | **Any attack**, Aerials, Hits of 12%+ | Which of your hits break a target, projectiles included. |
+| Target | **Disc**, CPU | CPU: the CPU itself is the target and flies like the disc. |
+| Target speed | **Normal**, Slow, Fast | Slow is half speed. Fast is one and a half times as fast. |
+| Spawn area | **In view**, Whole stage, Off stage | Each checked area has the same chance. |
+| Off-stage zone… | Opens the zone editor | The edges of this stage's off-stage area. |
+| Moving paths | Axe, Galaxian, Boomerang, Homing Missile, **Pop up** | Each checked flight path has the same chance. |
+| Target expiry | **Off**, 1 to 10 seconds | Replaces an unhit target after that time. |
+| Hit streak | **Off**, On | Shows your streak and session best. A whiff resets it. |
+| CPU during a game | **Hide**, Show | Hides the CPU while a game runs. A CPU target stays. |
 
-## [Break the Targets](../guide/break-the-targets.md)
+## Break the Targets
 
-| Option | What it does | Values; default |
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d8dc78d3f34bd83e7c687ed7ce791010bd1556e8" autoplay muted loop playsinline controls></video>
+
+*Mario punches the placed target. Eden, diagnostic `cc71537c`.* [Open the clip](../media/tut-break-the-targets.mp4)
+
+Place up to ten targets, then break them all against the clock ([guide](../guide/break-the-targets.md)).
+
+| Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| Start / Stop | Starts or stops Break the Targets; without targets, Start opens placement. | Action; **A** |
-| Projectiles break targets | Allows projectiles to break targets. | Off, On; **On** |
-| Place targets | Opens the target placement view. | Action; **A** opens |
-| Saved layouts | Opens saved layouts for the current stage. | Saved layouts; **A** opens |
-| Hit streak | See Hit streak above. | Off, On; **Off** |
-| CPU during a game | Hides or shows the CPU during the game; this is the same setting as in Eggs-ercise. | Hide, Show; **Hide** |
+| Start, Stop | | With no targets placed on this stage, Start opens the placing view. |
+| Projectiles break targets | Off, **On** | Off: only your fighter's attacks break targets. |
+| Place targets | Opens the placing view | Stick moves, A places, B removes the last, X starts. |
+| Saved layouts | Opens this stage's layouts | The five used last come first. |
+| Hit streak | **Off**, On | As in Eggs-ercise. |
+| CPU during a game | **Hide**, Show | The same setting as in Eggs-ercise. |
 
-## [Tech practice](../guide/tech-practice.md)
+## Tech practice
 
-**Set** uses the low handle of its range; **Random** picks within both handles each attempt. **Auto (approximate)** estimates the angle or start for the chosen point.
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d0eca9a146fb35a73838b8f5fa51330d6455a5c5" autoplay muted loop playsinline controls></video>
 
-| Option | What it does | Values; default |
+*Launches at 72%; the techs are missed. Eden, `5df3d9dc`.* [Open the clip](../media/tut-tech-practice.mp4)
+
+Tech a launch at a chosen or random surface; Set uses a range's low end, Random both ends ([guide](../guide/tech-practice.md)).
+
+| Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| Start / Stop | Starts or stops Tech practice. | Action; **A** |
-| Tech practice | Sets the session length. | 20 attempts, 10 attempts, 1 minute, 3 minutes, Free practice; **20 attempts** |
-| Tech wizard | Opens a guided setup for the spot, angle, distance and hit. | Action; **A** opens |
-| Surface | Chooses where to aim each launch. | Any, Floor, Wall, Ceiling (underside), Chosen point; **Any** |
-| Tech point | Opens the crosshair to choose a surface point. | Action; **A** opens |
-| Damage | Sets how starting damage is chosen. | Set, Random; **Set** |
-| Damage range | Sets starting damage. | 0–150% in steps of 5; **60–60%** |
-| Launch speed | Sets how launch strength is chosen. | Set, Random; **Set** |
-| Launch speed range | Sets launch strength. | 80–250 knockback in steps of 10; **100–100** |
-| Hit damage | Sets how much damage the hit adds. | Set, Random; **Set** |
-| Hit damage range | Sets the added damage and hit freeze. | 1–30%; **12–12%** |
-| Angle | Sets how launch direction is chosen. | Auto (approximate), Set, Random; **Auto (approximate)** |
-| Angle range | Sets the world angle, with right at 0° and up at 90°. | 0–355° in steps of 5; **0–355°** |
-| Start position | Sets how the starting offset is chosen. | Auto (approximate), Set, Random; **Auto (approximate)** |
-| Start range | Sets the starting offset from the point. | −120 to 120 units; **−40–40** |
-| Time to contact | Sets how the intended travel time is chosen. | Set, Random; **Random** |
-| Time range | Sets the intended travel time. | 10–60 frames; **20–40** |
-| DI | Chooses how you influence the launch. | Off, Player, Set, Random; **Off** |
-| DI direction | Sets the direction used by DI Set; In and Out are relative to the point. | Out, Up Out, Up, Up In, In, Down In, Down, Down Out, Neutral, Left, Right; **Neutral**; **A** opens and selects |
-| Facing | Sets which way you face at the start. | Toward the point, Left, Right, Random; **Toward the point** |
-| Delay before launch | Sets how the waiting time is chosen. | Set, Random; **Set** |
-| Delay range | Sets the wait before launch. | 10–90 frames; **30–30** |
-| Camera | Chooses the camera during an attempt. | Follow, Whole stage; **Follow** |
-| Skip wizard preview | Starts after Hit instead of opening Preview. | On, Off; **Off** |
+| Start, Stop | | Tech wizard and Tech point close into their own views first. |
+| Tech practice | **20 attempts**, 10 attempts, 1 minute, 3 minutes, Free practice | How long a session lasts. |
+| Tech wizard | Opens the wizard | Choose a spot, angle, start distance and hit. |
+| Surface | **Any**, Floor, Wall, Ceiling (underside), Chosen point | Where each launch is aimed. |
+| Tech point | Opens the crosshair | Stick moves, A sets the point, X starts. |
+| Damage, Damage range | **Set**, Random; 0 to 150%, **60%** | Your percent before the hit. |
+| Launch speed, its range | **Set**, Random; knockback 80 to 250, **100** | The launch's strength. |
+| Hit damage, its range | **Set**, Random; 1 to 30%, **12%** | The percent the hit adds. It also sets the freeze. |
+| Angle, Angle range | **Auto (approximate)**, Set, Random; 0 to 355° | World launch angle: right is 0°, up is 90°. |
+| Start position, Start range | **Auto (approximate)**, Set, Random; -120 to 120 units | Your start offset from the point. |
+| Time to contact, Time range | Set, **Random**; 10 to 60 frames, **20 to 40** | Travel time to the surface point. |
+| DI, DI direction | **Off**, Player, Set, Random; a direction, **Neutral** | Off is neutral. Player reads your stick. |
+| Facing | **Toward the point**, Left, Right, Random | Which way you face at the start. |
+| Delay before launch, Delay range | **Set**, Random; 10 to 90 frames, **30** | The wait at the start. Player 1 is held meanwhile. |
+| Camera | **Follow**, Whole stage | Follow the attempt, or frame the whole stage. |
+| Skip wizard preview | On, **Off** | On: A after Hit starts at once, without the Preview step. |
 
-## [Mash out](../guide/mash-out.md)
+## Mash out and Parry practice
 
-| Option | What it does | Values; default |
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/48415ed2d8d2476130d914666584abf824135ae4" autoplay muted loop playsinline controls></video>
+
+*Mash out: Good at 30f, Poor at 90f. Eden, `cc71537c`.* [Open the clip](../media/tut-mash-out.mp4)
+
+Escape a capture, or parry the CPU's recorded move ([Mash out](../guide/mash-out.md), [Parry practice](../guide/parry-practice.md)).
+
+| Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| Start / Stop | Starts or stops Mash out. | Action; **A** |
-| Fighter and move | Chooses the attack to escape, or a random state or move. | Available fighters and moves, Random; **Mario · Grab, Standing**; **A** opens |
+| <a id="mash-out"></a>Mash out: Start, Stop | | It runs until Stop. |
+| Mash out: Fighter and move | A fighter and its move, or Random; **Mario · Grab, Standing** | The capture to escape. |
+| <a id="parry-practice"></a>Parry practice: Start, Stop | | Play the CPU's macro as usual. Every hit is one attempt. |
+| Parry practice | **10 attempts**, Free practice | Ten attempts end a set with a summary. |
+| Saved parry practices | Opens your saved practices | Each holds a CPU macro and its Loop. |
+| Save this parry practice | | Saves the CPU's active macro and Loop as a practice. |
 
-## [Parry practice](../guide/parry-practice.md)
+## Guard the Edge and Juggler
 
-| Option | What it does | Values; default |
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3609165db1d1675f019de9a7f3b7d1b6f7b8ebf0" autoplay muted loop playsinline controls></video>
+
+*Guard the Edge: set-up, then three attempts. Eden, `5df3d9dc`.* [Open the clip](../media/tut-guard-edge-setup-and-score.mp4)
+
+Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.md), [Juggler](../guide/juggler.md)).
+
+| Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| Start / Stop | Starts or stops Parry practice. | Action; **A** |
-| Parry practice | Chooses sets of ten or ongoing practice. | 10 attempts, Free practice; **10 attempts** |
-| Saved parry practices | Opens your saved practices. | Saved practices; **A** opens |
-| Save this parry practice | Saves the active CPU recording and its Loop setting. | Action; **A** opens |
+| <a id="guard-the-edge"></a><a id="juggler"></a>Start, Stop | | Reuses your set-up on the floor it was made on. Otherwise the set-up opens. |
+| CPU fighter and mode | **Current CPU**, or a fighter; **CPU 9**, CPU 1 to 8, Perfect, Hero's Zoom | The CPU's fighter and how it recovers or escapes. |
+| Reaction | Frame-perfect, **Human 12 f**, Custom 1 to 30 frames | The CPU's reaction delay. Greyed unless the mode is Perfect. |
+| Set up… | Opens the set-up | The CPU's start and yours, then a preview. |
+| Attempts | **10**, 20, Free | How many attempts are scored. |
+| Zoom landing window | 1 to 30 frames, **10** | How long after Hero lands a hit or grab still wins. |
+| Guard the Edge: Under the stage | On, **Off** | On: the CPU's start may be under the stage. |
+| Guard the Edge: CPU percent | 0 to 300%, **100%** | The CPU's damage at the start of each attempt. |
+| Guard the Edge: CPU midair jumps | **Kept**, Used | Used: the CPU starts with every midair jump already spent. |
 
-## [Guard the Edge](../guide/guard-the-edge.md)
+## Good to know
 
-| Option | What it does | Values; default |
-| --- | --- | --- |
-| Start / Stop | Starts with the remembered setup for this stage, or opens setup if there is none; Stop ends it. | Action; **A** |
-| CPU fighter and mode | Chooses the fighter and recovery behavior. | Current CPU or a fighter; CPU 1–9, Perfect, or Hero's Zoom; **Current CPU, CPU 9**; **A** opens, **X** changes CPU level in the popup |
-| Reaction | Sets the CPU's reaction delay. | Frame-perfect, Human 12 f, Custom 1–30 frames; **Human 12 f**, Custom starts at **12**; **A** selects, **Left/Right** adjusts Custom |
-| Set up… | Opens the CPU and Player 1 start-point wizard. | Stage-specific points; **A** opens |
-| CPU percent | Sets the CPU's damage at each attempt. | 0–300%; **100%** |
-| Attempts | Chooses the number of scored attempts. | 10, 20, Free; **10** |
-| Zoom landing window | Sets how long after Hero lands a hit or grab still wins against Zoom. | 1–30 frames; **10** |
+![While Eggs-ercise runs: its screen's first row reads Stop with Running in green; A stops it and the row reads Start, the menu still open](../media/rc15-practice-menu-stop.gif)<br>
+*A running game's first row reads Stop. Eden, build 9aa51374.*
 
-## [Juggler](../guide/juggler.md)
-
-| Option | What it does | Values; default |
-| --- | --- | --- |
-| Start / Stop | Starts with the remembered setup for this stage, or opens setup if there is none; Stop ends it. | Action; **A** |
-| CPU fighter and mode | Chooses the fighter and escape behavior. | Current CPU or a fighter; CPU 1–9, Perfect, or Hero's Zoom; **Current CPU, CPU 9**; **A** opens, **X** changes CPU level in the popup |
-| Reaction | Sets the CPU's reaction delay. | Frame-perfect, Human 12 f, Custom 1–30 frames; **Human 12 f**, Custom starts at **12**; **A** selects, **Left/Right** adjusts Custom |
-| Set up… | Opens the CPU spot, percent and Player 1 start-point wizard. | Stage-specific points and percent; **A** opens |
-| Attempts | Chooses the number of attempts. | 10, 20, Free; **10** |
-| Zoom landing window | Sets how long after Hero lands a hit or grab still wins against Zoom. | 1–30 frames; **10** |
+| If | Then |
+| --- | --- |
+| You start a second game | The first one stops. Only one game runs at a time. |
+| You close the menu with B | Nothing starts and nothing stops. Only Start starts a game. |
+| You change a setting while a game runs | It applies at the next Start. |
+| A Guard the Edge KO does not count | Player 1 must get back on stage after the CPU's KO. |
+| Start opens the set-up again | You stand on another floor, or Under the stage is now Off. |
