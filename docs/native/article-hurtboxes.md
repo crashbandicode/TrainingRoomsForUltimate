@@ -2,15 +2,32 @@
 
 | Contract | Value |
 | --- | --- |
-| Game | 13.0.5; main build ID `21450c647b8c5940ed5b68218ea128fd3c5d597d` |
-| Seam | `article_get_from_no`, Called only, main+`0x2092e10`; no patch |
-| ABI | `extern "C" fn(usize, i32, i32) -> usize`: live accessor, article kind, ordinal; nullable `Article*` return |
-| Ordinal | Dense zero-based matching-kind entry in the current ring; enumerate to first null. Active-count equivalence is unproved. |
-| Guard | Exact 64 bytes, SHA256 `f586a4f0204ceacc5e6ac31d8ce7f08dffa773fda367e5a1fd71a698ceec0fd4`; canonical bytes in `data/tables/sites_hitbox.SITES.tsv` |
-| Owned ELF | SHA256 `0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2`; guard file offset `0x2093e10` |
+| Game | 13.0.5, main build ID `21450c647b8c5940ed5b68218ea128fd3c5d597d` |
+| Called site | `article_get_from_no` at main+`0x2092e10`. The plugin leaves its instructions intact. |
+| ABI | `extern "C" fn(usize, i32, i32) -> usize` |
+| Arguments | Live module accessor, article kind, zero-based ordinal |
+| Result | Nullable `Article*` |
+| Enumeration | Visit consecutive matching-kind entries in the current ring until the first null. |
+| Active count | Uses a different predicate from indexed lookup. |
+| Guard | 64 bytes from [the Hitbox site table](../../data/tables/sites_hitbox.SITES.tsv) |
+| Guard SHA256 | `f586a4f0204ceacc5e6ac31d8ce7f08dffa773fda367e5a1fd71a698ceec0fd4` |
+| Owned ELF SHA256 | `0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317706536c2` |
+| Guard file offset | `0x2093e10` |
 
-The existing boot version/build-ID verdict remains authoritative. The wrapper uses `state_natives::at` and therefore calls only a granted offset. The Hitbox row enters that feature's existing capability closure. No new allocation or lock is introduced.
+| Runtime check | Effect |
+| --- | --- |
+| Boot | The game version and build ID must pass. |
+| Native call | `state_natives::at` checks the offset grant before calling. An unavailable getter returns zero. |
+| Callers | Hitbox and Break the Targets projectile tracking both require this site. |
+| Wrapper cost | The wrapper adds no allocation or lock. |
 
-The dated native evidence record `artifacts/rc15-article-hurt/NATIVE-ABI.md` retains symbol, dispatch, pointer-return and ordinal derivation. Its actual19-NRO card copy dated 2026-11-15 produced no detected references at the thunk, concrete getter or virtual slot. The scan recognizes constants and MOVZ/MOVK construction; it does not establish absence of other address construction or later plugins. Install-time guards remain required.
-
-`core06_site_guards` pins the row and its capability dependency; `core06_rows_match_the_owned_elf` compares all 64 guard bytes and the exported symbol against the owned ELF. Both passed in the full XPS gate for `6def8553` on 2026-11-15. This seam record claims no runtime rendering or lifecycle coverage.
+| Evidence from 2026-11-15 | Scope |
+| --- | --- |
+| `artifacts/rc15-article-hurt/NATIVE-ABI.md` | Symbol, dispatch, pointer return and ordinal derivation |
+| Card scan | Across 19 NROs, no detected references to the thunk, concrete getter or virtual slot. |
+| Scan coverage | Constants and MOVZ/MOVK construction only. |
+| Scan limits | Other constructions and later plugins remain outside that scan. Install-time guards remain required. |
+| `core06_site_guards` | Pins the site row and Hitbox dependency. |
+| `core06_rows_match_the_owned_elf` | With the owned ELF present, compares all 64 guard bytes and checks the exported symbol. |
+| XPS gate | Both tests passed for `6def8553` on 2026-11-15. |
+| Runtime coverage | Rendering and object lifecycle were outside that gate. |
