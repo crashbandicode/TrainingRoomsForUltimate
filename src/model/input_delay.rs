@@ -345,7 +345,7 @@ mod tests {
         let input = include_str!("../runtime/ui/input.rs");
         assert!(input.contains("INPUT_OWNERS.fetch_or(Owners::MENU.bits()"));
         let macros = include_str!("../runtime/macros/mod.rs");
-        assert!(macros.contains("let held = replay_capture::panel_visible() || replay_capture::browser_visible();"));
+        assert!(macros.contains("let held = (replay_capture::panel_visible() && !replay_capture::fighter_load()) || replay_capture::browser_visible();"));
         assert!(macros.contains("(Owners::REPLAY_EDITOR, held)"));
         assert!(macros.contains("published::INPUT_OWNERS.fetch_or(owner.bits()"));
         assert!(include_str!("../runtime/macros/port.rs").contains("super::sync_owner();"));
@@ -426,10 +426,24 @@ mod tests {
         let common = include_str!("../runtime/compat/common.rs");
         assert!(common.contains("published::input_owners().holds_gameplay()"));
         let macros = include_str!("../runtime/macros/mod.rs");
-        assert!(macros.contains("let loading = replay_capture::loading();"));
+        assert!(macros.contains("let loading = replay_capture::loading() || replay_capture::fighter_load();"));
         assert!(macros.contains("Owners::REPLAY_LOADING"));
         let recorder = include_str!("../runtime/features/recorder.rs");
         assert!(recorder.contains("owners.contains(Owners::REPLAY_LOADING)"), "the chords stay modal while it loads");
+    }
+
+    /// Toggle fix (tr-primary-2 2026-11-27 00:40:25Z): a fighter switch asked from the open editor was held by the
+    /// editor's own owner bit; the roster kept the admitted request until the editor closed. While a switch is
+    /// wanted, asked or loading the editor publishes the load's bit instead, as the parked editor does (#68).
+    fn the_editor_does_not_hold_the_rosters_gate_during_a_fighter_load() {
+        let macros = include_str!("../runtime/macros/mod.rs");
+        assert!(macros.contains("let held = (replay_capture::panel_visible() && !replay_capture::fighter_load()) || replay_capture::browser_visible();"),
+            "the editor's owner bit is dropped while a fighter loads");
+        assert!(macros.contains("let loading = replay_capture::loading() || replay_capture::fighter_load();"));
+        assert!(!Owners::REPLAY_LOADING.holds_gameplay() && Owners::REPLAY_EDITOR.holds_gameplay());
+        let mut q = DelayQueue::new();
+        q.step(3, rec(1));
+        assert_eq!(q.poll(3, Owners::REPLAY_LOADING, rec(2)), MappedInputs::NEUTRAL, "Player 1 stays neutral");
     }
 
     fn an_owner_empties_the_queue() {
@@ -513,6 +527,7 @@ mod tests {
             ("two_polls_late", two_polls_late as fn()),
             ("the_strip_hides_while_the_waiting_rooms_menu_is_open", the_strip_hides_while_the_waiting_rooms_menu_is_open as fn()),
             ("a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates", a_replay_load_keeps_p1_neutral_but_does_not_hold_the_gameplay_gates as fn()),
+            ("the_editor_does_not_hold_the_rosters_gate_during_a_fighter_load", the_editor_does_not_hold_the_rosters_gate_during_a_fighter_load as fn()),
             ("an_owner_empties_the_queue", an_owner_empties_the_queue as fn()),
             ("a_reset_command_rides_the_delay_with_its_record", a_reset_command_rides_the_delay_with_its_record as fn()),
             ("the_physical_sticks_come_out_with_their_own_record", the_physical_sticks_come_out_with_their_own_record as fn()),

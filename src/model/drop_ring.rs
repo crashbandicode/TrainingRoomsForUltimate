@@ -35,6 +35,11 @@ impl<const W: usize, const N: usize> DropRing<W, N> {
 
     /// The producer (one thread): queue `value`; on a full ring the oldest value is dropped and counted. Never waits.
     pub fn push(&self, value: [u64; W]) {
+        self.push_with_drop(value, |_| {});
+    }
+
+    /// Report only the slot this producer actually evicted, before its one writer reuses it.
+    pub fn push_with_drop(&self, value: [u64; W], on_drop: impl FnOnce([u64; W])) {
         let tail = self.tail.load(Relaxed);
         loop {
             let head = self.head.load(Acquire);
@@ -43,6 +48,7 @@ impl<const W: usize, const N: usize> DropRing<W, N> {
             }
             if self.head.compare_exchange(head, head + 1, AcqRel, Acquire).is_ok() {
                 self.dropped.fetch_add(1, Relaxed);
+                on_drop(std::array::from_fn(|i| self.slots[(head % N as u64) as usize][i].load(Relaxed)));
                 break;
             }
         }

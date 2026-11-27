@@ -276,7 +276,7 @@ pub const SERVICE_STACK: CallbackStack = CallbackStack {
     name: "native-service",
     bytes: 236 * KIB,
     count: 2,
-    static_bound: 177_728,
+    static_bound: 177_744,
     native_room: 63_728,
     native_bound: 1_936,
     measured_in: "Eden final-surface-acc-d8679593-r2 ([HookStack] site=native_service min_free=63728)",

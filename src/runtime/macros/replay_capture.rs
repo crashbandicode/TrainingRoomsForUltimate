@@ -15,7 +15,7 @@ use crate::engine::library::Role;
 use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};
 use crate::engine::rr_host;
 use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
-use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, shoulder_action, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};
+use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, shoulder_action, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, FighterOutcome, PreviewTail, FIGHTER_REFUSED}};
 
 use crate::runtime::lobby::game_mode;
 use crate::runtime::game::{self, natives};
@@ -55,7 +55,7 @@ struct Browser { ui: ClipBrowser, revision: u64, request: Option<crate::engine::
 /// `switch` is set only by an answered Switch prompt: the recorded fighter is then
 /// requested once, and cleared when that request settles, fails or is cancelled. An
 /// editor without it never changes the CPU, whatever fighter the track recorded.
-struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, source:Option<(String,bool)>, request:Option<crate::engine::macro_ui::recordings::OpenRequest> }
+struct Editor { clip:ClipEditor, association:[Result<RawMii,String>;8], resolved:[Option<Configuration>;8], resolve_failed:u8, switch:bool, fighter_generation:u64, source:Option<(String,bool)>, request:Option<crate::engine::macro_ui::recordings::OpenRequest> }
 impl std::ops::Deref for Editor {type Target=ClipEditor;fn deref(&self)->&ClipEditor {&self.clip}}
 impl std::ops::DerefMut for Editor {fn deref_mut(&mut self)->&mut ClipEditor {&mut self.clip}}
 impl Editor {
@@ -332,7 +332,7 @@ pub fn open_file_editor(id: &str, combo: bool, player: bool) {
     let editor = match result { Ok(editor) => editor, Err(error) => { notify(error); return; } };
     if !capture_ready() { return; }
     *EDITOR.lock().unwrap() = Some(Editor { clip: editor,
-        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, source: Some((id.to_owned(), player)), request: None });
+        association: std::array::from_fn(|_| Err(String::new())), resolved: [None; 8], resolve_failed: 0, switch: false, fighter_generation:0, source: Some((id.to_owned(), player)), request: None });
     PENDING.lock().unwrap().take();
     SELECTION_REVISION.fetch_add(1, Ordering::AcqRel);
     REVISION.fetch_add(1, Ordering::Relaxed);
@@ -462,7 +462,7 @@ fn install_capture_source(source: CaptureSource, revision: u64, id: &str) -> Res
                 editor.select_kind(current);
             }
             *EDITOR.lock().unwrap() = Some(Editor {clip:editor.with_name(name).with_previous(previous),
-                association,resolved:[None;8],resolve_failed:0,switch:false,source:None,request});
+                association,resolved:[None;8],resolve_failed:0,switch:false,fighter_generation:0,source:None,request});
             PENDING.lock().unwrap().take();
             browser.take();
             drop(browser);
@@ -672,6 +672,12 @@ pub fn panel_visible() -> bool {
 }
 
 pub fn loading() -> bool { !crate::runtime::macros::named_macros::suspended() && RELOAD.lock().unwrap().is_some() }
+
+/// The open editor has a fighter switch wanted, asked or loading: Player 1 stays neutral, but the editor must not hold
+/// the gates that load waits on.
+pub fn fighter_load() -> bool {
+    !crate::runtime::macros::named_macros::suspended() && EDITOR.lock().unwrap().as_ref().is_some_and(|editor| editor.fighter_load())
+}
 
 pub fn suspend_waiting() {
     stop_preview();
@@ -931,8 +937,9 @@ fn scrub_service() {
         (block.pos(), [block.pose(0).0, block.pose(1).0])
     });
     let mut changed = editor.note_fighters(
-        [roster_requests::player_kind().map(|kind| kind as i32), facts::fact_cpu_kind()],
-        !character_roster::busy() && facts::fact_ready_go(),
+        // The kinds the game has: the roster's own record of Player 1 lags a Mii owner's completion.
+        [Some(rr_host::live_pose(0).fighter_kind).filter(|kind| *kind >= 0), facts::fact_cpu_kind()],
+        roster_requests::clip_can_settle() && !character_roster::busy() && facts::fact_ready_go(),
     );
     if let Some((pos, poses)) = observed {
         changed |= editor.note_scrub(pos);
@@ -979,33 +986,42 @@ fn service_wanted_play() {
 
 fn service_wanted_fighter() {
     use crate::engine::macro_ui::scrub_track::SLOT;
-    if roster_requests::take_clip_reply() == Some(false) {
-        let refused = EDITOR.lock().unwrap().as_mut().is_some_and(|editor| editor.fighter_loading().is_some() && editor.cancel_fighter());
-        if refused {
-            // restriction: clip-fighter-refused
-            notify("The roster refused the fighter switch".into());
-            return;
-        }
-    }
-    let (wanted, timed_out) = {
+    // What the roster says of the switch that was asked. Nothing here counts passes.
+    let outcome = roster_requests::clip_outcome();
+    let (wanted, refused) = {
         let mut editor = EDITOR.lock().unwrap();
-        let Some(editor) = editor.as_mut() else { return };
-        if editor.tick_fighter_load() {
-            (None, true)
-        } else if editor.wanted_fighter().is_some() && SLOT.released() {
-            (editor.take_wanted_fighter(), false)
+        let Some(editor) = editor.as_mut() else {
+            if outcome.is_some() { roster_requests::clear_clip(); }
+            return;
+        };
+        let mut refused = false;
+        if editor.fighter_loading().is_none() {
+            // The load ended on the fighter the game has, or the editor that asked is gone.
+            if outcome.is_some() { roster_requests::clear_clip(); }
         } else {
-            (None, false)
+            let told = match outcome {
+                Some(roster_requests::ClipOutcome::Refused | roster_requests::ClipOutcome::Dropped) => FighterOutcome::Refused,
+                Some(roster_requests::ClipOutcome::Withdrawn) => FighterOutcome::Withdrawn,
+                Some(roster_requests::ClipOutcome::Committed) => FighterOutcome::Committed,
+                _ => FighterOutcome::Loading,
+            };
+            if editor.note_fighter_outcome(told) {
+                crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+            }
+            if matches!(told, FighterOutcome::Refused | FighterOutcome::Withdrawn) { roster_requests::clear_clip(); }
+            refused = told == FighterOutcome::Refused;
         }
+        let wanted = if editor.wanted_fighter().is_some() && SLOT.released() {
+            editor.take_wanted_fighter().map(|(player,kind)|(player,kind,editor.fighter_generation))
+        } else { None };
+        (wanted, refused)
     };
-    if timed_out {
-        notify("The fighter did not load; the editor keeps the current one".into());
-        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
-        return;
+    if refused {
+        notify(FIGHTER_REFUSED.into());
     }
-    if let Some((player, kind)) = wanted {
+    if let Some((player, kind, generation)) = wanted {
         // restriction: clip-fighter-by-kind
-        roster_requests::request_clip_kind(player, kind as u32);
+        roster_requests::request_clip_kind(player, kind as u32, generation);
         crate::runtime::diag_log::diagnostic(format_args!(
             "[Scrub] fighter role={} kind={kind}: the roster is asked", if player { "p1" } else { "cpu" }));
     }
@@ -1177,6 +1193,9 @@ fn apply_action_as(action: ClipAction, playback: bool) {
         let source = editor.as_ref().and_then(|editor| editor.source.clone());
         let requested = editor.as_ref().is_some_and(|editor| editor.request.is_some());
         let effect = editor.as_mut().map(|editor| {
+            if let ClipAction::ToggleFighter { player } = action {
+                if !editor.fighter_load() { editor.fighter_generation = roster_requests::clip_generation(player); }
+            }
             if file || !matches!(action, ClipAction::Confirm) { return editor.on_action(action); }
             let view = editor.view();
             let configuration = editor.target_for(view.entry, editor.crop_kind(), view.previous_selected).ok().flatten().and_then(Target::configuration);
@@ -1253,7 +1272,7 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
         let mut editor = EDITOR.lock().unwrap();
         if let Some(editor) = editor.as_mut().filter(|editor| editor.wanted_fighter().is_some() || editor.fighter_loading().is_some()) {
             if controller.just_down.b() {
-                editor.cancel_fighter();
+                if editor.cancel_fighter() { roster_requests::withdraw_clip(); }
                 crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
             }
             return;

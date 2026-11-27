@@ -813,6 +813,10 @@ fn queue_admitted_with(role: Role, selection: Selection, restoring: bool, once: 
         notify(role, crate::engine::swap::cycle_members::FIGHTER_STILL_LOADING.into());
         return admission;
     }
+    // A newer request takes the place of one still waiting.
+    if let Some(replaced) = state.pending {
+        clip_dropped(role, replaced.selection, replaced.restoring);
+    }
     state.pending = Some(Request {
         scope,
         epoch: state.epoch,
@@ -925,6 +929,34 @@ pub fn request_player_kind(kind: u32) -> bool {
     matches!(queue_admitted(Role::Player, Selection::Direct(fighter), false, true), Admission::Accepted | Admission::Superseded)
 }
 
+/// The clip editor's B (`roster_requests`): a user's direct request for `kind` that still waits, with no load begun for
+/// it, is removed. False when there is none: the roster has begun, dropped or never held it.
+pub(crate) fn withdraw_direct(player: bool, kind: u32) -> bool {
+    let mut state = state_for(if player { Role::Player } else { Role::Cpu }).lock();
+    let waits = state.pending.is_some_and(|request| !request.restoring
+        && matches!(request.selection, Selection::Direct(fighter) if fighter.kind() == kind));
+    if waits {
+        state.pending = None;
+    }
+    waits
+}
+
+/// The roster gives up a request after admission: the clip editor's switch is told (`roster_requests::note_drop`).
+/// The request's two facts by value: a reference would put the whole request on the caller's stack.
+#[inline(never)]
+fn clip_dropped(role: Role, selection: Selection, restoring: bool) {
+    if let (Selection::Direct(fighter), false) = (selection, restoring) {
+        super::roster_requests::note_drop(role == Role::Player, Some(fighter.kind()));
+    }
+}
+
+fn clip_commits(role: Role, selection: Selection, user: bool) -> bool {
+    match (user, selection) {
+        (true, Selection::Direct(f)) => super::roster_requests::commit_direct(role == Role::Player, f.kind()),
+        _ => true,
+    }
+}
+
 /// Runs before the delay queue. Consume only our request, giving conflicting
 /// save/record/menu requests precedence. Preserve suppression through a held
 /// chord so it cannot turn into a delayed taunt or a player trio request.
@@ -1024,6 +1056,8 @@ pub fn scene_changed(mode: game_mode::Mode) {
     for role in [Role::Player, Role::Cpu] {
         ORIGINAL_KINDS[role as usize].store(u32::MAX, Ordering::Release);
         SOLO_ACTIVE[role as usize].store(false, Ordering::Release);
+        // Whatever load the role had, the Mii owners' included, goes with the scene.
+        super::roster_requests::note_drop(role == Role::Player, None);
         let mut state = state_for(role).lock();
         state.epoch = state.epoch.wrapping_add(1);
         state.pending = None;
@@ -1445,6 +1479,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     let refresh = matches!(request.selection, Selection::RefreshPartners);
     if request.epoch != state.epoch || scope(role) != Some(request.scope) || !admitted(role.enabled(), request.once, refresh) {
         state.pending = None;
+        clip_dropped(role, request.selection, request.restoring);
         trace!("[CharacterRoster] dropped stale request at native boundary");
         return;
     }
@@ -1470,6 +1505,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
             );
             notify(role, "Character swap unavailable during this action".into());
         }
+        clip_dropped(role, request.selection, request.restoring);
         return;
     }
     let current = current.unwrap();
@@ -1493,6 +1529,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     let slot=remembered.map_or(slot,|v|v.cursor);
     let forms = remembered.map_or_else(||requested_forms_at(&m, role, target.kind(), slot),|v|v.forms);
     if ready_forms(entry, owner) == Some((forms, target.kind())) {
+        if !clip_commits(role, request.selection, !request.restoring) { return; }
         state.cursor = slot;
         if request.scope.waiting() {
             WAITING_MEMORY.lock().commit(role as usize, WaitingValue::ordinary(target,forms,slot));
@@ -1516,12 +1553,18 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     let Some(pose) = capture_reload_pose(entry, owner) else {
         drop(state);
         notify(role, "Character swap unavailable: current position not ready".into());
+        clip_dropped(role, request.selection, request.restoring);
         return;
     };
     let Some(install_token) = INSTALL.try_begin(true) else {
         state.pending = Some(request);
         return;
     };
+    if !clip_commits(role, request.selection, !request.restoring) {
+        drop(state);
+        finish_install(install_token, "clip switch withdrawn before reload");
+        return;
+    }
     let active = Active {
         install: install_token,
         scope: request.scope,
@@ -1548,7 +1591,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
         kinds: forms.kinds,
         actor_count: forms.actor_count,
     });
-    training::clear_session_state();
+    training::clear_session_state(super::roster_requests::owns_install(role == Role::Player, target.kind()));
     trace!("[CharacterRoster] install owner={} entry=0x{:x} from=0x{:x} to=0x{:x} slot={:?} epoch={} mode=0x{:x}",
         owner, entry as usize, current, target.kind(), slot.map(|i| i+1), active.epoch, active.scope.mode);
     if owner == 0 {
@@ -1601,6 +1644,13 @@ pub unsafe fn on_destroy(entry: *const u8) {
             }))
     {
         WAITING_MEMORY.lock().player_departed();
+    }
+    if state.pending.is_some_and(|r| r.entry == entry as usize)
+        || state.observed.is_some_and(|(identity, _)| identity == entry as usize)
+        || state.active.is_some_and(|a| a.entry == entry as usize)
+    {
+        // The role's entry goes, and any load of the role with it.
+        super::roster_requests::note_drop(role == Role::Player, None);
     }
     if state.pending.is_some_and(|r| r.entry == entry as usize) {
         trace!(

@@ -152,7 +152,7 @@ pub fn update() {
     if now != previous {
         SEEN_ENTRIES.store(0, Ordering::Relaxed);
         crate::runtime::features::cpu::set_lobby(now);
-        super::clear_session_state();
+        super::clear_session_state(false);
         // The CPU's cached rolls start from the live menu, as after a Training reset.
         super::cpu_rolls::request_all();
         trace!(

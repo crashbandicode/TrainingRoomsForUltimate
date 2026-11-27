@@ -12858,7 +12858,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "d792c367785e504830cb6c29bdf9cd923ad4793e2aa38055f23fc8d9de9d8b40",
+   "dest_sha256": "191a9668e69d9e5d14f8bc015934dbf27c077bb9a2834d7b1aadbd961b51f0c1",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -14376,6 +14376,91 @@
      "reason": "P7 2026-11-26: re-derived after the edit lists of merge 92ac06d0 were combined by hand; replaces 40 edit(s) that no longer applied in order: RC15 macro frame menu root fix: preserve Busy before fact, lease, panel, session or request mutation; pass freshly resolved context/menu/scope through shared existing implementations. Legacy request guards and lazy reader order retained; no upstream-source change. | LEAD-1 review rework: settings_changed decides each role's one load from the settings change, Player Swapping turning On and the menu close's explicit pick (PickCoverage); queue_admitted reports an Admission and never silently replaces a user's waiting load. No upstream-source change. | LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change. | RESHIP-3 LEAD-1 composition, primary 2026-11-17 06:29Z: preserve versioned repick dispatch and typed Admission while retaining Tech nonblocking CPU readiness/context and saved-owner exact acceptance. No changed native admission; see integration merge record. | rc15/mashout integration (merge of main af72b7ba): Mash out + CPU-receipt owner on the LEAD-1 Admission API | rc.15 drill picker: reuse Practice ownership and provide the CPU kind to the game-frame roster service",
      "old": "}\n\nimpl Role {\n    fn selected(self, m: &TrainingModpackMenu) -> TrioFighter {\n        match self {\n            Self::Player => m.player_character,\n            Self::Cpu => m.cpu_character,\n        }\n    }\n    fn enabled(self) -> bool {\n        self == Self::Cpu || setting(&MENU).trio_practice == OnOff::ON\n    }\n    fn sync_selection(self, fighter: TrioFighter) {\n        let mut m = lock_write(&MENU);\n        match self {\n            Self::Player => m.player_character = fighter,\n            Self::Cpu => m.cpu_character = fighter,\n        }\n    }\n}\n\n",
      "new": "}\n\nimpl Role {\n    fn enabled(self) -> bool {\n        self.enabled_with(|| setting(&MENU))\n    }\n    fn enabled_with(self, read_menu: impl FnOnce() -> TrainingModpackMenu) -> bool {\n        self == Self::Cpu || read_menu().trio_practice == OnOff::ON\n    }\n    /// The applied fighter becomes the role's persisted choice only for the user's own request\n    /// (`ordinary_player::persists_selection`; a practice game's temporary CPU fighter never does).\n    fn sync_selection(self, fighter: TrioFighter, owner: Requester) {\n        if !persists_selection(owner) {\n            return;\n        }\n        let mut m = lock_write(&MENU);\n        match self {\n            Self::Player => m.player_character = fighter,\n            Self::Cpu => m.cpu_character = fighter,\n        }\n    }\n}\n\n/// Owner of a fighter the roster observes or settles without an ordinary-CPU request receipt: a practice game's live\n/// temporary CPU fighter is `Practice` (`mashout::temporary_cpu_selection`), everything else the user's.\nfn live_owner(role: Role, kind: u32) -> Requester {\n    if role == Role::Cpu && (crate::runtime::features::mashout::temporary_cpu_selection(kind)\n        || crate::runtime::features::edge_juggle::practice_cpu::temporary(kind))\n    {\n        Requester::Practice\n    } else {\n        Requester::User\n    }\n}\n\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "            }))\n    {\n        WAITING_MEMORY.lock().player_departed();\n    }\n    if state.pending.is_some_and(|r| r.entry == entry as usize) {\n        trace!(\n",
+     "new": "            }))\n    {\n        WAITING_MEMORY.lock().player_departed();\n    }\n    if state.pending.is_some_and(|r| r.entry == entry as usize)\n        || state.observed.is_some_and(|(identity, _)| identity == entry as usize)\n        || state.active.is_some_and(|a| a.entry == entry as usize)\n    {\n        // The role's entry goes, and any load of the role with it.\n        super::roster_requests::note_drop(role == Role::Player, None);\n    }\n    if state.pending.is_some_and(|r| r.entry == entry as usize) {\n        trace!(\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "    let Some(pose) = capture_reload_pose(entry, owner) else {\n        drop(state);\n        notify(role, \"Character swap unavailable: current position not ready\".into());\n        return;\n    };\n    let Some(install_token) = INSTALL.try_begin(true) else {\n",
+     "new": "    let Some(pose) = capture_reload_pose(entry, owner) else {\n        drop(state);\n        notify(role, \"Character swap unavailable: current position not ready\".into());\n        clip_dropped(role, &request);\n        return;\n    };\n    let Some(install_token) = INSTALL.try_begin(true) else {\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "            );\n            notify(role, \"Character swap unavailable during this action\".into());\n        }\n        return;\n    }\n    let current = current.unwrap();\n",
+     "new": "            );\n            notify(role, \"Character swap unavailable during this action\".into());\n        }\n        clip_dropped(role, &request);\n        return;\n    }\n    let current = current.unwrap();\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "    let refresh = matches!(request.selection, Selection::RefreshPartners);\n    if request.epoch != state.epoch || scope(role) != Some(request.scope) || !admitted(role.enabled(), request.once, refresh) {\n        state.pending = None;\n        trace!(\"[CharacterRoster] dropped stale request at native boundary\");\n        return;\n    }\n",
+     "new": "    let refresh = matches!(request.selection, Selection::RefreshPartners);\n    if request.epoch != state.epoch || scope(role) != Some(request.scope) || !admitted(role.enabled(), request.once, refresh) {\n        state.pending = None;\n        clip_dropped(role, &request);\n        trace!(\"[CharacterRoster] dropped stale request at native boundary\");\n        return;\n    }\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "    for role in [Role::Player, Role::Cpu] {\n        ORIGINAL_KINDS[role as usize].store(u32::MAX, Ordering::Release);\n        SOLO_ACTIVE[role as usize].store(false, Ordering::Release);\n        let mut state = state_for(role).lock();\n        state.epoch = state.epoch.wrapping_add(1);\n        state.pending = None;\n",
+     "new": "    for role in [Role::Player, Role::Cpu] {\n        ORIGINAL_KINDS[role as usize].store(u32::MAX, Ordering::Release);\n        SOLO_ACTIVE[role as usize].store(false, Ordering::Release);\n        // Whatever load the role had, the Mii owners' included, goes with the scene.\n        super::roster_requests::note_drop(role == Role::Player, None);\n        let mut state = state_for(role).lock();\n        state.epoch = state.epoch.wrapping_add(1);\n        state.pending = None;\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "    matches!(queue_admitted(Role::Player, Selection::Direct(fighter), false, true), Admission::Accepted | Admission::Superseded)\n}\n\n/// Runs before the delay queue. Consume only our request, giving conflicting\n/// save/record/menu requests precedence. Preserve suppression through a held\n/// chord so it cannot turn into a delayed taunt or a player trio request.\n",
+     "new": "    matches!(queue_admitted(Role::Player, Selection::Direct(fighter), false, true), Admission::Accepted | Admission::Superseded)\n}\n\n/// The clip editor's B (`roster_requests`): a user's direct request for `kind` that still waits, with no load begun for\n/// it, is removed. False when there is none: the roster has begun, dropped or never held it.\npub(crate) fn withdraw_direct(player: bool, kind: u32) -> bool {\n    let mut state = state_for(if player { Role::Player } else { Role::Cpu }).lock();\n    let waits = state.pending.is_some_and(|request| !request.restoring\n        && matches!(request.selection, Selection::Direct(fighter) if fighter.kind() == kind));\n    if waits {\n        state.pending = None;\n    }\n    waits\n}\n\n/// The roster gives up `request` after admission: the clip editor's switch is told (`roster_requests::note_drop`).\nfn clip_dropped(role: Role, request: &Request) {\n    if let (Selection::Direct(fighter), false) = (request.selection, request.restoring) {\n        super::roster_requests::note_drop(role == Role::Player, Some(fighter.kind()));\n    }\n}\n\n/// Runs before the delay queue. Consume only our request, giving conflicting\n/// save/record/menu requests precedence. Preserve suppression through a held\n/// chord so it cannot turn into a delayed taunt or a player trio request.\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "        notify(role, crate::engine::swap::cycle_members::FIGHTER_STILL_LOADING.into());\n        return admission;\n    }\n    state.pending = Some(Request {\n        scope,\n        epoch: state.epoch,\n",
+     "new": "        notify(role, crate::engine::swap::cycle_members::FIGHTER_STILL_LOADING.into());\n        return admission;\n    }\n    // A newer request takes the place of one still waiting.\n    if let Some(replaced) = state.pending {\n        clip_dropped(role, &replaced);\n    }\n    state.pending = Some(Request {\n        scope,\n        epoch: state.epoch,\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 01:02:26Z): the mark is a call, never inlined, so the native service path's frames stay within their stack bound.",
+     "old": "}\n\n/// The roster gives up `request` after admission: the clip editor's switch is told (`roster_requests::note_drop`).\nfn clip_dropped(role: Role, request: &Request) {\n    if let (Selection::Direct(fighter), false) = (request.selection, request.restoring) {\n        super::roster_requests::note_drop(role == Role::Player, Some(fighter.kind()));\n",
+     "new": "}\n\n/// The roster gives up `request` after admission: the clip editor's switch is told (`roster_requests::note_drop`).\n#[inline(never)]\nfn clip_dropped(role: Role, request: &Request) {\n    if let (Selection::Direct(fighter), false) = (request.selection, request.restoring) {\n        super::roster_requests::note_drop(role == Role::Player, Some(fighter.kind()));\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 01:02:26Z): the mark is a call, never inlined, so the native service path's frames stay within their stack bound.",
+     "old": "    let Some(pose) = capture_reload_pose(entry, owner) else {\n        drop(state);\n        notify(role, \"Character swap unavailable: current position not ready\".into());\n        clip_dropped(role, &request);\n        return;\n    };\n    let Some(install_token) = INSTALL.try_begin(true) else {\n",
+     "new": "    let Some(pose) = capture_reload_pose(entry, owner) else {\n        drop(state);\n        notify(role, \"Character swap unavailable: current position not ready\".into());\n        clip_dropped(role, request.selection, request.restoring);\n        return;\n    };\n    let Some(install_token) = INSTALL.try_begin(true) else {\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 01:02:26Z): the mark is a call, never inlined, so the native service path's frames stay within their stack bound.",
+     "old": "            );\n            notify(role, \"Character swap unavailable during this action\".into());\n        }\n        clip_dropped(role, &request);\n        return;\n    }\n    let current = current.unwrap();\n",
+     "new": "            );\n            notify(role, \"Character swap unavailable during this action\".into());\n        }\n        clip_dropped(role, request.selection, request.restoring);\n        return;\n    }\n    let current = current.unwrap();\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 01:02:26Z): the mark is a call, never inlined, so the native service path's frames stay within their stack bound.",
+     "old": "    let refresh = matches!(request.selection, Selection::RefreshPartners);\n    if request.epoch != state.epoch || scope(role) != Some(request.scope) || !admitted(role.enabled(), request.once, refresh) {\n        state.pending = None;\n        clip_dropped(role, &request);\n        trace!(\"[CharacterRoster] dropped stale request at native boundary\");\n        return;\n    }\n",
+     "new": "    let refresh = matches!(request.selection, Selection::RefreshPartners);\n    if request.epoch != state.epoch || scope(role) != Some(request.scope) || !admitted(role.enabled(), request.once, refresh) {\n        state.pending = None;\n        clip_dropped(role, request.selection, request.restoring);\n        trace!(\"[CharacterRoster] dropped stale request at native boundary\");\n        return;\n    }\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 01:02:26Z): the mark is a call, never inlined, so the native service path's frames stay within their stack bound.",
+     "old": "    waits\n}\n\n/// The roster gives up `request` after admission: the clip editor's switch is told (`roster_requests::note_drop`).\n#[inline(never)]\nfn clip_dropped(role: Role, request: &Request) {\n    if let (Selection::Direct(fighter), false) = (request.selection, request.restoring) {\n        super::roster_requests::note_drop(role == Role::Player, Some(fighter.kind()));\n    }\n}\n",
+     "new": "    waits\n}\n\n/// The roster gives up a request after admission: the clip editor's switch is told (`roster_requests::note_drop`).\n/// The request's two facts by value: a reference would put the whole request on the caller's stack.\n#[inline(never)]\nfn clip_dropped(role: Role, selection: Selection, restoring: bool) {\n    if let (Selection::Direct(fighter), false) = (selection, restoring) {\n        super::roster_requests::note_drop(role == Role::Player, Some(fighter.kind()));\n    }\n}\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 01:02:26Z): the mark is a call, never inlined, so the native service path's frames stay within their stack bound.",
+     "old": "    }\n    // A newer request takes the place of one still waiting.\n    if let Some(replaced) = state.pending {\n        clip_dropped(role, &replaced);\n    }\n    state.pending = Some(Request {\n        scope,\n",
+     "new": "    }\n    // A newer request takes the place of one still waiting.\n    if let Some(replaced) = state.pending {\n        clip_dropped(role, replaced.selection, replaced.restoring);\n    }\n    state.pending = Some(Request {\n        scope,\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "        state.pending = Some(request);\n        return;\n    };\n    let active = Active {\n        install: install_token,\n        scope: request.scope,\n",
+     "new": "        state.pending = Some(request);\n        return;\n    };\n    if !clip_commits(role, request.selection, !request.restoring) {\n        drop(state);\n        finish_install(install_token, \"clip switch withdrawn before reload\");\n        return;\n    }\n    let active = Active {\n        install: install_token,\n        scope: request.scope,\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "    let slot=remembered.map_or(slot,|v|v.cursor);\n    let forms = remembered.map_or_else(||requested_forms_at(&m, role, target.kind(), slot),|v|v.forms);\n    if ready_forms(entry, owner) == Some((forms, target.kind())) {\n        state.cursor = slot;\n        if request.scope.waiting() {\n            WAITING_MEMORY.lock().commit(role as usize, WaitingValue::ordinary(target,forms,slot));\n",
+     "new": "    let slot=remembered.map_or(slot,|v|v.cursor);\n    let forms = remembered.map_or_else(||requested_forms_at(&m, role, target.kind(), slot),|v|v.forms);\n    if ready_forms(entry, owner) == Some((forms, target.kind())) {\n        if !clip_commits(role, request.selection, !request.restoring) { return; }\n        state.cursor = slot;\n        if request.scope.waiting() {\n            WAITING_MEMORY.lock().commit(role as usize, WaitingValue::ordinary(target,forms,slot));\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "    }\n}\n\n/// Runs before the delay queue. Consume only our request, giving conflicting\n/// save/record/menu requests precedence. Preserve suppression through a held\n/// chord so it cannot turn into a delayed taunt or a player trio request.\n",
+     "new": "    }\n}\n\nfn clip_commits(role: Role, selection: Selection, user: bool) -> bool {\n    match (user, selection) {\n        (true, Selection::Direct(f)) => super::roster_requests::commit_direct(role == Role::Player, f.kind()),\n        _ => true,\n    }\n}\n\n/// Runs before the delay queue. Consume only our request, giving conflicting\n/// save/record/menu requests precedence. Preserve suppression through a held\n/// chord so it cannot turn into a delayed taunt or a player trio request.\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "        kinds: forms.kinds,\n        actor_count: forms.actor_count,\n    });\n    training::clear_session_state();\n    trace!(\"[CharacterRoster] install owner={} entry=0x{:x} from=0x{:x} to=0x{:x} slot={:?} epoch={} mode=0x{:x}\",\n        owner, entry as usize, current, target.kind(), slot.map(|i| i+1), active.epoch, active.scope.mode);\n    if owner == 0 {\n",
+     "new": "        kinds: forms.kinds,\n        actor_count: forms.actor_count,\n    });\n    training::clear_session_state(super::roster_requests::owns_install(role == Role::Player, target.kind()));\n    trace!(\"[CharacterRoster] install owner={} entry=0x{:x} from=0x{:x} to=0x{:x} slot={:?} epoch={} mode=0x{:x}\",\n        owner, entry as usize, current, target.kind(), slot.map(|i| i+1), active.epoch, active.scope.mode);\n    if owner == 0 {\n"
     }
    ]
   },
@@ -23772,7 +23857,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "ed4e7edda55bc3caef066c069a8de96a2540a303e27337040a55ef54ba5c545f",
+   "dest_sha256": "66a6a35e44c06978703f3419a6cb4ba53e82d1e87d8bd9a5fb928e616acd3455",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -24745,6 +24830,71 @@
      "reason": "P7 2026-11-26: re-derived after the edit lists of merge 92ac06d0 were combined by hand; replaces 11 edit(s) that no longer applied in order: FS04: shared ordinary CPU Cycle pending-refusal notice; preserve Direct admission and notifier. | RC15 macro frame menu root fix: preserve Busy before fact, lease, panel, session or request mutation; pass freshly resolved context/menu/scope through shared existing implementations. Legacy request guards and lazy reader order retained; no upstream-source change. | LEAD-1 review R1-R4: fighter loads come from the versioned dispatch record (menu_dispatch with the record's target, one per role per cause); settings_changed keeps only the roster-list re-plan; admission reports an accurate Admission (the ordinary Mii owners report admitted, busy, unavailable or coalesced; outside practice a user's request is told). No upstream-source change. | rc15/mashout integration (merge of main af72b7ba): Mash out + CPU-receipt owner on the LEAD-1 Admission API",
      "old": "    s.restore=Some(value);s.request=Some(Request::CYCLE);\n    true\n}\n/// None leaves routing to the roster; Some reports a consumed request's acceptance.\npub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,read_menu:impl Fn()->TrainingModpackMenu)->Option<bool> {\n    if role!=Role::Cpu || !ENABLED.load(Ordering::Acquire) {return None;}\n    let mut s=STATE.lock();\n    let Some(owner)=s.owner.as_ref() else {\n",
      "new": "    s.restore=Some(value);s.request=Some(Request::CYCLE);\n    true\n}\n/// LEAD-1 review R3c: `Some` is what became of the request (each refusal shows its notice here), `None` leaves it to the next owner.\npub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,requester:Requester,read_menu:impl Fn()->TrainingModpackMenu)->Option<crate::engine::swap::cycle_members::Admission> {\n    if role!=Role::Cpu || !ENABLED.load(Ordering::Acquire) {return None;}\n    let mut s=STATE.lock();\n    let Some(owner)=s.owner.as_ref() else {\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "        let mut s=STATE.lock();\n        if s.generic.as_ref().is_some_and(|g|g.before.binding.entry==entry as usize) {s.generic=None;}\n        let exact=s.owner.as_ref().is_some_and(|o|o.origin.binding.entry==entry as usize);\n        if exact {s.owner=None;s.request=None;s.restore=None;s.replay_result=None;s.capture=false;s.menu_valid=false;s.recapture_log=None;s.reservation.retire(true);s.departed=false;}\n        if let Some(b)=s.bank.filter(|b|b.ticket.entry==entry as usize) {\n            s.bank=None;\n            let released=settle_outcome(Outcome::Destroyed {reason:\"ordinary CPU1 bank switch destructor\",lease:b.token},\n                b.ticket,None,true);\n            trace!(\"[MiiOrdinaryCpu] destroyed bank ticket={:?} INSTALL_released={} cleanup_writes=false\",\n                b.ticket,released);\n        }\n        if s.track.as_ref().is_some_and(|t|t.ticket.entry==entry as usize) {\n            s.track.take().map(|t|(t.token,t.ticket,t.gate.phase(),t.gate.published(),t.recovering))\n        } else {None}\n    };\n",
+     "new": "        let mut s=STATE.lock();\n        if s.generic.as_ref().is_some_and(|g|g.before.binding.entry==entry as usize) {s.generic=None;}\n        let exact=s.owner.as_ref().is_some_and(|o|o.origin.binding.entry==entry as usize);\n        if exact {load_dropped();s.owner=None;s.request=None;s.restore=None;s.replay_result=None;s.capture=false;s.menu_valid=false;s.recapture_log=None;s.reservation.retire(true);s.departed=false;}\n        if let Some(b)=s.bank.filter(|b|b.ticket.entry==entry as usize) {\n            s.bank=None;load_dropped();\n            let released=settle_outcome(Outcome::Destroyed {reason:\"ordinary CPU1 bank switch destructor\",lease:b.token},\n                b.ticket,None,true);\n            trace!(\"[MiiOrdinaryCpu] destroyed bank ticket={:?} INSTALL_released={} cleanup_writes=false\",\n                b.ticket,released);\n        }\n        if s.track.as_ref().is_some_and(|t|t.ticket.entry==entry as usize) {\n            load_dropped();\n            s.track.take().map(|t|(t.token,t.ticket,t.gate.phase(),t.gate.published(),t.recovering))\n        } else {None}\n    };\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "fn bank_build_refused(t:&Track,reason:&'static str) {\n    let mut s=STATE.lock();\n    if !s.track.as_ref().is_some_and(|now|now.ticket==t.ticket) {return;}\n    s.track=None;s.owner=None;s.menu_valid=false;s.request=None;s.restore=None;\n    if let Some(selection)=t.replay {\n        s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {selection,outcome:Err(reason)});\n",
+     "new": "fn bank_build_refused(t:&Track,reason:&'static str) {\n    let mut s=STATE.lock();\n    if !s.track.as_ref().is_some_and(|now|now.ticket==t.ticket) {return;}\n    request_dropped(s.request.and_then(|r|r.direct_kind()));load_dropped();\n    s.track=None;s.owner=None;s.menu_valid=false;s.request=None;s.restore=None;\n    if let Some(selection)=t.replay {\n        s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {selection,outcome:Err(reason)});\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "    }\n    let mut s=STATE.lock();\n    if !s.bank.is_some_and(|now|now.ticket==b.ticket && now.token==b.token) {return;}\n    if effects.drop_bank {s.bank=None;}\n    if let Some(selection)=b.replay {\n        s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {selection,outcome:Err(reason)});\n    }\n    if effects.drop_request {s.request=None;s.restore=None;}\n    if !effects.keep_owner {s.owner=None;s.menu_valid=false;}\n    // Native's own pair goes into the receipt only of the owner the restore compared against,\n    // and the current record only when this owner claims it (`current_record_claim`).\n",
+     "new": "    }\n    let mut s=STATE.lock();\n    if !s.bank.is_some_and(|now|now.ticket==b.ticket && now.token==b.token) {return;}\n    if effects.drop_bank {s.bank=None;load_dropped();}\n    if let Some(selection)=b.replay {\n        s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {selection,outcome:Err(reason)});\n    }\n    if effects.drop_request {request_dropped(s.request.and_then(|r|r.direct_kind()));s.request=None;s.restore=None;}\n    if !effects.keep_owner {s.owner=None;s.menu_valid=false;}\n    // Native's own pair goes into the receipt only of the owner the restore compared against,\n    // and the current record only when this owner claims it (`current_record_claim`).\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "            let mut s=STATE.lock();\n            let owned=s.track.as_ref().is_some_and(|t|t.ticket==track.ticket);\n            if owned {\n                s.track=None;\n                if let Some(selection)=track.replay {\n                    s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {\n                        selection,outcome:Err(\"CPU bank build refused\")});\n",
+     "new": "            let mut s=STATE.lock();\n            let owned=s.track.as_ref().is_some_and(|t|t.ticket==track.ticket);\n            if owned {\n                s.track=None;load_dropped();\n                if let Some(selection)=track.replay {\n                    s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {\n                        selection,outcome:Err(\"CPU bank build refused\")});\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "        }\n        let sequence=s.next;\n        let Some(next)=sequence.checked_add(1) else {\n            s.request=None;drop(s);refused_before_submit(token,\"ordinary ticket exhausted\");return false;\n        };\n        let ticket=Ticket{epoch:epoch(),entry:entry as usize,sequence};\n        let registry=match provenance::final_registry(&current.helpers,Some(token)) {\n",
+     "new": "        }\n        let sequence=s.next;\n        let Some(next)=sequence.checked_add(1) else {\n            s.request=None;drop(s);request_dropped(request.direct_kind());refused_before_submit(token,\"ordinary ticket exhausted\");return false;\n        };\n        let ticket=Ticket{epoch:epoch(),entry:entry as usize,sequence};\n        let registry=match provenance::final_registry(&current.helpers,Some(token)) {\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "fn clear_request(request:Request) {\n    let mut s=STATE.lock();\n    let restore_refused=s.request==Some(request) && s.restore.is_some();\n    if s.request==Some(request) {s.request=None;s.restore=None;}\n    drop(s);\n    if restore_refused {\n        WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);\n",
+     "new": "fn clear_request(request:Request) {\n    let mut s=STATE.lock();\n    let restore_refused=s.request==Some(request) && s.restore.is_some();\n    if s.request==Some(request) {s.request=None;s.restore=None;request_dropped(request.direct_kind());}\n    drop(s);\n    if restore_refused {\n        WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "            s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {\n                selection,outcome:Err(reason)});\n        }\n        s.request=None;\n        restore_refused=s.restore.is_some();\n        cycle_refused=request==Request::CYCLE && !restore_refused;\n        s.restore=None;\n",
+     "new": "            s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {\n                selection,outcome:Err(reason)});\n        }\n        s.request=None;request_dropped(request.direct_kind());\n        restore_refused=s.restore.is_some();\n        cycle_refused=request==Request::CYCLE && !restore_refused;\n        s.restore=None;\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "        .and_then(|receipt|receipt.for_selection(selection,epoch(),super::mii_replay::revision(selection.source)))\n        .and_then(Result::err)\n}\nfn refuse_request(request:Request,reason:&'static str) {\n    let mut s=STATE.lock();\n    let mut restore_refused=false;\n",
+     "new": "        .and_then(|receipt|receipt.for_selection(selection,epoch(),super::mii_replay::revision(selection.source)))\n        .and_then(Result::err)\n}\n/// The clip editor's fighter switch (`roster_requests::note_drop`): this owner gave a request up after admission.\n/// `direct` is the request's own fighter; a cycle or a refresh marks nothing.\nfn request_dropped(direct:Option<u32>) {\n    if direct.is_some() {crate::runtime::roster::roster_requests::note_drop(false,direct);}\n}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(false,None);}\nfn refuse_request(request:Request,reason:&'static str) {\n    let mut s=STATE.lock();\n    let mut restore_refused=false;\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 01:02:26Z): the mark is a call, never inlined, so the native service path's frames stay within their stack bound.",
+     "old": "}\n/// The clip editor's fighter switch (`roster_requests::note_drop`): this owner gave a request up after admission.\n/// `direct` is the request's own fighter; a cycle or a refresh marks nothing.\nfn request_dropped(direct:Option<u32>) {\n    if direct.is_some() {crate::runtime::roster::roster_requests::note_drop(false,direct);}\n}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(false,None);}\nfn refuse_request(request:Request,reason:&'static str) {\n    let mut s=STATE.lock();\n",
+     "new": "}\n/// The clip editor's fighter switch (`roster_requests::note_drop`): this owner gave a request up after admission.\n/// `direct` is the request's own fighter; a cycle or a refresh marks nothing.\n#[inline(never)]\nfn request_dropped(direct:Option<u32>) {\n    if direct.is_some() {crate::runtime::roster::roster_requests::note_drop(false,direct);}\n}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(false,None);}\nfn refuse_request(request:Request,reason:&'static str) {\n    let mut s=STATE.lock();\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "        s.departed,s.busy(),s.request.is_some(),replace_restore,request.is_some(),\n        user_request && matches!(selection,Selection::Cycle));\n    if admitted {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}\n        s.request=request;\n",
+     "new": "        s.departed,s.busy(),s.request.is_some(),replace_restore,request.is_some(),\n        user_request && matches!(selection,Selection::Cycle));\n    if admitted {\n        if !clip_commits(role,selection,user_request) {\n            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);\n        }\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}\n        s.request=request;\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(false,None);}\nfn refuse_request(request:Request,reason:&'static str) {\n    let mut s=STATE.lock();\n    let mut restore_refused=false;\n",
+     "new": "}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_owner_drop(false);}\nfn refuse_request(request:Request,reason:&'static str) {\n    let mut s=STATE.lock();\n    let mut restore_refused=false;\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "        bank_refused(&b,\"CPU bank member switch refused before the native request\",false);\n        return false;\n    }\n    training::clear_session_state();\n    trace!(\"[MiiOrdinaryCpu] bank switch ticket={:?} outgoing={:#x} target={:#x} index={} cursor={:?} mii={}\",\n        b.ticket,outgoing,b.logical,b.before.index,b.destination.cursor,b.publish.is_some());\n    true\n",
+     "new": "        bank_refused(&b,\"CPU bank member switch refused before the native request\",false);\n        return false;\n    }\n    training::clear_session_state(crate::runtime::roster::roster_requests::owns_install(false,b.logical));\n    trace!(\"[MiiOrdinaryCpu] bank switch ticket={:?} outgoing={:#x} target={:#x} index={} cursor={:?} mii={}\",\n        b.ticket,outgoing,b.logical,b.before.index,b.destination.cursor,b.publish.is_some());\n    true\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "        {*bank=Some((plan,pose));return false;}\n    };\n    let staged=native_fighter_install::Descriptor::from_bytes(&track.descriptor);\n    training::clear_session_state();\n    trace!(\"[MiiOrdinaryCpu] submit ticket={:?} outgoing={:#x} target={:#x} index={} cursor={:?} resource_before={:02x?} saved_files_written=false\",\n        track.ticket,live_kind(entry,current.binding.owner,&current.descriptor),track.reload_target().kind,current.index,\n        track.destination.cursor,&current.record[88..104]);\n",
+     "new": "        {*bank=Some((plan,pose));return false;}\n    };\n    let staged=native_fighter_install::Descriptor::from_bytes(&track.descriptor);\n    training::clear_session_state(crate::runtime::roster::roster_requests::owns_install(false,track.reload_target().kind));\n    trace!(\"[MiiOrdinaryCpu] submit ticket={:?} outgoing={:#x} target={:#x} index={} cursor={:?} resource_before={:02x?} saved_files_written=false\",\n        track.ticket,live_kind(entry,current.binding.owner,&current.descriptor),track.reload_target().kind,current.index,\n        track.destination.cursor,&current.record[88..104]);\n"
     }
    ]
   },
@@ -25663,7 +25813,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "ccb0020ac93ad71620bce7683946d53f46cc69173c31a34d904c9a4bbdad8710",
+   "dest_sha256": "767108af623e866779894ff64a774de6e2905c49eb546d5747d036b394c50ace",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -26556,6 +26706,61 @@
      "old": "    if super::mii_ordinary_cpu::writers_reserved(0,0) {return false;}\n    mii_backend::ready() && crate::runtime::compat::common::is_ready_go()\n        && !menu::captures_input() && !lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !training::save_states::is_loading() && !training::recording_or_playback()\n        && !crate::runtime::compat::replay_preview::occupied()\n        && STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()})\n        && !portrait_render_held()\n}\n/// The Player's HUD portrait render holds a helper (sequencing: the press runs after the render, never dropped).\nfn portrait_render_held()->bool {\n",
      "new": "    if super::mii_ordinary_cpu::writers_reserved(0,0) {return false;}\n    mii_backend::ready() && crate::runtime::compat::common::is_ready_go()\n        && !menu::captures_input() && !lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !training::save_states::is_loading() && !training::recording_or_playback()\n        && STATES.iter().all(|s| {let s=s.lock();s.active.is_none()&&s.pending.is_none()})\n        && !portrait_render_held()\n}\n/// The Player's HUD portrait render holds a helper (sequencing: the press runs after the render, never dropped).\nfn portrait_render_held()->bool {\n",
      "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "        let mut s=STATE.lock();\n        if s.generic.as_ref().is_some_and(|g|g.before.binding.entry==entry as usize) {s.generic=None;}\n        if s.owner.as_ref().is_some_and(|o|o.origin.binding.entry==entry as usize) {\n            s.owner=None;s.request=None;s.restore=None;s.capture=false;s.menu_valid=false;\n        }\n        if let Some(b)=s.bank.filter(|b|b.ticket.entry==entry as usize) {\n            s.bank=None;\n            let released=settle_outcome(Outcome::Destroyed {reason:\"ordinary Player0 bank switch destructor\",lease:b.token},\n                b.ticket,None,true);\n            trace!(\"[MiiOrdinaryPlayer] destroyed bank ticket={:?} INSTALL_released={} cleanup_writes=false\",\n                b.ticket,released);\n        }\n        if s.track.as_ref().is_some_and(|t|t.ticket.entry==entry as usize) {\n            s.track.take().map(|t|(t.token,t.ticket,t.gate.phase(),t.gate.published(),t.recovering))\n        } else {None}\n    };\n",
+     "new": "        let mut s=STATE.lock();\n        if s.generic.as_ref().is_some_and(|g|g.before.binding.entry==entry as usize) {s.generic=None;}\n        if s.owner.as_ref().is_some_and(|o|o.origin.binding.entry==entry as usize) {\n            load_dropped();\n            s.owner=None;s.request=None;s.restore=None;s.capture=false;s.menu_valid=false;\n        }\n        if let Some(b)=s.bank.filter(|b|b.ticket.entry==entry as usize) {\n            s.bank=None;load_dropped();\n            let released=settle_outcome(Outcome::Destroyed {reason:\"ordinary Player0 bank switch destructor\",lease:b.token},\n                b.ticket,None,true);\n            trace!(\"[MiiOrdinaryPlayer] destroyed bank ticket={:?} INSTALL_released={} cleanup_writes=false\",\n                b.ticket,released);\n        }\n        if s.track.as_ref().is_some_and(|t|t.ticket.entry==entry as usize) {\n            load_dropped();\n            s.track.take().map(|t|(t.token,t.ticket,t.gate.phase(),t.gate.published(),t.recovering))\n        } else {None}\n    };\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "    }\n    let mut s=STATE.lock();\n    if !s.bank.is_some_and(|now|now.ticket==b.ticket && now.token==b.token) {return;}\n    if effects.drop_bank {s.bank=None;}\n    if effects.drop_request {s.request=None;s.restore=None;}\n    if !effects.keep_owner {s.owner=None;s.menu_valid=false;}\n    // Native's own pair goes into the receipt only of the owner the restore compared against.\n    if let (Some(Ok(r)),Some(o))=(&restored,s.owner.as_mut()) {\n",
+     "new": "    }\n    let mut s=STATE.lock();\n    if !s.bank.is_some_and(|now|now.ticket==b.ticket && now.token==b.token) {return;}\n    if effects.drop_bank {s.bank=None;load_dropped();}\n    if effects.drop_request {request_dropped(s.request.and_then(|r|r.direct_kind()));s.request=None;s.restore=None;}\n    if !effects.keep_owner {s.owner=None;s.menu_valid=false;}\n    // Native's own pair goes into the receipt only of the owner the restore compared against.\n    if let (Some(Ok(r)),Some(o))=(&restored,s.owner.as_mut()) {\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "        let owned={\n            let mut s=STATE.lock();\n            let owned=s.track.as_ref().is_some_and(|t|t.ticket==track.ticket);\n            if owned {s.track=None;}\n            owned\n        };\n        if owned {settle_refusal(Refusal {reason:\"Player bank build refused before native Reload\",lease:track.token},Some(track.ticket));}\n",
+     "new": "        let owned={\n            let mut s=STATE.lock();\n            let owned=s.track.as_ref().is_some_and(|t|t.ticket==track.ticket);\n            if owned {s.track=None;load_dropped();}\n            owned\n        };\n        if owned {settle_refusal(Refusal {reason:\"Player bank build refused before native Reload\",lease:track.token},Some(track.ticket));}\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "        }\n        let sequence=s.next;\n        let Some(next)=sequence.checked_add(1) else {\n            s.request=None;drop(s);refused_before_submit(token,\"ordinary ticket exhausted\");return false;\n        };\n        let ticket=Ticket{epoch:epoch(),entry:entry as usize,sequence};\n        let registry=match native::final_registry(&current.helpers,Some(token)) {\n",
+     "new": "        }\n        let sequence=s.next;\n        let Some(next)=sequence.checked_add(1) else {\n            s.request=None;drop(s);request_dropped(request.direct_kind());refused_before_submit(token,\"ordinary ticket exhausted\");return false;\n        };\n        let ticket=Ticket{epoch:epoch(),entry:entry as usize,sequence};\n        let registry=match native::final_registry(&current.helpers,Some(token)) {\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "fn bank_build_refused(t:&Track,reason:&'static str) {\n    let mut s=STATE.lock();\n    if !s.track.as_ref().is_some_and(|now|now.ticket==t.ticket) {return;}\n    s.track=None;s.owner=None;s.menu_valid=false;s.request=None;s.restore=None;\n    drop(s);\n    native::retire_authority(0,t.ticket.entry);\n",
+     "new": "fn bank_build_refused(t:&Track,reason:&'static str) {\n    let mut s=STATE.lock();\n    if !s.track.as_ref().is_some_and(|now|now.ticket==t.ticket) {return;}\n    request_dropped(s.request.and_then(|r|r.direct_kind()));load_dropped();\n    s.track=None;s.owner=None;s.menu_valid=false;s.request=None;s.restore=None;\n    drop(s);\n    native::retire_authority(0,t.ticket.entry);\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
+     "old": "    descriptor[0x46..0x48].copy_from_slice(&origin.binding.record_index.to_le_bytes());\n    descriptor\n}\nfn clear_request(request:Request) {\n    let mut s=STATE.lock();\n    let restore_refused=s.request==Some(request) && s.restore.is_some();\n    if s.request==Some(request) {s.request=None;s.restore=None;}\n    drop(s);\n    if restore_refused {\n        WAITING_MEMORY.lock().manual_request(Role::Player as usize);\n",
+     "new": "    descriptor[0x46..0x48].copy_from_slice(&origin.binding.record_index.to_le_bytes());\n    descriptor\n}\n/// The clip editor's fighter switch (`roster_requests::note_drop`): this owner gave a request up after admission.\n/// `direct` is the request's own fighter; a cycle or a refresh marks nothing.\nfn request_dropped(direct:Option<u32>) {\n    if direct.is_some() {crate::runtime::roster::roster_requests::note_drop(true,direct);}\n}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(true,None);}\nfn clear_request(request:Request) {\n    let mut s=STATE.lock();\n    let restore_refused=s.request==Some(request) && s.restore.is_some();\n    if s.request==Some(request) {s.request=None;s.restore=None;request_dropped(request.direct_kind());}\n    drop(s);\n    if restore_refused {\n        WAITING_MEMORY.lock().manual_request(Role::Player as usize);\n"
+    },
+    {
+     "reason": "Toggle fix (tr-primary-2 2026-11-27 01:02:26Z): the mark is a call, never inlined, so the native service path's frames stay within their stack bound.",
+     "old": "}\n/// The clip editor's fighter switch (`roster_requests::note_drop`): this owner gave a request up after admission.\n/// `direct` is the request's own fighter; a cycle or a refresh marks nothing.\nfn request_dropped(direct:Option<u32>) {\n    if direct.is_some() {crate::runtime::roster::roster_requests::note_drop(true,direct);}\n}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(true,None);}\nfn clear_request(request:Request) {\n    let mut s=STATE.lock();\n",
+     "new": "}\n/// The clip editor's fighter switch (`roster_requests::note_drop`): this owner gave a request up after admission.\n/// `direct` is the request's own fighter; a cycle or a refresh marks nothing.\n#[inline(never)]\nfn request_dropped(direct:Option<u32>) {\n    if direct.is_some() {crate::runtime::roster::roster_requests::note_drop(true,direct);}\n}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(true,None);}\nfn clear_request(request:Request) {\n    let mut s=STATE.lock();\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "    let replace_restore=manual_direct && s.restore.is_some();\n    let accepted=!s.busy() && (s.request.is_none() || replace_restore) && request.is_some();\n    if accepted {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}\n        s.request=request;\n",
+     "new": "    let replace_restore=manual_direct && s.restore.is_some();\n    let accepted=!s.busy() && (s.request.is_none() || replace_restore) && request.is_some();\n    if accepted {\n        if !clip_commits(role,selection,user_request) {\n            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);\n        }\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}\n        s.request=request;\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(true,None);}\nfn clear_request(request:Request) {\n    let mut s=STATE.lock();\n    let restore_refused=s.request==Some(request) && s.restore.is_some();\n",
+     "new": "}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_owner_drop(true);}\nfn clear_request(request:Request) {\n    let mut s=STATE.lock();\n    let restore_refused=s.request==Some(request) && s.restore.is_some();\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "        bank_refused(&b,\"bank member switch refused before the native request\",false);\n        return false;\n    }\n    training::clear_session_state();\n    trace!(\"[MiiOrdinaryPlayer] bank switch ticket={:?} outgoing={:#x} target={:#x} index={} mii={}\",\n        b.ticket,outgoing,b.logical,b.before.binding.record_index,b.publish.is_some());\n    true\n",
+     "new": "        bank_refused(&b,\"bank member switch refused before the native request\",false);\n        return false;\n    }\n    training::clear_session_state(crate::runtime::roster::roster_requests::owns_install(true,b.logical));\n    trace!(\"[MiiOrdinaryPlayer] bank switch ticket={:?} outgoing={:#x} target={:#x} index={} mii={}\",\n        b.ticket,outgoing,b.logical,b.before.binding.record_index,b.publish.is_some());\n    true\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "    };\n    // Outgoing FE is still untouched. INSTALL copies the separately staged 0x70-byte descriptor.\n    let staged=native_fighter_install::Descriptor::from_bytes(&track.descriptor);\n    training::clear_session_state();\n    trace!(\"[MiiOrdinaryPlayer] submit ticket={:?} outgoing={:#x} target={:#x} index={} bank_build={} resource_before={:02x?} saved_files_written=false\",\n        track.ticket,live_kind(entry,&current.descriptor),track.reload_target().kind,current.binding.record_index,\n        track.bank,&current.record[88..104]);\n",
+     "new": "    };\n    // Outgoing FE is still untouched. INSTALL copies the separately staged 0x70-byte descriptor.\n    let staged=native_fighter_install::Descriptor::from_bytes(&track.descriptor);\n    training::clear_session_state(crate::runtime::roster::roster_requests::owns_install(true,track.reload_target().kind));\n    trace!(\"[MiiOrdinaryPlayer] submit ticket={:?} outgoing={:#x} target={:#x} index={} bank_build={} resource_before={:02x?} saved_files_written=false\",\n        track.ticket,live_kind(entry,&current.descriptor),track.reload_target().kind,current.binding.record_index,\n        track.bank,&current.record[88..104]);\n"
     }
    ]
   },
@@ -26618,7 +26823,7 @@
    "dest": "src/runtime/mii/mii_saved_alpha.rs",
    "crate": "root",
    "src_sha256": "11c19c8277d129eeb64184454664d43c1a1fa00a2ea086c79667923de78649a8",
-   "dest_sha256": "4ad47187565cd475bf2d5185bde414b7373681ce7be38743d1485e7a206e4e20",
+   "dest_sha256": "f46220a983d6645285953ede4043ed6c254520406e2e19e8391122e790ec6fab",
    "edits": [
     {
      "old": "pub(super) fn init(base: usize) {",
@@ -26958,6 +27163,16 @@
      "old": "        && !lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !INSTALL.active()\n        && !training::save_states::is_loading()\n        && !training::recording_or_playback()\n        && !crate::runtime::compat::replay_preview::occupied()\n}\n\npub(super) unsafe fn service(entry: *mut u8, owner: u32) -> bool {\n    // Already-owned Training fallback work still receives its departure callback.\n    let i=match owner {0=>0,1|4=>1,_=>return false};\n",
      "new": "        && !lobby::native_ui_busy()\n        && !button_config::has_pending_request()\n        && !INSTALL.active()\n        && !training::save_states::is_loading()\n        && !training::recording_or_playback()\n}\n\npub(super) unsafe fn service(entry: *mut u8, owner: u32) -> bool {\n    // Already-owned Training fallback work still receives its departure callback.\n    let i=match owner {0=>0,1|4=>1,_=>return false};\n",
      "reason": "F7: route Replay and crop previews through Recording playback; retire the separate preview engine."
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "    }\n    let descriptor = native_fighter_install::Descriptor::copy_from(entry);\n    trace!(\"[MiiSavedAlpha] install owner={owner} epoch={epoch} operation={:?} kind={:#x} saved_files_written=false\",tx.operation(),tx.after().canonical().class as u32);\n    training::clear_session_state();\n    reload_at_pose(\n        BASE.load(Ordering::Acquire),\n        entry,\n",
+     "new": "    }\n    let descriptor = native_fighter_install::Descriptor::copy_from(entry);\n    trace!(\"[MiiSavedAlpha] install owner={owner} epoch={epoch} operation={:?} kind={:#x} saved_files_written=false\",tx.operation(),tx.after().canonical().class as u32);\n    training::clear_session_state(false);\n    reload_at_pose(\n        BASE.load(Ordering::Acquire),\n        entry,\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "static WORK: AtomicBool = AtomicBool::new(false);\nstatic MENU_EPOCH: AtomicU64 = AtomicU64::new(1);\nstatic OWNER_EPOCH: [AtomicU64; 2] = [AtomicU64::new(1), AtomicU64::new(1)];\npub(super) fn current_generation(owner: u32) -> u64 {\n    OWNER_EPOCH[owner as usize].load(Ordering::Acquire)\n}\nstruct Owner {\n",
+     "new": "static WORK: AtomicBool = AtomicBool::new(false);\nstatic MENU_EPOCH: AtomicU64 = AtomicU64::new(1);\nstatic OWNER_EPOCH: [AtomicU64; 2] = [AtomicU64::new(1), AtomicU64::new(1)];\npub(crate) fn current_generation(owner: u32) -> u64 {\n    OWNER_EPOCH[owner as usize].load(Ordering::Acquire)\n}\nstruct Owner {\n"
     }
    ]
   },
@@ -28882,7 +29097,7 @@
    "dest": "src/runtime/lobby/training/lobby.rs",
    "crate": "root",
    "src_sha256": "1b98ab33c03afaacea5620a2702f868253cb0fd8f68046ad3cd838d172c03d78",
-   "dest_sha256": "2a5a89a57ff82093288cd06932ae8c57ac0274e2d8f2b480e76aeaa67d22c150",
+   "dest_sha256": "176bb9b9b3d23f9e4bff5feda0135f3a3c82b9d353314383e5e8ea5048704ca4",
    "edits": [
     {
      "old": "use {training_mod_consts::Action, crate::runtime::compat::consts::FighterId, training_mod_consts::LedgeOption, crate::engine::compat::menu::OnOff, crate::runtime::compat::menu::MENU};",
@@ -28968,6 +29183,11 @@
      "old": "fn practice_setting(on: bool) -> bool {\n    on || RELEASING.load(Ordering::Acquire)\n}\n\npub fn requested() -> bool {\n    practice_setting(read(&MENU).lobby_practice == OnOff::ON) && is_waiting_scene()\n}\n\n/// Busy is unknown eligibility: callers must defer, not treat it as departure.\npub fn try_requested() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(practice_setting(crate::runtime::compat::menu::try_current_menu()?.lobby_practice == OnOff::ON) && is_waiting_scene())\n}\n\n/// The same request and readiness facts as `active`, without waiting on menu edits.\npub fn try_active() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(try_requested()? && UI_READY.load(Ordering::Acquire))\n}\n\npub fn active() -> bool {\n    requested() && UI_READY.load(Ordering::Acquire)\n}\n",
      "new": "fn practice_setting(on: bool) -> bool {\n    on || RELEASING.load(Ordering::Acquire)\n}\n\n/// The room's readiness as practice reads it: the layout's, or a release under way (`lobby_flag::released_clock`).\nfn ui_ready() -> bool {\n    UI_READY.load(Ordering::Acquire) || RELEASING.load(Ordering::Acquire)\n}\n\npub fn requested() -> bool {\n    practice_setting(read(&MENU).lobby_practice == OnOff::ON) && is_waiting_scene()\n}\n\n/// Busy is unknown eligibility: callers must defer, not treat it as departure.\npub fn try_requested() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(practice_setting(crate::runtime::compat::menu::try_current_menu()?.lobby_practice == OnOff::ON) && is_waiting_scene())\n}\n\n/// The same request and readiness facts as `active`, without waiting on menu edits.\npub fn try_active() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(try_requested()? && ui_ready())\n}\n\npub fn active() -> bool {\n    requested() && ui_ready()\n}\n",
      "reason": "Keep the room's practice readers ready during a partner release even when the layout readiness has dropped."
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "    if now != previous {\n        SEEN_ENTRIES.store(0, Ordering::Relaxed);\n        crate::runtime::features::cpu::set_lobby(now);\n        super::clear_session_state();\n        // The CPU's cached rolls start from the live menu, as after a Training reset.\n        super::cpu_rolls::request_all();\n        trace!(\n",
+     "new": "    if now != previous {\n        SEEN_ENTRIES.store(0, Ordering::Relaxed);\n        crate::runtime::features::cpu::set_lobby(now);\n        super::clear_session_state(false);\n        // The CPU's cached rolls start from the live menu, as after a Training reset.\n        super::cpu_rolls::request_all();\n        trace!(\n"
     }
    ]
   },
@@ -28976,7 +29196,7 @@
    "dest": "src/runtime/lobby/training/practice.rs",
    "crate": "root",
    "src_sha256": "290e866742b0665a4d8b487a3c24f034adba166b43901e0bfd5e04a3769de49d",
-   "dest_sha256": "9ec42e7d4772de97e51123f18505f3d0756d126765715387e334fccb5aae424a",
+   "dest_sha256": "5a78d4e8079454d20a8fc340356bb55e61787b825724c9bf33d05558eac46457",
    "edits": [
     {
      "old": "    common::try_get_battle_object(owner).is_some_and(|body|\n        body.module_accessor.as_ref().is_some_and(|module|\n            module.battle_object_id == owner && role(module).is_some()))",
@@ -29077,6 +29297,16 @@
      "old": "    let mode = common::game_mode::current();\n    Ok(practice_policy::context(false, mode.is_some_and(|m| m.initialized),\n        mode.map_or(0, |m| m.melee), mode.map_or(0, |m| m.mode), super::lobby::try_active()?))\n}\n\npub fn scene_enabled() -> bool { context().is_some() }\npub fn enabled() -> bool {\n    enabled_in(context())\n}\npub fn try_enabled() -> Result<bool, crate::runtime::compat::menu::MenuBusy> {\n    Ok(enabled_in(try_context()?))\n}\nfn enabled_in(current_context: Option<Context>) -> bool {\n    current_context.is_some() && !crate::runtime::roster::character_roster::busy() && !super::lobby::native_ui_busy()\n}\n\n",
      "new": "    let mode = common::game_mode::current();\n    Ok(practice_policy::context(false, mode.is_some_and(|m| m.initialized),\n        mode.map_or(0, |m| m.melee), mode.map_or(0, |m| m.mode), super::lobby::try_active()?))\n}\n\npub fn enabled() -> bool {\n    enabled_in(context())\n}\nfn enabled_in(current_context: Option<Context>) -> bool {\n    current_context.is_some() && !crate::runtime::roster::character_roster::busy() && !super::lobby::native_ui_busy()\n}\n\n",
      "reason": "F7: remove unused runtime entry points and fields after preview unification."
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "fn depart_session() {\n    practice_policy::depart_session(\n        || { OWNED.lock().retire(); },\n        super::clear_session_state,\n    );\n}\n\n",
+     "new": "fn depart_session() {\n    practice_policy::depart_session(\n        || { OWNED.lock().retire(); },\n        || super::clear_session_state(false),\n    );\n}\n\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "pub fn retire() {\n    let owned = OWNED.lock().retire();\n    if owned || crate::engine::rr_host::previewing() || super::recording_or_playback() {\n        super::clear_session_state();\n    }\n}\n\n",
+     "new": "pub fn retire() {\n    let owned = OWNED.lock().retire();\n    if owned || crate::engine::rr_host::previewing() || super::recording_or_playback() {\n        super::clear_session_state(false);\n    }\n}\n\n"
     }
    ]
   },

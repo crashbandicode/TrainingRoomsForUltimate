@@ -1,3 +1,4 @@
+fn clip_commits(_: Role, _: Selection, _: bool) -> bool { true }
 use runtime::lobby::training::{self, lobby};
 type Request = GenericRequest;
 use engine::swap::cycle_members::{admitted, over_pending, Admission};
@@ -167,6 +168,7 @@ fn scope(_: Role) -> Option<RequestScope> {
 static NOTICES: Lock<Vec<String>> = Lock::new(Vec::new());
 static SAVED_RESULT: Lock<Option<bool>> = Lock::new(None);
 fn notify(_: Role, message: String) { NOTICES.lock().push(message); }
+fn clip_dropped<S>(_: Role, _: S, _: bool) {}
 fn preload_targets(
     _: &TrainingModpackMenu,
     _: usize,

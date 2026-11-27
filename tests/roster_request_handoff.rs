@@ -325,6 +325,38 @@ impl Role {
 const FIXTURE: &str = include_str!("support/roster_request_handoff_fixture.rs");
 
 #[test]
+fn only_the_own_install_clear_preserves_the_editor() {
+    let training = include_str!("../src/runtime/lobby/training/mod.rs");
+    let recorder = include_str!("../src/runtime/features/recorder.rs");
+    assert!(block(training, "pub(crate) fn clear_session_state(keep_clip:").contains("recorder::session_clear(keep_clip)"));
+    assert!(block(recorder, "pub fn session_clear(").contains("named_macros::clear_session(keep_clip)"));
+    for (production, sites) in [
+        (include_str!("../src/runtime/roster/character_roster.rs"), 1),
+        (include_str!("../src/runtime/mii/mii_ordinary_player.rs"), 2),
+        (include_str!("../src/runtime/mii/mii_ordinary_cpu.rs"), 2),
+    ] {
+        let clears: Vec<_> = production.lines().filter(|l| l.contains("training::clear_session_state(")).collect();
+        assert_eq!(clears.len(), sites);
+        assert!(clears.iter().all(|l| l.contains("roster_requests::owns_install(")));
+    }
+    let named = include_str!("../src/runtime/macros/named_macros.rs");
+    let event = named.lines().find(|l| l.starts_with("enum Lifecycle ")).unwrap();
+    let producer = block(named, "pub fn clear_session(");
+    let source = include_str!("support/clip_clear_fixture.rs").replace("// EVENT", event)
+        .replace("// PRODUCER", &format!("{producer}\nuse clear_session as clear_for_test;"))
+        .replace("// DRAIN",block(named,"pub fn worker_lifecycle()"));
+    let scratch = crate::test_scratch::Scratch::new("clip-install-clear");
+    let src = scratch.join("clear.rs");
+    let exe = scratch.join("clear");
+    fs::write(&src, source).unwrap();
+    let build = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
+        .args(["--edition=2021","-Awarnings"]).arg(src).arg("-o").arg(&exe).output().unwrap();
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let run = Command::new(exe).output().unwrap();
+    assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+}
+
+#[test]
 fn clip_switch_reports_the_rosters_answer_on_the_next_worker_pass() {
     let runtime = include_str!("../src/runtime/macros/replay_capture.rs");
     let source = include_str!("support/clip_admission.rs")

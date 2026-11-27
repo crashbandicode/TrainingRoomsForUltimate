@@ -397,6 +397,15 @@ pub(super) fn replay_refusal(selection:crate::engine::mii::replay::Selection)->O
         .and_then(|receipt|receipt.for_selection(selection,epoch(),super::mii_replay::revision(selection.source)))
         .and_then(Result::err)
 }
+/// The clip editor's fighter switch (`roster_requests::note_drop`): this owner gave a request up after admission.
+/// `direct` is the request's own fighter; a cycle or a refresh marks nothing.
+#[inline(never)]
+fn request_dropped(direct:Option<u32>) {
+    if direct.is_some() {crate::runtime::roster::roster_requests::note_drop(false,direct);}
+}
+/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.
+#[inline(never)]
+fn load_dropped() {crate::runtime::roster::roster_requests::note_owner_drop(false);}
 fn refuse_request(request:Request,reason:&'static str) {
     let mut s=STATE.lock();
     let mut restore_refused=false;
@@ -406,7 +415,7 @@ fn refuse_request(request:Request,reason:&'static str) {
             s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {
                 selection,outcome:Err(reason)});
         }
-        s.request=None;
+        s.request=None;request_dropped(request.direct_kind());
         restore_refused=s.restore.is_some();
         cycle_refused=request==Request::CYCLE && !restore_refused;
         s.restore=None;
@@ -464,7 +473,7 @@ pub(super) fn menu_close(context:MenuContext,action:Action)->bool {
 fn clear_request(request:Request) {
     let mut s=STATE.lock();
     let restore_refused=s.request==Some(request) && s.restore.is_some();
-    if s.request==Some(request) {s.request=None;s.restore=None;}
+    if s.request==Some(request) {s.request=None;s.restore=None;request_dropped(request.direct_kind());}
     drop(s);
     if restore_refused {
         WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);
@@ -544,6 +553,9 @@ pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,req
         s.departed,s.busy(),s.request.is_some(),replace_restore,request.is_some(),
         user_request && matches!(selection,Selection::Cycle));
     if admitted {
+        if !clip_commits(role,selection,user_request) {
+            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);
+        }
         s.restore=None;
         if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}
         s.request=request;
@@ -1195,7 +1207,7 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
         }
         let sequence=s.next;
         let Some(next)=sequence.checked_add(1) else {
-            s.request=None;drop(s);refused_before_submit(token,"ordinary ticket exhausted");return false;
+            s.request=None;drop(s);request_dropped(request.direct_kind());refused_before_submit(token,"ordinary ticket exhausted");return false;
         };
         let ticket=Ticket{epoch:epoch(),entry:entry as usize,sequence};
         let registry=match provenance::final_registry(&current.helpers,Some(token)) {
@@ -1228,7 +1240,7 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
         {*bank=Some((plan,pose));return false;}
     };
     let staged=native_fighter_install::Descriptor::from_bytes(&track.descriptor);
-    training::clear_session_state();
+    training::clear_session_state(crate::runtime::roster::roster_requests::owns_install(false,track.reload_target().kind));
     trace!("[MiiOrdinaryCpu] submit ticket={:?} outgoing={:#x} target={:#x} index={} cursor={:?} resource_before={:02x?} saved_files_written=false",
         track.ticket,live_kind(entry,current.binding.owner,&current.descriptor),track.reload_target().kind,current.index,
         track.destination.cursor,&current.record[88..104]);
@@ -1243,7 +1255,7 @@ unsafe fn begin_prepare(entry:*mut u8,bank:&mut Option<BankSubmit>)->bool {
             let mut s=STATE.lock();
             let owned=s.track.as_ref().is_some_and(|t|t.ticket==track.ticket);
             if owned {
-                s.track=None;
+                s.track=None;load_dropped();
                 if let Some(selection)=track.replay {
                     s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {
                         selection,outcome:Err("CPU bank build refused")});
@@ -1299,7 +1311,7 @@ unsafe fn submit_bank(entry:*mut u8,plan:Option<super::body_bank::Plan>,
         bank_refused(&b,"CPU bank member switch refused before the native request",false);
         return false;
     }
-    training::clear_session_state();
+    training::clear_session_state(crate::runtime::roster::roster_requests::owns_install(false,b.logical));
     trace!("[MiiOrdinaryCpu] bank switch ticket={:?} outgoing={:#x} target={:#x} index={} cursor={:?} mii={}",
         b.ticket,outgoing,b.logical,b.before.index,b.destination.cursor,b.publish.is_some());
     true
@@ -1396,11 +1408,11 @@ unsafe fn bank_refused(b:&BankTrack,reason:&'static str,diverged:bool) {
     }
     let mut s=STATE.lock();
     if !s.bank.is_some_and(|now|now.ticket==b.ticket && now.token==b.token) {return;}
-    if effects.drop_bank {s.bank=None;}
+    if effects.drop_bank {s.bank=None;load_dropped();}
     if let Some(selection)=b.replay {
         s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {selection,outcome:Err(reason)});
     }
-    if effects.drop_request {s.request=None;s.restore=None;}
+    if effects.drop_request {request_dropped(s.request.and_then(|r|r.direct_kind()));s.request=None;s.restore=None;}
     if !effects.keep_owner {s.owner=None;s.menu_valid=false;}
     // Native's own pair goes into the receipt only of the owner the restore compared against,
     // and the current record only when this owner claims it (`current_record_claim`).
@@ -1435,6 +1447,7 @@ unsafe fn bank_refused(b:&BankTrack,reason:&'static str,diverged:bool) {
 fn bank_build_refused(t:&Track,reason:&'static str) {
     let mut s=STATE.lock();
     if !s.track.as_ref().is_some_and(|now|now.ticket==t.ticket) {return;}
+    request_dropped(s.request.and_then(|r|r.direct_kind()));load_dropped();
     s.track=None;s.owner=None;s.menu_valid=false;s.request=None;s.restore=None;
     if let Some(selection)=t.replay {
         s.replay_result=Some(crate::engine::mii::replay::SelectionReceipt {selection,outcome:Err(reason)});
@@ -1659,15 +1672,16 @@ pub(super) fn on_destroy(entry:*const u8) {
         let mut s=STATE.lock();
         if s.generic.as_ref().is_some_and(|g|g.before.binding.entry==entry as usize) {s.generic=None;}
         let exact=s.owner.as_ref().is_some_and(|o|o.origin.binding.entry==entry as usize);
-        if exact {s.owner=None;s.request=None;s.restore=None;s.replay_result=None;s.capture=false;s.menu_valid=false;s.recapture_log=None;s.reservation.retire(true);s.departed=false;}
+        if exact {load_dropped();s.owner=None;s.request=None;s.restore=None;s.replay_result=None;s.capture=false;s.menu_valid=false;s.recapture_log=None;s.reservation.retire(true);s.departed=false;}
         if let Some(b)=s.bank.filter(|b|b.ticket.entry==entry as usize) {
-            s.bank=None;
+            s.bank=None;load_dropped();
             let released=settle_outcome(Outcome::Destroyed {reason:"ordinary CPU1 bank switch destructor",lease:b.token},
                 b.ticket,None,true);
             trace!("[MiiOrdinaryCpu] destroyed bank ticket={:?} INSTALL_released={} cleanup_writes=false",
                 b.ticket,released);
         }
         if s.track.as_ref().is_some_and(|t|t.ticket.entry==entry as usize) {
+            load_dropped();
             s.track.take().map(|t|(t.token,t.ticket,t.gate.phase(),t.gate.published(),t.recovering))
         } else {None}
     };
