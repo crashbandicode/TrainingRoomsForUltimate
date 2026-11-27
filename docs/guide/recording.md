@@ -59,6 +59,6 @@
 | Compare two Vault captures | From Latest, ZR + X swaps captures if Previous exists; this resets the cut. |
 | Preview without saving | X previews a macro or capture; X or B stops playback or its tail. |
 | Leave without saving | B closes the idle editor. |
-| Show a take's moves on its fighter | In the editor, ZL+L switches Player 1 and ZL+R the CPU to the take's fighter. |
+| The editor names a different fighter | Press ZL+L for Player 1 or ZL+R for CPU; press again to switch back. |
 | X refuses a mid-action capture | Select In and press Y; [if X still refuses](../CURRENT-RELEASE.md#known-issues), deselect In with L. |
 | Keep the result | A names a new file; the original stays. Combos crop by link, drills by step. |
