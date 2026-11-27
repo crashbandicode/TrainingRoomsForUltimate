@@ -10,7 +10,8 @@ Current release: rc.15
 
 | | |
 | --- | --- |
-| On the test console | Install 6, built from `5df3d9dc`, installed 2026-11-26 and read back |
+| Last verified console install | Install 6, built from `5df3d9dc`, installed 2026-11-26 and read back |
+| Shipping behavior (not a console receipt) | [Clip editor](guide/recording.md#crop), [Loading](menu/fighters-and-stages.md#loading) and [Tech practice](guide/tech-practice.md) describe the fixes. |
 | Preview install cancelled | `cc71537c` was never installed: [preview notes](RELEASE-NOTES-rc15.md#preview-build) |
 | Changes | [Release notes](RELEASE-NOTES-rc15.md) |
 | Tests | [Install evidence](EVIDENCE-rc15-installs.md) |
@@ -44,6 +45,8 @@ The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
 Copy `libtraining_rooms.nro` and `libnro_hook.nro` into the Skyline plugins folder: [Getting started](guide/getting-started.md).
 
 ## Known issues
+
+These columns record the two earlier builds, not the behavior of the fixes linked above.
 
 | Issue | On install 6 | In the preview build |
 | --- | --- | --- |
