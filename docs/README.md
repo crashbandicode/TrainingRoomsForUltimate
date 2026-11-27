@@ -16,6 +16,6 @@ Start with [installation](guide/getting-started.md#installing) or [menu controls
 | Technical | This release | [Release status and notes](CURRENT-RELEASE.md), [Install evidence](EVIDENCE-rc15-installs.md), [Drill evidence](EVIDENCE-rc15-input-drill.md), [Crop evidence](EVIDENCE-rc15-crop-editor.md) |
 | Technical | Older notes | [Release history](CURRENT-RELEASE.md#earlier-releases) |
 | Technical | How it works | [Technical notes](TECHNICAL.md), [Build](BUILD.md), [Mii](MII.md), [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md), [Resource costs](resource-costs.md), [Article hurtboxes](native/article-hurtboxes.md) |
-| Technical | Decisions | [Decisions](DECISIONS.md), [pictures](decisions/), [design pages](design/), [Restrictions](RESTRICTIONS.md), [Roadmap](ROADMAP.md), [Menu redesign](menu-redesign.md), [mockup](menu-mockup/) |
+| Technical | Decisions | [Decisions](DECISIONS.md), [pictures](decisions/), [design pages](design/), [Tech aim design](design/tech-aim-solvable.md), [Restrictions](RESTRICTIONS.md), [Roadmap](ROADMAP.md), [Menu redesign](menu-redesign.md), [mockup](menu-mockup/) |
 | Technical | Records | [Feature ledger](FEATURE-LEDGER.md), [Media](MEDIA.md), [Asset reproduction](ASSET-REPRODUCTION-R15.md), [Code reduction](CODE-REDUCTION-rc10.md), [Coverage](COVERAGE-rc9.md), [Test cuts](TEST-CUT-LEDGER-rc9.md), [Size plan](SIZE-PLAN.md) |
 | Technical | Provenance | [Carried files](provenance/), [tests](test-provenance/) |
