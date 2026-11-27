@@ -6,24 +6,24 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
 
 ## Two toolchains, by design
 
-- **Host gates** (`cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo build --no-default-features`)
-  use the pin in `rust-toolchain.toml`: rustc **1.98.1**.
-- **Focused integration tests** use `cargo test --test all -- module_name::`. To select a single
-  test, pass its full name and `--exact`, for example `cargo test --test all -- capabilities::print_cross_needs --exact --ignored`.
-  Register new integration modules in `tests/all/main.rs`. The `native_ui` target supplies the
-  Skyline UI shim and uses the system allocator so the direct hook heap-meter test can measure
-  exact byte deltas. The `parry_start_fresh_set` target substitutes the practice runtime's engine
-  and diagnostic services at the crate root.
+| Build | Toolchain |
+| --- | --- |
+| Host tests, Clippy and no-default-features | Rust 1.98.1 from `rust-toolchain.toml` |
+| Switch release and diagnostic | `skyline-v3`, selected by cargo-skyline |
+
+- **Host gates:** `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo build --no-default-features`.
+- **Focused integration tests** use `cargo test --test all -- module_name::`.
+  - To select a single test, pass its full name and `--exact`, for example `cargo test --test all -- capabilities::print_cross_needs --exact --ignored`.
+  - Register new integration modules in `tests/all/main.rs`.
+  - The `native_ui` target supplies the Skyline UI shim and uses the system allocator so the direct hook heap-meter test can measure exact byte deltas.
+  - The `parry_start_fresh_set` target substitutes the practice runtime's engine and diagnostic services at the crate root.
 - **Vendored crates' own tests:** the root package has no workspace, so the root test gate does not run
   `crates/*/tests`. To check these separately, run `cargo test --manifest-path crates/smash-match-data/Cargo.toml`
   (its tests use the test-only oracle crate `crates/smash-match-data/tests/oracle`) and
   `cargo test --manifest-path crates/hos-lock/Cargo.toml`; same target dir, `CARGO_INCREMENTAL=0`.
-- **Size gate** (2026-11-02): `python3 -I tools/size_gate.py` prints the implementation lines per module (the
-  primary's sloc4 counter, `tools/sloc.py`: no blanks, comments or tests, test modules and simulator code apart; `third_party/` excluded) and fails above
-  `size-budget.toml`, or when that file records a raise without the lead's approval. It is a gate step of its own, run
-  on every gated head beside `cargo test`; `cargo test` runs the counter's and the gate's host tests
-  (`tests/size_budget.rs`, which needs `/usr/bin/python3` 3.11+ and has no skip switch). The budget only ratchets
-  down; the plan is `docs/SIZE-PLAN.md`.
+- **Size gate** (2026-11-02): `python3 -I tools/size_gate.py` prints the implementation lines per module (the primary's sloc4 counter, `tools/sloc.py`: no blanks, comments or tests, test modules and simulator code apart; `third_party/` excluded) and fails above `size-budget.toml`, or when that file records a raise without the lead's approval.
+  - It is a gate step of its own, run on every gated head beside `cargo test`; `cargo test` runs the counter's and the gate's host tests (`tests/size_budget.rs`, which needs `/usr/bin/python3` 3.11+ and has no skip switch).
+  - The ceiling falls unless the lead approves a recorded increase; see [the size plan](SIZE-PLAN.md).
 - **Probe check** (rc.10 S4): `cargo check --features named-input-trace` for the Switch target, a gate of every slice
   since that probe was found not to compile. It is the `named-input-trace` row of `tools/feature_matrix.py`'s core set
   (`python3 -I tools/feature_matrix.py --run --mode switch --set core …`), or directly
@@ -42,29 +42,35 @@ The rustup home used for a Switch build must contain `skyline-v3`. The Surface's
 
 ## Commands
 
-On a build host, use `cargo skyline build --release` for the shipped plugin and
-`cargo skyline build --release --features diag` for diagnostics.
+| Output on the build host | Command |
+| --- | --- |
+| Shipped plugin | `cargo skyline build --release` |
+| Diagnostics | `cargo skyline build --release --features diag` |
 
 For campaign builds, run `remote-gate.ps1 -BuildHost auto` from the Surface to book a free build host;
 do not run Cargo on the Surface. The runner uses the `tr-yoga` alias when it selects the Yoga.
 
 ## Evidence
 
-2026-11-02: a detached clean checkout of `e8dbcc9`, pin unchanged, no `RUSTUP_TOOLCHAIN`, built on the Surface
-(script `/tmp/tr-pin-probe.ps1`): `Finished release … in 16.54s`, `libtraining_rooms.nro` sha256
-`26a5fef0383d2252f44868257bd7e95ccf17c7157b4e1c00a314e377016303f9` — byte-identical to the release NRO built
-earlier with a `RUSTUP_TOOLCHAIN=nightly-2026-02-14` override (`IMPLEMENTATION-PROGRESS.md`) (removed after v0.2.0-rc.1; see that tag), so the build is
-reproducible and the override is not needed. Resident size: `nro_size.py` → 172,032 B.
+| Surface build, 2026-11-02 | Result |
+| --- | --- |
+| Source | Clean detached `e8dbcc9`, unchanged pin, no `RUSTUP_TOOLCHAIN` override |
+| Script | `/tmp/tr-pin-probe.ps1`: release finished in 16.54 s |
+| `libtraining_rooms.nro` SHA-256 | `26a5fef0383d2252f44868257bd7e95ccf17c7157b4e1c00a314e377016303f9` |
+
+- The NRO was byte-identical to the release NRO built earlier with a `RUSTUP_TOOLCHAIN=nightly-2026-02-14` override (`IMPLEMENTATION-PROGRESS.md`) (removed after v0.2.0-rc.1; see that tag), so the build is reproducible and the override is not needed.
+- Resident size: `nro_size.py` → 172,032 B.
 
 ## Layout archive recipe (package 5, host tool)
 
-2026-11-02. `assets/info_training.tra1` is built, not hand-written: `tools/layout-builder` reads the player's own stock
-`info_training` layout archive (451,604 B on 13.0.5; dumped by the **diag** build into
-`sd:/ultimate/TrainingRooms/stock/`, copied under the gitignored `eden/runs/<label>/` or a scratch folder; game data is
-never committed), adds the plugin's panes (`src/model/ui/panes.rs`, the one pane table the runtime also reads) to its
-`info_training.bflyt` and writes a `TRA1` recipe: copy ranges of the stock archive plus the plugin's own bytes. The
-committed recipe holds no complete game archive; the plugin applies it to the bytes the game just decompressed and refuses
-an archive whose length and FNV-1a fingerprint differ (`model::archive_recipe`).
+| Recipe generation, 2026-11-02 | Artifact |
+| --- | --- |
+| Private input | Player's stock `info_training` layout archive: 451,604 B on 13.0.5 |
+| Committed output | `assets/info_training.tra1`: copy ranges and the plugin's own bytes |
+
+- The **diag** build dumps the archive into `sd:/ultimate/TrainingRooms/stock/`; copy it under the gitignored `eden/runs/<label>/` or a scratch folder and keep the game data private.
+- `tools/layout-builder` adds the plugin panes from the runtime's shared table (`src/model/ui/panes.rs`) to `info_training.bflyt`.
+- After decompression, `model::archive_recipe` checks the archive length and FNV-1a fingerprint before applying the recipe.
 
     cd tools/layout-builder && cargo rustc --locked --release --bin layout-builder -- --cfg test   # own CARGO_TARGET_DIR
     layout-builder build <stock info_training.arc> <out dir>                  # target.arc (private), info_training.tra1, report.json
@@ -76,13 +82,10 @@ The waiting-room host uses the same pane table and builder:
     cp <out dir>/info_waiting.tra1 assets/info_waiting.tra1
     cp <out dir>/panes-recipe.sha256 assets/panes-recipe.sha256              # the same digest from either build
 
-**The recipes follow the pane table (guard, 2026-11-04).** Each build also writes `panes-recipe.sha256` (and
-`pane_table_sha256` in `report.json`): the SHA-256 of `tools/layout-builder/src/pane_table.rs`'s `BUILDER` line
-(the builder version and the pinned nx-layout-toolbox revision) and every `panes::specs()` entry. The committed copy
-`assets/panes-recipe.sha256` is checked by `tests/pane_recipe_guard.rs`: any change to the pane table without a rebuild
-of both recipes fails `cargo test`, with these commands in the message. 2026-11-04 the badge port changed the pane
-table without a rebuild, and the candidate's menu never opened (`menu_panes=665 missing=354`). Bump `BUILDER` with
-any builder change that alters the recipes for the same table.
+- **The recipes follow the pane table (guard, 2026-11-04).** Each build also writes `panes-recipe.sha256` (and `pane_table_sha256` in `report.json`): the SHA-256 of `tools/layout-builder/src/pane_table.rs`'s `BUILDER` line (the builder version and the pinned nx-layout-toolbox revision) and every `panes::specs()` entry.
+- The committed copy `assets/panes-recipe.sha256` is checked by `tests/pane_recipe_guard.rs`: any change to the pane table without a rebuild of both recipes fails `cargo test`, with these commands in the message.
+- 2026-11-04 the badge port changed the pane table without a rebuild, and the candidate's menu never opened (`menu_panes=665 missing=354`).
+- Bump `BUILDER` with any builder change that alters the recipes for the same table.
 
 `--cfg test`, on the builder crate only: since rc.10 S3 the plugin files the builder includes by path keep
 `panes::specs()` and `archive_recipe::{make, build}` behind `#[cfg(test)]`, so a plain `cargo build` of the builder no
@@ -101,7 +104,12 @@ chip carries `P_CmnVector`'s four layers; every layer pane but Neutral's square 
 material, the rect template's with the stock cursor highlights' additive blend (Add, source alpha, one). layout-builder 0.1.3; the
 stocks are unchanged.)
 
-Earlier recipes (rebuilt 2026-11-08 at the rc.6 integration from the merged pane table: the rc.6 sequence bar's 35 panes (`p23/rc6-seq-drill`); the r8 recording pop-up (`p23/rc6-cov-rec`): 12 sublines and the CONNECTIONS column, 28 panes; its CONNECTIONS boxes, pills and tree and the L/R role tabs, 50 panes; the section headers' squares, the order badges and the boxed page tabs, 26 panes; and the notice plates moved before the notice texts (`p23/rc6-cov-rest`). layout-builder 0.1.2; the stocks are unchanged). No lane's recipe is reused: `tools/layout-builder` wrote these bytes from the merged `panes::specs()`.
+- On 2026-11-08, layout-builder 0.1.2 generated both rc.6 recipes from the merged `panes::specs()` and unchanged stocks.
+- The rc.6 sequence bar added 35 panes (`p23/rc6-seq-drill`).
+- The r8 recording pop-up (`p23/rc6-cov-rec`) added 28 panes for 12 sublines and the CONNECTIONS column.
+- Its CONNECTIONS boxes, pills and tree and the L/R role tabs added 50 panes.
+- The section headers' squares, order badges and boxed page tabs added 26 panes.
+- The notice plates moved before the notice texts (`p23/rc6-cov-rest`).
 
 | File | SHA-256 | Bytes | Stock archive it applies to |
 | --- | --- | ---: | --- |
@@ -112,20 +120,16 @@ Earlier recipes (rebuilt 2026-11-08 at the rc.6 integration from the merged pane
 Both recipes are embedded in every NRO (`runtime/ui/archive.rs`), so their size is resident size too (the 354 roster
 mark panes added about 33 KB to each).
 
-Its menu, notification and frame-strip roots live beneath `TrModPort` (the frame strip replaced the input log in rc.3). The runtime
-recognizes each archive by its directory member and applies that layout's recipe.
-The two boot buffers each fit the larger recipe's stock/output size; both layouts
-share the pool and retain the five-second hand-out grace. A vanilla fallback uses
-the second buffer as scratch, so reload timing remains an Eden acceptance gate.
+- Its menu, notification and frame-strip roots live beneath `TrModPort` (the frame strip replaced the input log in rc.3).
+- The runtime recognizes each archive by its directory member and applies that layout's recipe.
+- The two boot buffers each fit the larger recipe's stock/output size; both layouts share the pool and retain the five-second hand-out grace.
+- A vanilla fallback uses the second buffer as scratch, so reload timing remains an Eden acceptance gate.
 
-Historical (superseded by the table above): the waiting recipe candidate generated with builder `44177d8`: stock 1,284,116 B,
-SHA256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`;
-recipe 65,784 B, SHA256 `599c7d6fe61568efae283356e237eac05784f817c8b2c02db12682b873a35261`;
-output 1,378,180 B. All 183 non-layout archive members and all 63 original pane
-records remain byte-identical. The builder adds 549 panes including the host.
-Raw generation and independent payload/hierarchy checks are retained privately
-under `eden/runs/ui-waiting-build-44177d8/`; this is build evidence, not runtime
-acceptance. Never commit `target.arc` or the stock archive.
+- Historical (superseded by the table above): the waiting recipe candidate generated with builder `44177d8`: stock 1,284,116 B, SHA256 `7dcc45360bd84dadffcfe8b47771f5d6b40e44468c6a54cbd3dbb6b4142eea64`; recipe 65,784 B, SHA256 `599c7d6fe61568efae283356e237eac05784f817c8b2c02db12682b873a35261`; output 1,378,180 B.
+- All 183 non-layout archive members and all 63 original pane records remain byte-identical.
+- The builder adds 549 panes including the host.
+- Raw generation and independent payload/hierarchy checks are retained privately under `eden/runs/ui-waiting-build-44177d8/`; this is build evidence, not runtime acceptance.
+- Never commit `target.arc` or the stock archive.
 
 The tool uses the operator's own MIT crate **nx-layout-toolbox** as a git dependency, host only (it is not linked into the plugin):
 
@@ -133,16 +137,23 @@ The tool uses the operator's own MIT crate **nx-layout-toolbox** as a git depend
 - pinned revision `9010ca890b6339346758fa68bb53075d24aa0f95` (2026-06-01, "Document MeshCodec mesh-framing RE"), in `tools/layout-builder/Cargo.toml` and `Cargo.lock`; the Yoga copy `/home/intpa/toolbox-cli-aux/Toolbox-Cli` used for the first builds is this revision (identical `src/` apart from CRLF line endings)
 - reproducible from a clean checkout: 2026-11-02 the recipe built from the git dependency is byte-identical to the committed `assets/info_training.tra1` (sha256 `a1f3ee13...`, target archive fnv `e8a5a9ce3f4ec968`; rebuilt 2026-11-02 after the chip-grid geometry change, in the Ally WSL with `eden/ally/ally-build.sh recipe`: sha256 `225fdfd0...`, target archive fnv `6ba2f66617e6c4ea`, 529,300 B) given the same stock archive.
 
-Item pictures: the builder reads the 39 PNGs from assets/item-icons (the 38 approved renders and rc.13's Wario bike, an Eden capture cut out by background subtraction), appends BC7 sRGB textures and corresponding picture materials to the stock combined BNTX, and emits the same TRA1 delta format. Verify source/destination provenance with `python3 -I tools/carry_ui_items.py`; the 40-file ledger is docs/provenance/ui-item-assets-ledger.md. Regenerate both recipes whenever the shared pane table changes. The generated target archives stay private.
+- Item pictures: the builder reads the 39 PNGs from assets/item-icons (the 38 approved renders and rc.13's Wario bike, an Eden capture cut out by background subtraction), appends BC7 sRGB textures and corresponding picture materials to the stock combined BNTX, and emits the same TRA1 delta format.
+- Verify source/destination provenance with `python3 -I tools/carry_ui_items.py`; the 40-file ledger is docs/provenance/ui-item-assets-ledger.md.
+- Regenerate both recipes whenever the shared pane table changes.
+- The generated target archives stay private.
 
 ## Docs checks
 
-`cargo test` runs `tests/docs_gates.rs`, which runs `python3 -I tools/docs_check.py` over `README.md` and `docs/**/*.md`
-and the fixtures that prove each rule fails on a seeded break (`tools/test_docs_check.py`,
-`tools/test_check_external_links.py`). It needs `/usr/bin/python3` and has no skip switch, like the size gate. It uses no
-network and no clock. In a checkout it asks git for the tracked files and for the clips' blob ids; in a plain export
-it reads the files themselves. [The checker](../tools/docs_check.py) lists every rule, including video blob IDs,
-headings with links, and the menu and guide budgets. These checks also apply:
+| Host gate | Coverage |
+| --- | --- |
+| `cargo test` | `tests/docs_gates.rs` runs `python3 -I tools/docs_check.py` on `README.md` and `docs/**/*.md`. |
+| Seeded breaks | `tools/test_docs_check.py` and `tools/test_check_external_links.py` verify that the rules detect their failures. |
+
+- It needs `/usr/bin/python3` and has no skip switch, like the size gate.
+- It uses no network and no clock.
+- In a checkout it asks git for the tracked files and for the clips' blob ids; in a plain export it reads the files themselves.
+- [The checker](../tools/docs_check.py) lists every rule, including video blob IDs, headings with links, and the menu and guide budgets.
+- These checks also apply:
 
 - **Links.** Every relative link and image resolves to a file or folder (with the exact case), and every `#anchor` to a
   heading or explicit anchor (the forge's heading slugs are not GitHub's: `L+R+A Reset` is `#l-r-a-reset`). A path that starts with `/`
@@ -150,27 +161,25 @@ headings with links, and the menu and guide budgets. These checks also apply:
 - **Orphans.** Every page under `docs/` is reached by a chain of links from `README.md` or `docs/README.md`. A link to a
   folder does not count. The pages kept on purpose without a link (redirect stubs, the folders of project records) are
   listed with their reason in `tools/docs_check.py` (`ORPHAN_OK`).
-- **Versions.** `docs/CURRENT-RELEASE.md` holds one `Current release: rc.N` line. The README's top (it must link that
-  page), that page, `guide/getting-started.md` and the Status section of `TECHNICAL.md` must name that release. A sentence
-  with "newest", "latest", "currently", "current release/build/version" or "this release/build/version" that names another
-  release fails. Pages that describe their own build (release notes, decisions, provenance, measurements, the media and
-  feature ledgers) are skipped, by the list `HISTORICAL` with a reason each; a sentence that has to stay is listed in
-  `CLAIM_OK` with its reason. A list entry that matches nothing fails. The crate version in `Cargo.toml`
-  (`0.2.0-rc.N`, with `Cargo.lock`'s own entry) must name that release too: the menu footer starts with it and the release
-  tag is `v0.2.0-rc.N` (decided 2026-11-15: the footer and the tag agree).
-- **Notice texts.** A text in double quotes that has to be a notice, a refusal or a greyed-row reason must be a string
-  literal of the code the release build compiles in `src/` (or `crates/`), so a reworded notice breaks the page that
-  quotes it. Test code (a `tests/` folder, `*_tests.rs`, `#[cfg(test)]`), host-only simulator code and diag-only code do not
-  count (the size gate's rule, `tools/sloc.py`): the player never sees what only they hold. On `guide/troubleshooting.md` every
-  quoted text counts; on any other player page, a quoted text in a sentence that says notice, refus…, message, help line,
-  reason or greyed; in `RESTRICTIONS.md`, the Message column. A text fits a literal when it is part of it, or fits its
-  `{}` holes ("Loading 6/10" fits "Loading {}/{}"). A notice built from pieces at run time goes in `NOTICE_OK` with its
-  reason. The check shows the wording exists in shipped code, not that the notice appears in the situation the page describes.
+- **Versions.** `docs/CURRENT-RELEASE.md` holds one `Current release: rc.N` line.
+  - The README's top (it must link that page), that page, `guide/getting-started.md` and the Status section of `TECHNICAL.md` must name that release.
+  - A sentence with "newest", "latest", "currently", "current release/build/version" or "this release/build/version" that names another release fails.
+  - Pages that describe their own build (release notes, decisions, provenance, measurements, the media and feature ledgers) are skipped, by the list `HISTORICAL` with a reason each; a sentence that has to stay is listed in `CLAIM_OK` with its reason.
+  - A list entry that matches nothing fails.
+  - The crate version in `Cargo.toml` (`0.2.0-rc.N`, with `Cargo.lock`'s own entry) must name that release too: the menu footer starts with it and the release tag is `v0.2.0-rc.N` (decided 2026-11-15: the footer and the tag agree).
+- **Notice texts.** A text in double quotes that has to be a notice, a refusal or a greyed-row reason must be a string literal of the code the release build compiles in `src/` (or `crates/`), so a reworded notice breaks the page that quotes it.
+  - Test code (a `tests/` folder, `*_tests.rs`, `#[cfg(test)]`), host-only simulator code and diag-only code do not count (the size gate's rule, `tools/sloc.py`): the player never sees what only they hold.
+  - On `guide/troubleshooting.md` every quoted text counts; on any other player page, a quoted text in a sentence that says notice, refus…, message, help line, reason or greyed; in `RESTRICTIONS.md`, the Message column.
+  - A text fits a literal when it is part of it, or fits its `{}` holes ("Loading 6/10" fits "Loading {}/{}").
+  - A notice built from pieces at run time goes in `NOTICE_OK` with its reason.
+  - The check shows the wording exists in shipped code, not that the notice appears in the situation the page describes.
 
 ## Release checklist
 
-The docs steps of a release. The build, the tag, the Forgejo release and the card are in the playbook's
-`docs/CHECKLIST.md` and the operator's order.
+| Release work | Authority |
+| --- | --- |
+| Documentation | The steps below |
+| Build, tag, Forgejo release and card | The playbook's `docs/CHECKLIST.md` and the operator's order |
 
 1. Edit `docs/CURRENT-RELEASE.md`: the `Current release:` line, the status, what's new, the known issues.
 2. Name the release in the README and Getting started status links and in `docs/TECHNICAL.md` under Status.
@@ -180,8 +189,8 @@ The docs steps of a release. The build, the tag, the Forgejo release and the car
    test): the footer reads `0.2.0-rc.N · rcN <commit>`. Not before: `cargo test` fails (`version-cargo`) while the crate
    version and `Current release:` name different releases.
 4. Publish the Forgejo release page (the docs link to `releases/tag/v0.2.0-<rc>`).
-5. Run `python3 -I tools/check_external_links.py` from the repository root. It asks the network about every `http(s)`
-   link in `README.md` and `docs/`, and about the forge's release list, prints a report and changes nothing. It exits 1
-   when a link fails, or when the forge already has a release newer than the one `CURRENT-RELEASE.md` names; fix those by
-   hand. `--strict` also fails a moved link (a redirect); `--skip REGEX` leaves a URL out. It is not part of `cargo test`:
-   it needs the network.
+5. Run `python3 -I tools/check_external_links.py` from the repository root.
+   - It asks the network about every `http(s)` link in `README.md` and `docs/`, and about the forge's release list, prints a report and changes nothing.
+   - It exits 1 when a link fails, or when the forge already has a release newer than the one `CURRENT-RELEASE.md` names; fix those by hand.
+   - `--strict` also fails a moved link (a redirect); `--skip REGEX` leaves a URL out.
+   - It is not part of `cargo test`: it needs the network.
