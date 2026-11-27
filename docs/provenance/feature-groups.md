@@ -26,6 +26,15 @@
 
 ## Mixed files by feature (fork-only ranges are stage line numbers)
 
+| Feature | Mixed files |
+| --- | ---: |
+| Upstream documentation | 1 |
+| Build configuration | 4 |
+| Upstream: CPU behaviour (mash, followup, triggers, overrides, defensive, ledge, tech, shield, aerial/throw timing, frame advantage) | 9 |
+| Upstream: save states, reset, charges, buffs, items, fighter-specific restore, stage hazards | 11 |
+| Upstream: input recording/playback, input display, input delay, button chords, notifications | 7 |
+| Upstream: boot, offsets, logging, menu system, persistence, layout archive, hitbox visualizer, dev config | 25 |
+
 ### Upstream documentation
 
 | File | stage lines | retained upstream | fork-only | fork-only ranges |
@@ -115,10 +124,12 @@
 
 ## Unmapped
 
-- `docs/cpu-rolls-apply.md` (ours-new)
-- `docs/skyline-logger-race.md` (ours-new)
-- `src/log_stress.rs` (ours-new)
-- `src/training/cpu_rolls.rs` (ours-new)
-- `training_mod_consts/src/cpu_rolls.rs` (ours-new)
-- `training_mod_consts/src/log_stress.rs` (ours-new)
-- `training_mod_consts/src/notice_queue.rs` (ours-new)
+| File | Origin |
+| --- | --- |
+| `docs/cpu-rolls-apply.md` | ours-new |
+| `docs/skyline-logger-race.md` | ours-new |
+| `src/log_stress.rs` | ours-new |
+| `src/training/cpu_rolls.rs` | ours-new |
+| `training_mod_consts/src/cpu_rolls.rs` | ours-new |
+| `training_mod_consts/src/log_stress.rs` | ours-new |
+| `training_mod_consts/src/notice_queue.rs` | ours-new |
