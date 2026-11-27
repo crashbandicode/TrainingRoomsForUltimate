@@ -331,18 +331,27 @@ starts, then a wrong move (up tilt) drops the sequence back to combo 1.* See [ME
 Kong 1, Link 2, Ness 3) and the blue ones the CPU's; in Training against Ryu (outside the cycle), each press of
 ZL + D-pad Right switches Player 1 to Donkey Kong, Link, then Ness, each standing clear of the notice. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-Cycle chords step through your own order of fighters per role (red for Player 1, blue for the CPU), drawn with the
-game's stock icons. The CPU's chord always works; Player 1's works only while Fighters & Stages › Player Swapping is On
-(it's Off at first).
+| Cycle chord | Rule |
+| --- | --- |
+| Both | Step through your own order of fighters for that role (red for Player 1, blue for the CPU), drawn with the game's stock icons |
+| The CPU's | Always works |
+| Player 1's | Works only while Fighters & Stages › Player Swapping is On. It's Off at first |
 
-The fighters of your cycles load hot. Each role's first window of fighters is ready when Training starts, and the
-other groups are built in the background while you play; once the notice reads Ready or All loaded, a switch into a
-group took about 50–70 ms in Eden. Changing a cycle in Training builds the new fighters the same way, at once. The
-fighters that left it are freed when you next open the pause menu, or right away if the new ones need their room (a
-brief pause). Leaving a Mii for the fighters it replaced is a warm switch, not a reload. The background build
-waits only while Kirby is on screen, and for a second Mii group while a Mii is on screen
-(`background_build_eligible`, `src/model/swap/body_bank.rs:852`). Raising No. of CPUs brings in the CPU cycle's next
-fighters, a saved Mii included.
+The fighters of your cycles load hot:
+
+| When | What happens |
+| --- | --- |
+| Training starts | Each role's first window of fighters is ready |
+| While you play | The other groups are built in the background. Once the notice reads Ready or All loaded, a switch into a group took about 50–70 ms in Eden |
+| A cycle changes in Training | The new fighters are built the same way, at once |
+| Fighters leave a cycle | They are freed when you next open the pause menu, or right away if the new ones need their room (a brief pause) |
+| You leave a Mii for the fighters it replaced | A warm switch, not a reload |
+| Kirby is on screen | The background build waits |
+| A Mii is on screen | The build of a second Mii group waits |
+| No. of CPUs is raised | The CPU cycle's next fighters come in, a saved Mii included |
+
+The background build waits in those two cases only; the rule is `background_build_eligible` in
+`src/model/swap/body_bank.rs`.
 
 **Clip** [`rc7-kirby-hats.gif`](media/rc7-kirby-hats.gif): Player 1's Kirby: the hat chord twice, two hats in turn
 
@@ -353,10 +362,15 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 
 ### Mii fighters
 
-Each Mii class (Fighters & Stages › Mii Brawler, Swordfighter, Gunner) lists your saved Miis per role (ZR switches
-Player and CPU). *Add New…* opens Smash's own Mii Fighter editor from Training. Saving creates a new Mii and leaves the
-others untouched, and leaving without saving creates nothing. Saving a Mii you already have saves nothing new and says
-"Same as ‹saved name›, nothing new saved". See [MII.md](MII.md).
+Each Mii class (Fighters & Stages › Mii Brawler, Swordfighter, Gunner) lists your saved Miis per role; ZR switches
+Player and CPU. More: [MII.md](MII.md).
+
+| In the list | Result |
+| --- | --- |
+| *Add New…* | Opens Smash's own Mii Fighter editor from Training |
+| Save in the editor | Creates a new Mii and leaves the others untouched |
+| Leave without saving | Creates nothing |
+| Save a Mii you already have | Saves nothing new and says "Same as ‹saved name›, nothing new saved" |
 
 **Clip** [`rc6-mii-same.gif`](media/rc6-mii-same.gif): Add New, then Save with the copy unchanged: nothing new is saved
 
@@ -380,12 +394,15 @@ Mii file was written. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 A; "Practice Stage · Stage requested"; the static 2.8 s wait before the morph is cut; then the whole morph to
 Battlefield Ω (`[PracticeStageRequest] native_complete`) and its "Stage ready" notice. Cuts are listed in [MEDIA.md](MEDIA.md).*
 
-*Change Stage* (Fighters & Stages › Stages) goes to the stage you pick when the menu closes, in Training and in
-waiting-room practice; Y picks its form first.
+| Row (Fighters & Stages › Stages) | What it does |
+| --- | --- |
+| Change Stage | Goes to the stage you pick when the menu closes, in Training and in waiting-room practice. Y picks its form first |
+| Lobby Stages | Pick the stages and their order for Training rotation and waiting-room practice |
+| Training Stage Rotation | On: Training opens on the stage you pick, then on the next stage of the Lobby Stages list at each return through the character select. Off at first |
 
 **Clip** [`rc11-lobby-stages.gif`](media/rc11-lobby-stages.gif): Lobby Stages: A on Battlefield adds it as number 2
 
-Pick the stages and their order for Training rotation and waiting-room practice. *Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Fighters & Stages ›
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Fighters & Stages ›
 Lobby Stages; the grid with 1. Big Battlefield; the cursor to Battlefield, A, and the tile reads "2. Battlefield". Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 **Clip** [`rc11-stage-rotation.gif`](media/rc11-stage-rotation.gif): Training Stage Rotation from Off to On; the next Training entry, the same fighters, opens on Big Battlefield
@@ -408,18 +425,23 @@ standing; the game's own waiting-room menu, Training Partners 1, Right to 2; a s
 guest leaves the room (Yes) and rejoins the host's next room (the host's approval); it opens with two partners
 standing still. The log: `[LobbyPersist] entry saved=Saved { partners: Some(2), behavior: Some(1) }` on entry. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-The same menu works while you wait in an online or local room, once Fighters & Stages › Lobby Practice is On (it's Off
-at first). The Training partners and CPU action you set in the
-game's own waiting-room menu are remembered for the next room, and CPU › Level › CPU Level sets the partners' level.
+| In a waiting room | Rule |
+| --- | --- |
+| The menu | Works while you wait in an online or local room, while Fighters & Stages › Lobby Practice is On. It's On at first |
+| Training partners and CPU action | What you set in the game's own waiting-room menu is remembered for the next room |
+| The partners' level | CPU › Level › CPU Level |
+| Leaving a Quickplay room before the match | Close the TrainingRooms menu first: while it is open, Plus doesn't reach the game. The game's Pause › Leave Battle is kept open for a few seconds after you join by the QuickPlay cancel fix plugin |
 
 With the CPU pilot plugin 0.2.3 (`libssbu_cpu_pilot.nro`), the pilot can also drive Player 1 in Quickplay's
-waiting-room practice. Arm it from its CPU Pilot page as in Training. The practice shows no `CPU Lv` tag, and when a
-match is found the pilot keeps Player 1 in the match. The lobby tools above work beside it, Record, Play on Player 1
-and Quick Reset are refused while it drives, and the Game speed chord works at every speed.
+waiting-room practice:
 
-To leave a Quickplay room before the match starts (the game's Pause › Leave Battle, which the QuickPlay cancel fix
-plugin keeps open for a few seconds after you join), close the TrainingRooms menu first: while it is open, Plus
-doesn't reach the game.
+| With the pilot driving Player 1 | |
+| --- | --- |
+| Arming | From its CPU Pilot page, as in Training |
+| On screen | The practice shows no `CPU Lv` tag |
+| When a match is found | The pilot keeps Player 1 in the match |
+| Refused while it drives | Record, Play on Player 1 and Quick Reset |
+| Still working | The lobby tools above, and the Game speed chord at every speed |
 
 **Clip** [`rc11-lobby-combos.gif`](media/rc11-lobby-combos.gif): Save last combo in a Local Wireless waiting room, then the helper bar drills it and grades a try
 
@@ -437,9 +459,11 @@ fighters show their hurtboxes as pills. The first second (the CPU page) is a sep
 
 **Clip** [`menu-section-jump.gif`](media/menu-section-jump.gif): ZL + Down jumps through the CPU page's sections
 
-ZL + Up/Down jumps between a page's sections (in popup lists, a screenful). The menu reopens on the page and row you
-left. ZR no longer resets a page: each page ends with *Reset page to defaults*, which asks first. *Eden, 2026-11-05,
-`p23/menu-nav` diag NRO `1273c29f`, the navigation code rc.3 merged.*
+*Eden, 2026-11-05, `p23/menu-nav` diag NRO `1273c29f`, the navigation code rc.3 merged.*
+
+- **ZL + Up/Down** jumps between a page's sections; in popup lists, a screenful.
+- **Reopening:** the menu reopens on the page and row you left.
+- **Resetting a page:** each page ends with *Reset page to defaults*, which asks first. ZR no longer resets a page.
 
 ### The Developer page
 
@@ -463,6 +487,11 @@ Minus; A opens the chord editor, X starts the capture, ZL held with D-pad Up giv
 shields) with D-pad Up opens the menu. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 Menu shortcuts are changed in the menu and work at once.
+
+![Two designs for the menu's shortcut rows: A shows them read-only with the INI as the editor; B lets A re-bind a row in the menu, which writes button_config.ini](decisions/09-menu-shortcuts.png)
+
+*The two designs considered. Decided 2026-11-01: B, editable in the menu; the menu writes `button_config.ini` and
+the new chord applies at once. [Decisions](DECISIONS.md)*
 
 **Clip** [`rc11-replay-window.gif`](media/rc11-replay-window.gif): A capture cropped in the Replay window and saved; played on the CPU, which becomes the recorded Mii Gunner and replays the moves
 
