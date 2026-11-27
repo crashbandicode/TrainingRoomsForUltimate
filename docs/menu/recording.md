@@ -70,7 +70,7 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 | --- | --- | --- |
 | <a id="ask-before-switching-fighter"></a>Ask before switching fighter | **On**, Off | On: a file recorded on another fighter asks first. Off: your fighter stays. |
 | <a id="change-placement"></a>Change placement | Opens the placement picker | Places both fighters of the active macro's start save. |
-| <a id="replay-window"></a>Replay window | Opens the clip editor | Pick a saved capture, a fighter and an input window. [Clip](../media/tut-clip-snap.mp4) |
+| <a id="replay-window"></a>Replay window | Opens the capture list | Choose a capture, then select a fighter and input range in the editor. [Clip](../media/tut-clip-snap.mp4) |
 | <a id="replay-capture"></a>Replay capture | On, Off | On: saving a replay also captures its inputs. The choice is saved automatically. |
 | <a id="fighter-toggle"></a>ZL+L, ZL+R in the clip editor | Player 1, CPU | Switch recorded/original fighter; cancel only while the footer says **B cancels**. |
 | <a id="moves-while-you-scrub-preview-build"></a>Scrubbing in the clip editor | Positions | The opening In frame lines up with the playback target's current spot. |
