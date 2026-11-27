@@ -232,11 +232,10 @@ Where the recording code is (moved here from the Recording guide; named by funct
 | The pop-up, the Recording page and the file screens | `src/model/recording_menu.rs` and `src/model/ui/frame.rs` |
 | Record, Play and the pop-up chord | Are applied in `src/model/rr_host.rs` |
 | The start save | Keeps the recorded fighter's facing and speed in `note_record_start` (`rr_host.rs`) |
-| Momentum | Is `play_start_speed` (`rr_host.rs`) and `apply_start_speed` (`src/runtime/features/recording_host.rs`) |
-| Mash interrupts playback | Stops the CPU's macro through `note_mash` and the `MASH` flag in `rr_host.rs` |
+| [Mash interrupts playback](menu/recording.md#mash-interrupts-playback) | `recorder.rs::interrupt_playback` checks Parry practice before forwarding `note_mash`. |
 | Placement picker | Change placement and Place fighters before Record share `Wizard` in `src/model/record_place.rs`. The fighter-frame code is in `src/runtime/features/record_place.rs`. |
 | Placement on and off stage | `tech::floors` supplies traced floors for `src/model/floor_hop.rs`. Switching to Off stage uses `off_stage_spot` and the rules in `src/model/stage_geometry.rs`. |
-| Saving and applying placement | In `rr_host.rs`, `commit_placement` writes the edited fields, `active_placement_ids` finds the active macro and its start save, and `warp_pair` applies the macro's offset. |
+| Saving placement | In `rr_host.rs`, `active_placement_ids` finds the macro and start save; `commit_placement` writes the edit. |
 | Replay window | Capture loads and [fighter switches](design/toggle-load-wait/DESIGN.md) use `REPLAY_LOADING`: neutral Player 1 input, unblocked roster. |
 | Replay fighter mismatch | A chain checks its first macro (`screen=mismatch ask=macro1`). For a replay Mii, `installable` in `src/model/mii_install.rs` supplies a configuration the game can load. |
 | [Named setup actions](guide/save-states.md#using-a-setup) | `Pane::leads_to` in `src/editors/setups.rs` distinguishes opening, restoring and binding; `src/model/state/setup_transaction.rs` validates the restore. |
@@ -282,7 +281,7 @@ Where the recording code is (moved here from the Recording guide; named by funct
 | Start save | Mechanism |
 | --- | --- |
 | Warp | `rr_host.rs::warp_pair` applies the macro offset to its role before restoring the pair. |
-| Momentum | `play_start_speed` supplies recorded or zero speed after the warp, before first input. |
+| Momentum | `rr_host.rs::play_start_speed` chooses the speed; `recording_host.rs::apply_start_speed` applies it before the first input. |
 
 ![Q7 compares a shared menu toggle with INI and Deluxe alone](decisions/07-replay-capture.png)
 
@@ -346,8 +345,7 @@ restart (`src/model/recording_menu.rs`). A combo drill's Fighter Mismatch questi
 | Source | Optional `made_from`, `take` and drill `trim`. | `take` names the owned macro; trim is `start`, `end`, `both` or `off`. |
 | Hit link | `from`, `to`, `verdict`, and `steps` or `events`; optional `window`, `spot`, `drift`. | Window is a pair of frame numbers. |
 | Verdict | `kind` is `true` or `drop`. | `link` is nullable only for `true`. |
-| Endpoints 1 | `jab`, `dash_attack`, `side_tilt`, `up_tilt`, `down_tilt`. | `side_smash`, `up_smash`, `down_smash`, `aerial`, `other`. |
-| Endpoints 2 | `neutral_special`, `side_special`, `up_special`, `down_special`. | `grab`, `throw`, `ledge_attack`, `getup_attack`, `trip_attack`. |
+| Endpoints | `from`, `to` | Use the [accepted move keys](guide/combos.md#name-the-moves-in-a-link). |
 | Descriptions | `from_shown`, `to_shown`: optional `of`, `angle`, `variant`, `move`. | Both describe a hit link; angle is `up`/`down`, variant 0–31. |
 | Exact move | A hit description's `move` extends an `other` endpoint. | Final Smash uses `other` plus `move: final_smash`, never a bare endpoint. |
 | Steps | At most four `button`, `aim`, `offset` objects; required without `events`. | Buttons: `attack`, `special`, `jump`, `shield`, `grab`; aims: `neutral`, `up`, `down`, `side`. |
