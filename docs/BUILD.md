@@ -21,7 +21,7 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
   `crates/*/tests`. To check these separately, run `cargo test --manifest-path crates/smash-match-data/Cargo.toml`
   (its tests use the test-only oracle crate `crates/smash-match-data/tests/oracle`) and
   `cargo test --manifest-path crates/hos-lock/Cargo.toml`; same target dir, `CARGO_INCREMENTAL=0`.
-- **Size gate** (2026-11-02): `python3 -I tools/size_gate.py` prints the implementation lines per module (the primary's sloc4 counter, `tools/sloc.py`: no blanks, comments or tests, test modules and simulator code apart; `third_party/` excluded) and fails above `size-budget.toml`, or when that file records a raise without the lead's approval.
+- **Size gate:** `python3 -I tools/size_gate.py` reports implementation lines per module and checks the rustfmt-sloc4 ceilings in `size-budget.toml`. Raw sloc4 entries remain as history. The counter excludes blanks, comments, tests, simulator code, diagnostic-only code and `third_party/`.
   - It is a gate step of its own, run on every gated head beside `cargo test`; `cargo test` runs the counter's and the gate's host tests (`tests/size_budget.rs`, which needs `/usr/bin/python3` 3.11+ and has no skip switch).
   - The ceiling falls unless the lead approves a recorded increase; see [the size plan](BUDGETS.md#size-plan).
 - **Probe check** (rc.10 S4): `cargo check --features named-input-trace` for the Switch target, a gate of every slice
@@ -83,7 +83,7 @@ The waiting-room host uses the same pane table and builder:
     cp <out dir>/panes-recipe.sha256 assets/panes-recipe.sha256              # the same digest from either build
 
 - **The recipes follow the pane table (guard, 2026-11-04).** Each build also writes `panes-recipe.sha256` (and `pane_table_sha256` in `report.json`): the SHA-256 of `tools/layout-builder/src/pane_table.rs`'s `BUILDER` line (the builder version and the pinned nx-layout-toolbox revision) and every `panes::specs()` entry.
-- The committed copy `assets/panes-recipe.sha256` is checked by `tests/pane_recipe_guard.rs`: any change to the pane table without a rebuild of both recipes fails `cargo test`, with these commands in the message.
+- The committed copy `assets/panes-recipe.sha256` is checked by `tests/pane_recipe_guard.rs`: any change to the pane table without a rebuild of both recipes fails `cargo test`; use the builder commands above.
 - 2026-11-04 the badge port changed the pane table without a rebuild, and the candidate's menu never opened (`menu_panes=665 missing=354`).
 - Bump `BUILDER` with any builder change that alters the recipes for the same table.
 
