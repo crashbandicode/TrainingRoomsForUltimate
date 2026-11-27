@@ -43,11 +43,14 @@ flowchart LR
 
 ## Controls
 
-[Build tag in the menu footer](media/rc11-footer-tag.gif)
+| To check | Where to look |
+| --- | --- |
+| Move between pages or edit a value | [Menu navigation](guide/using-the-menu.md) |
+| Look up an action's factory binding | [Button chords](menu/display-and-controls.md#button-chords) |
+| Find a control that cannot be rebound | [Fixed controls](guide/controls.md#fixed-buttons) |
+| Identify the running build | [Read the menu footer](CURRENT-RELEASE.md#which-build-is-mine) |
 
-See [menu navigation](guide/using-the-menu.md), [factory chords](menu/display-and-controls.md#button-chords), [fixed controls](guide/controls.md#fixed-buttons) and [build identification](CURRENT-RELEASE.md#which-build-is-mine).
-
-*2026-11-12 · [Capture record](MEDIA.md)*
+[Build tag in the menu footer](media/rc11-footer-tag.gif) · [Capture record, 2026-11-12](MEDIA.md)
 
 ## Features in detail
 
@@ -456,7 +459,8 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 | Descriptions | `from_shown`, `to_shown`: optional `of`, `angle`, `variant`, `move`. | Both describe a hit link; angle is `up`/`down`, variant 0–31. |
 | Exact move | A hit description's `move` extends an `other` endpoint. | Final Smash uses `other` plus `move: final_smash`, never a bare endpoint. |
 | Steps | At most four `button`, `aim`, `offset` objects; required without `events`. | Buttons: `attack`, `special`, `jump`, `shield`, `grab`; aims: `neutral`, `up`, `down`, `side`. |
-| Hit offsets | Frames from Player 1's first actionable frame after this link's first hit. | Negative offsets mean buffered inputs; `events` takes precedence over `steps`. |
+| Hit offsets | Frames from Player 1's first actionable frame after this link's first hit. | Negative offsets mean buffered inputs. |
+| Both arrays present | The decoder uses `events` but still validates `steps`. | Malformed legacy steps invalidate the file. |
 | Events | At most 12 per link; each has `kind`, `dir`, `offset`. | Kinds: `press`, `release`, `cstick`, `flick`; `aim` requires version 3 or 4. |
 | Event fields | Press/release use `button`; flick uses `flick`; aim uses `part` 1 or 2. | Flick values: `fast_fall`, `dash`, `tap_jump`. |
 | Directions | `neutral`, `forward`, `forward_up`, `up`, `back_up`. | `back`, `back_down`, `down`, `forward_down`; relative to facing. |
