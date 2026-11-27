@@ -182,13 +182,13 @@ Options, Plugins or a plugin's own page) if Deluxe uses its D-pad there.
 | A Save or Load press that doesn't happen | Says why in a notice (Saves › Save States) |
 | On a GameCube controller | Deluxe's L + R is both triggers: the ZL/ZR chords and the two chords above don't fire while both triggers are held, and one trigger works as before |
 
-### Combos
+### Combos, in short
 
 *+ Save last combo…* (Recording › Combos & Sequences) saves a combo you landed, and the combo helper grades your next
 attempts against it, link by link. A sequence of combos is drilled the same way, one combo after another. Each saved
 combo is a small JSON file in `sd:/ultimate/TrainingRooms/combos/`. You can edit it, copy it to another card or share
-it, and any fighter can practise it; [COMBOS.md](guide/combos.md) describes the format. The clip is under Combos
-below.
+it, and any fighter can practise it; [COMBOS.md](guide/combos.md) describes the format. The clip is under
+[Combos: the clip and the files](#combos-the-clip-and-the-files).
 
 ### CPU reactions
 
@@ -246,6 +246,11 @@ platform at the top. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 Named save states (one bound to Save and Load at a time), mirroring and damage on load (Saves page). *Respawn on platform* (Fighters & Stages ›
 Stages) chooses between the game's respawn platform (above) and the instant respawn.
 
+![The Respawn on platform row and its help text; what happened after a KO with Save States On and Off; choice A keep the link, choice B work with Save States Off](decisions/TR5-respawn.png)
+
+*Design picture of decision TR5 (2026-11-13), not footage. Its middle panel shows rc.11, where the row was ignored
+with Save States Off. B was decided: since rc.12 the row works whatever Save States says. [Decisions](DECISIONS.md)*
+
 ### Recording and playback
 
 A save state only warps, and Load starts nothing. Each role has one active macro, a recording or a chain, and
@@ -254,6 +259,15 @@ nothing. X cycles the selected role's loop count in MACROS. On a drill with a sa
 a preview on Player 1. It does not interrupt a Play already queued or running for Player 1.
 The [Recording guide](guide/recording.md) is how to use it. The pop-up and the Recording page are in that doc.
 What rc.6 changes is [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
+
+While a macro plays on the CPU, the recording wins over the CPU's DI, SDI, air-dodge, tech and throw settings.
+The advanced row [Settings override playback](menu/recording.md#settings-override-playback), Off by default, turns
+that round.
+
+![A recorded air dodge Down In with the Airdodge Direction setting on Up: under A the setting changes it to Up, under B the CPU air-dodges Down In as recorded](decisions/B5-playback-vs-settings.png)
+
+*Design picture of decision B5 (2026-11-01), not footage: B, the recording wins, with the advanced row for A.
+[Decisions](DECISIONS.md)*
 
 Where the recording code is (moved here from the Recording guide; named by function, not line, because the lines move):
 
@@ -299,7 +313,7 @@ Player 1's inputs as the game receives them, the AI's included, and TrainingRoom
 through the take. Play on Player 1 and the waiting room's Quick Reset are refused ("P1 is controlled by an AI: Play
 on Player 1 is off", "… Quick Reset is off"), and Player 1's input is left to the pilot.
 
-### Combos
+### Combos: the clip and the files
 
 **Clip** [`rc7-combo-helper.gif`](media/rc7-combo-helper.gif): The combo helper grading a drilled combo: Combo 1, jab → jab, TRUE −5, on time
 

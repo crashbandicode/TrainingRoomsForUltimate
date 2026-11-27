@@ -3,6 +3,18 @@
 Every user-facing refusal a branch adds cites one approved row here with `// restriction: <ID>` on its line or one of
 the 3 above it (playbook `docs/CHECKLIST.md`, the "cites an approved restriction" row; `compliance.py --base`).
 
+The table is one list, in the order the rows were approved. By subsystem:
+
+- **Placing fighters:** `record-place-practice`, `record-place-start`, `record-place-load`, `place-save-write`
+- **Clip editor and replays:** `clip-cut-here-order`, `clip-no-second-fighter`, `clip-fighter-swap-wait`, `clip-fighter-refused`, `clip-fighter-by-kind`, `scrub-point-not-standable`, `replay-preview-fighter`, `replay-mii-metadata`, `replay-mii-loader-build`
+- **Combos, drills and recordings:** `drill-capacity`, `combo-capacity`, `combo-file-size`, `combos-training-only`, `combo-save-wait-load`, `combo-name-online-default`, `chain-recordings-only`, `macro-start-save-missing`, `playback-slot-empty`, `drill-preview-rerecord`
+- **Save states and settings:** `state-export-invalid-settings`, `save-load-off`, `save-load-empty`, `save-load-busy`, `save-load-player-cpu`, `save-load-deluxe-page`, `save-load-gamecube-triggers`, `save-load-not-ready`
+- **Fighters, stages and loading:** `mii-class-unavailable`, `preload-wait-memory`, `preload-wait-pool`, `preload-failed-and-waiting`, `custom-stage-missing`, `character-swap-busy`, `hide-cpu-play`
+- **Mash out:** `MASH-R2-NO-END`, `MASH-R2-NO-SAVING`, `M3-T2-NATIVE-EPOCH`, `MASH-M1-MISMATCH`, `mashout-not-mashable`, `mashout-blizzard-practice`, `mashout-ganon-tech`, `M3-READER-GUARD`, `MASH-NATIVE-SLOT`, `MASH-NATIVE-END`, `MASH-RIDLEY-FIXTURE`, `mashout-sora-prep`, `MASH-TROLLEY-FLOOR`
+- **Tech practice:** `tech-wizard-preview-blocked`, `tech-wizard-preview-unavailable`, `tech-surface-unavailable-after-rebuild`, `tech-hit-damage-multiplier-unavailable`, `tech-calibration-unmeasured`, `tech-native-observation-unavailable`
+- **Parry practice:** `parry-practice-start-save-missing`, `parry-practice-macro-missing`, `parry-practice-no-recording`, `parry-mash-ignored`
+- **Practice games:** `btt-projectile-guard`, `edge-juggle-cpu-playback-busy`, `edge-juggle-start-over-stage`, `edge-juggle-stage-unread`, `edge-juggle-start-no-floor`, `edge-juggle-no-open-ledge`, `edge-juggle-juggler-start`, `edge-juggle-player-no-floor`
+
 | ID | Message | Why | Approved |
 | --- | --- | --- | --- |
 | `record-place-practice` | `Stop the practice game to place fighters` | A running practice game owns the fighters, so placement does not open over it. | Operator record-placement design, R1 handoff |
