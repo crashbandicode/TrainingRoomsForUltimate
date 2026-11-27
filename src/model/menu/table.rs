@@ -465,11 +465,11 @@ pub static ROWS: [Row; 175] = [
     r(LOADING, "Ready Hats", "cycle_preload_ready_hats", Control::Number { first: 0, step: 1 },
       "How many Kirby hats are kept ready, apart from the fighters.\nA hat of a ready fighter shares its body."),
     r(LOADING, "Ready Fighter Bodies", "cycle_preload_bank_members", Control::Dropdown(&o::BODIES),
-      "How many bodies a ready fighter keeps.\nOff, two or three; some groups need three."),
+      "How many fighters each role keeps in its own slot, counting\nthe one on screen. More means quicker swaps. Off: no groups."),
     r(LOADING, "Group Swap", "cycle_preload_group_swap", TOGGLE,
       "The master switch of the group swaps below.\nOff turns every group off."),
     r(LOADING, "Swap groups", "", Control::SwapGroups,
-      "Which swaps are done as a group. A greyed entry says why.\nPT / Aegis groups need 3 free Ready Fighters."),
+      "Which swaps are done as a group. A greyed entry says why.\nPT / Aegis groups need free Ready Fighters: PT 3, Aegis 2."),
     // Display & Controls > On screen
     r(SCREEN, "HUD", "hud", TOGGLE, "On: the game's HUD shows as usual.\nOff: Training hides damage, pointers and off-screen bubbles."),
     r(SCREEN, "Hitbox Visualization", "hitbox_vis", Control::MultiSelect(&o::HITBOX_ITEMS),
