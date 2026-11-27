@@ -80,9 +80,7 @@ is how to read the lanes, the stick row, and the readouts. The rc.5 clips are li
 strip; R + D-pad Down, "Input display · Off", and the next jab draws no strip; R + D-pad Down again, "Input display ·
 On", and the jab draws on it. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-R + D-pad Down turns the input display on and off without opening the menu, in Training and in the waiting-room
-practice. A notice says "Input display" and On or Off. The menu's Input Display row shows the same value, and the
-choice is saved.
+The [Input display binding](menu/display-and-controls.md#button-chords) and [menu row](menu/display-and-controls.md#input-display) share one saved setting.
 
 Where the frame strip code is (moved here from the [Frame strip](guide/frame-strip.md) guide): the lanes, chips, freeze, readouts, the stick row, the C-stick arrow and the 20-frame rule are what `src/model/frame_strip.rs` draws, as specified in `specs/SPEC-input-06-frame-strip.md`.
 
@@ -103,9 +101,7 @@ walks in and forward-smashes Ridley at x1; R + D-pad Up held, the pop-up steps x
 the HUD's stopwatch reads 1/4; the same walk-in and smash play about four times slower. The log has
 `[GameSpeed] … speed=1/4`. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-Hold R + D-pad Up and a small "Game speed" pop-up shows the current speed between two D-pad arrows. While you hold
-it, D-pad Left and Right step one speed at a time; the steps stop at the slowest and fastest speeds instead of wrapping
-around. Let go and the pop-up closes; the speed stays.
+The [speed control](guide/game-speed.md) stops at either end of the list rather than wrapping.
 
 | Where | What the chord does |
 | --- | --- |
@@ -576,9 +572,7 @@ fighters show their hurtboxes as pills. The first second (the CPU page) is a sep
 
 *Eden, 2026-11-05, `p23/menu-nav` diag NRO `1273c29f`, the navigation code rc.3 merged.*
 
-- **ZL + Up/Down** jumps between a page's sections; in popup lists, a screenful.
-- **Reopening:** the menu reopens on the page and row you left.
-- **Resetting a page:** each page ends with *Reset page to defaults*, which asks first. ZR no longer resets a page.
+For section jumps, reopening and page resets, see [Using the menu](guide/using-the-menu.md#open-change-and-close).
 
 ### The Developer page
 

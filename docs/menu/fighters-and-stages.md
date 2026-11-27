@@ -1,6 +1,6 @@
 # Fighters & Stages
 
-From the CPU page, press L twice to open Fighters & Stages.
+From the CPU page, press R three times to open Fighters & Stages.
 
 ## Player 1 and CPU
 

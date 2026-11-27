@@ -17,12 +17,14 @@ The labelled menu key and six detail pictures in the [menu tour](../README.md#ab
 | `readme-tour-display.png` | `tut-menu-tour.mp4`, On screen list | 7.15 s |
 | `readme-tour-fighters.png` | `tut-menu-tour.mp4`, CPU Character selected | 5.20 s |
 | `readme-tour-games.png` | `rc15-practice-menu-start.gif`, opening entries of the Practice games list | frame 18 (zero-based) |
-| `readme-tour-recording.png` | `rc13-combo-library.png`, named combos | still |
+| `readme-tour-recording.png` | [Source still of the named combos](media/rc13-combo-library.png) | still |
 | `readme-tour-saves.png` | `tut-menu-tour.mp4`, damage and mirroring settings | 3.25 s |
 
 The README showcase also embeds the existing `tut-guard-edge-setup-and-score`, `tut-input-drill-record`, `tut-clip-snap`, `tut-fighter-cycle`, `tut-stage-change`, `tut-kirby-hat` and `tut-mii-pick` MP4s from the tutorial table. The three interim GIFs are `rc13-replay-capture`, `rc11-lobby-practice` and `rc11-give-item`.
 
 ## Tutorial clips (2026-11-25 through 2026-11-27)
+
+The [clip editor legend](diagrams/clip-editor-legend.svg) labels the strip at 4.5 s in `tut-clip-scrub-moves.mp4`, with In selected.
 
 The menu tour, menu option and button-chord films come from `tut-c51f4d81-yoga-1` on release build `c51f4d81`.
 They crop a 1842×1036 region at (39, 44) from the 1080p capture and scale it to 720p, removing the capture tool's
@@ -165,7 +167,7 @@ The rc.13 options and drawing changes, shot by gif-nav-author-2. rc.13 is Eden-t
   README, TECHNICAL, menu/cpu and guide/cpu-behaviour; `rc13-fast-fall-delay-quarter.gif` replaces
   `rc12-fast-fall-delay.gif` in menu/cpu (rc.12 counted the delay in 60 Hz reads, not game frames, so its 1/4 clip is
   out of date); `rc13-clatter-strength.gif` replaces `rc11-cpu-clatter-strength.gif` in menu/cpu (the rc.11 clip's menu
-  set Normal, not High, and never showed the break-out). The old files stay in `media/`.
+  set Normal, not High, and never showed the break-out). The rows below preserve those earlier takes' provenance.
 - **SDI Direction and Clatter Strength:** the last two clips were added later, on rc.13 `ed0d7a35` (diag `2a667381…`),
   on the XPS, one instance, Training only, muted, GDB stub on, with the gamepad overlay; Clatter Strength at Eden
   speed 50 %. `rc13-sdi-direction.gif` is Kirby's rapid jab, not a neutral air: six neutral airs probed (Samus, Kirby,
@@ -497,8 +499,7 @@ is clean outside the bar). The crops keep every frame and its time; the trims ke
   tree on 2026-11-27: the retakes above replace them. The files are in the history before `64496a81`.
 - Trimmed: `rc5-popup-trim.gif` (0.45–3.95 s, the pop-up only; the bar shows once it closes, so the close is not
   shown) and `rc5-recording-page-trim.gif` (from 0.5 s; the first 0.47 s in Training had the bar).
-- Removed: `rc5-record-start-save.gif` (guide/recording.md). `rc7-record-macro.gif`, embedded right after it, shows the
-  same record and start save without the bar.
+- The rc.7 recording guide replaced the marked `rc5-record-start-save` take with `rc7-record-macro`.
 
 With Online Deluxe 0.10.1 and the CPU pilot 0.2.1 (the card's own install, `switch-mtp-v0101-v021`) staged and the
 gamepad overlay left out: `docs-rd6-722525a5` (Surface, 2026-11-11 09:28–09:33Z) and `docs-rd6b-722525a5`
@@ -612,7 +613,7 @@ evidence clips stay outside git, in `artifacts/phase23/feature-gifs/evidence/`.
 
 ## rc.5 clips
 
-23 of the rows below are in [`media/`](media), and the player docs embed them. Three more were there until
+The rc.5 player docs embedded 23 takes from [`media/`](media). Three more were there until
 2026-11-10, when clips that show the result replaced them (rc.6 docs clips above); they remain in the history up to
 `da26d632`. They are Eden footage of
 `p23/rc5-wire-fix` diag builds, and for the last three of `p23/rc6-hot-slots` diag builds, which add log lines only (the
@@ -657,9 +658,8 @@ palette of 96 colours and no dither: `rc5-popup.gif` and `rc5-save-warp.gif` kee
 `rc5-loop-no-warp.gif` and `rc5-chain-play.gif` keep every second
 frame with the time of both, so they still play at game speed.
 
-The other rows are not captured yet, and their doc sections have no picture. Capture each one in the Eden session that
-boots the build named on the row. Do not keep a take where the "Must be visible" line is missing. Full screen,
-1280×720, one behaviour, game speed, under 10 s. Trim only the ends.
+The remaining rows record the rc.5 capture plan, not missing visuals in today's guides. Each take called for one
+visible behaviour at game speed: full screen, 1280×720, under 10 s, trimmed only at the ends.
 
 Shared start, unless a row says otherwise:
 

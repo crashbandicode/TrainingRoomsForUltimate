@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="530" viewBox="0 0 1280 530" font-family="DejaVu Sans, Verdana, sans-serif">
   <title>The clip editor's strip, labelled</title>
-  <desc>One frame of docs/media/tut-clip-scrub-moves.mp4 at 4.5 s (Eden, the diagnostic file of preview build cc71537c, 2026-11-27), cropped to the editor's strip, with twelve numbered labels. In is selected.</desc>
+  <desc>The clip editor's strip with In selected. Twelve labels identify the fighters, playback target, timeline, handles and controls.</desc>
   <rect width="1280" height="530" fill="#15151a"/>
   <text x="28" y="30" font-size="20" font-weight="bold" fill="#ffffff">The clip editor's strip</text>
   <text x="28" y="52" font-size="13" fill="#cfd3da">A frame of the scrub clip with In selected. The strip sits over the bottom of the screen; the game runs above it.</text>
@@ -74,6 +74,6 @@
   <text x="690" y="430.5" font-size="13" fill="#ffffff">What the selected handle does, and how to move it faster.</text>
   <circle cx="671" cy="456" r="11" fill="#ffd166"/>
   <text x="671" y="460.5" font-size="12.5" font-weight="bold" text-anchor="middle" fill="#15151a">12</text>
-  <text x="690" y="460.5" font-size="13" fill="#ffffff">Key hints. The fighter switch is a known issue in this preview.</text>
+  <text x="690" y="460.5" font-size="13" fill="#ffffff">Key hints for the current selection.</text>
   <text x="28" y="514" font-size="12" fill="#cfd3da">Selecting In shows the first kept frame; selecting Out shows the last kept frame (Out minus one).</text>
 </svg>
