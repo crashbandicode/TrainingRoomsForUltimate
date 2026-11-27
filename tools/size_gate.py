@@ -115,7 +115,7 @@ def run(repo, budget_path, rev=None, depth=3, out=sys.stdout):
         return 2
     if over:
         print('size_gate: over budget in ' + ', '.join(over) + '. Cut code, or record a raise with the lead\'s '
-              'approval as a new [[budget]] entry (docs/SIZE-PLAN.md).', file=out)
+              'approval as a new [[budget]] entry (docs/BUDGETS.md#size-plan).', file=out)
         return 1
     return 0
 

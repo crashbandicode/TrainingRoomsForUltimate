@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rc.10 S1 (docs/CODE-REDUCTION-rc10.md): guard-table rows as data.
+"""rc.10 S1 (docs/BUDGETS.md#code-reduction-rc10): guard-table rows as data.
 
 A guard table is an array of struct literals (`Seam { .. }`, `Site { .. }`, `CommonSite { .. }`). Its rows live in
 `data/tables/<file stem>.<TABLE>.tsv`; `build.rs` turns each file back into the array (`$OUT_DIR/tables/<name>.rs`), and the
