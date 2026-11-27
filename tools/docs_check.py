@@ -41,6 +41,11 @@ Rules (a problem's rule name is the first word of its line):
                    as "save again" and "load again". Comments and char literals of the Rust source do not count. This
                    proves the wording exists in shipped code, not that the notice shows in the situation the page describes.
                    Texts built from pieces at run time go in `NOTICE_OK` with the reason.
+  wall             a wall of text on a menu or guide page (`WALL_PAGES`): a caption (a block that starts with one `*`)
+                   of more than 120 visible characters, its "Open the clip" link not counted; a paragraph or list item
+                   of more than two sentences, or of more than 300 visible characters; a list item that starts with
+                   **Values:**, **Default:** or **How:**. Table rows, headings, code blocks, HTML and an image's alt
+                   text are not read. A page still to be rewritten is in `WALL_PENDING` with its count, which only falls.
   allowlist-stale  an entry of the lists below that matches no file, or whose sentence or text is gone.
 
 Anchors follow the slug rules of the forge's Markdown renderer (Forgejo). They are NOT GitHub's: GitHub drops punctuation
@@ -153,6 +158,20 @@ CLAIM_WORDS = re.compile(
 RELEASE_TOKEN = re.compile(r"(?<![A-Za-z0-9])rc\.?(\d+)(?:\.\d+)*(?![A-Za-z0-9])", re.I)
 
 
+# Walls of text (`wall`): the player pages the rule reads, its limits, and the pages not yet rewritten.
+# Ordered 2026-11-27 (operator, through tr-primary-2 02:33:44Z): a caption is one short line, a paragraph is at most
+# two short sentences, a setting's Values / Default / How bullets are a table.
+WALL_PAGES = ["docs/menu/*.md", "docs/guide/*.md"]
+WALL_CAPTION = 120
+WALL_SENTENCES = 2
+WALL_CHARS = 300
+WALL_BULLETS = re.compile(r"^\*\*(?:Values|Default|How):\*\*")
+# page -> the number of `wall` problems it may still have while the pages are rewritten one by one. A page with more
+# fails with every one of them listed; a page with fewer fails as `allowlist-stale`, so a number only falls and a
+# finished page leaves the list. An empty list means every page is held to the rule.
+WALL_PENDING = {}
+
+
 class Problem(NamedTuple):
     rule: str
     path: str
@@ -171,6 +190,8 @@ class Config(NamedTuple):
     notice_ok: list = NOTICE_OK
     notice_pages: list = NOTICE_PAGES
     notice_columns: dict = NOTICE_COLUMNS
+    wall_pages: list = WALL_PAGES
+    wall_pending: dict = WALL_PENDING
 
 
 class Link(NamedTuple):
@@ -907,6 +928,47 @@ def check_notices(tree, config, problems, used):
             problems.append(Problem("notice-text", rel, line, f'"{quote}" is not a text in src/ (a reworded notice, or one built from pieces: NOTICE_OK)'))
 
 
+def walls(text):
+    """(line, what is wrong) of each wall of text on a page: a long caption, a long paragraph, a settings bullet."""
+    for line, block in blocks(text):
+        body = re.sub(r"!\[.*?\]\([^)]*\)(?:<br>)?", "", block).strip()
+        body = re.sub(r"^(?:[-*+]|\d+[.)])\s+", "", body)
+        if not body or body.startswith(("|", "#", "<")):
+            continue
+        if body.startswith("*") and not body.startswith("**"):
+            shown = claim_text(re.sub(r"\[Open [^\]]*\]\([^)]*\)", "", body)).replace("*", "").strip()
+            if len(shown) > WALL_CAPTION:
+                yield line, f"a caption of {len(shown)} characters (at most {WALL_CAPTION}: one short line; the clip shows the rest)"
+            continue
+        if WALL_BULLETS.match(body):
+            yield line, "a Values / Default / How bullet (make it a table: Value | What it does)"
+            continue
+        shown = claim_text(body).replace("*", "").strip()
+        count = len(list(sentences(shown)))
+        if count > WALL_SENTENCES:
+            yield line, f"a paragraph of {count} sentences (at most {WALL_SENTENCES}: put options, keys and results in a table)"
+        elif len(shown) > WALL_CHARS:
+            yield line, f"a paragraph of {len(shown)} characters (at most {WALL_CHARS})"
+
+
+def check_walls(tree, config, problems):
+    for rel in tree.files:
+        if not any(fnmatch.fnmatchcase(rel, pattern) for pattern in config.wall_pages):
+            continue
+        found = list(walls(tree.text(rel)))
+        allowed = config.wall_pending.get(rel)
+        if allowed is None or len(found) > allowed:
+            problems.extend(Problem("wall", rel, line, text) for line, text in found)
+            if allowed is not None:
+                problems.append(Problem("wall", rel, 1, f"{len(found)} walls of text; the page was pending at {allowed}, and that number only falls"))
+        elif len(found) < allowed:
+            fix = f"lower it to {len(found)}" if found else "remove the entry"
+            problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"wall_pending entry for {rel} is {allowed} but the page has {len(found)}: {fix}"))
+    for rel in config.wall_pending:
+        if rel not in tree.files:
+            problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"wall_pending entry `{rel}` matches no page"))
+
+
 def check_allowlists(tree, config, used, problems):
     for name, entries in (("historical", config.historical), ("orphan_ok", config.orphan_ok)):
         for pattern, _ in entries:
@@ -931,6 +993,7 @@ def check(root, config=None, used=None):
     check_orphans(tree, config, problems, graph, used)
     check_versions(tree, config, problems, used)
     check_notices(tree, config, problems, used)
+    check_walls(tree, config, problems)
     check_allowlists(tree, config, used, problems)
     return sorted(set(problems), key=lambda p: (p.path, p.line, p.rule, p.text))
 

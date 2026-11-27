@@ -66,7 +66,7 @@ CLEAN = {
 def cfg(**changes):
     """A config with no allowance and no notice pages: the real lists name pages the small fixtures do not have."""
     base = dict(historical=[("docs/RELEASE-NOTES-rc*.md", "a past release")], orphan_ok=[], claim_ok=[], must_name=d.MUST_NAME,
-                notice_ok=[], notice_pages=[], notice_columns={})
+                notice_ok=[], notice_pages=[], notice_columns={}, wall_pending={})
     return d.Config(**dict(base, **changes))
 
 
@@ -383,6 +383,73 @@ def notice_problems(page, text, sources=None, **config):
     """notice-text and allowlist problems of `page` with `text`; `sources` ({path: text}) replaces src/lib.rs's SRC."""
     files = dict(CLEAN, **(sources or {"src/lib.rs": SRC}), **{"docs/README.md": CLEAN["docs/README.md"] + f"- [p]({page[len('docs/'):]})\n", page: text})
     return [(r, p, t) for r, p, t in problems(files, config=config.pop("config", STRICT)) if r in ("notice-text", "allowlist-stale")]
+
+
+WALL_PAGE = "docs/menu/page.md"
+LONG = "word " * 30
+
+
+def wall_problems(text, page=WALL_PAGE, **config):
+    """wall and allowlist problems of `page` with `text` (linked from docs/README.md, so it is no orphan)."""
+    files = dict(CLEAN, **{"docs/README.md": CLEAN["docs/README.md"] + f"- [p]({page[len('docs/'):]})\n", page: text})
+    return [(r, p, t) for r, p, t in problems(files, config=cfg(**config)) if r in ("wall", "allowlist-stale")]
+
+
+class Walls(unittest.TestCase):
+    def test_a_long_caption_fails_and_a_short_one_passes(self):
+        got = wall_problems(f"# T\n\n*{LONG}Eden, 2026-11-27.* [Open the clip](../media/pic.gif)\n")
+        self.assertEqual([r for r, _, _ in got], ["wall"])
+        self.assertIn("a caption of", got[0][2])
+        self.assertEqual(wall_problems("# T\n\n*Mario jabs twice. Eden, 2026-11-27.* [Open the clip](../media/pic.gif)\n"), [])
+
+    def test_the_link_to_the_clip_and_the_alt_text_of_the_image_are_not_counted(self):
+        caption = "x" * 118
+        self.assertEqual(wall_problems(f"# T\n\n![{LONG}](../media/pic.gif)<br>\n*{caption}.* [Open the clip](../media/pic.gif)\n"), [])
+
+    def test_a_paragraph_of_three_sentences_fails_and_two_pass(self):
+        got = wall_problems("# T\n\nOne thing. Another thing. A third thing.\n")
+        self.assertEqual([r for r, _, _ in got], ["wall"])
+        self.assertIn("3 sentences", got[0][2])
+        self.assertEqual(wall_problems("# T\n\nOne thing. Another thing.\n"), [])
+
+    def test_a_list_item_is_read_alone_and_a_long_one_fails(self):
+        self.assertEqual(wall_problems("# T\n\n- One. Two.\n- Three. Four.\n"), [])
+        self.assertEqual([r for r, _, _ in wall_problems("# T\n\n- One. Two.\n- Three. Four. Five.\n")], ["wall"])
+
+    def test_one_very_long_sentence_fails(self):
+        got = wall_problems(f"# T\n\n{'word ' * 70}end.\n")
+        self.assertEqual([r for r, _, _ in got], ["wall"])
+        self.assertIn("characters", got[0][2])
+
+    def test_a_settings_bullet_fails(self):
+        for word in ("Values", "Default", "How"):
+            got = wall_problems(f"# T\n\n- **{word}:** On, Off\n")
+            self.assertEqual([r for r, _, _ in got], ["wall"], word)
+        self.assertEqual(wall_problems("# T\n\n- **Where:** the Saves page\n"), [])
+
+    def test_tables_headings_code_and_html_are_not_read(self):
+        text = f"# {LONG}\n\n| A | B |\n| --- | --- |\n| One. Two. Three. Four. | {LONG} |\n\n```\nOne. Two. Three. Four.\n```\n\n<video src=\"x\"></video>\n"
+        self.assertEqual([r for r, _, _ in wall_problems(text) if r == "wall"], [])
+
+    def test_only_menu_and_guide_pages_are_read(self):
+        self.assertEqual(wall_problems("# T\n\nOne. Two. Three. Four.\n", page="docs/other.md"), [])
+        self.assertEqual([r for r, _, _ in wall_problems("# T\n\nOne. Two. Three. Four.\n", page="docs/guide/other.md")], ["wall"])
+
+    def test_a_pending_page_may_keep_its_count_but_not_grow(self):
+        two = "# T\n\nOne. Two. Three.\n\nFour. Five. Six.\n"
+        self.assertEqual(wall_problems(two, wall_pending={WALL_PAGE: 2}), [])
+        got = wall_problems(two, wall_pending={WALL_PAGE: 1})
+        self.assertEqual(sorted({r for r, _, _ in got}), ["wall"])
+        self.assertEqual(len(got), 3)
+        self.assertTrue(any("pending at 1" in t for _, _, t in got))
+
+    def test_a_pending_count_that_is_too_high_or_names_no_page_is_stale(self):
+        got = wall_problems("# T\n\nOne. Two. Three.\n", wall_pending={WALL_PAGE: 2})
+        self.assertEqual([(r, "lower it to 1" in t) for r, _, t in got], [("allowlist-stale", True)])
+        got = wall_problems("# T\n\nOne.\n", wall_pending={WALL_PAGE: 1})
+        self.assertEqual([(r, "remove the entry" in t) for r, _, t in got], [("allowlist-stale", True)])
+        got = wall_problems("# T\n\nOne.\n", wall_pending={"docs/menu/gone.md": 1})
+        self.assertEqual([(r, "matches no page" in t) for r, _, t in got], [("allowlist-stale", True)])
 
 
 class NoticeTexts(unittest.TestCase):
