@@ -837,6 +837,15 @@ impl HandleSet {
         self.held[..self.len].iter().map(|h| h.handle)
     }
 
+    #[cfg(test)]
+    pub fn active_snapshot(&self) -> Self {
+        let mut copy = *self;
+        let empty = Self::new();
+        copy.held[copy.len..].fill(empty.held[0]);
+        copy.pending[copy.pending_len..].fill(empty.pending[0]);
+        copy
+    }
+
     /// The spheres held now (the own orbs are placed from them).
     pub fn spheres(&self) -> impl Iterator<Item = &Sphere> + '_ {
         self.held[..self.len].iter().map(|h| &h.sphere)

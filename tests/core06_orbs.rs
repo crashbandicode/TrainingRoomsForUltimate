@@ -708,7 +708,7 @@ fn parity(table_a: &mut hitbox::SetTable, articles_a: &mut orbs::Articles, table
         let (a, b) = (table_a.find_life(key, life), table_b.find_life(key, life));
         assert_eq!(a.is_some(), b.is_some(), "fighter {key:#x}");
         if let (Some(i), Some(j)) = (a, b) {
-            assert_eq!(format!("{:?}", table_a.sets[i]), format!("{:?}", table_b.sets[j]));
+            assert_eq!(format!("{:?}", table_a.sets[i].active_snapshot()), format!("{:?}", table_b.sets[j].active_snapshot()));
             table_a.sets[i].reconcile(&[], true, &mut OrbSink { status });
             table_b.sets[j].reconcile(&[], true, &mut OrbSink { status });
             assert_eq!(table_a.sets[i].handles().collect::<Vec<_>>(), table_b.sets[j].handles().collect::<Vec<_>>());
@@ -725,7 +725,7 @@ fn parity(table_a: &mut hitbox::SetTable, articles_a: &mut orbs::Articles, table
         let (a, flag_a) = articles_a.track(id, key, None, false).unwrap();
         let (b, flag_b) = articles_b.track(id, key, None, false).unwrap();
         assert_eq!(*flag_a, *flag_b);
-        assert_eq!(format!("{a:?}"), format!("{b:?}"));
+        assert_eq!(format!("{:?}", a.active_snapshot()), format!("{:?}", b.active_snapshot()));
         orbs::article_pass(&mut board_a, a, (id, key), status, &mut Shot(false), |s| Some(s.pos), orbs::Extras::NONE);
         orbs::article_pass(&mut board_b, b, (id, key), status, &mut Shot(false), |s| Some(s.pos), orbs::Extras::NONE);
         assert_eq!(a.handles().collect::<Vec<_>>(), b.handles().collect::<Vec<_>>());
@@ -797,7 +797,6 @@ fn handed_off_commands_leave_what_immediate_commands_left() {
         if n % 3 == 0 { turns.push(Command::Rebound { key, life: fighter }); }
     }
     sequences.push(turns);
-    let keys: Vec<_> = (1..=5).map(|id| (id, id as usize * 16)).collect();
     for (case, commands) in sequences.iter().enumerate() {
         let mut a = Box::new(hitbox::SetTable::new());
         let mut aa = orbs::Articles::new();
@@ -816,7 +815,8 @@ fn handed_off_commands_leave_what_immediate_commands_left() {
         if case == 9 { assert!(aa.tracked().contains(&(1, 16)) && !aa.tracked().contains(&(2, 32))); }
         let mut checked = fighters.clone();
         checked.push((0xb000, retired));
-        parity(&mut a, &mut aa, &mut b, &mut ab, &checked, &keys, 11);
+        let published: &[(u32, usize)] = if case == 2 { &[(4, 64)] } else { &[] };
+        parity(&mut a, &mut aa, &mut b, &mut ab, &checked, published, 11);
         if case == 4 {
             let i = b.find_life(0x1000, life).unwrap();
             assert_eq!(b.sets[i].handles().collect::<Vec<_>>(), [orbs::orb_handle(10); 2]);
@@ -865,7 +865,8 @@ fn a_full_lane_refuses_only_what_the_sets_queue_refuses() {
                 assert_eq!(post(link, &generations, &command), if n < 24 { Put::Stored } else { Put::Full });
             }
             drain(&mut b, &mut ab, &generations);
-            parity(&mut a, &mut aa, &mut b, &mut ab, &[(0x1000, life)], &[(1, 16)], 10);
+            let published: &[(u32, usize)] = if article { &[(1, 16)] } else { &[] };
+            parity(&mut a, &mut aa, &mut b, &mut ab, &[(0x1000, life)], published, 10);
             if article {
                 assert_eq!(aa.track(1, 16, None, false).unwrap().0.len(), 24);
                 assert_eq!(ab.track(1, 16, None, false).unwrap().0.len(), 24);
@@ -948,7 +949,8 @@ fn a_command_before_the_pass_holds_its_locks_is_applied_before_the_pass() {
                 immediate(&mut a, &mut aa, &generations, &last);
             }
             drain(&mut b, &mut ab, &generations);
-            parity(&mut a, &mut aa, &mut b, &mut ab, &[(0x1000, life)], &[(1, 16)], 10);
+            let published: &[(u32, usize)] = if article { &[(1, 16)] } else { &[] };
+            parity(&mut a, &mut aa, &mut b, &mut ab, &[(0x1000, life)], published, 10);
             let count = if article {
                 ab.track(id, key, None, false).unwrap().0.len()
             } else {
