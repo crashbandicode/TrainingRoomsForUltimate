@@ -240,10 +240,10 @@ Operator decisions of 2026-11-05 (`origin/review/menu-proposal` `deccd62`); the 
 
 **Draw fighter spheres with plugin discs**
 
-- Hitbox Visualization draws every fighter sphere (hitboxes, hurtboxes, grab boxes) as the plugin's own discs instead of the game's shared effect pool, which refused part of a large fighter's spheres (two Ridleys: 22 of 55 on every frame).
-- The layout has 512 disc panes: up to 128 spheres for each of Training's four possible fighter objects (two fighters, each possibly Ice Climbers with Nana). Only while a gone fighter's last spheres linger (a few frames) can there be more;
-- then hurtboxes are cut before hitboxes and grab boxes, and the log says so once.
-- The discs sit under the HUD and the menus like the old spheres, are flat (no depth), stop at each sphere's radius (the old glow went past it) and trail the camera by one to two frames while it pans. Projectiles keep the game's effect spheres.
+- In rc.3, TrainingRooms drew fighter hitboxes, hurtboxes and grab boxes with its own discs. With two Ridleys, the game's effect pool had refused 22 of 55 spheres each frame.
+- The layout had 512 disc panes, enough for 128 spheres per fighter object in a four-object Ice Climbers match. When a departing fighter's spheres lingered, the plugin dropped hurtboxes first and logged the overflow once.
+- The flat discs stopped at the sphere radius and sat beneath the HUD. They trailed a panning camera by one to two frames. Projectiles still used the game's effect spheres in rc.3.
+- See [Hitboxes and grab boxes](TECHNICAL.md#hitboxes-and-grab-boxes) for the current fighter and projectile display.
 
 
 
