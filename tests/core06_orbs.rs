@@ -995,6 +995,34 @@ fn a_command_for_another_article_does_not_protect_a_passive_slot_from_eviction()
             assert!(set.spheres().any(|s| s.key == hitbox::sphere_key(hitbox::KIND_GRAB, 77, 0)));
         }
     }
+
+    let mut reference = orbs::Articles::new();
+    let mut fighters = Box::new(hitbox::SetTable::new());
+    let (link, mut table, mut articles) = linked();
+    let (mut reference_board, mut board) = (Board::new(), Board::new());
+    let issue = |id| Command::Wind { id, key: id as usize * 16 };
+    for command in [single_shape(16, 1, None, 77), issue(2), issue(3), issue(4)] {
+        immediate(&mut fighters, &mut reference, &generations, &command);
+        assert_eq!(post(link, &generations, &command), model::handoff::Put::Stored);
+    }
+    drain(&mut table, &mut articles, &generations);
+    let racing = issue(2);
+    assert_eq!(post(link, &generations, &racing), model::handoff::Put::Stored);
+    *articles.track(2, 32, Some(&mut board), false).unwrap().1 = false;
+    *reference.track(2, 32, Some(&mut reference_board), false).unwrap().1 = false;
+    articles.settle();
+    immediate(&mut fighters, &mut reference, &generations, &racing);
+    immediate(&mut fighters, &mut reference, &generations, &issue(5));
+    assert_eq!(post(link, &generations, &issue(5)), model::handoff::Put::Stored);
+    drain(&mut table, &mut articles, &generations);
+
+    assert!(!reference.tracked().contains(&(1, 16)));
+    assert_eq!(articles.tracked(), reference.tracked());
+    for (id, key) in reference.tracked().into_iter().filter(|(id, _)| *id != 0) {
+        assert_eq!(*articles.track(id, key, Some(&mut board), false).unwrap().1,
+            *reference.track(id, key, Some(&mut reference_board), false).unwrap().1, "article {id}");
+    }
+    assert!(*articles.track(2, 32, Some(&mut board), false).unwrap().1);
 }
 
 fn a_catch_during_the_pass_survives_the_passes_forget() {
