@@ -560,9 +560,10 @@ others keep fighting, as extra CPUs do in Training.
 
 ### Eggs-ercise
 
-A practice game for your attacks. A target pops up from the ground. Hit it and it breaks, and the next one pops up
+A practice game for your attacks. A target pops up on one of the stage's floors or platforms, or, about half the time,
+in the air above one, within about a jump's height. Hit it and it breaks, and the next one pops up
 somewhere else on screen, at least a few character widths away. Each target flies straight up for about half a second,
-falls back, bounces once and then rests on the ground until you hit it; it may drift a little sideways. It passes
+falls back, bounces once and then rests where it appeared until you hit it; it may drift a little sideways. It passes
 through platforms. Break as many as you can in one minute, break 10 or 20 as fast as you can, or practise without a
 timer.
 
