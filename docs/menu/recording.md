@@ -62,7 +62,7 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/23b4e00d007427260ccff3ee35d14c0f976f2e50" autoplay muted loop playsinline controls></video>
 
-*Scrubbing shows each fighter's move. Eden, preview `cc71537c`.* [Open the clip](../media/tut-clip-scrub-moves.mp4)
+*Scrubbing shows each fighter's move.* [Open the clip](../media/tut-clip-scrub-moves.mp4)
 
 [Edit a match capture](../guide/recording.md#crop) or [move a start save's fighters](../guide/recording.md#change-placement-and-the-replay-window).
 
@@ -73,7 +73,8 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 | <a id="replay-window"></a>Replay window | Opens the clip editor | Pick a saved capture, a fighter and an input window. [Clip](../media/tut-clip-snap.mp4) |
 | <a id="replay-capture"></a>Replay capture | On, Off | On: saving a replay also captures its inputs. The choice is saved automatically. |
 | <a id="fighter-toggle"></a>ZL+L, ZL+R in the clip editor | Player 1, the CPU | Switches between the recorded and original fighters for that side. B cancels early. |
-| <a id="moves-while-you-scrub-preview-build"></a>Scrubbing in the clip editor | Install 6, preview build | Install 6 shows positions; the preview also shows stored poses on matching fighters. |
+| <a id="moves-while-you-scrub-preview-build"></a>Scrubbing in the clip editor | The recorded fighter | Stands at its recorded spot and shows its recorded pose. |
+| Scrubbing, spot only | A different fighter, or a frame with no stored pose | Stands at the recorded spot only. ZL+L or ZL+R switches to the recorded fighter. |
 
 ![The clip editor's strip with twelve numbered labels](../diagrams/clip-editor-legend.svg)<br>
 *The clip editor's strip, labelled.* [Open the full-size legend](../diagrams/clip-editor-legend.svg)
