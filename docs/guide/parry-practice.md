@@ -10,6 +10,6 @@
 |---|---|
 | 1. Prepare | [Record an attack](recording.md), then set that macro active for the CPU. |
 | 2. Start | Open Parry practice in [Practice games](../menu/practice-games.md); choose Start. |
-| 3. Attempt | Play the CPU recording; release shield just before the attack connects. |
+| 3. Attempt | Press **Play on CPU** (default ZR + D-pad Up). Release shield just before impact. |
 | 4. Compare | Read your grade and streak; ten-attempt sets also give a summary. |
 | Return later | Choose **Save this parry practice**; keep the linked recording and its starting save. |

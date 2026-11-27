@@ -8,7 +8,7 @@
 
 | Step | What to do |
 |---|---|
-| 1. Open placement | Choose **Place targets** in [Practice games](../menu/practice-games.md), or Start with no layout. |
+| 1. Open placement | Open [Practice games](../menu/practice-games.md) → **Break the Targets** → **Place targets**. Start opens placement without targets. |
 | 2. Lay out the course | Move the crosshair with the stick or D-pad; A places a target, up to ten. |
 | 3. Undo | B removes the last target; press Y twice to clear all. |
 | 4. Race | Press X; your first gameplay input starts the clock, the last break stops it. |
