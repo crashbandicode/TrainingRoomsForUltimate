@@ -2,7 +2,7 @@
 
 ## Change a chord
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3a68fe9e37b78333c5a0ca217f7349b12124fe89" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/73d6022ec181abd0660b1d5a28ea5cf67b28b937" autoplay muted loop playsinline controls></video>
 
 *Change the save chord, then save with it.* [Open the clip](../media/tut-controls-change-chord.mp4)
 

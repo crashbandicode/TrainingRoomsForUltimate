@@ -47,7 +47,7 @@ Learn to read the lanes, link timing and advantage in the [frame strip guide](..
 
 ## Input timing
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/1275892b7d895b7e839248090d7861d88f01c3b2" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0ca11e31bdc0e881b596322c54f86afb84ee9a31" autoplay muted loop playsinline controls></video>
 
 *Input Delay changes from zero to ten frames.* [Open the clip](../media/tut-input-delay.mp4)
 
@@ -57,7 +57,7 @@ Learn to read the lanes, link timing and advantage in the [frame strip guide](..
 
 ## Controls
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3a68fe9e37b78333c5a0ca217f7349b12124fe89" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/73d6022ec181abd0660b1d5a28ea5cf67b28b937" autoplay muted loop playsinline controls></video>
 
 *A different Save chord works after rebinding.* [Open the clip](../media/tut-controls-change-chord.mp4)
 
@@ -84,7 +84,7 @@ Use the [chord editor](../guide/controls.md#changing-a-chord) to replace or disa
 
 ## Menu shortcuts
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/29fadaf711f22a5ea361c3aaebe670a04c07bdc1" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5ecdd4bac2b07e7a8dc8f5be43cf40e122bb29ef" autoplay muted loop playsinline controls></video>
 
 *A new shortcut opens the menu.* [Open the clip](../media/rc11-menu-shortcut.mp4)
 

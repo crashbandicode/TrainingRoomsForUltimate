@@ -18,7 +18,7 @@ Open the library during practice with your [Recording pop-up chord](display-and-
 
 ## Save states & Macros
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35e8edb3e156f65dc2b9cc87b450a10d83e2f8d9" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/98458f1bb06f9d595e377ae7baf99022af5f3130" autoplay muted loop playsinline controls></video>
 
 *Record tints Player 1 red.* [Open the clip](../media/tut-record-macro.mp4)
 
@@ -116,7 +116,7 @@ Playback and grading settings.
 
 ## Good to know
 
-![The Recording page, Player view: the hot five outlined, the bound save and the active macro green, orange floppies, CONNECTIONS filled](../media/rc13-recording-page.png)<br>
+![The Recording page, Player view: RECORDINGS, the role tabs, the bound save and the active macro green, orange floppies](../media/rc13-recording-page.png)<br>
 *Green marks the bound save and the active macro.*
 
 | If | Then |

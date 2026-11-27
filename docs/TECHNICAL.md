@@ -768,7 +768,7 @@ For section jumps, reopening and page resets, see [Using the menu](guide/using-t
 
 ### Menu shortcuts and replay capture
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/29fadaf711f22a5ea361c3aaebe670a04c07bdc1" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5ecdd4bac2b07e7a8dc8f5be43cf40e122bb29ef" autoplay muted loop playsinline controls></video>
 
 *Rebind and use a menu shortcut* [Open the clip](media/rc11-menu-shortcut.mp4)
 
