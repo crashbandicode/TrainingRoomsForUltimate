@@ -20,8 +20,9 @@ either way.
 
 ### Hitbox Visualization
 
-<!-- CLIP: tut-hitbox-visualization.mp4 | Tick Hitboxes, Grab boxes and Hurtboxes → hurtbox pills → a neutral air's red hitbox -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b5760c58e2de36d18ee1fc677043ffb7c7376dce" autoplay muted loop playsinline controls></video>
+
+*With Hitboxes, Grab boxes and Hurtboxes ticked, both fighters show their hurtboxes as see-through pills. Look for the pink hitbox on Mario's jab and the purple box when he grabs. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-hitbox-visualization.mp4)
 
 Draws the fighters' boxes and, optionally, hittable objects' hurtboxes in colour. It is a checklist: tick what you want to see, and each item draws on its own, so
 any mix works, such as hurtboxes alone, or hitboxes with their launch angles. It works in Training, and on the two
@@ -35,8 +36,9 @@ practice fighters in a waiting room.
 Press **A** on **Hitbox Visualization** to read the **Colour legend** beside the checklist. Only ticked drawing
 families appear; fighter and article hurtboxes share the same key.
 
-<!-- CLIP: tut-hitbox-colour-legend.mp4 | A on Hitbox Visualization → the Colour legend beside the checklist -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/92d7297c170fb3d7be983666052e3c45c7df40c1" autoplay muted loop playsinline controls></video>
+
+*A on Hitbox Visualization opens its checklist, with the Colour legend beside it. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-hitbox-colour-legend.mp4)
 
 | Colour | What it shows |
 | --- | --- |

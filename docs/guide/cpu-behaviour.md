@@ -4,13 +4,15 @@ The [CPU page](../menu/cpu.md) controls the training CPU. Its settings also appl
 waiting room with [Lobby Practice](../menu/fighters-and-stages.md#lobby-practice) On. Ice Climbers' Popo and Nana
 follow them separately; they do not control Player 1, even with [Player 1 control](../menu/cpu.md#player-1-control) On.
 
-<!-- CLIP: tut-cpu-shield.mp4 | CPU › Shield set to Hold → Mario jabs the CPU → it keeps its shield up -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b2ca0b09d2664446c350ff95d74972d18d8fd626" autoplay muted loop playsinline controls></video>
+
+*CPU › Shield is set to hold. Link keeps his shield up while Mario jabs it three times, and the bubble shrinks. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-cpu-shield.mp4)
 
 ## Mash and Followup
 
-<!-- CLIP: tut-cpu-mash.mp4 | CPU › Mash set to Jab → Mario jabs the CPU → the CPU answers out of hitstun -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/67d92f30104dd21a740499e4b780336754029284" autoplay muted loop playsinline controls></video>
+
+*With CPU › Mash set to an attack, Mario jabs Link and Link hits back. Link ends at 2.7%, Mario at 3.7%. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-cpu-mash.mp4)
 
 [Mash](../menu/cpu.md#mash) sets the CPU's first reaction; [Followup](../menu/cpu.md#followup) sets what comes next.
 When a situation starts, the CPU picks both actions at once, at random from their ticked choices. It performs each as
@@ -80,8 +82,9 @@ See [Recording](../menu/recording.md#a-file-s-own-screen) for the five playback-
 
 ## Direction chips
 
-<!-- CLIP: tut-cpu-di.mp4 | DI Direction Left, then Right → the same smash at the same damage sends the CPU to different places -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/33d1eaf8950f69680e4cf2116dd880001009bb4e" autoplay muted loop playsinline controls></video>
+
+*The same forward smash on Link at 80%, twice: first with DI Direction Left, then Right. He leaves on a different line each time. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-cpu-di.mp4)
 
 [DI Direction](../menu/cpu.md#di-direction), [SDI Direction](../menu/cpu.md#sdi-direction),
 [Airdodge Direction](../menu/cpu.md#airdodge-direction) and [Shield Tilt](../menu/cpu.md#shield-tilt) use a grid.

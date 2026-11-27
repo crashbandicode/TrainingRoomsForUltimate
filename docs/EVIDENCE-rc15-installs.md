@@ -1,4 +1,4 @@
-# rc.15 installs 1 to 6: what was installed and what was tested
+# rc.15 installs 1 to 6 and the preview build: what was installed and what was tested
 
 2026-11-25. The receipts behind [the rc.15 release notes](RELEASE-NOTES-rc15.md) and the status on
 [Current release](CURRENT-RELEASE.md). Three claims are kept apart:
@@ -144,8 +144,22 @@ These were two Guard the Edge runs in Eden on the XPS, not the release smoke tes
 | Setup | Releases | What the first frames showed |
 | --- | ---: | --- |
 | Idle; Player 1 jabs (`place-float-xps-03`) | 10 + 10 | No split like the one at the in-view start. |
-| Deep start (`place-float-xps-04`) | 9 | The first frames agreed in all eight rounds seen in full. |
+| Deep start (`place-float-xps-04`) | 9 | The first four frames agreed in all eight rounds seen in full. |
 | Start in view (`place-float-xps-04`) | 6 | Rounds 1, 3 and 5: the ordinary CPU pressed Guard and air-dodged up and toward the stage. Rounds 2 and 6: it fell, then used Up special. Round 4's first free frames were not captured. |
+
+**How long did the starts match?** The longer comparison used the same logs, starting at release and looking
+ahead up to 60 frames. Not every release had a continuous watch. These counts are the releases the comparison
+could identify, not the 35 release coordinates checked above.
+
+| Setup | Releases compared | Distinct sequences in the available frames | Earliest observed difference between rounds |
+| --- | ---: | ---: | --- |
+| Default, Player 1 idle | 9 | 7 | Frame +9: horizontal position |
+| Default, Player 1 jabs | 9 | 5 | Frame +9: horizontal position |
+| Deep | 7 | 4 | Frame +6: jump input |
+| In view | 5 | 5 | Release frame: air dodge or fall |
+
+Source: `artifacts/phase23/gte-same-start/design/rounds_all.py` over `out-03` and `out-04`
+(finding 2026-11-26 15:02:52Z, ruled 15:03:30Z). Frame +0 is the release frame.
 
 The camera also framed the stage differently at Ready. Screen height alone does not show that the release point
 changed. Receipts: `artifacts/phase23/place-float/eden/out-03/` and `out-04/`; report 13:36:05Z, accepted
@@ -382,3 +396,64 @@ files named below were read for this page.
   fighter walked off stage (SP-11). No match-capture preview fed inputs in `scrub-m17b-yoga-01`. In the separate
   filming boot, the deselected-In control **did** feed inputs; it is not a pass for X with In still selected.
   The playhead rows passed on Yoga; the filming boot also showed browsing, Y to a move and both cuts on one macro.
+
+## Preview build (`cc71537c`)
+
+Staged for the card on 2026-11-27 and **not installed**. Nothing here ran on a console.
+
+| Fact | Value | Where |
+| --- | --- | --- |
+| Commit | `cc71537c`, the head of the next build's branch with every part in | — |
+| Release file | sha256 `78db86f5378635a8ce6820b6cdace6feb3d9d1c73ef126aa4475da1e4f03e77a`, 5,419,008 bytes | `artifacts/phase23/card-install/20261127-0046Z-preview-cc71537c/` |
+| It would replace | install 6's file, `c1ced861…` | `operator-approval.json` in that folder |
+| Host gate | Six steps exited 0. The six top-level suites reported 3,182 passed, 0 failed, 4 ignored. The summary also counted 15 nested passes and missed a sixteenth whose output was interleaved. | `artifacts/phase23/next-build/gate-cc71537c/`, `logs/test.log:359` |
+
+### Smoke tests on the release file
+
+Two boots on one host (the XPS). Neither log has a panic, abort, crash or unmapped-access line. Source: dup-audit,
+inbox 2026-11-26 23:11:03Z and 2026-11-27 00:38:37Z. For this page the two posts were read, not the row files.
+
+| Check | First boot, `next-smoke-xps-01` | Second boot, `next-smoke-xps-02` |
+| --- | --- | --- |
+| A take past 1,200 frames | The take has 1,610 frames and its positions file 1,610. The last frame's held line was not read by the test | The filmed take kept 1,632 of 1,632. End was selected on the last frame with no "Positions end here." warning; the held line was again missing from the log |
+| Snapped X in the Replay window | Played | Played |
+| A point inside the stage, at frame 137 | Refused, with "Can't stand there on this stage." and both fighters at their homes | Not run |
+| Scrub poses | Shown for both fighters on a held frame | Shown for both |
+| The recorded-fighter choice | Not exercised | Failed for Player 1: loading, then "The fighter did not load; the editor keeps the current one"; the fighter changed three frames after the editor closed. The CPU side was not reached |
+| A save's Off stage fighter | Read in the air, on the ground, then in the air again | Not run |
+| Settings check | No option off its default, twice | Passed |
+| Waiting room, as host | The menu opened there; the footer read `rc15 cc71537c` | Not run |
+| A capture saved and read back | Not flown: the route stopped on the Main menu | Not flown: the route reached stage select while the test expected fighter select. No match or save |
+
+- Three rows of the first boot passed on a second try in the same boot, after faults in the test's own steps.
+- The editor's input gate holds the roster request while the editor is visible. Its timeout counts worker passes,
+  not game frames: once the count exceeds 600 it clears its own wait, not the accepted roster request. In the second
+  boot Player 1 timed out twice; the roster applied the switch three game frames after close.
+- Four clips were made in the second boot (`artifacts/phase23/final-smoke-media/`). They are not placed in the pages:
+  three are to be filmed again after the fixes.
+
+### Eden, on the diagnostic build of the same commit
+
+Source: place-t1a, inbox 2026-11-26 23:01:24Z and 23:19:06Z. Receipts:
+`artifacts/phase23/scrub-moves/proof/eden/evidence/`. The diagnostic file is sha256 `b156c5ff…`.
+
+| Run | What it showed |
+| --- | --- |
+| `moves-proof-yoga-01` | Frames 114, 130 and 144 of a take were shown exactly, with no hitbox, effect or sound from the held fighters. X and B from a posed frame let the fighters go. On two rows the closing check gave no verdict: both fighters stood up to 0.8 units off their places after B |
+| `moves-proof-yoga-02` | The slide. With 120 frames on the posed frame before B, both fighters stayed in place for all 474 and 475 frames watched. With B straight after the pose, both came to rest 0.5754 units from their places |
+
+### Slide traces on the release file
+
+Both Yoga traces used the staged release `78db86f5…`, not the diagnostic file. Receipts are in each run's
+`TRACE-REPORT.txt` under `artifacts/phase23/scrub-moves/proof/eden/evidence/`.
+
+| Run | What happened after B |
+| --- | --- |
+| `moves-trace-yoga-01` | Both fighters returned to their places. In four of six quick releases from a pose the game then pushed them apart on the release tick and the next; each slid 0.592 units. Neither fighter slid in the unposed control. |
+| `moves-trace-yoga-02` | The push boxes moved back to the fighters' restored centres but kept the posed width for a few ticks. The boxes still overlapped, so the game applied a fresh push. One of three posed releases slid (0.6355 units each); the unposed control stayed in place. |
+
+### Not covered
+
+- No console run: the build is not installed.
+- Captures keeping their animation has host tests only, including one where a second process reads the files back.
+- The CPU side of the fighter choice, the way back to the current fighter, and a second player in a waiting room.
