@@ -18,6 +18,16 @@ fn nro_load_module_name_reads_to_the_first_nul() {
     }
 }
 
+#[test]
+fn common_install_does_not_write_the_event_file_on_the_loader_thread() {
+    // Switch std's metadata/open construct an owned CString even on a successful append.
+    let mut graph = crate::callgraph::Graph::scan(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime"), &[]);
+    graph.precise_imports = true;
+    let [install] = graph.find("cpu_common::install")[..] else { panic!("missing common installer") };
+    let [writer] = graph.find("install::write_text")[..] else { panic!("missing event writer") };
+    assert!(!graph.callees(install).contains(&writer), "common install calls the allocating synchronous event writer");
+}
+
 fn u16_at(bytes: &[u8], at: usize) -> u16 {
     u16::from_le_bytes(bytes[at..at + 2].try_into().unwrap())
 }
