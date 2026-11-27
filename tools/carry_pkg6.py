@@ -289,10 +289,6 @@ def main():
 DELETED_SECTION = """
 ## Deleted fork functions (lead ruling 2026-11-02: single owner)
 
-The fork called these from its mixed upstream code (hooks whose sites are not ours-new files). The clean room's packages 2-4 own the behaviour, so
-the carried functions are deleted by recorded manifest edits of `training/practice.rs` and `training/lobby.rs`. "Proof" names the Eden row of the
-package-6 lobby-practice set that shows the parity (rows are in `eden/EDEN-PACKAGE-6.md`).
-
 | Fork function | Clean-room owner | Behaviour difference / status | Proof |
 | --- | --- | --- | --- |
 | `lobby::permits_entry(entry)` (waiting room serves only entries 0 and 4) | `model::cpu::role::is_cpu_role` / `Scene::Lobby` with `LOBBY_CPU_ENTRY = 4` (pkg2: "only entries 0 and 4 are serviced, entry 0 is never a CPU") | none known | CPU behaviours act on entry 4 and on no other waiting-room entry |
@@ -308,18 +304,22 @@ package-6 lobby-practice set that shows the parity (rows are in `eden/EDEN-PACKA
 | `heap_fields::HeapFields` (`heap_allocations=<calls>` of the fork's own install line) | package 1's install line owns `heap_allocations=` (hook allocations); the meter's call count is the `[HeapMeter]` diag line (`runtime::diag_log`, `compat::logging::heap_profile`) | the field name is package 1's; the meter reads `hook_stats::heap_bytes()` | diag row R5: `[HeapMeter]` lines with `plugin-heap-meter` |
 | `heap_metrics::Meter` / `practice_trace::TraceAllocator` as `#[global_allocator]` (`plugin-heap-meter`, `console-practice-trace`, `native-unlink-probe`) | one global allocator, `runtime::alloc` (package 1's `CountingAllocator`); its byte meter (`hook_stats::heap_bytes`) is what the meter and the recorder read; under `console-practice-trace` the global allocator is the recorder's `TraceAllocator`, which forwards to `CountingAllocator` and records events 100-104 as before | none in the shipped build (the byte counters compile away); the diag features build (`tools/feature_matrix.py`) | `tests/hook_alloc.rs` (byte meter), `tests/pkg6_features.rs` (one allocator), diag boot rows |
 
-## Clean-room natives deleted (lead ruling 2026-11-02)
+The fork called these functions from mixed upstream hooks, outside the ours-new files. Packages 2-4 took over the
+behaviours marked deleted; the manifest records the edits to `training/practice.rs` and `training/lobby.rs`.
+The Proof column names the corresponding lobby-practice row from `eden/EDEN-PACKAGE-6.md`; not every row was flown.
 
-Package 3's `runtime::state_natives` held seven natives for a save-state item restore of its own. The carried item engine (`roster::character_items`, reached through `features::item_bridge`) is the owner since the item engine took the save state's held item, and it calls the same game functions behind the rows `roster::CALLED_ROWS` lists, so the duplicates had no caller.
+## Clean-room natives deleted (lead ruling 2026-11-02)
 
 | Function | Owner now | Behaviour difference | Proof |
 | --- | --- | --- | --- |
 | `state_natives::{have_item, is_have_item, get_have_item_id, remove_item, set_have_item_action, object_category}` | `character_items` (`ItemModule::*` and `utility::get_category` through `smash::`, guarded by the `state_*` and `utility_get_category` rows) | none known | item save/restore with the owner not in the match (set D rows) |
 | `state_natives::turnip_power(peach, n)` (two raw offsets, no guarded row) | `character_items` builds the turnip power thunks itself (`paste!`) | none known | `[ItemTable]` diag dump (turnip variations 0, 5, 6, 7) |
 
-## Wired to the clean-room owner of the moment (lead ruling 2026-11-02)
+Package 3's `runtime::state_natives` held seven natives for restoring held items. The carried item engine
+(`roster::character_items`, reached through `features::item_bridge`) calls the same game functions listed in
+`roster::CALLED_ROWS`. Once it owned held-item restoration, the seven duplicates had no caller.
 
-The fork called these from mixed upstream code; the clean room's owner of each moment now calls them.
+## Wired to the clean-room owner of the moment (lead ruling 2026-11-02)
 
 | Carried function | Owner of the moment (caller) | Behaviour difference | Proof |
 | --- | --- | --- | --- |
@@ -329,20 +329,29 @@ The fork called these from mixed upstream code; the clean room's owner of each m
 | `presentation::{state_load_started, state_load_completed}` and `character_roster::main_base` (the Mii HUD portrait's state-load check) | `features::states`: started for both roles at the load request, completed per role in `finish` (SPEC-state-01 section 9, the per-role load notification) | none: a load must change no HUD card, the check logs `[Hud] state_load ... unchanged=` | save/load with a Mii or any swapped fighter: `[Hud] state_load owner=0 unchanged=true` |
 | `character_sources::legacy_training_owner_reserved` | retired with its sole source-owner experiment consumer (RC RESET option2, lead 2026-11-03 10:42:04); ordinary role-based ownership unchanged | no shipped-path change | final RC parity pending |
 | `cycle_preload_config::publish_applied(menu)` | `compat::menu::apply_snapshot` (every menu commit after the boot publish; decision D1 `preload::apply`) | none: the engine's INI boot cache and its cache and re-plan follow a menu change again | preload rows: change slots in the menu, `[CyclePreload] applied ...` and the new `cycle_preload.ini` |
-| `character_roster::{current_mii_configuration, waiting_drafts_ready, cpu_reload_ready, request_cpu_kind}` | package 4's named-macro layer (`macros::named_macros`, `macros::replay_capture`) through its retired port: stream/pkg4 `d124246` (not merged here yet) | none | pkg4 named-macro rows |
+| `character_roster::{current_mii_configuration, waiting_drafts_ready, cpu_reload_ready, request_cpu_kind}` | Package 4's named-macro and replay-capture layer used its since-retired port (`macros::named_macros`, `macros::replay_capture`). | none recorded | pkg4 named-macro rows |
 
-## Carried helpers waiting for a screen (consumer not built; not deleted)
+The fork called these helpers from mixed upstream code. The table records which clean-room owner took each call.
+The named-macro change was on `stream/pkg4` at `d124246`, not yet merged at the November 2 handoff.
 
-`character_items::request` (the Give item screen), the Mii editor bridge's `request`/`menu_ready`/`catalog_read` and the `ui::menu_app` Mii-catalog methods (the Mii list screen), `practice_stage_request::*` and `training_stage_rotation::*` (the Lobby Stages screen), `lobby::set_ui_ready` (the info_waiting tick). Their owners are the ui-screens stream and package 5; the lead's list names them.
+## Screen helpers retained at the package 6 handoff
 
-RC warning-root audit (lead 2026-11-03 12:57Z): removed the now-orphaned
-`character_roster::{original_player_kind, original_cpu_kind}`,
-`cycle_preload::fighter_ready`, `native_body_bank::cycle_ready` and
-`mii_ordinary_native::try_registry`. Across all Rust sources and tests there were
-only their five definitions and the orphan `fighter_ready -> cycle_ready` call;
-no screen or feature retained a caller. The live `original_kind`, progress,
-registry and native readiness/transaction paths remain unchanged. These are
-exact-text carry deletions, not lint suppression or feature-gated placeholders.
+| Consumer identified for ui-screens and package 5 | Helper retained for that consumer |
+| --- | --- |
+| Give item | `character_items::request` |
+| Mii list | Mii editor bridge methods `request`, `menu_ready`, `catalog_read` and `ui::menu_app` Mii-catalog methods |
+| Lobby Stages | `practice_stage_request::*` and `training_stage_rotation::*` |
+| info_waiting tick | `lobby::set_ui_ready` |
+
+## RC warning-root audit (2026-11-03 12:57Z)
+
+| Audit record | Finding |
+| --- | --- |
+| Exact-text carry deletions | `character_roster::{original_player_kind, original_cpu_kind}`, `cycle_preload::fighter_ready`, `native_body_bank::cycle_ready`, `mii_ordinary_native::try_registry` |
+| Rust sources and tests | Five definitions and one orphan call from `fighter_ready` to `cycle_ready`. |
+| Consumers | No screen or feature called the removed helpers. |
+| Paths preserved | Live `original_kind`, progress, registry and native readiness/transaction paths. |
+| Removal method | The carry removed the definitions without lint suppression or feature-gated placeholders. |
 """
 
 
@@ -351,10 +360,13 @@ def write_ledger(root, manifest):
     path = os.path.join(root, "docs/provenance/pkg6-carry-ledger.md")
     with open(path, "w") as f:
         f.write(f"# Package 6 carried files (stage {manifest['stage']})\n\n")
-        f.write("Generated by `python3 -I tools/carry_pkg6.py ledger` from `pkg6-carry-manifest.json`; do not edit. Every file is a copy of\n")
-        f.write("the stage file with the path rewrite of the tool (`crate::x` / `training_mod_*::x` to the clean-room module path, listed in the\n")
-        f.write("manifest's `modules`) and, where a row says so, the exact-text edits below it. `src sha256` is the stage file, `here sha256` the\n")
-        f.write("file in this repository.\n\n")
+        f.write("| Ledger key | Meaning |\n")
+        f.write("| --- | --- |\n")
+        f.write("| Regenerate | Edit `pkg6-carry-manifest.json`, not this ledger; run `python3 -I tools/carry_pkg6.py ledger`. |\n")
+        f.write("| Module paths | Manifest field `modules` maps `crate::x` and `training_mod_*::x` to clean-room paths. |\n")
+        f.write("| Edits | Each row records exact-text changes to the copy after path rewriting. |\n")
+        f.write("| `src sha256` | First 16 hex digits of the source SHA-256. |\n")
+        f.write("| `here sha256` | First 16 hex digits of the destination SHA-256, or `removed`. |\n\n")
         f.write("| Here | Fork path (stage) | src sha256 | here sha256 | edits (clean-room changes, each with its reason) |\n| --- | --- | --- | --- | --- |\n")
         for e in manifest["files"]:
             parts = list(dict.fromkeys(x["reason"] for x in e.get("edits", [])))
