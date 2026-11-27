@@ -221,6 +221,8 @@ pub fn random_spot<S: Source>(
             low + (high - low) * unit as f32 / 65535.0,
         ),
     );
+    // The one-snap attempt (expected-red): the drawn point as its line snaps it.
+    let point = line.snap(point)?;
     (finite(point) && dot(sub(point, line.ends[0]), sub(point, line.ends[0])).is_finite())
         .then_some(Spot { line, point })
 }
