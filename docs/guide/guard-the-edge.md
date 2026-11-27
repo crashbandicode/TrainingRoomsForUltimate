@@ -2,7 +2,7 @@
 
 ## Stop the recovery and get back
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3609165db1d1675f019de9a7f3b7d1b6f7b8ebf0" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/fdc7a4382ed255e1ebda8d4dc1dd87f43ca16e9c" autoplay muted loop playsinline controls></video>
 
 *Place the CPU offstage, then secure a stock.* [Open the clip](../media/tut-guard-edge-setup-and-score.mp4)
 

@@ -86,9 +86,9 @@ Escape a capture, or parry the CPU's recorded move ([Mash out](../guide/mash-out
 
 ## Guard the Edge and Juggler
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3609165db1d1675f019de9a7f3b7d1b6f7b8ebf0" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/fdc7a4382ed255e1ebda8d4dc1dd87f43ca16e9c" autoplay muted loop playsinline controls></video>
 
-*Guard the Edge: placement, then three attempts.* [Open the clip](../media/tut-guard-edge-setup-and-score.mp4)
+*Guard the Edge: Set up…, the placing view, two attempts.* [Open the clip](../media/tut-guard-edge-setup-and-score.mp4)
 
 Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.md), [Juggler](../guide/juggler.md)).
 
@@ -106,7 +106,7 @@ Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.
 
 ## Good to know
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7f393b9a162d1df9f1262b327902cc0ce9827c04" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/37c5bfc34a34e2b10cdb124a7c96faaff3838dcb" autoplay muted loop playsinline controls></video>
 *Stopping Eggs-ercise changes its first row back to Start.* [Open the clip](../media/rc15-practice-menu-stop.mp4)
 
 | If | Then |

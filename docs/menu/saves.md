@@ -77,7 +77,7 @@ Keep a [named setup](../guide/save-states.md#making-a-setup) from the fighters' 
 
 ## Good to know
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/06348008e027aeaf9cc70d69c9ab74930ce388bc" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6bdcfb3a520887a441f56d87a5959a16d4ea4bff" autoplay muted loop playsinline controls></video>
 
 *Save is refused until Save States is turned on.* [Open the clip](../media/tut-notice-save-states-off.mp4)
 

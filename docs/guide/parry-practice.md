@@ -2,7 +2,7 @@
 
 ## Practise against a recorded attack
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35e8edb3e156f65dc2b9cc87b450a10d83e2f8d9" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/98458f1bb06f9d595e377ae7baf99022af5f3130" autoplay muted loop playsinline controls></video>
 
 *Record a forward smash to use as the CPU's attack.* [Open the clip](../media/tut-record-macro.mp4)
 

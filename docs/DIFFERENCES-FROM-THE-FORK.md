@@ -95,7 +95,7 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 
 *Cycle badges show the order of Player 1’s fighter swaps.* [Open the clip](media/rc11-cycle-switch.mp4)
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/29fadaf711f22a5ea361c3aaebe670a04c07bdc1" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5ecdd4bac2b07e7a8dc8f5be43cf40e122bb29ef" autoplay muted loop playsinline controls></video>
 
 *A new menu shortcut applies at once* [Open the clip](media/rc11-menu-shortcut.mp4)
 
