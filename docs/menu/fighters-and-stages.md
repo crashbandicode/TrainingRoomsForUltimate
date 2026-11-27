@@ -680,12 +680,17 @@ What the target is. Disc: the plugin's target, as above. CPU: the CPU itself is 
 
 - **Values:** Disc, CPU
 - **Default:** Disc
-- **How:** CPU: the CPU flies like the disc. At each spot it starts on the ground with 0%, is launched up, drifts a
-  little, falls back, bounces once and then stands where it landed until you hit it. In the air it shows the game's own
-  falling pose. **Target speed** applies to it as to the disc. A hit that the game registers on it, in the air or on the
-  ground, and that **Breaks on** lets count breaks the target: the game plays its own hitlag and knockback, then the CPU
-  goes back to 0% at the next spot and flies again. A hit that doesn't count puts it back on its flight. It applies from
-  the next Start. In the waiting room's practice the CPU is moved too.
+- **How:** CPU: the CPU flies like the disc. It applies from the next Start. In the waiting room's practice the CPU is
+  moved too.
+
+With **CPU**:
+
+| Moment | What the CPU does |
+| --- | --- |
+| At each spot | It starts on the ground with 0%, is launched up, drifts a little, falls back, bounces once and then stands where it landed until you hit it. |
+| In the air | It shows the game's own falling pose. **Target speed** applies to it as to the disc. |
+| A hit that the game registers on it, in the air or on the ground, and that **Breaks on** lets count | Breaks the target: the game plays its own hitlag and knockback, then the CPU goes back to 0% at the next spot and flies again. |
+| A hit that doesn't count | Puts it back on its flight. |
 
 ![Target set to CPU: the CPU flies up and down with its CPU tag on, rests, and Fox's neutral air hits it in the air; the count goes up and the CPU is put back at 0% at a new spot](../media/rc14-eggs-cpu-target.gif)<br>
 *Practice games, Eggs-ercise on Free practice with Breaks on Aerials and Target speed Slow: Target reads Disc, then CPU, and the menu closes. The CPU (Mario) is launched, flies up and falls back with its "CPU" tag on, and stands where it lands. Fox takes a full hop and a neutral air hits it in the air: the count goes up, the CPU is put back at 0% at a new spot and flies again, and no disc target appears. Eden, rc.14 (untested on hardware).*
@@ -845,14 +850,23 @@ Chooses a new random spot each attempt on **Any**, **Floor**, **Wall** or **Ceil
 
 ### Set, Random and Auto
 
-**Set** keeps the value at the lower handle of its range; **Random** chooses again between the two handles each
-attempt; **Auto (approximate)** works out the angle or start position for your spot.
+| Mode | What it does |
+| --- | --- |
+| **Set** | Keeps the value at the lower handle of its range. |
+| **Random** | Chooses again between the two handles each attempt. |
+| **Auto (approximate)** | Works out the angle or start position for your spot. Auto is available for **Angle** and **Start position**; the other ranges use Set or Random. |
 
 Use **Left / Right** on a setting to choose its mode, or **A** to open its list.
-**A** on its range row opens the slider on Min. **Up / Down** choose Min or Max and **A** edits it. While editing,
-**Up** raises and **Down** lowers it by the range's own step; holding speeds up. **A** or **B** puts the handle down;
-**B** again goes back. **Left / Right** do nothing, and Min stays at or below Max.
-Auto is available for **Angle** and **Start position**; the other ranges use Set or Random.
+
+| On the range row | Key | What it does |
+| --- | --- | --- |
+| The row | **A** | Opens the slider on Min. |
+| The slider | **Up / Down** | Choose Min or Max. |
+| The slider | **A** | Edits it. |
+| While editing | **Up** / **Down** | **Up** raises and **Down** lowers it by the range's own step; holding speeds up. |
+| While editing | **A** or **B** | Puts the handle down; **B** again goes back. |
+| While editing | **Left / Right** | Do nothing, and Min stays at or below Max. |
+
 Auto lands on your spot on floors and platform tops; on walls it can land off your spot or find no solution, and under the stage it can miss by a lot, so use Set or Random there.
 If the chosen values cannot make a launch, the message asks for a different setup.
 
