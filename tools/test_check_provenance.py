@@ -73,16 +73,17 @@ class ProvenanceTests(unittest.TestCase):
 
     def test_every_changed_file_is_named(self):
         for name, old, new in (
-            ("provenance-files.md", "| Path |", "| Poth |"),
+            ("provenance-files.txt", "| Path |", "| Poth |"),
             ("feature-groups.json", '"UNMAPPED"', '"UNMAPPEd"'),
         ):
-            path = self.provenance / name
+            folder = self.root / "tools/provenance-data" if name.endswith(".txt") else self.provenance
+            path = folder / name
             text = path.read_text(encoding="utf-8")
             self.assertIn(old, text)
             path.write_text(text.replace(old, new, 1), encoding="utf-8")
         out = self.run_check()
         self.assertEqual(out.returncode, 1, out.stdout + out.stderr)
-        self.assertIn("DIFFERS docs/provenance/provenance-files.md: line 1", out.stdout)
+        self.assertIn("DIFFERS tools/provenance-data/provenance-files.txt: line 1", out.stdout)
         self.assertIn("DIFFERS docs/provenance/feature-groups.json: line 2", out.stdout)
         self.assertTrue(out.stdout.rstrip().endswith("2 problem(s)"))
 
