@@ -1,7 +1,7 @@
 # Provenance: the fork against upstream
 
 Phase 0 of the TrainingRoomsForUltimate plan. Written 2026-11-01 by the project
-lead. The original inventory came from `tools/provenance_scan.py` and
+lead. The November 1 inventory came from `tools/provenance_scan.py` and
 `tools/feature_groups.py` over the trees named here. See the [November 26 addendum](#november-26-rescan) for the regenerated inventories.
 
 ## Baselines
@@ -52,7 +52,7 @@ By disposition (files):
 | --- | ---: | ---: | ---: |
 | **Carry over as-is under MIT** (the fork's own features) | 754 | 153,546 | 0 |
 | **Clean-room spec, then reimplement** (upstream-origin code) | 71 (47 mixed, 24 upstream-identical) | 6,373 (fork fixes and additions inside upstream files; each is triaged by the spec writer as "fold into the spec" or "carry over") | 26,498 |
-| **Replace** (unlicensed upstream artwork and layout) | 54 (53 identical SVGs, 1 binary `layout.arc`; the 11 `photos/*` are counted here too) | – | – |
+| **Replace** (unlicensed upstream artwork and layout) | 54 (42 SVGs, 11 README images and 1 binary `layout.arc`) | – | – |
 | **Drop** (upstream README/CODEOWNERS, analytics, auto-update, dialog, metrics tool) | 2 in the stage (`README.md` mixed: 110 fork-only / 474 retained; `CODEOWNERS`) + 3 already dropped by the fork + `training_mod_metrics` (2 files, counted under clean-room above) | 110 | 476 |
 | **New** (build configuration: Cargo workspace per the playbook; the fork's feature list is ours) | 8 (2 ours-new, 4 mixed, 2 identical) | 1,993 | 119 |
 
@@ -111,7 +111,7 @@ implementers read specs only. "Fork-only" is the count of fork lines inside
 the upstream file(s) that the spec writer must triage.
 
 The cost column cites
-the fork's measurements where the campaign has them; `docs/resource-costs.md`
+the fork's measurements where the campaign has them; the original resource-costs report
 carries the full table (Tables A–C) with a file:line or JSON-key source for
 every number.
 
@@ -209,8 +209,7 @@ them. Question 16 subsequently adopted runtime lookup for fighter portraits ([No
 `docs/menu-mockup/captures/` holds 102 crops (87 fighter cells, 15 stage cells)
 cut from four captures of the fork's own grid pickers: two Eden grabs and the
 fork's `docs/feature-walkthroughs/kirby-grid.png` and `stage-rotation.png`.
-`tools/crop_menu_captures.py` pins each source by sha256, and
-`docs/menu-mockup/index.md` lists every crop box.
+`tools/crop_menu_captures.py` pins each source by sha256, and the historical mockup index listed each crop box.
 
 These are game-asset
 captures, used only to render the review mockup. They are not shipped

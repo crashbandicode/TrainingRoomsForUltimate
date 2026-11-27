@@ -2340,6 +2340,8 @@ B as the stop key and `B stop preview` as their hint.
 | | Choice | A | B |
 | --- | --- | --- | --- |
 | T1 | Switch a fighter to Off stage | Pick nearest open-air ledge's default spot, then move the crosshair freely. | Off stage accepts only off-stage points. |
+| T2 | Under a solid | Placement accepts it; Guard the Edge keeps refusing it | No feature accepts it |
+| T3 | Guard the Edge, Juggler and the eggs Off stage zone | Move them to the same rule in a later build | Placement only |
 
 ![The Training stage's collision](decisions/training-stage-offstage/training-01-outline.png)
 
@@ -2368,12 +2370,6 @@ B as the stop key and `B stop preview` as their hint.
 
 - **The three choices put to the operator** ([stage geometry review](#training-stage-offstage)):
 
-| | Choice | A | B |
-| --- | --- | --- | --- |
-| T1 | Switch a fighter to Off stage | Pick nearest open-air ledge's default spot, then move the crosshair freely. | Off stage accepts only off-stage points. |
-| T2 | Under a solid | Placement accepts it; Guard the Edge keeps refusing it | No feature accepts it |
-| T3 | Guard the Edge, Juggler and the eggs Off stage zone | Move them to the same rule in a later build | Placement only |
-
 - **The answer**, 2026-11-25 about 17:05Z (relayed by tr-primary-2, inbox 17:06:54Z), is the list below. Its reason for T2: some fighters, Pikachu for one, can recover from under the stage. Its reason for T3: the design is much better, so the build waits for it.
 
 **Decided:**
@@ -2399,6 +2395,22 @@ B as the stop key and `B stop preview` as their hint.
 | | Choice | Decided |
 | --- | --- | --- |
 | PC1 | Floor selection | **B.** Left/Right follow the floor; Up/Down step to the floor above or below. |
+| PC1 | Source | Reuse Tech practice's surface walk. A diagonal stick hold keeps the floor. |
+| PC1 | While tracing | The fighter stands on the floor under a free crosshair. |
+| PC2 | Entry points | **All four routes open the same picker.** |
+| PC2 | Save or macro | Open from the save screen, or edit the start save from a macro/chain screen. |
+| PC2 | Recording pop-up | Press X on a save. |
+| PC2 | Recording › Replays | The row opens the active macro's start save. |
+| PC3 | Pages | **All five.** Where, Spot, State, Percent, Preview. |
+| PC3 | Save | **+ saves from any page.** Unvisited pages keep the save's values. |
+| PC4 | Place fighters before Record | **A.** Share one wizard for both uses. |
+| PC4 | Shared features | Where page, live fighters, game's magnifier and range to the blast line. |
+| PC5 | Shared start save | **Ask first.** Show how many macros use it. Offer change for all or copy. |
+| PC5 | Copy from a macro | That macro uses the new start save. |
+| PC5 | Copy from the save screen | No macro uses the new copy. |
+| PC5 | Advanced setting | **Shared start save** offers Prompt (default), Always change or Always copy. |
+| PC6 | Old key grid | **A.** Remove the grid. Move Momentum to the macro's own screen. |
+| PC6 | Existing macro offset | Show its Offset row. A clears it. |
 
 ![The flow: the save's own screen, then Where, then Spot, then A saves](decisions/placement-crosshair/place-next-01-flow.png)
 
@@ -2417,26 +2429,6 @@ B as the stop key and `B stop preview` as their hint.
 **The answers**, 2026-11-25 about 15:50Z (relayed by tr-primary-2, inbox 15:53:07Z), are the table below.
 
 **Decided:**
-
-| | Choice | Decided |
-| --- | --- | --- |
-| PC1 | Floor selection | **B.** Left/Right follow the floor; Up/Down step to the floor above or below. |
-| PC1 | Source | Reuse Tech practice's surface walk. A diagonal stick hold keeps the floor. |
-| PC1 | While tracing | The fighter stands on the floor under a free crosshair. |
-| PC2 | Entry points | **All four routes open the same picker.** |
-| PC2 | Save or macro | Open from the save screen, or edit the start save from a macro/chain screen. |
-| PC2 | Recording pop-up | Press X on a save. |
-| PC2 | Recording › Replays | The row opens the active macro's start save. |
-| PC3 | Pages | **All five.** Where, Spot, State, Percent, Preview. |
-| PC3 | Save | **+ saves from any page.** Unvisited pages keep the save's values. |
-| PC4 | Place fighters before Record | **A.** Share one wizard for both uses. |
-| PC4 | Shared features | Where page, live fighters, game's magnifier and range to the blast line. |
-| PC5 | Shared start save | **Ask first.** Show how many macros use it. Offer change for all or copy. |
-| PC5 | Copy from a macro | That macro uses the new start save. |
-| PC5 | Copy from the save screen | No macro uses the new copy. |
-| PC5 | Advanced setting | **Shared start save** offers Prompt (default), Always change or Always copy. |
-| PC6 | Old key grid | **A.** Remove the grid. Move Momentum to the macro's own screen. |
-| PC6 | Existing macro offset | Show its Offset row. A clears it. |
 
 ![PC1](decisions/placement-crosshair/place-next-PC1-on-stage.png)
 
@@ -2498,17 +2490,13 @@ B as the stop key and `B stop preview` as their hint.
 | Proposed step | Action |
 | --- | --- |
 | 1 | Open Change placement with A on the save screen. |
+| 2 · Where | Choose On stage or Off stage for each fighter. |
+| 3 · Spot | Move the fighter with the crosshair. |
+| 4 | Press A to save, then load once. |
 
 ![Original placement flow](decisions/placement-crosshair/place-next-01-flow.png)
 
 The 2026-11-25 proposal used the Break the Targets crosshair to edit a save directly, with separate Player 1 and CPU choices.
-
-| Proposed step | Action |
-| --- | --- |
-| 1 | Open Change placement with A on the save screen. |
-| 2 · Where | Choose On stage or Off stage for each fighter. |
-| 3 · Spot | Move the fighter with the crosshair. |
-| 4 | Press A to save, then load once. |
 
 - **Decided 2026-11-25, about 15:50Z.** Each section gives the outcome first. Green outlines mark the original recommendations. See [the decision record](#placement-decision) and [the Recording guide](guide/recording.md#change-placement-and-the-replay-window).
 
@@ -5475,12 +5463,6 @@ FUN_0135ca00 (the battle task entry, every update, main thread)
 | Design record | Detail |
 | --- | --- |
 | Lane / reviewer | preview-vis-sol / rv-hit-streak |
-
-The 2026-11-27 fix shipped with the retry and stop behavior described in the [Tech practice guide](guide/tech-practice.md).
-
-| Design record | Detail |
-| --- | --- |
-| Lane / reviewer | preview-vis-sol / rv-hit-streak |
 | Worktree | `/home/intpa/tr-fixes-20261113/tech-aim` |
 | Branch / base | `fix/tech-aim-solvable` from `rc-next` at `0a63c101` |
 | Playbook | `c8d9959` |
@@ -5488,6 +5470,8 @@ The 2026-11-27 fix shipped with the retry and stop behavior described in the [Te
 | Inbox decisions | tr-primary-2, 05:40:04Z and 05:48:17Z |
 | Review correction | rv-hit-streak, 05:49:37Z. Part 1 revised at 05:50:07Z. |
 | Implementation approval | 05:57:16Z, including the remembered spot field |
+
+The 2026-11-27 fix shipped with the retry and stop behavior described in the [Tech practice guide](guide/tech-practice.md).
 
 <a id="tech-aim-solvable--original-host-reproduction"></a>
 
