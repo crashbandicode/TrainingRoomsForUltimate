@@ -426,13 +426,25 @@ list doesn't grey them for that.
 
 Tutorials: [Practice games](practice-games.md), [Parry practice](../guide/parry-practice.md), [Mash out](../guide/mash-out.md), [Break the Targets](../guide/break-the-targets.md), [Tech practice](../guide/tech-practice.md) and [Eggs-ercise](../guide/eggs-ercise.md).
 
-**Practice games** lists one row per game: **Eggs-ercise**, **Break the Targets**, **Tech practice**, **Mash out**
-(its screen: Start and **Fighter and move**; it runs until Stop) and **Parry practice** (Start, then
-10 attempts or Free practice, Saved parry practices and Save this parry practice; using a saved practice starts it when
-the menu closes), plus **Guard the Edge** and **Juggler**. **A** on a game
-opens its own screen, laid out like **Button chords**: the path at the top (Fighters & Stages > Practice games > the
-game), then **Start** and the game's settings. The keys are the page's: Up/Down move, Left/Right change a setting, **A**
-opens it, **Y** resets it, **B** goes back to the list.
+**Practice games** lists one row per game. **A** on a game opens its own screen, laid out like **Button chords**: the
+path at the top (Fighters & Stages > Practice games > the game), then **Start** and the game's settings.
+
+| Row | Its screen |
+| --- | --- |
+| **Eggs-ercise**, **Break the Targets**, **Tech practice** | Start and the game's settings, described below. |
+| **Mash out** | Its screen: Start and **Fighter and move**; it runs until Stop. |
+| **Parry practice** | Start, then 10 attempts or Free practice, Saved parry practices and Save this parry practice; using a saved practice starts it when the menu closes. |
+| **Guard the Edge** and **Juggler** | Described below. |
+
+The keys are the page's:
+
+| Key | What it does |
+| --- | --- |
+| Up/Down | Move. |
+| Left/Right | Change a setting. |
+| **A** | Opens it. |
+| **Y** | Resets it. |
+| **B** | Goes back to the list. |
 
 - **Start** (the first row; the cursor opens on it) closes the menu and starts the game with the settings shown. Only
   Start starts a game: closing the menu with **B** starts nothing and stops nothing.
