@@ -102,7 +102,7 @@ How a macro plays back, and how the Combo helper grades.
 | <a id="on-time-tolerance"></a>On-time tolerance | Exact, **1 frame**, 2 frames | How far from the recorded press still counts as on time. |
 | <a id="after-an-attempt"></a>After an attempt | **Keep playing**, Load save state | Keep playing, or load the save state to retry from the same spot. |
 | <a id="show-playback-indicator"></a>Show playback indicator | **On**, Off | On: shows which role is playing a recording. |
-| <a id="playback-delay"></a>Playback delay | **None**, 10 to 120 frames | Frames to wait after the fighters are placed, before the first input. |
+| <a id="playback-delay"></a>Playback delay | **None**, 10, 20, 30, 45, 60, 90, 120 frames | Frames to wait after the fighters are placed, before the first input. |
 
 ## Reset page to defaults
 

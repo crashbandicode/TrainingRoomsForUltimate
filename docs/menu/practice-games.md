@@ -55,11 +55,11 @@ Tech a launch at a chosen or random surface; Set uses the low end of a range ([g
 | Tech wizard | Opens the wizard | Choose a spot, angle, start distance and hit. |
 | Surface | **Any**, Floor, Wall, Ceiling (underside), Chosen point | Where each launch is aimed. |
 | Tech point | Opens the crosshair | Stick moves, A sets the point, X starts. |
-| Damage, Damage range | **Set**, Random; 0 to 150%, **60%** | Your percent before the hit. |
-| Launch speed, its range | **Set**, Random; knockback 80 to 250, **100** | The launch's strength. |
+| Damage, Damage range | **Set**, Random; 0 to 150% by 5, **60%** | Your percent before the hit. |
+| Launch speed, its range | **Set**, Random; knockback 80 to 250 by 10, **100** | The launch's strength. |
 | Hit damage, its range | **Set**, Random; 1 to 30%, **12%** | The percent the hit adds. It also sets the freeze. |
-| Angle, Angle range | **Auto (approximate)**, Set, Random; 0 to 355° | World launch angle: right is 0°, up is 90°. |
-| Start position, Start range | **Auto (approximate)**, Set, Random; -120 to 120 units | Your start offset from the point. |
+| Angle, Angle range | **Auto (approximate)**, Set, Random; **0 to 355°**, steps of 5° | World launch angle: right is 0°, up is 90°. |
+| Start position, Start range | **Auto (approximate)**, Set, Random; -120 to 120 units, **-40 to 40** | Your start offset from the point. |
 | Time to contact, Time range | Set, **Random**; 10 to 60 frames, **20 to 40** | With Auto start, knockback limits the random draw: 20–38 frames at factory settings. |
 | DI, DI direction | **Off**, Player, Set, Random; a direction, **Neutral** | Off is neutral. Player reads your stick. |
 | Facing | **Toward the point**, Left, Right, Random | Which way you face at the start. |
