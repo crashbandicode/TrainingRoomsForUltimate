@@ -36,9 +36,9 @@ elite-rematch, ssbu-quiet-elite-switch, ssbu-tile-cursor: each pins `rust-toolch
   `~/.rustup/toolchains/skyline-v3` → `~/.cargo/skyline/toolchain/skyline`; on the Surface in the campaign home
   `/home/intpa/smash-training-lobby/toolchain/tools/rustup/toolchains/skyline-v3`.
 
-The rustup home used for a Switch build must contain `skyline-v3`. The Surface's default `~/.rustup` does not
-(toolchains: stable, nightly, nightly-2026-02-14, 1.75, 1.98.1), which is why the first Switch build here failed with
-"the option `Z` is only accepted on the nightly compiler". No `RUSTUP_TOOLCHAIN` override is needed.
+The build host’s rustup home must contain `skyline-v3`. No `RUSTUP_TOOLCHAIN` override is needed.
+On 2026-11-02 the Surface’s default rustup home lacked that toolchain, and the first build failed with
+"the option `Z` is only accepted on the nightly compiler".
 
 ## Commands
 
