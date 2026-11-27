@@ -333,10 +333,6 @@ Where the recording code is (moved here from the Recording guide; named by funct
 | Clip window | `src/model/macros/window.rs::Window` bounds handles; `clip_panel.rs::export_selection` applies the selection. |
 | Legacy slots | `src/model/library/migrate.rs::migrate` converts nonempty live slots once, separately from card import. |
 
-![Replay capture preference shared with Online Deluxe](decisions/07-replay-capture.png)
-
-*Design picture of decision Q7, not footage. [Decisions](DECISIONS.md)*
-
 | Replay capture | Mechanism |
 | --- | --- |
 | Archive | `src/runtime/macros/replay_store.rs::archive` uses `sd:/ultimate/TrainingRooms/replay_captures/`. |
