@@ -560,34 +560,46 @@ timer.
 - **How:** pick a mode and choose **Start**: the menu closes, the first target appears and the notice shows the count,
   in a band at the top, under Input Display's strip and the combo bar when they show, so the targets keep the middle of
   the screen. The clock runs while the game runs; pausing or opening the menu stops it.
-  - **1 minute:** the notice reads "Eggs 0   1:00" and the clock counts down. At 0:00 the targets stop and the notice
-    reads "Time! 12 eggs (best 15)" for three seconds.
-  - **10 targets, 20 targets:** the notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths. The last
-    target stops it, and the notice reads "Done! 10 in 0:18.27 (best 0:16.90)" for three seconds.
-  - **Free practice:** only the count.
-  - The best is per fighter and per mode, and lasts until the game closes.
+
+| Mode | While it runs | At the end |
+| --- | --- | --- |
+| **1 minute** | The notice reads "Eggs 0   1:00" and the clock counts down. | At 0:00 the targets stop and the notice reads "Time! 12 eggs (best 15)" for three seconds. |
+| **10 targets, 20 targets** | The notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths. | The last target stops it, and the notice reads "Done! 10 in 0:18.27 (best 0:16.90)" for three seconds. |
+| **Free practice** | Only the count. | |
+
+The best is per fighter and per mode, and lasts until the game closes.
 
 #### Spawn area
 
 Check **In view**, **Whole stage**, **Off stage**, or a combination. Each new target gets an equal chance of using each
-checked area. In view is the default and takes over when the checklist is empty. Whole stage uses the stage's world
-bounds, so a target can appear outside the current camera. Changes apply at the next Start.
+checked area. Changes apply at the next Start.
 
-Open **Off-stage zone…** to edit the zones: two mirrored ones on most stages. Use the left stick up/down for the blue
-**Top** and **Bottom** lines. Use left/right to move the paired yellow **Inner edges** and paired purple **Outer edges**
-in or out. Yellow limit lines mark how far inward each side can reach under the stage. The active edge has a handle,
-sample targets show places targets can appear, and the rest of the screen is dimmed. The solid stage is excluded.
-**A** advances, **B** goes back or cancels from Top, and **X** previews the factory zone. In **Preview**, press **A**
-or **+** to apply. Training Rooms saves the zone for the current stage and form.
+| Area | Where targets appear |
+| --- | --- |
+| **In view** | The default; it takes over when the checklist is empty. |
+| **Whole stage** | Uses the stage's world bounds, so a target can appear outside the current camera. |
+| **Off stage** | Only in the air off stage, inside the zones below: never inside another part of the stage, and never above a floor or a platform. |
 
-Each zone lies beside a ledge of the stage's main floor, the floor under the middle of the camera's range. A side
-has a zone only when its ledge has open air next to it, so a stage can have one zone or none. The outer edge
-stops where that open air ends: at the next part of the stage, or short of the blast line. On the Training stage
-the one zone is the gap between the long floor and the island.
+Open **Off-stage zone…** to edit the zones: two mirrored ones on most stages. The active edge has a handle, sample
+targets show places targets can appear, and the rest of the screen is dimmed. The solid stage is excluded. Yellow limit
+lines mark how far inward each side can reach under the stage.
 
-A target appears only in the air off stage: never inside another part of the stage, and never above a floor or a
-platform. The stage is read when the zone is first needed on it. A platform that moves afterwards is not
-followed, and a piece of the stage narrower than 10 units can be missed.
+| Control | What it does |
+| --- | --- |
+| Left stick up/down | Moves the blue **Top** and **Bottom** lines. |
+| Left stick left/right | Moves the paired yellow **Inner edges** and paired purple **Outer edges** in or out. |
+| **A** | Advances. In **Preview**, **A** or **+** applies. |
+| **B** | Goes back, or cancels from Top. |
+| **X** | Previews the factory zone. |
+
+Training Rooms saves the zone for the current stage and form.
+
+- Each zone lies beside a ledge of the stage's main floor, the floor under the middle of the camera's range.
+- A side has a zone only when its ledge has open air next to it, so a stage can have one zone or none.
+- The outer edge stops where that open air ends: at the next part of the stage, or short of the blast line. On the
+  Training stage the one zone is the gap between the long floor and the island.
+- The stage is read when the zone is first needed on it. A platform that moves afterwards is not followed, and a piece
+  of the stage narrower than 10 units can be missed.
 
 In an Eden smoke boot on install 5 (2026-11-25) the zone editor on the Training stage showed that one zone, in the gap,
 and the game started with only the Off stage area chosen. Where the targets then appeared was not checked. [Install evidence](../EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build)
@@ -598,14 +610,23 @@ keeps your best.
 
 #### Moving paths and target expiry
 
-Check one or more **Moving paths** to have each new target use one selected flight. The choices are Richter's Axe,
-Pac-Man's Galaxian, Link's Boomerang, and Samus's Homing Missile. Homing Missile follows the active player's movement.
-When the list is empty, targets use the ordinary bouncing flight. Target speed changes playback speed.
+Check one or more **Moving paths** to have each new target use one selected flight. When the list is empty, targets use
+the ordinary bouncing flight. Target speed changes playback speed.
 
-With **In view** or **Whole stage**, a moving target stays over the floor it appeared on: it does not pass the ends
-of that floor and does not drop below it. A flight that needs more room than that is flown smaller. A flight needs at
-least one target's width of room in each direction it moves: a target appears where a floor gives its flight that
-room, and uses Pop up when none of the spots tried does. **Off stage** targets keep to their zone.
+| Moving path | Note |
+| --- | --- |
+| Richter's Axe | |
+| Pac-Man's Galaxian | |
+| Link's Boomerang | |
+| Samus's Homing Missile | Follows the active player's movement. |
+
+| Spawn area | Where a moving target stays |
+| --- | --- |
+| **In view** or **Whole stage** | Over the floor it appeared on: it does not pass the ends of that floor and does not drop below it. A flight that needs more room than that is flown smaller. |
+| **Off stage** | Inside its zone. |
+
+A flight needs at least one target's width of room in each direction it moves: a target appears where a floor gives its
+flight that room, and uses Pop up when none of the spots tried does.
 
 Set **Target expiry** to **Off** or from **1 second** through **10 seconds**. An unhit target then disappears and is
 replaced. Pausing or opening a menu freezes its timer. With **Hit streak** on, an expiry clears the current streak
@@ -617,9 +638,15 @@ and keeps your best.
 ![Eggs-ercise 10 targets: the row set from Off to 10 targets, the menu closed, Fox breaks the targets one after another and the count climbs from 0/10 to 9/10; the tenth break stops the clock: Done! 10 in 0:16.96](../media/rc14-eggs-n-targets.gif)<br>
 *Practice games > Eggs-ercise: Right twice turns Off into 10 targets and the menu closes. The notice reads "Eggs 0/10   0:00.00" and the clock counts up in hundredths; Fox chases each target and breaks it, and the count climbs: 3/10, 7/10, 9/10. The tenth break stops the clock: "Done! 10 in 0:16.96 (best 0:16.96)". Eden, rc.14 (untested on hardware).*
 
-To go again, press L+R+A in Training (with **L+R+A Reset** On): it starts a new run from 0. Opening and closing the menu
-keeps the run going. Changing the stage starts a new run too. A fighter cycle or a save-state load keeps the run going.
-**Stop** removes the target and the notice, and the notices are back where they were.
+#### Going again, and what else changes
+
+| You do | The run |
+| --- | --- |
+| L+R+A in Training (with **L+R+A Reset** On) | Starts a new run from 0. |
+| Open and close the menu | Keeps going. |
+| Change the stage | Starts a new run too. |
+| A fighter cycle or a save-state load | Keeps going. |
+| **Stop** | Removes the target and the notice, and the notices are back where they were. |
 
 The target is drawn by the plugin, so Hitbox Visualization can be On or Off: with it On you see your hitboxes meet the
 target. Nothing changes in the game. It works in the waiting room's practice as in Training, a break's freeze included, and only your own screen shows the target. The CPU keeps
