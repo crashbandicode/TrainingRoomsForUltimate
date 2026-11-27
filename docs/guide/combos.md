@@ -29,6 +29,6 @@ These are kinds of move, not fighter-specific move names.
 
 | When sharing | What the reader does |
 |---|---|
-| Sharing named grab, throw or getup keys | Check [reader compatibility](../RELEASE-NOTES-rc15.md#combo-reader-through-a945b0c1) before sending the file. |
+| Sharing named grab, throw or getup keys | These keys are [not backward compatible with earlier shipped installs](../RELEASE-NOTES-rc15.md#combo-reader-through-a945b0c1). |
 | Older file with `other` and a move description | Still reads; renaming preserves it, cropping writes the named keys. |
 | Final Smash | Use `other` with `final_smash` in the description, not directly in `from` or `to`. |
