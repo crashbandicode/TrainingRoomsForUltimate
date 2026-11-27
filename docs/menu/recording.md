@@ -12,9 +12,9 @@ ZR + D-pad Right opens the pop-up over the match ([reading the lists](../guide/r
 | Key | On the page | In the pop-up |
 | --- | --- | --- |
 | <a id="the-recording-pop-up"></a>A | Opens the file's own screen. | Acts at once: binds a save, sets a macro active, picks the drill. |
-| X | In MACROS, steps the loop count. On a drill, previews it. | In MACROS, steps the loop count. On a save, opens Change placement. |
+| X | In MACROS, cycles Loop. On an input drill with a take, previews it. | Cycles Loop in MACROS, opens placement on a save, or previews a drill's take. |
 | ZR | Switches between the Player view and the CPU view. | Switches the side that Record records. |
-| B | Closes the menu. | Closes the pop-up and never reaches your fighter. |
+| B | Backs out of a file or sublist before closing the menu. | Backs out of DRILLS first; closing the pop-up doesn't reach your fighter. |
 
 ## Save states & Macros
 
@@ -27,9 +27,10 @@ A on a save state, macro or chain opens its own screen ([what each row is for](.
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
 | <a id="recordings"></a>RECORDINGS > | Vault and saved captures | Play one back, or make a macro, a combo or a drill from it. |
-| <a id="a-file-s-own-screen"></a>Bind to Save / Load | On, Off | On: the Save and Load chords use this save. |
+| <a id="a-file-s-own-screen"></a>Bind to Save / Load | On, Off | Save writes here; Load uses it unless a [named setup](saves.md#setup-library) is selected. |
 | Start save | On, Off | On: warps both fighters to the macro's start save once, before it plays. |
 | Momentum | **Keep recorded speed**, Start at rest | The speed the playing side has on its first input. |
+| Offset | Only on macros with an old offset | A clears the offset from the start position. |
 | Set active | On, Off | On: this view's Play chord plays this macro. |
 | Playback slot | None, Slot 1 to 5 | The CPU plays the macro when it picks that slot. Up to 600 frames. [Clip](../media/rc14-playback-slot.gif) |
 | Trim | Start, End, Both, Off | Skips neutral frames at those sides in playback. The file is unchanged. |
@@ -53,9 +54,9 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 | + Save last combo… | | Keeps the last combo the frame strip saw and makes it the drill. |
 | <a id="input-drills"></a>DRILLS > + Record drill… | | Arms a Player 1 take that needs no hit. Record starts and stops it. |
 | + New sequence | Opens the numbered picker | A sequence is combos drilled one after another. |
-| Drill, Drill sequence | On, Off | On: this is the one file the helper grades. |
+| Drill, Drill sequence | A selects | Makes this the file the helper grades, replacing the previous choice. |
 | Crop | Opens the clip editor | Whole links for a combo, whole steps for a drill. [Clip](../media/rc15-input-drill.gif) |
-| X on a drill | | Previews its recorded inputs on Player 1. B or X stops it. |
+| X on an input drill | A recorded take is required | Previews the inputs on Player 1. B or X stops it. |
 
 ## Replays
 
@@ -63,7 +64,7 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 
 *Scrubbing shows each fighter's move. Eden, preview `cc71537c`.* [Open the clip](../media/tut-clip-scrub-moves.mp4)
 
-Turn a match replay into a recording, or move a start save's fighters ([guide](../guide/recording.md#change-placement-and-the-replay-window)).
+[Edit a match capture](../guide/recording.md#crop) or [move a start save's fighters](../guide/recording.md#change-placement-and-the-replay-window).
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
@@ -71,7 +72,7 @@ Turn a match replay into a recording, or move a start save's fighters ([guide](.
 | <a id="change-placement"></a>Change placement | Opens the placement picker | Places both fighters of the active macro's start save. |
 | <a id="replay-window"></a>Replay window | Opens the clip editor | Pick a saved capture, a fighter and an input window. [Clip](../media/tut-clip-snap.mp4) |
 | <a id="replay-capture"></a>Replay capture | On, Off | On: saving a replay also captures its inputs. The choice is saved automatically. |
-| <a id="moves-while-you-scrub-preview-build"></a>Scrubbing in the clip editor | Install 6, preview build | Install 6 shows recorded positions. The preview build `cc71537c` also shows recorded moves. |
+| <a id="moves-while-you-scrub-preview-build"></a>Scrubbing in the clip editor | Install 6, preview build | Install 6 shows positions; the preview also shows stored poses on matching fighters. |
 
 ![The clip editor's strip with twelve numbered labels](../diagrams/clip-editor-legend.svg)<br>
 *The clip editor's strip, labelled.* [Open the full-size legend](../diagrams/clip-editor-legend.svg)
@@ -108,7 +109,7 @@ How a macro plays back, and how the Combo helper grades.
 
 | Setting | Values | What it does |
 | --- | --- | --- |
-| Reset page to defaults | A, then confirm | Restores Replays and Options to saved defaults, and both Loop counts to 1. |
+| Reset page to defaults | A, then confirm | Restores saved settings and resets both Loop counts to 1; Replay capture stays unchanged. |
 
 ## Good to know
 
@@ -121,4 +122,4 @@ How a macro plays back, and how the Combo helper grades.
 | You press X or Y on this page | X never saves your defaults here, and Y does nothing. |
 | A file was recorded on another fighter | Play asks first, unless Ask before switching fighter is Off. |
 | You reset this page | Your files, the bound save, the active macros and the drill stay. |
-| You use ZL+L or ZL+R in the preview's editor | Known issue: the fighter can switch only after the editor closes. |
+| Fighter switch in the preview editor (ZL+L / ZL+R) | [Known issue](../CURRENT-RELEASE.md#known-issues): Player 1 switched after close; the CPU shortcut was not tested. |

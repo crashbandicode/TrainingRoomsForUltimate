@@ -14,14 +14,14 @@ Break the targets that appear ([guide](../guide/eggs-ercise.md)).
 | Start, Stop | | Starts the game and closes the menu. Stop ends it. |
 | Eggs-ercise | **1 minute**, 10 targets, 20 targets, Free practice | The goal or the time limit. |
 | Breaks on | **Any attack**, Aerials, Hits of 12%+ | Which of your hits break a target, projectiles included. |
-| Target | **Disc**, CPU | CPU: the CPU itself is the target and flies like the disc. |
+| Target | **Disc**, CPU | The CPU flies like the disc unless [Hide CPU](cpu.md#hide-cpu) is on; then a disc flies. |
 | Target speed | **Normal**, Slow, Fast | Slow is half speed. Fast is one and a half times as fast. |
 | Spawn area | **In view**, Whole stage, Off stage | Each checked area has the same chance. |
 | Off-stage zone… | Opens the zone editor | The edges of this stage's off-stage area. |
 | Moving paths | Axe, Galaxian, Boomerang, Homing Missile, **Pop up** | Each checked flight path has the same chance. |
 | Target expiry | **Off**, 1 to 10 seconds | Replaces an unhit target after that time. |
 | Hit streak | **Off**, On | Shows your streak and session best. A whiff resets it. |
-| CPU during a game | **Hide**, Show | Hides the CPU while a game runs. A CPU target stays. |
+| CPU during a game | **Hide**, Show | Hides the opponent during Eggs-ercise unless it is the target. |
 
 ## Break the Targets
 
@@ -81,7 +81,7 @@ Escape a capture, or parry the CPU's recorded move ([Mash out](../guide/mash-out
 | Mash out: Fighter and move | A fighter and its move, or Random; **Mario · Grab, Standing** | The capture to escape. |
 | <a id="parry-practice"></a>Parry practice: Start, Stop | | Play the CPU's macro as usual. Every hit is one attempt. |
 | Parry practice | **10 attempts**, Free practice | Ten attempts end a set with a summary. |
-| Saved parry practices | Opens your saved practices | Each holds a CPU macro and its Loop. |
+| Saved parry practices | Opens your saved practices | Use one to start on menu close with its CPU macro and Loop. |
 | Save this parry practice | | Saves the CPU's active macro and Loop as a practice. |
 
 ## Guard the Edge and Juggler
@@ -112,7 +112,7 @@ Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.
 | If | Then |
 | --- | --- |
 | You start a second game | The first one stops. Only one game runs at a time. |
-| You close the menu with B | Nothing starts and nothing stops. Only Start starts a game. |
+| You close the menu with B after browsing settings | Browsing alone starts nothing; using a saved parry practice starts it on close. |
 | You change a setting while a game runs | It applies at the next Start. |
 | A Guard the Edge KO does not count | Player 1 must get back on stage after the CPU's KO. |
-| Start opens the set-up again | You stand on another floor, or Under the stage is now Off. |
+| Start reopens a saved set-up | Different floor, or Guard the Edge saved an under-stage start now disallowed. |
