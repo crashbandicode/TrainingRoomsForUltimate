@@ -349,6 +349,110 @@ fn a_changed_snapshot_is_wanted_and_a_dropped_publish_stays_dirty_until_it_lands
     assert!(!p.wants(b"a=2"));
 }
 
+/// The test bridge as a provider meets it (ssbu-hw-bridge docs/RUNTIME-TOGGLE.md §8 and §9): Off and On each start a
+/// new generation, the export gives 0 while Off, a publish lands only while On and carries that generation, and a read
+/// is fresh only when the landed generation is the current one.
+#[derive(Default)]
+struct Bridge {
+    generation: u64,
+    on: bool,
+    landed: Option<u64>,
+    calls: u32,
+}
+
+impl Bridge {
+    fn toggle(&mut self) {
+        self.generation += 1;
+        self.on = !self.on;
+    }
+
+    fn fresh(&self) -> bool {
+        self.on && self.landed == Some(self.generation)
+    }
+
+    /// One provider pass, as `runtime::bridge_state::Provider::tick` makes it.
+    fn pass(&mut self, publisher: &mut Publisher, snapshot: &[u8]) {
+        publisher.session(if self.on { self.generation } else { 0 });
+        if publisher.wants(snapshot) {
+            self.calls += 1;
+            if self.on {
+                self.landed = Some(self.generation);
+            }
+            publisher.published(snapshot, i32::from(!self.on));
+        }
+    }
+}
+
+/// docs boot 8 (`tut-dc5302f1-xps-8`), takes a and b: the bridge went Off and On with the menu closed; `tr.menu` made 0
+/// publish calls in the next 20 s and 20 of 20 reads answered `stale_toggle`.
+#[test]
+fn a_landed_snapshot_is_published_again_once_the_bridge_is_re_enabled() {
+    let (mut bridge, mut publisher) = (Bridge::default(), Publisher::default());
+    bridge.toggle();
+    for _ in 0..3 {
+        bridge.pass(&mut publisher, b"open=0");
+    }
+    assert!(bridge.fresh());
+    assert_eq!(bridge.calls, 1, "landed and unchanged: nothing more to send");
+    bridge.toggle();
+    bridge.pass(&mut publisher, b"open=0");
+    assert_eq!(bridge.calls, 1, "an unchanged snapshot is not offered to a bridge that is Off");
+    bridge.toggle();
+    assert!(!bridge.fresh(), "what landed in the earlier session is stale in this one");
+    for _ in 0..3 {
+        bridge.pass(&mut publisher, b"open=0");
+    }
+    assert!(bridge.fresh(), "the unchanged snapshot was not published again after the bridge came back On");
+    assert_eq!(bridge.calls, 2, "once for the new session");
+
+    // Take c: the snapshot changed while Off. The refused publish keeps it wanted, and one lands after On.
+    bridge.toggle();
+    bridge.pass(&mut publisher, b"open=1");
+    bridge.pass(&mut publisher, b"open=1");
+    assert_eq!(bridge.calls, 4, "offered and refused on every pass while Off");
+    bridge.toggle();
+    bridge.pass(&mut publisher, b"open=1");
+    bridge.pass(&mut publisher, b"open=1");
+    assert!(bridge.fresh());
+    assert_eq!(bridge.calls, 5);
+
+    // A drop in the new session (the bridge's reader held the buffer) is tried again until it lands.
+    bridge.toggle();
+    bridge.toggle();
+    publisher.session(bridge.generation);
+    assert!(publisher.wants(b"open=1"));
+    publisher.published(b"open=1", 1);
+    publisher.session(bridge.generation);
+    assert!(publisher.wants(b"open=1"), "kept wanted after a drop");
+    publisher.published(b"open=1", 0);
+    publisher.session(bridge.generation);
+    assert!(!publisher.wants(b"open=1"));
+
+    // A bridge without the toggle has no generation: every pass reads 0, and the rule is the old one.
+    let mut old = Publisher::default();
+    old.session(0);
+    assert!(old.wants(b"a=1"));
+    old.published(b"a=1", 0);
+    old.session(0);
+    assert!(!old.wants(b"a=1"));
+}
+
+#[test]
+fn both_providers_follow_the_bridges_generation_and_there_is_no_third() {
+    let runtime = include_str!("../runtime/bridge_state.rs");
+    let tick = runtime.split_once("pub fn tick(").unwrap().1.split_once("\n    fn events(").unwrap().0;
+    let told = tick.find("self.publisher.session(toggle_generation(").expect("the menu provider reads the generation");
+    assert!(told < tick.find("self.publisher.wants(").unwrap(), "before it decides whether to publish");
+    assert!(tick.contains("|practice| practice.admission_export"), "the export itself, not tr.practice's registration");
+    let practice = runtime.split_once("fn poll_practice(").unwrap().1.split_once("\n    }\n}").unwrap().0;
+    let renewed = practice.find("if admission != self.admission || activation != self.activation {").unwrap();
+    let publisher = practice.find("self.publisher = m::Publisher::default();").unwrap();
+    assert!(renewed < publisher && publisher < practice.find("self.publisher.wants(").unwrap());
+    let registered: Vec<_> = runtime.match_indices("= register(").map(|(at, _)| &runtime[at..at + 29]).collect();
+    assert_eq!(registered, ["= register(practice::NAME.as_", "= register(m::NAME.as_ptr(), "]);
+    assert_eq!((NAME, crate::model::practice_state::NAME), (&b"tr.menu"[..], &b"tr.practice"[..]));
+}
+
 #[test]
 fn scene_is_the_practice_layouts_fresh_pass_only() {
     assert_eq!(scene_name(1000 << 2 | 1, 1200, 500), "training");
