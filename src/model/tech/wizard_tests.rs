@@ -316,7 +316,16 @@ fn wizard_config_preserves_all_advanced_seed_fields() {
 #[test]
 fn wizard_marker_and_world_angle_match_existing_planner() {
     use super::{planner, solver::Box2, surface::Surfaces};
-    let surfaces = Surfaces::EMPTY;
+    // The planner flies a manual launch: a floor under every start of the table.
+    let mut surfaces = Surfaces::EMPTY;
+    assert!(surfaces.push(Line {
+        id: 1,
+        ends: [Vec2 { x: -450., y: -60. }, Vec2 { x: 450., y: -60. }],
+        normal: Vec2 { x: 0., y: 1. },
+        floor: true,
+        wall: false,
+        passable: false,
+    }));
     let bounds = Box2 {
         min: Vec2 { x: -500., y: -500. },
         max: Vec2 { x: 500., y: 500. },
