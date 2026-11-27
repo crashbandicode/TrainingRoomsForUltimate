@@ -287,7 +287,8 @@ screen; the reason is in the logs.
 
 When another mod ships its own `info_training` layout, should the plugin inject its layout anyway and
 document the conflict, or detect it and skip injection (the other mod's HUD stays and our menu is off)?
-**Original recommendation: inject anyway, document it.** The install line notes the other layout. Cost: that mod's
+
+- **Original recommendation: inject anyway, document it.** The install line notes the other layout. Cost: that mod's
 training HUD does not show while this plugin is installed.
 
 ![B3 layout mods](decisions/B3-layout-mods.png)
@@ -2016,7 +2017,7 @@ editor; a second B closes it. X also stops, and an editor ZR tap switches target
 
 - The Recording pop-up's first help line shows the configured Record and Play chords.
 - It uses the full names when they fit the pane's UTF-16 capacity and width, then P1 and CPU, then a pointer to the chords screen.
-- The hint shows only while the preview is running; the key line reads `B back` during the approximately one-second tail (tr-primary-2's ruling, 2026-11-25 15:11:54Z).
+- Only the clip editor hint `B stop preview` depends on active playback; the key line reads `B back` during the approximately one-second tail (tr-primary-2's ruling, 2026-11-25 15:11:54Z).
 - The design was accepted at 14:35:13Z; the hint lifecycle and fit rule were amended after review by rv-hit-streak at 14:36:00Z.
 
 ## Off stage, found from the stage's own lines (2026-11-25): decided (operator)
