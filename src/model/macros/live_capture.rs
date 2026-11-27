@@ -18,6 +18,8 @@ pub struct NativeRecordKey {
 /// to the newest capture. At most 4 * 8 * MAX_FRAMES samples are retained internally.
 pub const MAX_RETAINED_CAPTURES: usize = 4;
 const ENTRIES: usize = 8;
+/// The frames a track's storage grows by: a tenth of the limit, a minute of play.
+const GROWTH: usize = MAX_FRAMES / 10;
 
 /// First worker transition only. Flags: gap=1, invalid sample=2, late start=4.
 #[cfg(any(feature = "diag", test))]
@@ -195,28 +197,25 @@ impl LiveCapturePool {
         let track_index = match live.session.tracks.iter().position(|track| track.entry == entry) {
             Some(index) => index,
             None => {
-                let mut frames = Vec::new();
-                // One bounded reservation when this fighter first appears. No
-                // growth/allocation on subsequent simulation samples.
-                if frames.try_reserve_exact(MAX_FRAMES).is_err() {
-                    #[cfg(any(feature = "diag", test))]
-                    observe_seal(&mut self.first_seal, live, key, SealReason::Reservation, 0, Some(entry), Some(tick));
-                    live.sealed[slot] = true;
-                    live.session.truncated = true;
-                    return false;
-                }
-                live.session.tracks.push(LiveTrack { fighter: None, entry, frames });
+                live.session.tracks.push(LiveTrack { fighter: None, entry, frames: Vec::new() });
                 live.session.tracks.len() - 1
             }
         };
-        if live.session.tracks[track_index].frames.len() == MAX_FRAMES {
+        // A full track takes one more step of storage here, on the worker, up to the limit: it holds what it
+        // recorded, never the ten minutes from its first sample.
+        let frames = &mut live.session.tracks[track_index].frames;
+        let limit = frames.len() == MAX_FRAMES;
+        if limit || frames.len() == frames.capacity() && frames.try_reserve_exact(GROWTH.min(MAX_FRAMES - frames.len())).is_err() {
+            // A fighter whose first step failed leaves no empty track.
+            if frames.is_empty() { live.session.tracks.pop(); }
             #[cfg(any(feature = "diag", test))]
-            observe_seal(&mut self.first_seal, live, key, SealReason::Limit, 0, Some(entry), Some(tick));
+            observe_seal(&mut self.first_seal, live, key,
+                if limit { SealReason::Limit } else { SealReason::Reservation }, 0, Some(entry), Some(tick));
             live.sealed[slot] = true;
             live.session.truncated = true;
             return false;
         }
-        live.session.tracks[track_index].frames.push(sample);
+        frames.push(sample);
         live.session.first_counter.get_or_insert(tick);
         live.last_tick[slot] = Some(tick);
         true
@@ -424,10 +423,25 @@ mod tests {
         }
     }
 
+    /// The storage grows where it was reserved before: on the menu worker. The capture hooks hold tokens and post events.
+    fn the_capture_hooks_only_post_and_the_worker_alone_holds_the_frames() {
+        let runtime = include_str!("../../runtime/macros/live_replay.rs");
+        assert!(runtime.contains("struct HookPool { tokens: LiveTokens }"), "the hooks' pool holds no frames");
+        let hook = runtime.split_once("    fn push(&mut self, key: NativeRecordKey, entry: i32, tick: u32, sample: LiveFrame) -> bool {")
+            .unwrap().1.split_once("\n    }").unwrap().0;
+        assert!(hook.contains("post(LiveEvent::Sample { key, entry, tick, sample })"), "a sample is posted");
+        let worker = runtime.split_once("pub fn worker_events() {").unwrap().1.split_once("\n}\n").unwrap().0;
+        assert_eq!((runtime.matches("ARCHIVE.lock()").count(), worker.matches("ARCHIVE.lock()").count()), (2, 2),
+            "only the worker opens the archive");
+        assert_eq!(include_str!("handoff.rs").matches("self.pool.push(key, entry, tick, sample)").count(), 1,
+            "and the archive is where a sample reaches the pool");
+    }
+
     /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("the_capture_hooks_only_post_and_the_worker_alone_holds_the_frames", the_capture_hooks_only_post_and_the_worker_alone_holds_the_frames as fn()),
             ("a_tracks_storage_grows_with_its_frames_and_the_limit_is_no_reservation", a_tracks_storage_grows_with_its_frames_and_the_limit_is_no_reservation as fn()),
             ("a_live_sample_keeps_its_pose_through_the_pool", a_live_sample_keeps_its_pose_through_the_pool as fn()),
             ("duplicates_do_not_advance_and_gaps_never_compress_time", duplicates_do_not_advance_and_gaps_never_compress_time as fn()),
