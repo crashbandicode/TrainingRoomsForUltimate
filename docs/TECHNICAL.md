@@ -1031,8 +1031,7 @@ The Brawler, Swordfighter and Gunner lists grey out each role's character-select
     memory (cov-rest `f2298ee`, `src/model/mii_install.rs` `installable`).
   - **Edit placement** and the **Setup library** returned in that port. Edit placement changed the active macro's
     offset until [Change placement](guide/recording.md#change-placement-and-the-replay-window) replaced it on 2026-11-25.
-- **Capture commit:** a committed replay capture goes to the menu worker through a 16-slot mailbox (no heap in the
-  game's hooks); the fork wrote it directly.
+- **Capture commit:** the game hook posts a save event to the 1,024-slot replay mailbox. The worker passes the committed capture to the writer.
 - **Not carried:** the fork's diagnostic Mii probes and observers (listed in the manifest's `not_carried`); the two
   Lua helper tests (`lua_helpers/tests/*.lua`; they need a Lua 5.3 interpreter, not a cargo test); and the fork test
   `training_mod_mii/tests/source_provenance.rs`, whose subjects are runtime files that a host test could only include
