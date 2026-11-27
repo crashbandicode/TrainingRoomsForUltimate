@@ -1,83 +1,62 @@
 # Current release
 
-<!-- Shipping a release: change the line below first; the steps are in docs/BUILD.md, "Release checklist". -->
-
 Current release: rc.15
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5c59ac60ffc033815119d657b463e73f2fadb636" autoplay muted loop playsinline controls></video>
+TrainingRooms 0.2.0-rc.15 is the November 27, 2026 build for console testing. The [public download](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases) is rc.13.
 
-*The menu over Training.* [Open the clip](media/tut-menu-tour.mp4)
+## What you need
 
-| | |
+| Thing | Upstream | Our fork | What the fork changes |
+| --- | --- | --- | --- |
+| Switch firmware | [latest](https://en-americas-support.nintendo.com/app/answers/detail/a_id/22525) | — | — |
+| Atmosphère | [latest](https://github.com/Atmosphere-NX/Atmosphere/releases/latest) | [Atmosphère fork](https://git.syntaxbyexample.com/intpa/atmosphere-ro-cleanup-p1) | Unmaps plugin memory when loading fails. |
+| Super Smash Bros. Ultimate | 13.0.5 | — | — |
+| Skyline | [latest](https://github.com/skyline-dev/skyline/releases/latest) | none | — |
+| ARCropolis | [latest](https://github.com/Raytwo/ARCropolis/releases/latest) | [ARCropolis fork](https://git.syntaxbyexample.com/intpa/ARCropolis) | Rebuilds damaged mod caches and refreshes lookup tables after mod changes. |
+
+## Install
+
+1. Close Smash. Open `sd:/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/`.
+2. Put `libnro_hook.nro` there if missing. Remove `libtraining_modpack.nro` if present.
+3. Copy the downloaded `libtraining_rooms.nro` there. Replace the previous copy to update.
+4. Keep your settings and recordings in `sd:/ultimate/TrainingRooms/`.
+
+To uninstall, remove only `libtraining_rooms.nro`. Keep saved data and shared hooks.
+
+## What changed
+
+| Change | Read more |
 | --- | --- |
-| Last verified console install | `dc5302f1`, installed and [read back](EVIDENCE.md#evidence-rc15-installs--fixed-build) on 2026-11-27 |
-| Repository main at this audit | `30f7f21a` (2026-11-27) |
-| Shipping behavior (not a console receipt) | [Clip editor](guide/recording.md#crop), [Loading](menu/fighters-and-stages.md#loading) and [Tech practice](guide/tech-practice.md) describe the fixes. |
-| Preview install cancelled | `cc71537c` was never installed: [preview notes](RELEASE-NOTES.md#release-notes-rc15--preview-build) |
-| Changes | [Release notes](RELEASE-NOTES.md#release-notes-rc15) |
-| Tests | [Install evidence](EVIDENCE.md#evidence-rc15-installs) |
+| Switch recorded fighters after loading finishes | [Guide](guide/recording.md) |
+| Return fighters to their spots after scrubbing a pose | [Guide](guide/recording.md) |
+| Explain loading and extra fighter groups in the menu | [Loading](menu/fighters-and-stages.md#loading) |
+| Clarify what L+R+A does in Training | [Controls](guide/controls.md) |
+| Read the CPU-first setup order in Guard the Edge | [Guide](guide/guard-the-edge.md) |
+| Count Tech practice attempts with factory launch settings | [Guide](guide/tech-practice.md) |
+
+## Tested on
+
+| Feature | Hardware | Eden |
+| --- | --- | --- |
+| Switch recorded fighters after loading finishes | no | no |
+| Returning fighters to their spots after scrubbing | no | no |
+| Showing a recorded pose while scrubbing | no | yes |
+| Loading and Group Swap help | no | no |
+| L+R+A help | no | no |
+| Read the CPU-first setup order in Guard the Edge | no | yes |
+| Count Tech practice attempts with factory launch settings | no | yes |
+
+“No” means a passing run is unconfirmed for this release.
 
 ## Which build is mine?
 
-| The tag ends with | Build | Installed |
-| --- | --- | --- |
-| `dc5302f1` | Fixed build | 2026-11-27 |
-| `cc71537c` | Preview build | Never installed |
-| `5df3d9dc` | Install 6 | 2026-11-26 |
-| `b7a382e4` | Install 5 | 2026-11-25 |
-| `a945b0c1` | Install 4 | 2026-11-25 |
-| `e7667f26` | Install 3 | 2026-11-24 |
-| `71158421` | Install 2 | 2026-11-24 |
-| `152629cd` | Install 1 | 2026-11-23 |
-| Other commit | Unlisted build | Check the release name; commit alone doesn't establish age. |
-
-The menu footer shows `0.2.0-rc.15 · rc15`, then the build's commit.
-
-## What's new in rc.15
-
-| Build | In short | More |
-| --- | --- | --- |
-| Fixed build | Fighter switching, return after scrubbing, menu help and Tech practice launches | [Notes](RELEASE-NOTES.md#release-notes-rc15--fixed-build) |
-| Preview | Scrubbing shows saved poses on matching fighters | [Notes](RELEASE-NOTES.md#release-notes-rc15--preview-build) |
-| Install 6 | Y on In, a free playhead, fighters shown while you scrub | [Notes](RELEASE-NOTES.md#release-notes-rc15--install-6) |
-| Install 5 | Record under an AI, Delete for captures, Change placement, Guard the Edge options | [Notes](RELEASE-NOTES.md#release-notes-rc15--install-5) |
-| Install 4 | Drills read moves alike for every fighter; the clip editor; Recordings; Trim | [Notes](RELEASE-NOTES.md#release-notes-rc15--install-4) |
-
-## Installing
-
-| Before starting Training | Reference |
-| --- | --- |
-| Required files and plugin folder | [Installing TrainingRooms](guide/getting-started.md#installing) |
+Read the version in the TrainingRooms menu footer.
 
 ## Known issues
 
-| Earlier builds only | On install 6 | In the preview build |
-| --- | --- | --- |
-| Scrub positions stop at 20 seconds on long takes | Open | Fixed |
-| First X refused after a snap | Open; deselect the handle, then press X | Fixed |
-| A fighter beside a wall is shown off its point | Open | Refusal host-tested; wall case not flown |
-| Scrubbing shows places, not moves | By design | Poses when recorded; older captures show positions only |
-| A save's Off stage fighter stays grounded | Open; switch On stage, then Off stage | Fixed |
-| Guard the Edge rounds can diverge after release | Open; measured release coordinates matched | Unchanged |
-| The recorded-fighter switch timed out in the preview | Not in this build | Affected preview only; the fix waits for the roster |
-| Fighters slid apart after B from a posed frame | Not in this build | Seen in preview; [leaving the editor](guide/recording.md#crop) describes the fixed behavior |
-
-Details: [release notes](RELEASE-NOTES.md#release-notes-rc15--known-issues), [Install evidence](EVIDENCE.md#evidence-rc15-installs).
-
-## Good to know
-
-| Topic | Where |
-| --- | --- |
-| Test coverage: Eden runs and console reports, no full hardware test | [Install evidence](EVIDENCE.md#evidence-rc15-installs) |
-| Waiting rooms have their own limits | [What is different, or refused](guide/waiting-rooms.md#what-is-different-or-refused) |
-| A fighter outside Ready Fighters loads when you swap to it | [Fighter cycles](guide/fighter-cycles.md) |
-| Limits kept from the Training Modpack | [Differences from the fork](DIFFERENCES-FROM-THE-FORK.md) |
+- Older captures show fighter positions only when they lack recorded poses.
+- [Waiting-room and practice restrictions](RESTRICTIONS.md)
 
 ## Earlier releases
 
-| Release | Notes |
-| --- | --- |
-| rc.15, build by build | [rc.15 release notes](RELEASE-NOTES.md#release-notes-rc15) |
-| rc.5, rc.6, rc.8, rc.9 | [rc.5](RELEASE-NOTES.md#release-notes-rc5), [rc.6](RELEASE-NOTES.md#release-notes-rc6), [rc.8](RELEASE-NOTES.md#release-notes-rc8), [rc.9](RELEASE-NOTES.md#release-notes-rc9) |
-| rc.12, rc.13 | [rc.12](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.12), [rc.13](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.13) |
-| rc.7, rc.10, rc.11, rc.14 | No separate release notes |
+[Release notes](RELEASE-NOTES.md#release-notes-rc15)
