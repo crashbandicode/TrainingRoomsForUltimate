@@ -4,11 +4,7 @@ The 2026-11-01 wireframe and controls below record the first proposal, before
 implementation; [the later inventory](../MENU-DRAFT.md) superseded it. For the
 menu in the game, use the [menu pages](README.md).
 
-## What the fork's menu is today
-
-Nine tabs, 103 rows, four control types (single toggle, multi toggle, ordered
-list, slider) plus the fork's own screens (portrait grid, hat grid, Mii list,
-named library, setup library, clip editor, replay window, stage menu):
+## Fork menu at the 2026-11-01 inventory
 
 | Tab | Rows | Of which single-choice | Notes |
 | --- | ---: | ---: | --- |
@@ -22,12 +18,14 @@ named library, setup library, clip editor, replay window, stage menu):
 | Characters | 4 | 1 | fork |
 | Character Extras | 14 | 14 | fork: Solo Popo, hats, item, 10 preload/group rows |
 
-Problems the operator named: too many pages, settings scattered (display items
+The inventory counted four control types (single toggle, multi toggle, ordered list, slider) plus portrait, hat, Mii and stage pickers, named and setup libraries, the clip editor and replay window.
+
+The review identified too many pages, settings scattered (display items
 in Misc, stages in Misc, chords on their own tab), 13 near-identical override
 rows, 10 preload rows most players never touch, and single-choice settings shown
 as toggle rows that take a whole row's worth of cycling.
 
-## Proposal: five pages, sections inside, dropdowns for single choices
+## Five-page proposal with sections and dropdowns
 
 ```
  ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -57,9 +55,9 @@ Controls:
 
 | Control | Looks like | Input | Used for |
 | --- | --- | --- | --- |
-| **Dropdown** (new) | `[ Value ▾ ]` | ◂/▸ cycle without opening; A opens a popup list, ▴/▾ move, A picks, B cancels | every single-choice setting (today's `ToggleSingle` rows with more than two values) |
+| **Dropdown** (new) | `[ Value ▾ ]` | ◂/▸ cycle without opening; A opens a popup list, ▴/▾ move, A picks, B cancels | every single-choice setting (fork `ToggleSingle` rows with more than two values) |
 | **Toggle** | `[ On ]` / `[ Off ]` | A or ◂/▸ flips | two-value settings |
-| **Checklist** | `[ a, b, c ]` (summary) | A opens a popup list with check marks, A toggles, B closes; ZL selects all / none | multi-select settings (today's `ToggleMultiple`) |
+| **Checklist** | `[ a, b, c ]` (summary) | A opens checklist or toggles item. B closes. ZL selects all/none. | multi-select settings (fork `ToggleMultiple`) |
 | **Slider** | `[ 0 ━━●━━ 150 ]` | ◂/▸ move the handle; A edits the other end | ranges (damage) |
 | **Editor ▸** | `[ summary ]  ▸` | A opens a sub-screen; B returns | overrides, chords, grids, libraries, Mii lists |
 | **Section header** | `▸ Name` | collapsed by default when marked *(advanced)*; A on the header expands | grouping inside a page |
@@ -69,24 +67,24 @@ page, X saves the current values as the defaults, B closes the menu, the help
 text of the focused row shows at the bottom, and the menu opens with Minus or
 the permanent B + D-pad Up.
 
-Changed 2026-11-05 (operator, `p23/menu-nav`): ZR no longer resets the page. ZR is the role switch inside the
-roster grids and was easy to hit by accident on a page. Each page now ends with a **Reset page to defaults** line,
-which asks for confirmation (A reset, B cancel) and logs the page and the rows it changed. ZL + Up/Down jumps
-between the sections of a page, and the menu reopens where it was closed.
-
-Changed 2026-11-05 (review MN-1/MN-2): ZL + Up/Down jumps only where a jump means something, on a page (a section)
-and in the popup lists (a window). On the other screens (the direction grids, the sliders, the roster and stage grids,
-the panels) ZL acts on its press as before and Up/Down move as usual. Letting go of ZL on the same frame as another
-press is not a ZL tap. The reset's confirmation says the menu shortcuts stay (they are not settings of the page).
+| Navigation changes recorded on 2026-11-05 | Decision |
+| --- | --- |
+| Reset (`p23/menu-nav`) | Move page reset off ZR to avoid accidental resets near roster role switching. |
+| Reset page to defaults | End each page with confirmation. A reset, B cancelled, and shortcuts stayed. |
+| Logging | Record the page and changed rows. |
+| Reopening | Restore the player's previous menu position. |
+| ZL + Up/Down (review MN-1/MN-2) | Jump one section on a page or one window in popup lists. |
+| Other screens | Direction grids, sliders, roster/stage grids and panels kept separate ZL and direction presses. |
+| Tap detection | Releasing ZL alongside another press did not count as a tap. |
 
 ### Page 1 — CPU (what the CPU does)
 
-| Section | Row | Control | Values / default | Today |
+| Section | Row | Control | Values / default | Fork baseline |
 | --- | --- | --- | --- | --- |
 | Reactions | Mash | checklist | 13 actions / none | Mash → Mash Toggles |
 | | Followup | checklist | 13 actions / none | Mash → Followup Toggles |
 | | Mash Triggers | checklist | 16 situations / Hitstun, Shieldstun, … (upstream default) | Mash → Mash Triggers |
-| | Situation overrides | editor ▸ | sub-screen: a dropdown picks the situation (13), a checklist sets its actions; summary shows how many are set | Override tab (13 rows) |
+| | Situation overrides | editor ▸ | Choose among 13 situations, tick desired actions, see count configured. | Override tab (13 rows) |
 | Defence | Airdodge Direction | checklist | 11 directions / none | Defensive |
 | | DI Direction | checklist | 11 / none | Defensive |
 | | SDI Direction | checklist | 11 / none | Defensive |
@@ -115,13 +113,11 @@ press is not a ZL tap. The reset's confirmation says the menu shortcuts stay (th
 | CPU plays Player 1 | P1 CPU Control | toggle | Off | Misc |
 | | P1 CPU Level | dropdown | 1–9 / 3 | Misc |
 
-Open point: the upstream `BoolFlag` rows (Falling Aerials, Full Hop, Fast Fall)
-are multi-select on purpose (random Yes/No). The draft keeps them as
-checklists; the alternative is a three-value dropdown *Yes / No / Random*.
+The proposal considered checklists for random Yes/No values. Falling Aerials, Full Hop and Fast Fall now use the Yes / No / Random dropdown.
 
 ### Page 2 — Saves (positions, damage, setups)
 
-| Section | Row | Control | Values / default | Today |
+| Section | Row | Control | Values / default | Fork baseline |
 | --- | --- | --- | --- | --- |
 | Save states | Save States | toggle | On | Save States → Enable |
 | | Slot | dropdown | 1–5 / 1 | Save States |
@@ -141,7 +137,7 @@ checklists; the alternative is a three-value dropdown *Yes / No / Random*.
 
 ### Page 3 — Recording (inputs the CPU plays back)
 
-| Section | Row | Control | Values / default | Today |
+| Section | Row | Control | Values / default | Fork baseline |
 | --- | --- | --- | --- | --- |
 | Recording | Record Slot | dropdown | 1–5 / 1 | Input Recording → Recording Slot |
 | | Trigger | dropdown | Button, Save State load / Button | Input Recording |
@@ -162,7 +158,7 @@ checklists; the alternative is a three-value dropdown *Yes / No / Random*.
 
 ### Page 4 — Fighters & Stages
 
-| Section | Row | Control | Values / default | Today |
+| Section | Row | Control | Values / default | Fork baseline |
 | --- | --- | --- | --- | --- |
 | Player 1 and CPU | Player Swapping | toggle | Off | Characters |
 | | Player Character | editor ▸ (portrait grid) | | Characters |
@@ -180,18 +176,20 @@ checklists; the alternative is a three-value dropdown *Yes / No / Random*.
 | | Ready Fighters | dropdown | total across roles / 10 | Character Extras |
 | | Ready Fighter Bodies | dropdown | Off, 1–3 / native max | Character Extras |
 | | Group Swap | toggle | On | Character Extras |
-| | Swap groups | checklist | Ice Climbers pair bank, Original fighter bank, Solo Popo groups, Ice Climbers pair groups, PT/Aegis groups, Ice Climbers pair group, Mii groups / all on | Character Extras (7 rows → 1) |
+| | Swap groups | checklist | Seven independent switches, all on in the proposal. See list below. | Character Extras (7 rows → 1) |
 | | Preload Samples | toggle | Off | Character Extras |
 
-The seven group rows become one checklist because every one of them is an
-independent On/Off with the same help shape; the per-entry help text moves
-into the popup. Dependencies (needs Group Swap; needs 3 bodies) are shown by
-greying the entry and saying why in the help line, as the fork does for
-unavailable portraits.
+| Proposed switches | Entries |
+| --- | --- |
+| Banks | Ice Climbers pair bank, Original fighter bank |
+| Groups | Solo Popo groups, Ice Climbers pair groups, PT/Aegis groups |
+| Other groups | Ice Climbers pair group, Mii groups |
+| Help | Independent On/Off switches shared a help format inside one popup. |
+| Dependencies | Grey unavailable entries and explain the Group Swap or three-body requirement, as for portraits. |
 
 ### Page 5 — Display & Controls
 
-| Section | Row | Control | Values / default | Today |
+| Section | Row | Control | Values / default | Fork baseline |
 | --- | --- | --- | --- | --- |
 | On screen | HUD | toggle | On | Misc |
 | | Hitbox Visualization | toggle | Off | Misc |
@@ -199,46 +197,44 @@ unavailable portraits.
 | | Input Display | dropdown | Off, Smash, Raw, Status only / Smash (upstream default) | Misc |
 | | Group inputs by status | toggle | Off | Misc → Input Display Status |
 | | Input Delay | dropdown | 0–10 frames / 0 | Misc |
-| Button chords | Chords | editor ▸ | sub-screen listing Save State Save, Save State Load, Input Record, Input Playback, Cycle Player, Cycle CPU; each row a chord editor (hold one, press the others) | Button Config (6 rows → 1) |
+| Button chords | Chords | editor ▸ | Save/Load State, Input Record/Playback, Cycle Player/CPU. Hold one button and press the others. | Button Config (6 rows → 1) |
 | | Menu shortcuts | read-only rows | the INI's `shortcut_1` / `shortcut_2` and the permanent B + D-pad Up | `button_config.ini` (fork) |
 
 ## Page count and row count
 
-| | Today | Proposal |
+| | Fork baseline | Proposal |
 | --- | ---: | ---: |
 | Pages | 9 | 5 |
-| Rows on pages | 103 | 73 (13 overrides → 1, 6 chords → 1, 7 group toggles → 1, 2 read-only shortcut rows added) |
+| Rows reported in the first proposal | 103 (tab counts above sum to 105) | 73 total. Merge overrides 13→1, chords 6→1, groups 7→1. Add two read-only shortcuts. |
 | Single-choice rows shown as dropdowns | 0 | 24 |
 
-## Variants to decide
+## Alternatives considered on 2026-11-01
 
-1. **Four pages** instead of five: merge *Display & Controls* into *Saves* (as
-   "Room & Display") — fewer pages, but the page gets long.
-2. **Six pages**: split *Fighters & Stages* into *Fighters* and *Stages & Lobby*
-   when lobby practice grows.
-3. The *Loading (advanced)* section could live under a single "Advanced…" editor
-   row instead of a collapsed section.
-4. Keep the three Yes/No `BoolFlag` rows as checklists (random) or make them
-   *Yes / No / Random* dropdowns.
+| Alternative | Trade-off discussed |
+| --- | --- |
+| Four pages | Merge Display & Controls into Saves as Room & Display. The resulting page grows longer. |
+| Six pages | Split Fighters & Stages into Fighters and Stages & Lobby as lobby practice grows. |
+| Loading editor | Put advanced Loading rows behind one editor instead of a collapsed section. |
+| Yes/No values | Keep three checklists for random selection or use Yes / No / Random dropdowns. |
 
-## Open questions for the operator
+## Decisions after the first proposal
 
-1. Approve the five-page grouping, or pick a variant above.
-2. Dropdown input: ◂/▸ cycling without opening the list is quick but makes
-   accidental changes easier; keep it, or require A to open?
-3. Should *Situation overrides*, *Chords* and *Swap groups* be sub-screens (as
-   drawn) or stay as rows on the page?
-4. Menu shortcuts: show them read-only (as drawn) or make them editable in the
-   menu too (the INI stays the file of record either way)?
-5. Which page opens first: the last page used (today) or always CPU?
+| Question | Alternatives reviewed | Decision |
+| --- | --- | --- |
+| Grouping | Four, five or six regular pages | Five regular pages plus a hidden Developer page (November 1). |
+| Dropdown input | Cycle directly or require A to avoid accidental changes | Left/Right cycle directly. A opens the list (November 1). |
+| Overrides, Chords and Swap groups | Separate page rows or one entry each | One editor or popup per group (November 1). |
+| Menu shortcuts | Read-only INI display or in-menu editing | Two editable shortcuts write the INI. The permanent chord stays fixed (November 1). |
+| Initial page | Last page used or always CPU | Last used. CPU on first open (November 2). |
 
-## What this changes for the implementation
+The [later inventory](../MENU-DRAFT.md) records the 2026 decisions.
 
-- The clean-room menu model (SPEC-core-02) needs the Dropdown and Section
-  controls and a sub-screen stack; the fork's grids, lists and panels plug in
-  as *editor* rows unchanged.
-- Settings keys do not change: every row maps to an existing field in the
-  settings JSON, so the fork's `training_modpack.json` files load as they are.
-  The seven group toggles stay seven fields behind one checklist.
-- The layout archive (SPEC-core-05) needs new pane sets for the dropdown popup
-  and the section header; the artwork is ours (SPEC-core-07).
+## Implementation assumptions in the first proposal
+
+| Area | 2026-11-01 proposal |
+| --- | --- |
+| Menu model (SPEC-core-02) | Add Dropdown, Section and a sub-screen stack. |
+| Editors | Reuse the fork's grids, lists and panels as editor rows. |
+| Settings JSON | Preserve keys so the fork's `training_modpack.json` files load unchanged. |
+| Swap groups | Keep seven settings fields behind one checklist. |
+| Layout archive (SPEC-core-05) | Add dropdown and section-header panes with original artwork (SPEC-core-07). |
