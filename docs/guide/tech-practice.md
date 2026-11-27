@@ -2,7 +2,7 @@
 
 ## Tech a surface on impact
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d0eca9a146fb35a73838b8f5fa51330d6455a5c5" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/31d110ca42ab2ca51e85e01734275117539643bb" autoplay muted loop playsinline controls></video>
 
 *The third attempt is a missed tech.* [Open the clip](../media/tut-tech-practice.mp4)
 
