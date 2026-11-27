@@ -15,12 +15,14 @@
 
 - 2026-11-01. This page lists every operator decision of the menu proposal, one illustration per decision.
 - In each picture the recommended option has a **green outline**.
-- The images are in [`decisions/`](DECISIONS.md) and are drawn by `tools/render_decisions.py` in the menu mockup's style.
+- The images are in [`decisions/`](decisions/) and are drawn by `tools/render_decisions.py` in the menu mockup's style.
 - Sources: `MENU-DRAFT.md` §4 (the menu questions keep their numbers), the specs' *Open questions* sections, `PROVENANCE.md` *Open questions* and `specs/SPEC-core-08` §10.
 
 - **Answered 2026-11-01 (late evening ET):** the operator approved the proposal with the answers in the *Decision* column below, and implementation may begin.
 - The remaining answers arrived on November 2 and are included in the table.
-- The new requirements the answers add are collected in [*New requirements from the answers*](#new-requirements-from-the-answers) at the end, with their mockups.
+- The new requirements the answers add are collected in [*New requirements from the answers*](#new-requirements-from-the-answers), with their mockups.
+
+<a id="november-menu-decisions"></a>
 
 | # | Decision | Recommendation | Decision (2026-11-01) |
 | --- | --- | --- | --- |
@@ -61,13 +63,13 @@
 
 | Menu recommendations | Recorded outcomes |
 | --- | --- |
-| Q1–Q18 | [November 1–2 decision table](#decisions-for-the-operator) |
+| Q1–Q18 | [November 1–2 decision table](#november-menu-decisions) |
 
 ### Q1 · Number of pages
 
 Five pages, four (Saves and Display & Controls merged) or six (Stages & Lobby split out)?
 
-- **Q1 proposal ([November 1 outcome](#decisions-for-the-operator)): five.** Each page has one theme, and no page is very long or nearly empty.
+- **Q1 proposal ([November 1 outcome](#november-menu-decisions)): five.** Each page has one theme, and no page is very long or nearly empty.
 - Cost: none; the mockups already show five.
 
 ![Q1 pages](decisions/01-pages.png)
@@ -76,7 +78,7 @@ Five pages, four (Saves and Display & Controls merged) or six (Stages & Lobby sp
 
 Should Left / Right change a dropdown's value in place, or must A open the list first?
 
-- **Q2 proposal ([November 1 outcome](#decisions-for-the-operator)): in place, as drawn.** A still opens the full list.
+- **Q2 proposal ([November 1 outcome](#november-menu-decisions)): in place, as drawn.** A still opens the full list.
 - It is one press per change instead of three.
 - Cost: a stray Left / Right changes the value.
 
@@ -86,7 +88,7 @@ Should Left / Right change a dropdown's value in place, or must A open the list 
 
 Aerial, fast-fall, throw, pummel and ledge delays, OoS offset, reaction time and the slot sets: keep them as checklists, or use a min–max slider?
 
-- **Q3 proposal ([November 1 outcome](#decisions-for-the-operator)): checklists.** They keep today's meaning, so saved files load unchanged.
+- **Q3 proposal ([November 1 outcome](#november-menu-decisions)): checklists.** They keep today's meaning, so saved files load unchanged.
 - A range slider cannot express a set like {0, 5, 10}.
 - Cost: a checklist is a longer popup than a slider.
 
@@ -99,7 +101,7 @@ Aerial, fast-fall, throw, pummel and ledge delays, OoS offset, reaction time and
 
 Should these three be sub-screens (one row each), or should all their rows sit on the page?
 
-- **Q4 proposal ([November 1 outcome](#decisions-for-the-operator)): sub-screens.** Putting the rows on the page adds 12 rows to CPU, 6 to Fighters & Stages and 5 to Display & Controls.
+- **Q4 proposal ([November 1 outcome](#november-menu-decisions)): sub-screens.** Putting the rows on the page adds 12 rows to CPU, 6 to Fighters & Stages and 5 to Display & Controls.
 - Cost: one more press (A) to reach them.
 
 ![Q4 sub-screens](decisions/04-subscreens.png)
@@ -108,7 +110,7 @@ Should these three be sub-screens (one row each), or should all their rows sit o
 
 Should the menu open on the last page used (today's behaviour) or always on CPU?
 
-- **Q5 proposal ([November 2 outcome](#decisions-for-the-operator)): the last page used.** A drill loop (record, test, adjust) comes back to the same page.
+- **Q5 proposal ([November 2 outcome](#november-menu-decisions)): the last page used.** A drill loop (record, test, adjust) comes back to the same page.
 - Cost: none; this is today's behaviour.
 
 ![Q5 first page](decisions/05-first-page.png)
@@ -119,7 +121,7 @@ Should the menu open on the last page used (today's behaviour) or always on CPU?
 
 Keep this legacy row for saves made before the fork's item snapshot, or convert those saves once at import and drop the row?
 
-- **Q6 proposal ([November 1 outcome](#decisions-for-the-operator)): keep it for now.** It carries no risk, and new saves never use it.
+- **Q6 proposal ([November 1 outcome](#november-menu-decisions)): keep it for now.** It carries no risk, and new saves never use it.
 - Revisit once the import has been tested on real cards.
 - Cost: one rarely used row on Saves.
 
@@ -131,7 +133,7 @@ Keep this legacy row for saves made before the fork's item snapshot, or convert 
 
 Should there be a menu toggle that writes `replay_capture.ini` and matches the Deluxe Plugins row, or should the setting stay INI / Deluxe only?
 
-- **Q7 proposal ([November 1 outcome](#decisions-for-the-operator)): add the toggle.** It can then be changed in game, and all three places always agree.
+- **Q7 proposal ([November 1 outcome](#november-menu-decisions)): add the toggle.** It can then be changed in game, and all three places always agree.
 - Cost: one row, and one small INI write when the row changes.
 
 ![Q7 replay capture](decisions/07-replay-capture.png)
@@ -140,7 +142,7 @@ Should there be a menu toggle that writes `replay_capture.ini` and matches the D
 
 Ship this diagnostics row under *Loading (advanced)*, or put it in the `diag` build only?
 
-- **Q8 proposal ([November 1 outcome](#decisions-for-the-operator)): diag build only.** Players never need it, and the playbook's `diag` feature exists for exactly this.
+- **Q8 proposal ([November 1 outcome](#november-menu-decisions)): diag build only.** Players never need it, and the playbook's `diag` feature exists for exactly this.
 - Cost: measuring on a card then needs the diag build.
 
 ![Q8 preload samples](decisions/08-preload-samples.png)
@@ -151,7 +153,7 @@ Ship this diagnostics row under *Loading (advanced)*, or put it in the `diag` bu
 
 Show the INI shortcuts read-only in the menu, or make them editable there with the INI as the file of record?
 
-- (This also answers `PROVENANCE.md` open question 5.) **Q9 proposal ([November 1 outcome](#decisions-for-the-operator)): read-only.** No second chord editor is needed, and the behaviour matches the fork (restart to apply).
+- (This also answers `PROVENANCE.md` open question 5.) **Q9 proposal ([November 1 outcome](#november-menu-decisions)): read-only.** No second chord editor is needed, and the behaviour matches the fork (restart to apply).
 - Cost: changing a shortcut means editing `button_config.ini`.
 
 ![Q9 menu shortcuts](decisions/09-menu-shortcuts.png)
@@ -162,7 +164,7 @@ Show the INI shortcuts read-only in the menu, or make them editable there with t
 
 Keep one help line at the bottom, or use a two-line panel?
 
-- **Q10 proposal ([November 1 outcome](#decisions-for-the-operator)): two lines.** The fork's longer help texts (the group rows, for example) then fit without being cut.
+- **Q10 proposal ([November 1 outcome](#november-menu-decisions)): two lines.** The fork's longer help texts (the group rows, for example) then fit without being cut.
 - Cost: the item list shows one row fewer.
 
 ![Q10 help text](decisions/10-help-text.png)
@@ -171,7 +173,7 @@ Keep one help line at the bottom, or use a two-line panel?
 
 Show the two hidden fallback rows (as proposed), make it INI only, or drop the TM-side control and require the pilot?
 
-- **Q11 proposal ([November 1 outcome](#decisions-for-the-operator)): the fallback rows.** P1 control still works on a card without the pilot.
+- **Q11 proposal ([November 1 outcome](#november-menu-decisions)): the fallback rows.** P1 control still works on a card without the pilot.
 - With the pilot installed, only the info row shows.
 - Cost: two rows, shown only when the pilot is absent.
 
@@ -181,7 +183,7 @@ Show the two hidden fallback rows (as proposed), make it INI only, or drop the T
 
 Show a weight digit on each selected chip (today's counts), or use plain on/off chips with an even pick?
 
-- **Q12 proposal ([November 1 outcome](#decisions-for-the-operator)): weights.** They keep today's semantics, and saved files carry the counts.
+- **Q12 proposal ([November 1 outcome](#november-menu-decisions)): weights.** They keep today's semantics, and saved files carry the counts.
 - Cost: a small badge per chip, and A adds weight instead of only toggling.
 
 ![Q12 weights](decisions/12-direction-weights.png)
@@ -190,7 +192,7 @@ Show a weight digit on each selected chip (today's counts), or use plain on/off 
 
 Keep items at 4 × 8 per page (two pages) and stages at 4 × 4 (eight pages), as the fork does, or use denser pages?
 
-- **Q14 proposal ([November 1 outcome](#decisions-for-the-operator)): as the fork.** This layout is tested on the console, and the item names stay readable.
+- **Q14 proposal ([November 1 outcome](#november-menu-decisions)): as the fork.** This layout is tested on the console, and the item names stay readable.
 - Cost: L / R to reach items 33–38.
 
 ![Q14 paging](decisions/14-grid-paging.png)
@@ -204,7 +206,7 @@ Keep items at 4 × 8 per page (two pages) and stages at 4 × 4 (eight pages), as
 
 Lists with the fork's bust thumbnail beside each saved Mii where one exists, or text only?
 
-- **Q15 proposal ([November 1 outcome](#decisions-for-the-operator)): busts where they exist.** They make saved Miis easy to tell apart, and the fork already makes them.
+- **Q15 proposal ([November 1 outcome](#november-menu-decisions)): busts where they exist.** They make saved Miis easy to tell apart, and the fork already makes them.
 - Cost: one small texture per visible Mii.
 - (The picture uses a neutral silhouette in place of a bust.)
 
@@ -217,7 +219,7 @@ Lists with the fork's bust thumbnail beside each saved Mii where one exists, or 
 ### Q16 · Fighter portraits and mods
 
 - Should the portrait grid read each fighter's own UI portrait from the game at run time, as the stage grid does (so character and costume mods show), or keep fixed stock icons as the fork does?
-- **Q16 proposal ([November 1 outcome](#decisions-for-the-operator)): read at run time, falling back to a text tile.**
+- **Q16 proposal ([November 1 outcome](#november-menu-decisions)): read at run time, falling back to a text tile.**
 - This is the same rule as stages and DI / SDI chips: nothing is baked or committed, and mods show.
 - Cost: the run-time read has the same open unknowns as the stage thumbnails (`SPEC-core-07` §4.5, U1–U8), plus choosing the right costume, so it needs one more development probe.
 
@@ -228,7 +230,7 @@ Lists with the fork's bust thumbnail beside each saved Mii where one exists, or 
 Should only the DI and SDI chips show the game's own visual, with Airdodge Direction and Shield Tilt keeping
 the clean room's arrows?
 
-- **Q17 proposal ([November 1 outcome](#decisions-for-the-operator)): yes, DI and SDI only.** The game's visual shows launch influence; on an air-dodge or shield chip it would suggest something those options do not do.
+- **Q17 proposal ([November 1 outcome](#november-menu-decisions)): yes, DI and SDI only.** The game's visual shows launch influence; on an air-dodge or shield chip it would suggest something those options do not do.
 - Cost: none; this is how the mockups are drawn.
 
 ![Q17 chips](decisions/17-di-sdi-chips.png)
@@ -241,7 +243,7 @@ the clean room's arrows?
 - A. Apply at the next CPU frame. The roll holds until reset or another change to the row.
 - B. Apply as in A and roll a new SDI direction every hitlag episode (`SPEC-cpu-02` questions 1 and 9).
 - C. Keep reset-only and label the row "applies on next reset".
-- **Q18 proposal ([November 1 outcome](#decisions-for-the-operator)): A, follow the fork.**
+- **Q18 proposal ([November 1 outcome](#november-menu-decisions)): A, follow the fork.**
 - It is built and was checked in Eden (the SDI Up → In change, and the Shield Tilt change, applied with no reset).
 - The menu then means the same in both plugins, and Shield Tilt and the other per-reset rolls follow the same rule.
 - Cost: with two or more directions selected, SDI keeps one direction until the next reset or change, which upstream's own source marks as a bug.
@@ -255,7 +257,7 @@ the clean room's arrows?
 
 | File decisions | Recorded outcomes |
 | --- | --- |
-| S1 and S2 | [November 1 decision table](#decisions-for-the-operator) |
+| S1 and S2 | [November 1 decision table](#november-menu-decisions) |
 
 ### S1 · Five import details (`SPEC-core-08` §10)
 
@@ -284,7 +286,7 @@ Of the five original import recommendations numbered in the picture, four were a
 
 Delete the file and start from defaults (upstream), or keep a renamed copy and load it field by field?
 
-- **S2 proposal ([November 1 outcome](#decisions-for-the-operator)): keep a copy, default per field.** One bad field no longer wipes every setting.
+- **S2 proposal ([November 1 outcome](#november-menu-decisions)): keep a copy, default per field.** One bad field no longer wipes every setting.
 - Cost: one renamed file on the card until the player deletes it.
 
 ![S2 corrupt settings](decisions/S2-corrupt-settings.png)
@@ -293,14 +295,14 @@ Delete the file and start from defaults (upstream), or keep a renamed copy and l
 
 | Decisions | Recorded outcomes |
 | --- | --- |
-| B1–B11 | [November 1–2 decision table](#decisions-for-the-operator) |
+| B1–B11 | [November 1–2 decision table](#november-menu-decisions) |
 | B4 | November 25 reversal recorded in the same table. |
 
 ### B1 · Plugin name (`SPEC-core-01` question 6)
 
 Name the plugin `training_rooms` (`libtraining_rooms.nro`), or keep `training_modpack`?
 
-- **B1 proposal ([November 1 outcome](#decisions-for-the-operator)): `training_rooms`.** The two plugins can then be told apart on a card and in logs.
+- **B1 proposal ([November 1 outcome](#november-menu-decisions)): `training_rooms`.** The two plugins can then be told apart on a card and in logs.
 - They must never be installed together, because they hook the same sites.
 - Cost: none.
 
@@ -310,7 +312,7 @@ Name the plugin `training_rooms` (`libtraining_rooms.nro`), or keep `training_mo
 
 Show the error pop-up on a panic (upstream: the game is unusable until it is closed), or write the panic to the diagnostics file and the Skyline log with no pop-up?
 
-- **B2 proposal ([November 1 outcome](#decisions-for-the-operator)): log it, no pop-up**, as the playbook's plugins do.
+- **B2 proposal ([November 1 outcome](#november-menu-decisions)): log it, no pop-up**, as the playbook's plugins do.
 - Cost: the player sees no message on screen; the reason is in the logs.
 
 ![B2 panic](decisions/B2-panic-policy.png)
@@ -320,7 +322,7 @@ Show the error pop-up on a panic (upstream: the game is unusable until it is clo
 When another mod ships its own `info_training` layout, should the plugin inject its layout anyway and
 document the conflict, or detect it and skip injection (the other mod's HUD stays and our menu is off)?
 
-- **B3 proposal ([November 1 outcome](#decisions-for-the-operator)): inject anyway, document it.** The install line notes the other layout. Cost: that mod's
+- **B3 proposal ([November 1 outcome](#november-menu-decisions)): inject anyway, document it.** The install line notes the other layout. Cost: that mod's
 training HUD does not show while this plugin is installed.
 
 ![B3 layout mods](decisions/B3-layout-mods.png)
@@ -328,7 +330,7 @@ training HUD does not show while this plugin is installed.
 ### B4 · P1 driven by an AI (`SPEC-cpu-01` question 7, `SPEC-input-01` question 7)
 
 - When the pilot or the fallback drives P1: should the CPU settings (Mash, DI, SDI, ledge, tech, shield …) apply to P1 too, and what should Record do?
-- **B4 proposal ([November 1 outcome](#decisions-for-the-operator)): the CPU settings apply to the CPU role only, and Record is refused with a notice.**
+- **B4 proposal ([November 1 outcome](#november-menu-decisions)): the CPU settings apply to the CPU role only, and Record is refused with a notice.**
 - Two drivers never fight over P1, and no new game site is needed.
 - Cost: recording the AI's line would need the alternative (reading P1's controller slot).
 
@@ -341,7 +343,7 @@ training HUD does not show while this plugin is installed.
 
 While a recording plays on the CPU, should the DI, SDI, air-dodge, tech and throw settings override it (upstream), or should the recording win?
 
-- **B5 proposal ([November 1 outcome](#decisions-for-the-operator)): the recording wins**, the same way shield and stick already yield to playback.
+- **B5 proposal ([November 1 outcome](#november-menu-decisions)): the recording wins**, the same way shield and stick already yield to playback.
 - Cost: none; the settings apply again when playback ends.
 
 ![B5 playback](decisions/B5-playback-vs-settings.png)
@@ -352,7 +354,7 @@ While a recording plays on the CPU, should the DI, SDI, air-dodge, tech and thro
 
 Should Popo and Nana share one set of CPU counters and cases (upstream), or have one each?
 
-- **B6 proposal ([November 1 outcome](#decisions-for-the-operator)): one per fighter.** Nana's SDI count, DI case and delays then stop leaking into Popo's.
+- **B6 proposal ([November 1 outcome](#november-menu-decisions)): one per fighter.** Nana's SDI count, DI case and delays then stop leaking into Popo's.
 - Cost: a few bytes per CPU fighter.
 
 ![B6 per fighter](decisions/B6-per-fighter-state.png)
@@ -361,7 +363,7 @@ Should Popo and Nana share one set of CPU counters and cases (upstream), or have
 
 - Upstream's air dodge mirrors only when the player is on the CPU's right, and its shield tilt is absolute.
 - Should both use the opponent-relative rule that DI and SDI use?
-- **B7 proposal ([November 1 outcome](#decisions-for-the-operator)): yes, toward the opponent everywhere.**
+- **B7 proposal ([November 1 outcome](#november-menu-decisions)): yes, toward the opponent everywhere.**
 - The direction grid labels its chips In and Out, so they should mean the same on every row and on both sides.
 - Cost: a visible change against the fork when the player stands on the CPU's left.
 
@@ -372,7 +374,7 @@ Should Popo and Nana share one set of CPU counters and cases (upstream), or have
 The specs recommend thirteen small user-visible fixes (top of the picture) and six behaviours to keep as
 the fork has them (bottom).
 
-- **B8 proposal ([November 1 outcome](#decisions-for-the-operator)): accept the batch.** Any single line can be reversed by naming it.
+- **B8 proposal ([November 1 outcome](#november-menu-decisions)): accept the batch.** Any single line can be reversed by naming it.
 - Each line's spec question has the details.
 - Cost: each fix is a small parity change against the fork, and the release notes list them.
 
@@ -387,7 +389,7 @@ the fork has them (bottom).
 Drop `dev_config`, the debug hooks and `raygun_printer` from the shipped build, or keep them as diag-only behaviour?
 
 - Should `training_mod_sync` (36 lines of lock helpers) be kept, or should the code use `parking_lot` directly?
-- **B9 proposal ([November 1 outcome](#decisions-for-the-operator)): drop them, and add a diag version only if a developer asks; use `parking_lot` directly.** Cost: none for players.
+- **B9 proposal ([November 1 outcome](#november-menu-decisions)): drop them, and add a diag version only if a developer asks; use `parking_lot` directly.** Cost: none for players.
 
 ![B9 dev code](decisions/B9-dev-only-code.png)
 
@@ -398,7 +400,7 @@ Drop `dev_config`, the debug hooks and `raygun_printer` from the shipped build, 
 
 Reuse the fork's walkthrough GIFs now (some show the old menu), reuse only those without the menu, or ship no media until the new menu is built?
 
-- **B10 proposal ([November 1 outcome](#decisions-for-the-operator)): reuse the GIFs that show no menu now, and re-record the menu GIFs after the build.** Cost: the README has no menu pictures until then.
+- **B10 proposal ([November 1 outcome](#november-menu-decisions)): reuse the GIFs that show no menu now, and re-record the menu GIFs after the build.** Cost: the README has no menu pictures until then.
 
 ![B10 README media](decisions/B10-readme-media.png)
 
@@ -409,7 +411,7 @@ Reuse the fork's walkthrough GIFs now (some show the old menu), reuse only those
 - The throw option behaves the same way for a CPU already holding someone.
 - The fork's SDI and Shield Tilt rolls no longer have this problem (Q18).
 - Options: (a) re-roll the ledge options (and the throw options) when the menu changes them, like SDI Direction: the CPU takes the new option during the same hang; (b) apply on the next ledge grab, which is what the fork does today and what `SPEC-cpu-03` currently says.
-- **B11 proposal ([November 2 outcome](#decisions-for-the-operator)): (a).**
+- **B11 proposal ([November 2 outcome](#november-menu-decisions)): (a).**
 - The menu then does what it says without a second hang, and it follows the same rule as Q18.
 - Cost: one more roll cleared on a menu change; a CPU already hanging can act differently the moment the row changes; the fork keeps (b) until it gets the same change.
 - Source: the fork's `c1162/di-sdi-apply/PROGRESS.md`, "For the primary" item 2.
@@ -541,6 +543,8 @@ The November 2 acceptance criteria covered count 1→2→3→2→1, a helper sti
 - If the pool or memory cannot hold that configuration, present the measurements for a decision rather than silently lowering it.
 - The measurement must follow resolution of the existing helper-path fault hold.
 - The follow-up was a blocker only if it changed approved behavior. [The roadmap](ROADMAP.md) records ten hot fighters and five hot hats in rc.5, with the first Eden rows in rc.6.
+
+<a id="f9-live-hat-item-source-immediate-cutover-2026-11-03"></a>
 
 ### F9 live hat/item source: immediate cutover — 2026-11-03
 
@@ -745,36 +749,26 @@ The primary (12:32Z): a root fix, not a removed check.
 
 ### Eggs-ercise
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/02e39f54547da1f2ece5fbdf93795738b0498564" autoplay muted loop playsinline controls></video>
+[Watch the three original Eggs-ercise takes](#rc14-targets-preview--eggs-ercise).
 
-*Break as many targets as possible in one minute.* [Open the clip](media/rc14-preview-eggs-1-minute.mp4)
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/5015eca5396ee7de078c104a31cb08b51ebac1b0" autoplay muted loop playsinline controls></video>
 
-*10 targets: a timed run to ten breaks, with your best kept.* [Open the clip](media/rc14-preview-eggs-n-targets.mp4)
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867785f05794d57fcb7e75b7f2603d05c5d787e8" autoplay muted loop playsinline controls></video>
 
-*Each CPU hit counts; it resets to 0% at a new spot.* [Open the clip](media/rc14-preview-eggs-cpu-target.mp4)
 
 ### Break the Targets
 
 - Two clips from the Eden test runs of Break the Targets (`btt-4-2`, `btt-4-3`; builds `d2/btt-4` on the rc.14 core).
-- These are test-run footage, not the final docs GIFs.
-- The notice band moves once more (below the frame strip when Input Display is On), and the docs GIFs are shot on the final rc.14 build.
+- Both takes already showed the top notice band.
+- [The final rc.14 reshoots](#rc14-targets-preview--newest-takes-the-rc-14-build-footer-rc14-8199c696-shot-about-23-50z) followed the notice change.
 - Untested on hardware.
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/c8fceff0d6950f7ad688e1cd9dedce4cccfe2c09" autoplay muted loop playsinline controls></video>
+[Watch the original placement and timed run](#rc14-targets-preview--break-the-targets).
 
-*Press A to place targets at the cursor.* [Open the clip](media/rc14-preview-btt-place.mp4)
 
-The preview opened Practice games › Place targets and placed three targets.
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7ab7168ab0564e9e2dcf570d083b61ae10b7302f" autoplay muted loop playsinline controls></video>
 
-*Three targets in 0:04.08 (best 0:04.06).* [Open the clip](media/rc14-preview-btt-run.mp4)
 
-- The readout went from Targets 0/3 0:00.00 through 2/3 to Done!
 
 ## Lobby Practice is On by default (2026-11-22): decided
 
@@ -1364,7 +1358,9 @@ Opened 2026-11-14 with the question whether pill shapes are used where they shou
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/17726eb104066a56c6d3fdb7be88614e5e01ec5f" autoplay muted loop playsinline controls></video>
 
-*rc14-eggs preview: the menu set to 1 minute, an egg with the counting notice, a jab that doesn't break it, and a neutral air that does, with the next egg in view (hits at 25 % speed)* [Open the clip](media/rc14-eggs-demo.mp4)
+*A jab leaves the egg intact. A neutral air breaks it.* [Open the clip](media/rc14-eggs-demo.mp4)
+
+The draft used the one-minute setting. The clip shows the counting notice and the next egg at 25% hit speed.
 
 Draft built at the recommended defaults; watch for the egg's look (D1), the notice size (D5) and the rise (D2).
 - **One Eden run, no splice** (Training, P1 Fox, CPU Mario, draft `5b8c3fd0`). The egg before each hit was placed by
@@ -1810,6 +1806,8 @@ Which licence for the six repos with no LICENSE file: smash-replay-to-mp4, insta
 - It supersedes the on-screen rule for Whole stage only; In view keeps the existing behavior.
 - The setting applies on the next Start.
 
+<a id="zone-editor-decision"></a>
+
 ### rc.15 zone editor: design 3, the crop window (operator decision, 2026-11-22)
 
 - At about 17:07Z design 3 was chosen as the cleanest.
@@ -1856,6 +1854,8 @@ Eden build `2a29baf4` tested the spike before full implementation.
 
 Added by the operator with the answers: the crosshair is built as one shared component, because the new Recording
 placement wizard (hit-streak-sol lane) uses it too.
+
+<a id="gj1-ko-decision"></a>
 
 ### GJ1 · Guard the Edge: a KO counts only once Player 1 is back
 
@@ -1922,8 +1922,7 @@ Required since 2026-11-22: an edgeguard counts only when Player 1 then returns t
 
 ### GJ2 · Guard the Edge wizard: Break the Targets' crosshair in place of the quadrant page
 
-*Changed 2026-11-25: Guard the Edge gets an option to start the CPU under the stage; see "Off stage, found from the
-stage's own lines" at the end of this file.*
+*Changed 2026-11-25: the [off-stage decision](#off-stage-decision) added a Guard the Edge option to start the CPU under the stage.*
 
 - Decided 2026-11-22: the start is picked with the same crosshair as Break the Targets, not by quadrant. That saves code and is simpler. This replaces the four start areas chosen on 2026-11-20 (Q1 of the Guard the Edge design).
 
@@ -2034,6 +2033,8 @@ Decided 2026-11-22: Juggler picks the CPU's area with the same crosshair, the on
 - **Rework 2026-11-23 (GJ4-8).** The Player cursor returns to the last position with a floor if its move has none underneath. A point whose floor is gone is refused on A; see the [Player cursor rule](#gj4-8-player-cursor).
 
 ![GJ3: the crosshair on Juggler's CPU page](decisions/gte-next-GJ3-juggler-crosshair.png)
+
+<a id="gj4-start-decision"></a>
 
 ### GJ4 · Player 1's start: two measured defects the crosshair does not remove
 
@@ -2273,7 +2274,7 @@ in Training left an unseen name draft open that held both fighters after the Rec
   change.
 - The Final Smash needs no handling of its own (19:48:35Z).
 
-Design: [design/action-model.md](#action-model).
+Design: [Action model](#action-model).
 
 ## Range sliders and the Recording pop-up (2026-11-24)
 
@@ -2332,6 +2333,8 @@ B as the stop key and `B stop preview` as their hint.
 - Only the clip editor hint `B stop preview` depends on active playback; the key line reads `B back` during the approximately one-second tail (tr-primary-2's ruling, 2026-11-25 15:11:54Z).
 - The design was accepted at 14:35:13Z; the hint lifecycle and fit rule were amended after review by rv-hit-streak at 14:36:00Z.
 
+<a id="off-stage-decision"></a>
+
 ## Off stage, found from the stage's own lines (2026-11-25): decided (operator)
 
 | | Choice | A | B |
@@ -2363,7 +2366,7 @@ B as the stop key and `B stop preview` as their hint.
 
 ![Battlefield, before and with the rule](decisions/training-stage-offstage/battlefield-05-today-and-proposed.png)
 
-- **The three choices put to the operator** (review page [decisions/training-stage-offstage/README.md](#training-stage-offstage)):
+- **The three choices put to the operator** ([stage geometry review](#training-stage-offstage)):
 
 | | Choice | A | B |
 | --- | --- | --- | --- |
@@ -2389,6 +2392,8 @@ B as the stop key and `B stop preview` as their hint.
 
 - Who builds what is in tr-primary-2's inbox post of 17:06:54Z. The rule lives in the stage-geometry module (`artifacts/phase23/stage-geometry/DESIGN.md`).
 
+<a id="placement-decision"></a>
+
 ## Change placement: the crosshair, on the save itself (2026-11-25): decided (operator)
 
 | | Choice | Decided |
@@ -2406,7 +2411,7 @@ B as the stop key and `B stop preview` as their hint.
 
 - **The design** (lane tile-fix-g4; `artifacts/phase23/placement-crosshair/DESIGN.md`): Change placement is the wizard of Place fighters before Record, opened on a save state, on the live game.
 - The design showed the fighters at their spots during placement and proposed saving with A. The November 25 PC3 ruling below assigned + to save from any page and A to confirm on Preview.
-- Six choices were put to the operator on the review page [decisions/placement-crosshair/README.md](#placement-crosshair).
+- Six choices were put to the operator in the [placement review](#placement-crosshair).
 - A green outline in a picture marks the lane's recommendation at the time, which is not always what was decided.
 
 **The answers**, 2026-11-25 about 15:50Z (relayed by tr-primary-2, inbox 15:53:07Z), are the table below.
@@ -2476,7 +2481,7 @@ B as the stop key and `B stop preview` as their hint.
 - Edit placement as an offset editor in Recording › Replays (`docs/FEATURE-LEDGER.md` row 70; primary 2026-11-08
   #70 (a)). The row stays, renamed Change placement, and opens the picker.
 - "The recording start picker keeps its chevron: its spots are clamped to the camera's range"
-  (`docs/design/rc15-gte-wizard-start.md`, 2026-11-23). Under PC4 A it holds the fighters at their spots and reaches
+  ([wizard start design](#rc15-gte-wizard-start), 2026-11-23). Under PC4 A it holds the fighters at their spots and reaches
   to 1 unit inside the blast line off stage.
 - Place fighters before Record had four pages; it has five.
 
@@ -2505,7 +2510,7 @@ The 2026-11-25 proposal used the Break the Targets crosshair to edit a save dire
 | 3 · Spot | Move the fighter with the crosshair. |
 | 4 | Press A to save, then load once. |
 
-- **Decided 2026-11-25, about 15:50Z.** Each section gives the outcome first. Green outlines mark the original recommendations. See [the decision record](DECISIONS.md) and [the Recording guide](guide/recording.md#change-placement-and-the-replay-window).
+- **Decided 2026-11-25, about 15:50Z.** Each section gives the outcome first. Green outlines mark the original recommendations. See [the decision record](#placement-decision) and [the Recording guide](guide/recording.md#change-placement-and-the-replay-window).
 
 <a id="placement-crosshair--pc1-on-stage-how-the-floor-is-chosen"></a>
 
@@ -2790,7 +2795,7 @@ Both rules marked the same area and two ledges on Battlefield.
 | T2 · Under a solid | Allow placement. Keep the Guard the Edge refusal from 2026-11-22. | Exclude it from every feature. | Add Guard the Edge options for under-stage CPU starts and midair jumps already used. |
 | T3 · Guard the Edge, Juggler and Off stage eggs | Adopt the shared rule later for all three. | Apply it only to placement. | Include all three so drills support Training and eggs avoid the island. |
 
-[Read the dated decisions](DECISIONS.md).
+[Read the dated decisions](#off-stage-decision).
 
 <a id="training-stage-offstage--evidence-limits"></a>
 
@@ -3348,7 +3353,7 @@ Both [Guard the Edge](guide/guard-the-edge.md) and [Juggler](guide/juggler.md) u
 | Guard the Edge, same boot | Successive reads were −66 and −78.9856. |
 
 - The original record named the external `artifacts/phase23/fix-round-20261123/gj4/gj4-8/CAUSE.md` receipt.
-- The published [GJ4 decision](DECISIONS.md) preserves the placement history.
+- The published [GJ4 decision](#gj4-start-decision) preserves the placement history.
 
 <a id="gj4-8-player-cursor--shipped-cursor-rule"></a>
 
@@ -3402,7 +3407,7 @@ The fix kept the existing floor lookup for both drills.
 *Two placement defects reconstructed from trace values.*
 
 - The shipped placement rules apply to [Guard the Edge](guide/guard-the-edge.md) and [Juggler](guide/juggler.md).
-- [Decisions](DECISIONS.md) records GJ4 for placement and GJ1 for KO scoring.
+- See [GJ4 for placement](#gj4-start-decision) and [GJ1 for KO scoring](#gj1-ko-decision).
 
 <a id="gj4-player-start--measured-cause"></a>
 
@@ -3614,7 +3619,7 @@ Shipped behavior and settings are in the [Eggs-ercise guide](guide/eggs-ercise.m
 
 - A target uses one floor, shown in yellow.
 - Its moving path stays above that floor and clear of gaps.
-- [Decisions](DECISIONS.md) includes the stage pictures.
+- See the [Training stage collision diagrams](#training-stage-offstage).
 
 <a id="rc15-eggs-paths-on-stage--cause-on-the-original-build"></a>
 
@@ -4073,7 +4078,7 @@ Host checks: `angle_of_reads_the_angled_side_animations`,
 
 | Fact | Where |
 | --- | --- |
-| The bind uses the menu setter’s native label writer. | `0x1bbbd30(menu, value, pane)`; `training_tick`; `rc8-binds.md` §2 |
+| The bind uses the menu setter’s native label writer. | `0x1bbbd30(menu, value, pane)`; `training_tick`; [native speed research](#rc8-binds--2-the-native-speed-checked-against-the-elf) |
 
 For the shipped controls see [Game speed](guide/game-speed.md) and [Recording](guide/recording.md).
 
@@ -4092,7 +4097,7 @@ flowchart LR
 
 | Fact | Where |
 | --- | --- |
-| The bind uses the menu setter’s native label writer. | `0x1bbbd30(menu, value, pane)`; `training_tick`; `rc8-binds.md` §2 |
+| The bind uses the menu setter’s native label writer. | `0x1bbbd30(menu, value, pane)`; `training_tick`; [native speed research](#rc8-binds--2-the-native-speed-checked-against-the-elf) |
 | Value 2 (1 Frame) loads the Training pause menu’s glyph style. | `.1bbbd78`: `ldr w8,[x22,#0x30]`; jump table `0x44f8a24`, entry 0 |
 | Default button code is `0xc`; styles 3–6 index a table. | `[main+0x44681a0 + 4*(style-3)]`, `.1bbbd78`–`.1bbbd94` |
 | Each text object receives the style at `+0x25c`. | `.1bbbe34`–`.1bbbf78` |
@@ -4894,7 +4899,7 @@ The [Eggs-ercise guide](guide/eggs-ercise.md) covers the shipped editor.
 
 *Design 3 crop-window model.*
 
-- [Decisions](DECISIONS.md) includes the proving-boot still.
+- See the [zone editor decision and proving-boot still](#zone-editor-decision).
 
 - The world view uses up to 19 rectangles: five dims, two limit lines, eight edges and four handle rectangles.
 - The inset adds up to ten more limits and edges, for at most **29 of the 176 roster stripes**. These are existing menu rectangles, not added panes or textures.
@@ -5071,7 +5076,7 @@ The display and speed chords shipped in rc.8, and the [game speed guide](guide/g
      - Online Deluxe 0.10.4 used L + R + D-pad Down for window pages, L + R + D-pad Up for its 30-second capture, and L + R + X to toggle.
      - Extra buttons still matched the default binds. Down also flipped the input display; Up would have opened the speed popup.
      - The CPU pilot and counterpick plugin shared that window.
-     - **The card scan** ([rc8-chord-survey.md](#rc8-chord-survey): `ultimate/` configs and the plugins' NRO
+     - **The card scan** ([card chord survey](#rc8-chord-survey): `ultimate/` configs and the plugins' NRO
        strings, read-only, 2026-11-11): no other plugin chord with R and a D-pad direction was found. The NRO strings
        show only text, so chords hard-coded as button masks aren't covered.
 2. **The input display bind** flips `input_display_strip` between `Off` and `Frame strip`.
