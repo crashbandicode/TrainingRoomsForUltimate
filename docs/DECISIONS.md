@@ -49,7 +49,7 @@
 | B1 | Plugin name | `training_rooms` | **as recommended** |
 | B2 | Panic policy | log it, no pop-up | **as recommended** |
 | B3 | Another mod's training HUD layout | inject anyway, document it | **as recommended** |
-| B4 | P1 driven by an AI | CPU settings on the CPU only; recording refused | **as recommended**; Record reversed 2026-11-25 (see the end) |
+| B4 | P1 driven by an AI | CPU settings on the CPU only; recording refused | Record refusal [reversed November 25](#record-while-an-ai-plays-player-1-2026-11-25). CPU settings still apply only to the CPU. |
 | B5 | Input playback and the CPU settings | the recording wins | **the recording wins by default;** an advanced row lets the settings override it (default Off) |
 | B6 | Ice Climbers state | one state per fighter | **as recommended** |
 | B7 | In / Out for Airdodge and Shield Tilt | toward the opponent, everywhere | **as recommended** |
