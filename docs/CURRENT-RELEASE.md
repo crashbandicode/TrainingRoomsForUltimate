@@ -131,14 +131,14 @@ The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#eden-on-inst
 | Scrub positions can stop at 20 seconds | Fixed: a 1,610-frame take kept all its positions |
 | First X refused after a snap | Fixed: X plays after a held frame |
 | A fighter beside a wall is shown off its point | The editor refuses that point instead; host-tested only |
-| Scrubbing shows where the fighters were, not their moves | It shows the recorded move |
+| Scrubbing shows where the fighters were, not their moves | A matching fighter shows the recorded move on frames that have a pose |
 | Placement on a save | Fixed: the Off stage fighter floats again |
 | Guard the Edge | Not changed |
 
 | Found in testing the preview build | What happens | Workaround | Status |
 | --- | --- | --- | --- |
-| The recorded-fighter choice does not load in the editor | After ZL + L the strip says it is loading the take's fighter, then "The fighter did not load; the editor keeps the current one". The fighter changes after the editor is closed. Seen in Eden for Player 1; the CPU side was not flown. | None. | Fix in work. |
-| A slide after B from a posed frame | B pressed straight after stepping to a posed frame can leave both fighters about 0.6 units from their places: four of six tries in one run. With two seconds on the frame first, both stayed in place. | None established. | Cause not yet found; fix in work. |
+| Fighter switch times out | The open editor blocks the roster. After 600 editor passes it stops waiting but leaves the switch pending. In Eden, ZL + L changed Player 1 only after the editor closed. The CPU side was not tested. | None established. | Not fixed in this preview. |
+| Fighters slide apart after B | The fighters are back at their places, but their push boxes can keep the scrubbed pose's width for a few ticks. The overlap pushes them apart. | None established. | Not fixed in this preview. |
 
 The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#preview-build-cc71537c).
 

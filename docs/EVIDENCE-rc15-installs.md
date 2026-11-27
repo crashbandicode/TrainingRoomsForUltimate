@@ -398,16 +398,16 @@ Staged for the card on 2026-11-27 and **not installed**. Nothing here ran on a c
 | Commit | `cc71537c`, the head of the next build's branch with every part in | — |
 | Release file | sha256 `78db86f5378635a8ce6820b6cdace6feb3d9d1c73ef126aa4475da1e4f03e77a`, 5,419,008 bytes | `artifacts/phase23/card-install/20261127-0046Z-preview-cc71537c/` |
 | It would replace | install 6's file, `c1ced861…` | `operator-approval.json` in that folder |
-| Host gate | six steps exit 0; the test row reads 3,197 passed, 0 failed, 4 ignored | `artifacts/phase23/next-build/gate-cc71537c/SUMMARY.md` |
+| Host gate | Six steps exited 0. The six top-level suites reported 3,182 passed, 0 failed, 4 ignored. The summary also counted 15 nested passes and missed a sixteenth whose output was interleaved. | `artifacts/phase23/next-build/gate-cc71537c/`, `logs/test.log:359` |
 
-### Eden, on the release file
+### Smoke tests on the release file
 
 Two boots on one host (the XPS). Neither log has a panic, abort, crash or unmapped-access line. Source: dup-audit,
 inbox 2026-11-26 23:11:03Z and 2026-11-27 00:38:37Z. For this page the two posts were read, not the row files.
 
 | Check | First boot, `next-smoke-xps-01` | Second boot, `next-smoke-xps-02` |
 | --- | --- | --- |
-| A take past 1,200 frames | The take has 1,610 frames and its positions file 1,610. The last frame's held line was not read by the test | Not run |
+| A take past 1,200 frames | The take has 1,610 frames and its positions file 1,610. The last frame's held line was not read by the test | The filmed take kept 1,632 of 1,632. End was selected on the last frame with no "Positions end here." warning; the held line was again missing from the log |
 | Snapped X in the Replay window | Played | Played |
 | A point inside the stage, at frame 137 | Refused, with "Can't stand there on this stage." and both fighters at their homes | Not run |
 | Scrub poses | Shown for both fighters on a held frame | Shown for both |
@@ -415,22 +415,34 @@ inbox 2026-11-26 23:11:03Z and 2026-11-27 00:38:37Z. For this page the two posts
 | A save's Off stage fighter | Read in the air, on the ground, then in the air again | Not run |
 | Settings check | No option off its default, twice | Passed |
 | Waiting room, as host | The menu opened there; the footer read `rc15 cc71537c` | Not run |
-| A capture saved and read back | Not flown: the test's route stopped before the match | Not flown, for the same reason |
+| A capture saved and read back | Not flown: the route stopped on the Main menu | Not flown: the route reached stage select while the test expected fighter select. No match or save |
 
 - Three rows of the first boot passed on a second try in the same boot, after faults in the test's own steps.
+- The editor's input gate holds the roster request while the editor is visible. Its timeout counts worker passes,
+  not game frames: once the count exceeds 600 it clears its own wait, not the accepted roster request. In the second
+  boot Player 1 timed out twice; the roster applied the switch three game frames after close.
 - Four clips were made in the second boot (`artifacts/phase23/final-smoke-media/`). They are not placed in the pages:
   three are to be filmed again after the fixes.
 
 ### Eden, on the diagnostic build of the same commit
 
-Source: place-t1a, inbox 2026-11-26 23:01:24Z and 23:19:06Z and 2026-11-27 00:35:36Z. Receipts:
+Source: place-t1a, inbox 2026-11-26 23:01:24Z and 23:19:06Z. Receipts:
 `artifacts/phase23/scrub-moves/proof/eden/evidence/`. The diagnostic file is sha256 `b156c5ff…`.
 
 | Run | What it showed |
 | --- | --- |
 | `moves-proof-yoga-01` | Frames 114, 130 and 144 of a take were shown exactly, with no hitbox, effect or sound from the held fighters. X and B from a posed frame let the fighters go. On two rows the closing check gave no verdict: both fighters stood up to 0.8 units off their places after B |
 | `moves-proof-yoga-02` | The slide. With 120 frames on the posed frame before B, both fighters stayed in place for all 474 and 475 frames watched. With B straight after the pose, both came to rest 0.5754 units from their places |
-| `moves-trace-yoga-01`, on the release file | B straight after a posed frame: four tries slid 0.592 units each way and two stayed in place. An unposed frame stayed in place. Ruled a defect of the posed hold (inbox 2026-11-27 00:36:24Z); its cause is not established |
+
+### Slide traces on the release file
+
+Both Yoga traces used the staged release `78db86f5…`, not the diagnostic file. Receipts are in each run's
+`TRACE-REPORT.txt` under `artifacts/phase23/scrub-moves/proof/eden/evidence/`.
+
+| Run | What happened after B |
+| --- | --- |
+| `moves-trace-yoga-01` | Both fighters returned to their places. In four of six quick releases from a pose the game then pushed them apart on the release tick and the next; each slid 0.592 units. Neither fighter slid in the unposed control. |
+| `moves-trace-yoga-02` | The push boxes moved back to the fighters' restored centres but kept the posed width for a few ticks. The boxes still overlapped, so the game applied a fresh push. One of three posed releases slid (0.6355 units each); the unposed control stayed in place. |
 
 ### Not covered
 

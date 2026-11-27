@@ -5,7 +5,7 @@ Notes for players. rc.15 is one release name for a line of builds. Each build's 
 ([Which build you have](guide/getting-started.md#which-build-you-have)).
 
 Six of these builds were installed on the project's test console one after another, and are called install 1 to 6.
-A seventh, the preview build, is staged for the card and not installed.
+The preview build is staged for the card; install 6 is still the newest installed build.
 Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
@@ -32,7 +32,7 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 An in-between build for the operator to play while two defects are fixed. It is **staged for the card and not
 installed**, and it is not the next release.
 
-| | |
+| Preview | Details |
 | --- | --- |
 | Built from | `cc71537c` (the footer ends with it) |
 | Release file | `78db86f5…`, 5,419,008 bytes |
@@ -41,7 +41,7 @@ installed**, and it is not the next release.
 ### Scrubbing shows the recorded moves
 
 On install 6 a scrubbed fighter was moved to its recorded place and kept the pose it had. On this build it also
-shows the move it was doing on that frame.
+shows the recorded move when that frame has a pose and the fighter matches the take.
 
 | What | How it works |
 | --- | --- |
@@ -49,7 +49,7 @@ shows the move it was doing on that frame.
 | A match capture or a Vault recording made on this build | Keeps each frame's animation too |
 | A macro without recorded moves | Still loads and plays. The editor reads "Play it once to see the moves while scrubbing." |
 | An older capture | Still loads. It shows positions only |
-| Which fighter is shown | Each side can show the take's recorded fighter or the one on stage now: ZL + L for Player 1, ZL + R for the CPU. See the known issue below |
+| Fighter choice | ZL + L requests a switch for Player 1; ZL + R requests one for the CPU. The Player 1 switch did not finish in the editor; the CPU switch was not tested |
 | Not shown | Projectiles, items and damage, as before |
 
 ### Fixes to install 6
@@ -68,8 +68,8 @@ Guard the Edge's uneven start is not changed by this build.
 
 | Issue | What happens | Way round | Status |
 | --- | --- | --- | --- |
-| The recorded-fighter choice does not load in the editor | After ZL + L the strip says it is loading the take's fighter, then "The fighter did not load; the editor keeps the current one". The fighter changes after the editor is closed. Seen in Eden for Player 1; the CPU side was not flown | None | Fix in work |
-| A slide after B from a posed frame | B pressed straight after stepping to a posed frame can leave both fighters about 0.6 units from their places: four of six tries in one run. With two seconds on the frame first, both stayed in place | None established | Cause not yet found; fix in work |
+| Fighter switch times out | The open editor blocks the roster from applying the switch. After 600 editor passes it gives up without withdrawing the request. In Eden, Player 1 changed fighters only after the editor closed; the CPU side was not tested | None established | Not fixed in this preview |
+| Fighters slide apart after B | Both fighters return to their places, but their push boxes can keep the width of the scrubbed pose for a few ticks. The boxes still overlap, so the game pushes the fighters apart. A quick B left each about 0.6 units off in four of six tries | None established | Not fixed in this preview |
 
 Both are to be fixed before the next release.
 
