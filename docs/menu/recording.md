@@ -22,7 +22,7 @@ Use your [Recording pop-up chord](display-and-controls.md#button-chords) to open
 
 *Record tints Player 1 red.* [Open the clip](../media/tut-record-macro.mp4)
 
-A on a save state, macro or chain opens its own screen ([what each row is for](../guide/recording.md#a-file-s-own-screen)).
+A on a save state, macro or chain opens its own screen ([page and pop-up controls](../guide/recording.md#a-file-s-own-screen)).
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
