@@ -91,5 +91,5 @@ Give Kirby a [lineup of copy abilities](docs/guide/fighter-cycles.md#kirby-hats)
 | ![Saved combos in the recording library](docs/media/readme-tour-recording.png) | [Recording](docs/menu/recording.md) · Keep a combo, edit a take or practise a sequence. |
 | ![Mirroring and damage beneath Save States](docs/media/readme-tour-saves.png) | [Saves](docs/menu/saves.md) · Set the damage and positions you return to. |
 
-Smash Ultimate 13.0.5 on Switch or emulator: [Downloads](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases) · [Install guide](docs/guide/getting-started.md#installing) · [Release notes](docs/RELEASE-NOTES-rc15.md)<br>
+Smash Ultimate 13.0.5 on Switch or emulator: [Downloads](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases) · [Install guide](docs/guide/getting-started.md#installing) · [Release notes](docs/RELEASE-NOTES.md#release-notes-rc15)<br>
 [MIT License](LICENSE) · Made with the assistance of AI · [Technical notes](docs/TECHNICAL.md) · [Build from source](docs/BUILD.md) (`cargo skyline build --release`)
