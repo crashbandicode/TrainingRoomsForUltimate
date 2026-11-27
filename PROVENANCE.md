@@ -31,8 +31,8 @@ classifies it:
 
 A new file whose basename matches an upstream file with a similarity ratio of
 0.3 or more is flagged as a possible move (three `Cargo.toml` files were; all
-are new crates, not moves). `feature_groups.py` then assigns every file to a
-feature by path rules (first match wins) and sums the line counts.
+are new crates, not moves). `feature_groups.py` sums line counts by feature. The first matching path rule selects the feature;
+files without a match appear under `UNMAPPED`.
 
 ## Summary
 

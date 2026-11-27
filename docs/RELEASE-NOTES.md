@@ -4,7 +4,7 @@
 
 ## rc.15 · November 27, 2026
 
-For Training players editing recordings, practising against the CPU, and using practice tools.
+[Download TrainingRooms rc.15](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.15).
 
 TrainingRooms 0.2.0-rc.15 is the November 27, 2026 hardware-tested release for players editing recordings, practising against the CPU, and using practice tools.
 
@@ -266,7 +266,7 @@ Withdrawn before console play. Its recording tools shipped in rc.6.
 
 ### Install
 
-Use rc.6. There is no public rc.5 download.
+There is no public rc.5 download. For a playable build, follow the [current release installation steps](CURRENT-RELEASE.md#install).
 
 ### What changed
 
@@ -292,7 +292,7 @@ Use rc.6. There is no public rc.5 download.
 
 ### Known limits
 
-- Use rc.6 to drill a sequence or save the last combo.
+- Sequence drills and saving the last combo arrived in [rc.6](#release-notes-rc6).
 - [Practice restrictions](RESTRICTIONS.md)
 
 <a id="release-notes-rc3.1"></a>
