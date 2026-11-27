@@ -3,18 +3,16 @@
 **Answered 2026-11-25 (about 15:50Z):** PC1 B; PC2 all four ways in (the Replays row stays and opens the same
 picker); PC3 all five pages, with + saving from any page; PC4 A; PC5 a question each time, with an Advanced setting
 (Prompt by default, Always change, Always copy); PC6 A. The decision record is in
-[DECISIONS.md](../../DECISIONS.md), "Change placement: the crosshair, on the save itself". The page below is as it
-was put, before the answers.
+[DECISIONS.md](../../DECISIONS.md), "Change placement: the crosshair, on the save itself". The alternatives below are
+historical; see [the Recording guide](../../guide/recording.md#change-placement-and-the-replay-window) to use the picker.
 
-Your order (2026-11-25):
+Original design goals (2026-11-25):
 - placement uses the Break the Targets crosshair;
 - you pick Player 1 or the CPU;
 - you choose On stage or Off stage;
 - it edits the save state itself, not through the Replays menu.
 
-The design is by the tile-fix-g4 lane (`artifacts/phase23/placement-crosshair/DESIGN.md`). Nothing is built yet. A green outline in a picture marks the lane's recommendation.
-
-**How to answer:** one letter per choice, for example `PC1 B, PC2 A, PC3 A, PC4 A, PC5 A, PC6 A`. Anything you leave out takes the recommended option.
+Green outlines show the design lane's recommendations, not necessarily the choices that shipped.
 
 ![The proposed flow: the save's own screen, then Where, then Spot, then A saves](place-next-01-flow.png)
 
@@ -24,7 +22,7 @@ The design is by the tile-fix-g4 lane (`artifacts/phase23/placement-crosshair/DE
 3. **Spot:** the crosshair moves the fighter itself.
 4. A saves the file, and the save loads once.
 
-## PC1 · On stage: how the floor is chosen (your words point to B)
+## PC1 · On stage: how the floor is chosen
 
 ![PC1](place-next-PC1-on-stage.png)
 
@@ -33,7 +31,7 @@ The design is by the tile-fix-g4 lane (`artifacts/phase23/placement-crosshair/DE
 | **A** (lane recommends) | The crosshair moves freely. The fighter stands on whatever floor is under it: on a platform at or above it, on the ground once you move below it. This is Record placement's rule today, which passed 19 of 19 emulator rows. | No new code. |
 | B | The cursor stays on a floor. Left and Right move along it, and Up and Down jump to the floor above or below. | About +70 lines and its own tests; not tried in the emulator yet. |
 
-You wrote "you can go down to select the ground vs a platform". With A you do that by moving the crosshair down past the platform. B gives a dedicated Up/Down hop.
+With A the crosshair would move down past the platform; B gave Up/Down a dedicated floor hop.
 
 ## PC2 · Where Change placement is opened (A recommended)
 
@@ -44,7 +42,7 @@ You wrote "you can go down to select the ground vs a platform". With A you do th
 | **A** | Three ways in: a save's own screen, a macro's own screen (it opens that macro's start save), and X on a save in the pop-up over the game. |
 | B | The save's and the macro's own screens only. |
 
-Either way, the old Edit placement row in Recording › Replays is removed.
+Both proposals would have removed the Replays row. The final choice kept it as a fourth way in.
 
 ## PC3 · How many pages (A recommended)
 
@@ -82,6 +80,6 @@ Either way, the old Edit placement row in Recording › Replays is removed.
 | **A** | The grid goes, and Momentum becomes a row on the macro's own screen. A macro that already has an offset shows it in a new Offset row, and A clears it. Keep and New go too: B cancels, and Duplicate copies a save. |
 | B | The grid stays as "Fine offset". That gives two ways to move a start, and the offset is still added on top of the picked spot. |
 
-Old saves and macros keep working either way. Nothing in the file format changes. The picker moves the save itself and never edits a macro file. A macro's old offset stays, and Play adds it on top of the new spot until you clear it (with option A, in the Offset row).
+Placement edits the save, not the macro's offset. Choosing a separate copy for a macro relinks that macro to the new save. Play still adds its old offset until you clear it.
 
 *Updated 2026-11-25 15:31Z: the PC6 picture and text were corrected by the design lane. Earlier, a macro's offset became 0 after you used the picker; now it stays until you clear it.*

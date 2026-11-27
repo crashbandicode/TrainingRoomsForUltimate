@@ -46,7 +46,7 @@ Place up to ten targets, then break them all against the clock ([guide](../guide
 
 *The counter reads 3/20 after a missed tech.* [Open the clip](../media/tut-tech-practice.mp4)
 
-Tech a launch at a chosen or random surface; Set uses a range's low end, Random both ends ([guide](../guide/tech-practice.md)).
+Tech a launch at a chosen or random surface; Set uses the low end of a range ([guide](../guide/tech-practice.md)).
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
@@ -60,7 +60,7 @@ Tech a launch at a chosen or random surface; Set uses a range's low end, Random 
 | Hit damage, its range | **Set**, Random; 1 to 30%, **12%** | The percent the hit adds. It also sets the freeze. |
 | Angle, Angle range | **Auto (approximate)**, Set, Random; 0 to 355° | World launch angle: right is 0°, up is 90°. |
 | Start position, Start range | **Auto (approximate)**, Set, Random; -120 to 120 units | Your start offset from the point. |
-| Time to contact, Time range | Set, **Random**; 10 to 60 frames, **20 to 40** | Travel time to the surface point. |
+| Time to contact, Time range | Set, **Random**; 10 to 60 frames, **20 to 40** | With Auto start, knockback limits the random draw: 20–38 frames at factory settings. |
 | DI, DI direction | **Off**, Player, Set, Random; a direction, **Neutral** | Off is neutral. Player reads your stick. |
 | Facing | **Toward the point**, Left, Right, Random | Which way you face at the start. |
 | Delay before launch, Delay range | **Set**, Random; 10 to 90 frames, **30** | The wait at the start. Player 1 is held meanwhile. |
