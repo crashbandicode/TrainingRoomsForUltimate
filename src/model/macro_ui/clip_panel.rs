@@ -1403,6 +1403,19 @@ mod tests {
         }
     }
 
+    /// 01:02:26Z, 01:10:33Z: the roster's own record of Player 1 lags a Mii owner's completion and never changes
+    /// when its publication is refused. The kind the editor compares is the one the game has.
+    fn a_refused_publish_still_shows_the_fighter_the_game_has() {
+        let (mut e, _) = asked_switch(0);
+        e.note_fighter_outcome(FighterOutcome::Loading);
+        assert!(e.note_fighters([Some(6), Some(18)], true), "the game has the asked fighter and the roster is not busy");
+        assert_eq!((e.fighter_load(), e.fighter_word(0)), (false, "recorded"));
+        let worker = include_str!("../../runtime/macros/replay_capture.rs");
+        let service = worker.split("fn scrub_service(").nth(1).unwrap().split("\nfn ").next().unwrap();
+        assert!(service.contains("rr_host::live_pose(0)") && !service.contains("roster_requests::player_kind()"),
+            "Player 1's kind is the game's, not the roster's observed pair");
+    }
+
     fn the_modifier_turns_l_and_r_into_the_fighter_toggles() {
         assert!(shoulder_action(false, false, false).is_none());
         assert!(matches!(shoulder_action(true, false, false), Some(ClipAction::SelectIn)));
@@ -2487,6 +2500,7 @@ mod tests {
             ("a_refused_switch_shows_the_refusal", a_refused_switch_shows_the_refusal as fn()),
             ("the_strip_stays_loading_until_the_roster_answers", the_strip_stays_loading_until_the_roster_answers as fn()),
             ("the_cpu_toggle_and_the_way_back_wait_on_the_roster", the_cpu_toggle_and_the_way_back_wait_on_the_roster as fn()),
+            ("a_refused_publish_still_shows_the_fighter_the_game_has", a_refused_publish_still_shows_the_fighter_the_game_has as fn()),
             ("a_take_without_a_second_fighter_refuses_the_toggle", a_take_without_a_second_fighter_refuses_the_toggle as fn()),
             ("a_second_toggle_waits_for_the_swap", a_second_toggle_waits_for_the_swap as fn()),
             ("the_modifier_turns_l_and_r_into_the_fighter_toggles", the_modifier_turns_l_and_r_into_the_fighter_toggles as fn()),

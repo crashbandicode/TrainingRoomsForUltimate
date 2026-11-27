@@ -61,6 +61,30 @@ pub(crate) fn take_clip_reply() -> Option<bool> {
     Some(word & 3 == 1)
 }
 
+/// What became of the clip switch the worker asked for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ClipOutcome { Asked, Admitted, Refused, Dropped, Withdrawn, Committed }
+
+/// Worker. Ask to take the current ticket's request back.
+pub(crate) fn withdraw_clip() {}
+
+/// Worker. The current ticket's state; `None` when no ticket is in flight. Reading does not consume it.
+pub(crate) fn clip_outcome() -> Option<ClipOutcome> {
+    match CLIP_REPLY.load(Ordering::Acquire) & 3 {
+        1 => Some(ClipOutcome::Admitted),
+        2 => Some(ClipOutcome::Refused),
+        _ => None,
+    }
+}
+
+/// Worker. Forget the ticket after a final state was shown.
+pub(crate) fn clear_clip() {}
+
+/// The game side: the roster gave up the direct request of this role's clip ticket.
+pub(crate) fn note_drop(player: bool) {
+    let _ = player;
+}
+
 /// Player 1's fighter kind as the roster last observed it, as of the last game frame (the worker's read; never a lock).
 pub(crate) fn player_kind() -> Option<u32> {
     Some(PLAYER_KIND.load(Ordering::Acquire)).filter(|kind| *kind != NONE)
