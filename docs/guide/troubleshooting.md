@@ -2,7 +2,7 @@
 
 ## Start with what you see
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6bdcfb3a520887a441f56d87a5959a16d4ea4bff" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2424854e2dc29b8427a5a56989fb14195ba67d0f" autoplay muted loop playsinline controls></video>
 
 *The Save States notice identifies the disabled setting.* [Open the clip](../media/tut-notice-save-states-off.mp4)
 
