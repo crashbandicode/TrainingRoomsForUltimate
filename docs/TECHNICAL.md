@@ -212,12 +212,9 @@ A save state only warps, and Load starts nothing. Each role has one active macro
 that role's Play chord plays it without warping back on later loops. In the Recording page's main lists, Y does
 nothing. X cycles the selected role's loop count in MACROS. On a drill with a saved, nonempty take, X requests
 a preview on Player 1. It does not interrupt a Play already queued or running for Player 1.
-The [Recording guide](guide/recording.md) is how to use it. The pop-up and the Recording page are in that doc.
-What rc.6 changes is [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
+See the [Recording guide](guide/recording.md) for a walkthrough and [the page and its pop-up](menu/recording.md#the-page-and-its-pop-up) for their different controls.
 
-While a macro plays on the CPU, the recording wins over the CPU's DI, SDI, air-dodge, tech and throw settings.
-The advanced row [Settings override playback](menu/recording.md#settings-override-playback), Off by default, turns
-that round.
+For the current priority rule, see [Settings override playback](menu/recording.md#settings-override-playback).
 
 ![A recorded air dodge Down In with the Airdodge Direction setting on Up: under A the setting changes it to Up, under B the CPU air-dodges Down In as recorded](decisions/B5-playback-vs-settings.png)
 
@@ -312,7 +309,7 @@ start_observed slot=1`, then the CPU's status changes. The windows are listed in
 on Player 1 and two jabs; the pop-up then lists "Macro 1" (Recorded on Mario) and its start save "Macro 1 · start".
 Playback is shown in the [Recording guide](guide/recording.md). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-While an AI drives Player 1, for example the standalone CPU pilot, Record works (changed 2026-11-25): the take holds
+<a id="recording-with-an-ai"></a>While an AI drives Player 1, for example the standalone CPU pilot, Record works: the take holds
 Player 1's inputs as the game receives them, the AI's included, and TrainingRooms' own P1 CPU Control keeps playing
 through the take. Play on Player 1 and the waiting room's Quick Reset are refused ("P1 is controlled by an AI: Play
 on Player 1 is off", "… Quick Reset is off"), and Player 1's input is left to the pilot.
@@ -534,8 +531,7 @@ waiting-room practice:
 | Arming | From its CPU Pilot page, as in Training |
 | On screen | The practice shows no `CPU Lv` tag |
 | When a match is found | The pilot keeps Player 1 in the match |
-| Record | Records Player 1's inputs as the game receives them, including the pilot's inputs |
-| Refused in waiting-room practice | Play on Player 1 and Quick Reset (L + R + A) |
+| Record, Play and Quick Reset | See [recording with an AI](#recording-with-an-ai). |
 | Game speed | The pilot does not disable the practice speed chord. [Waiting-room speed and frame step](guide/game-speed.md#in-the-waiting-rooms) |
 
 **Clip** [`rc11-lobby-combos.gif`](media/rc11-lobby-combos.gif): Save last combo in a Local Wireless waiting room, then the helper bar drills it and grades a try
@@ -579,7 +575,7 @@ Minus; A opens the chord editor, X starts the capture, ZL held with D-pad Up giv
 (`button_config.ini written`); back in Training, Minus opens nothing (no `[Ui] menu opened`), and ZL held (Mario
 shields) with D-pad Up opens the menu. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-Menu shortcut 1 and Menu shortcut 2 can be changed in the menu. B + D-pad Up is permanent.
+See [Menu shortcuts](menu/display-and-controls.md#menu-shortcuts) for the editable and permanent bindings.
 
 ![Two designs for the menu's shortcut rows: A shows them read-only with the INI as the editor; B lets A re-bind a row in the menu, which writes button_config.ini](decisions/09-menu-shortcuts.png)
 
