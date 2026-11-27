@@ -950,6 +950,13 @@ fn clip_dropped(role: Role, selection: Selection, restoring: bool) {
     }
 }
 
+fn clip_commits(role: Role, selection: Selection, user: bool) -> bool {
+    match (user, selection) {
+        (true, Selection::Direct(f)) => super::roster_requests::commit_direct(role == Role::Player, f.kind()),
+        _ => true,
+    }
+}
+
 /// Runs before the delay queue. Consume only our request, giving conflicting
 /// save/record/menu requests precedence. Preserve suppression through a held
 /// chord so it cannot turn into a delayed taunt or a player trio request.
@@ -1522,6 +1529,7 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
     let slot=remembered.map_or(slot,|v|v.cursor);
     let forms = remembered.map_or_else(||requested_forms_at(&m, role, target.kind(), slot),|v|v.forms);
     if ready_forms(entry, owner) == Some((forms, target.kind())) {
+        if !clip_commits(role, request.selection, !request.restoring) { return; }
         state.cursor = slot;
         if request.scope.waiting() {
             WAITING_MEMORY.lock().commit(role as usize, WaitingValue::ordinary(target,forms,slot));
@@ -1552,6 +1560,11 @@ unsafe fn service_body(entry:*mut u8,owner:u32,_caller_lr:usize) {
         state.pending = Some(request);
         return;
     };
+    if !clip_commits(role, request.selection, !request.restoring) {
+        drop(state);
+        finish_install(install_token, "clip switch withdrawn before reload");
+        return;
+    }
     let active = Active {
         install: install_token,
         scope: request.scope,

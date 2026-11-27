@@ -6180,7 +6180,7 @@
    "dest": "src/runtime/macros/replay_capture.rs",
    "crate": "root",
    "src_sha256": "f8966f890350ab12733cae99c650381c3683c269d8771c10a08b47a77d0ef144",
-   "dest_sha256": "c733750b924a31ac3f0d7cf91dd4d8112725e95a5359a44a9bb9434b7c00e4c7",
+   "dest_sha256": "9dad232b870607736bf7d86f916ee16efa652b20f8c5e29e705e9251d1073c83",
    "edits": [
     {
      "old": "        crate::runtime::macros::frame_counter::reset_frame_count(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n        crate::runtime::macros::frame_counter::start_counting(*crate::runtime::compat::common::menu::MENU_CLOSE_FRAME_COUNTER);\n",
@@ -7301,6 +7301,11 @@
      "reason": "Toggle fix (tr-primary-2 2026-11-27 00:40:25Z, 01:02:26Z, 01:10:33Z): the editor's fighter switch waits on the roster's outcome with no pass count; the roster marks a user's direct request it gives up and removes a waiting one on B.",
      "old": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, shoulder_action, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};\n\nuse crate::runtime::lobby::game_mode;\nuse crate::runtime::game::{self, natives};\n",
      "new": "use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};\nuse crate::engine::rr_host;\nuse {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};\nuse {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, shoulder_action, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, FighterOutcome, PreviewTail, FIGHTER_REFUSED}};\n\nuse crate::runtime::lobby::game_mode;\nuse crate::runtime::game::{self, natives};\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "    let mut changed = editor.note_fighters(\n        // The kinds the game has: the roster's own record of Player 1 lags a Mii owner's completion.\n        [Some(rr_host::live_pose(0).fighter_kind).filter(|kind| *kind >= 0), facts::fact_cpu_kind()],\n        !roster_requests::clip_busy() && !character_roster::busy() && facts::fact_ready_go(),\n    );\n    if let Some((pos, poses)) = observed {\n        changed |= editor.note_scrub(pos);\n",
+     "new": "    let mut changed = editor.note_fighters(\n        // The kinds the game has: the roster's own record of Player 1 lags a Mii owner's completion.\n        [Some(rr_host::live_pose(0).fighter_kind).filter(|kind| *kind >= 0), facts::fact_cpu_kind()],\n        roster_requests::clip_can_settle() && !character_roster::busy() && facts::fact_ready_go(),\n    );\n    if let Some((pos, poses)) = observed {\n        changed |= editor.note_scrub(pos);\n"
     }
    ]
   },

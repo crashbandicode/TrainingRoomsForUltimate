@@ -405,7 +405,7 @@ fn request_dropped(direct:Option<u32>) {
 }
 /// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.
 #[inline(never)]
-fn load_dropped() {crate::runtime::roster::roster_requests::note_drop(false,None);}
+fn load_dropped() {crate::runtime::roster::roster_requests::note_owner_drop(false);}
 fn refuse_request(request:Request,reason:&'static str) {
     let mut s=STATE.lock();
     let mut restore_refused=false;
@@ -553,6 +553,9 @@ pub(super) fn intercept_with(role:Role,selection:Selection,user_request:bool,req
         s.departed,s.busy(),s.request.is_some(),replace_restore,request.is_some(),
         user_request && matches!(selection,Selection::Cycle));
     if admitted {
+        if !clip_commits(role,selection,user_request) {
+            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);
+        }
         s.restore=None;
         if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}
         s.request=request;

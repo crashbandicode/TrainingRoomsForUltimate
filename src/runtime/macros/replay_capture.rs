@@ -939,7 +939,7 @@ fn scrub_service() {
     let mut changed = editor.note_fighters(
         // The kinds the game has: the roster's own record of Player 1 lags a Mii owner's completion.
         [Some(rr_host::live_pose(0).fighter_kind).filter(|kind| *kind >= 0), facts::fact_cpu_kind()],
-        !roster_requests::clip_busy() && !character_roster::busy() && facts::fact_ready_go(),
+        roster_requests::clip_can_settle() && !character_roster::busy() && facts::fact_ready_go(),
     );
     if let Some((pos, poses)) = observed {
         changed |= editor.note_scrub(pos);

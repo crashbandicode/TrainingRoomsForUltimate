@@ -1,3 +1,4 @@
+fn clip_commits(_: Role, _: Selection, _: bool) -> bool { true }
 use runtime::lobby::training::{self, lobby};
 type Request = GenericRequest;
 use engine::swap::cycle_members::{admitted, over_pending, Admission};

@@ -46,19 +46,25 @@ static CLIP_REPLY: AtomicU64 = AtomicU64::new(0);
 /// Player 1's fighter kind as the roster last observed it (`NONE` before a practice entry), as of the last game frame.
 static PLAYER_KIND: AtomicU32 = AtomicU32::new(NONE);
 
+fn post(what: u64, kind: u32) {
+    REQUESTS.push_with_drop([what, u64::from(kind)], |[evicted, _]| {
+        if evicted >= SEQ { step(evicted, &[ASKED], DROPPED); }
+    });
+}
+
 /// The worker: ask the roster to change the CPU to `kind` (`character_roster::request_cpu_kind`, on the next game frame).
 pub(crate) fn request_cpu_kind(kind: u32) {
-    REQUESTS.push([CPU, u64::from(kind)]);
+    post(CPU, kind);
 }
 
 /// The worker: ask the roster to change Player 1 to `kind` (`character_roster::request_player_kind`, on the next game frame).
 pub(crate) fn request_player_kind(kind: u32) {
-    REQUESTS.push([PLAYER, u64::from(kind)]);
+    post(PLAYER, kind);
 }
 
 /// The worker: [`request_player_kind`], answered through [`take_reply`] with whether the roster queued it.
 pub(crate) fn request_player_kind_replied(kind: u32) {
-    REQUESTS.push([PLAYER_REPLIED, u64::from(kind)]);
+    post(PLAYER_REPLIED, kind);
 }
 
 /// The worker: the next answer, `(fighter kind, queued)`.
@@ -79,7 +85,7 @@ pub(crate) enum ClipOutcome {
     Dropped,
     /// Taken back before the roster began.
     Withdrawn,
-    /// The worker asked to take it back after the roster had begun: it runs to its end.
+    /// The roster began the load: it runs to its end even without a B press.
     Committed,
 }
 
@@ -88,13 +94,15 @@ pub(crate) fn request_clip_kind(player: bool, kind: u32) {
     let sequence = ((CLIP_REPLY.load(Ordering::Relaxed) & SEQUENCE).wrapping_add(SEQ) & SEQUENCE).max(SEQ);
     let ticket = sequence | if player { 0 } else { ROLE_CPU };
     CLIP_REPLY.store((u64::from(kind) << 32) | ticket | BUSY | ASKED, Ordering::Release);
-    REQUESTS.push([ticket, u64::from(kind)]);
+    post(ticket, kind);
 }
 
 /// Worker. Ask to take the current ticket's request back. The game frame answers: withdrawn, or committed.
 pub(crate) fn withdraw_clip() {
-    let _ = CLIP_REPLY.fetch_update(Ordering::AcqRel, Ordering::Acquire, |word| {
-        matches!(word & STATE, ASKED | ADMITTED).then_some(word | WITHDRAW)
+    let _ = CLIP_REPLY.fetch_update(Ordering::AcqRel, Ordering::Acquire, |word| match word & STATE {
+        ASKED => Some((word & !STATE) | WITHDRAWN),
+        ADMITTED => Some(word | WITHDRAW),
+        _ => None,
     });
 }
 
@@ -111,10 +119,10 @@ pub(crate) fn clip_outcome() -> Option<ClipOutcome> {
     })
 }
 
-/// Worker. A switch is in flight and the roster was working on the last game frame (or has not heard of it yet).
-pub(crate) fn clip_busy() -> bool {
+/// Only an accepted, settled request may finish on the observed fighter. Terminal answers must reach the editor.
+pub(crate) fn clip_can_settle() -> bool {
     let word = CLIP_REPLY.load(Ordering::Acquire);
-    matches!(word & STATE, ASKED | ADMITTED | COMMITTED) && word & BUSY != 0
+    matches!(word & STATE, ADMITTED | COMMITTED) && word & BUSY == 0
 }
 
 /// Worker. Forget the ticket: its last state was shown, or the load ended on the fighter the game has.
@@ -128,10 +136,29 @@ pub(crate) fn clear_clip() {
 /// callers sit on the deepest native service path, whose frames must not grow (`model::thread_stacks`).
 #[inline(never)]
 pub(crate) fn note_drop(player: bool, kind: Option<u32>) {
+    mark_drop(player, kind, kind.is_none());
+}
+
+/// A Mii track or bank failed, not the role's entry: an unadmitted switch cannot belong to it.
+pub(crate) fn note_owner_drop(player: bool) {
+    mark_drop(player, None, false);
+}
+
+#[inline(never)]
+fn mark_drop(player: bool, kind: Option<u32>, departed: bool) {
     let _ = CLIP_REPLY.fetch_update(Ordering::AcqRel, Ordering::Acquire, |word| {
-        (matches!(word & STATE, ADMITTED | COMMITTED) && (word & ROLE_CPU == 0) == player
+        ((matches!(word & STATE, ADMITTED | COMMITTED) || (departed && word & STATE == ASKED)) && (word & ROLE_CPU == 0) == player
             && kind.is_none_or(|kind| (word >> 32) as u32 == kind)).then_some((word & !STATE) | DROPPED)
     });
+}
+
+/// At the owner's irreversible handoff. A B posted since the mailbox drain wins if it got here first.
+#[inline(never)]
+pub(crate) fn commit_direct(player: bool, kind: u32) -> bool {
+    !CLIP_REPLY.fetch_update(Ordering::AcqRel, Ordering::Acquire, |w| {
+        (w & STATE == ADMITTED && (w & ROLE_CPU == 0) == player && (w >> 32) as u32 == kind)
+            .then_some((w & !STATE) | if w & WITHDRAW != 0 { WITHDRAWN } else { COMMITTED })
+    }).is_ok_and(|old| old & WITHDRAW != 0)
 }
 
 /// Move `ticket` from one of the states `from` to `to`. Another ticket, or another state, is left alone.
@@ -162,10 +189,8 @@ pub(crate) fn service() {
                 replied = true;
             }
             ticket => {
-                // Only the current ticket, and only while it is still asked. A withdraw that came first: never sent.
-                let withdrawn = CLIP_REPLY.load(Ordering::Acquire) & WITHDRAW != 0 && step(ticket, &[ASKED], WITHDRAWN);
                 // Admitted before the roster hears it, so a drop the roster marks at once is kept.
-                if !withdrawn && step(ticket, &[ASKED], ADMITTED) {
+                if step(ticket, &[ASKED], ADMITTED) {
                     let queued = if ticket & ROLE_CPU == 0 { super::character_roster::request_player_kind(kind) }
                         else { super::character_roster::request_cpu_kind(kind) };
                     if !queued { step(ticket, &[ADMITTED], REFUSED); }

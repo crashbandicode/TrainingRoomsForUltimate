@@ -12858,7 +12858,7 @@
    "dest": "src/runtime/roster/character_roster.rs",
    "crate": "root",
    "src_sha256": "07d282cdc6c5b4b080a5c0b3e4107a033f623ea3e5809783e0ff595afe759dd5",
-   "dest_sha256": "c29fb54a0d2f12d035d317cc96ae98649999c0acd01e69f41fc4330bf142f7ae",
+   "dest_sha256": "8844d4b547675a105b3434967e7cf3bc4e204fa7b005c60229e6ff8ef34975f0",
    "edits": [
     {
      "old": "fn notify(role: Role, message: String) {",
@@ -14441,6 +14441,21 @@
      "reason": "Toggle fix (tr-primary-2 2026-11-27 01:02:26Z): the mark is a call, never inlined, so the native service path's frames stay within their stack bound.",
      "old": "    }\n    // A newer request takes the place of one still waiting.\n    if let Some(replaced) = state.pending {\n        clip_dropped(role, &replaced);\n    }\n    state.pending = Some(Request {\n        scope,\n",
      "new": "    }\n    // A newer request takes the place of one still waiting.\n    if let Some(replaced) = state.pending {\n        clip_dropped(role, replaced.selection, replaced.restoring);\n    }\n    state.pending = Some(Request {\n        scope,\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "        state.pending = Some(request);\n        return;\n    };\n    let active = Active {\n        install: install_token,\n        scope: request.scope,\n",
+     "new": "        state.pending = Some(request);\n        return;\n    };\n    if !clip_commits(role, request.selection, !request.restoring) {\n        drop(state);\n        finish_install(install_token, \"clip switch withdrawn before reload\");\n        return;\n    }\n    let active = Active {\n        install: install_token,\n        scope: request.scope,\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "    let slot=remembered.map_or(slot,|v|v.cursor);\n    let forms = remembered.map_or_else(||requested_forms_at(&m, role, target.kind(), slot),|v|v.forms);\n    if ready_forms(entry, owner) == Some((forms, target.kind())) {\n        state.cursor = slot;\n        if request.scope.waiting() {\n            WAITING_MEMORY.lock().commit(role as usize, WaitingValue::ordinary(target,forms,slot));\n",
+     "new": "    let slot=remembered.map_or(slot,|v|v.cursor);\n    let forms = remembered.map_or_else(||requested_forms_at(&m, role, target.kind(), slot),|v|v.forms);\n    if ready_forms(entry, owner) == Some((forms, target.kind())) {\n        if !clip_commits(role, request.selection, !request.restoring) { return; }\n        state.cursor = slot;\n        if request.scope.waiting() {\n            WAITING_MEMORY.lock().commit(role as usize, WaitingValue::ordinary(target,forms,slot));\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "    }\n}\n\n/// Runs before the delay queue. Consume only our request, giving conflicting\n/// save/record/menu requests precedence. Preserve suppression through a held\n/// chord so it cannot turn into a delayed taunt or a player trio request.\n",
+     "new": "    }\n}\n\nfn clip_commits(role: Role, selection: Selection, user: bool) -> bool {\n    match (user, selection) {\n        (true, Selection::Direct(f)) => super::roster_requests::commit_direct(role == Role::Player, f.kind()),\n        _ => true,\n    }\n}\n\n/// Runs before the delay queue. Consume only our request, giving conflicting\n/// save/record/menu requests precedence. Preserve suppression through a held\n/// chord so it cannot turn into a delayed taunt or a player trio request.\n"
     }
    ]
   },
@@ -23837,7 +23852,7 @@
    "dest": "src/runtime/mii/mii_ordinary_cpu.rs",
    "crate": "root",
    "src_sha256": "db7e15715560db924eba68ba570e97540f1b445b1cf4989a172c0426dd32c6ce",
-   "dest_sha256": "3cfb7a8ffb211211b992632fe2922c4edcad60aa6f0f06c9a3ed46e6b4cfa5fb",
+   "dest_sha256": "86309eaaed5f1116360bfbff5639bbbbc532f6ef4ecb03b6d321e7227bedf52b",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryCpu] {reason}\"); }",
@@ -24855,6 +24870,16 @@
      "reason": "Toggle fix (tr-primary-2 2026-11-27 01:02:26Z): the mark is a call, never inlined, so the native service path's frames stay within their stack bound.",
      "old": "}\n/// The clip editor's fighter switch (`roster_requests::note_drop`): this owner gave a request up after admission.\n/// `direct` is the request's own fighter; a cycle or a refresh marks nothing.\nfn request_dropped(direct:Option<u32>) {\n    if direct.is_some() {crate::runtime::roster::roster_requests::note_drop(false,direct);}\n}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(false,None);}\nfn refuse_request(request:Request,reason:&'static str) {\n    let mut s=STATE.lock();\n",
      "new": "}\n/// The clip editor's fighter switch (`roster_requests::note_drop`): this owner gave a request up after admission.\n/// `direct` is the request's own fighter; a cycle or a refresh marks nothing.\n#[inline(never)]\nfn request_dropped(direct:Option<u32>) {\n    if direct.is_some() {crate::runtime::roster::roster_requests::note_drop(false,direct);}\n}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(false,None);}\nfn refuse_request(request:Request,reason:&'static str) {\n    let mut s=STATE.lock();\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "        s.departed,s.busy(),s.request.is_some(),replace_restore,request.is_some(),\n        user_request && matches!(selection,Selection::Cycle));\n    if admitted {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}\n        s.request=request;\n",
+     "new": "        s.departed,s.busy(),s.request.is_some(),replace_restore,request.is_some(),\n        user_request && matches!(selection,Selection::Cycle));\n    if admitted {\n        if !clip_commits(role,selection,user_request) {\n            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);\n        }\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Cpu as usize);}\n        s.request=request;\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(false,None);}\nfn refuse_request(request:Request,reason:&'static str) {\n    let mut s=STATE.lock();\n    let mut restore_refused=false;\n",
+     "new": "}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_owner_drop(false);}\nfn refuse_request(request:Request,reason:&'static str) {\n    let mut s=STATE.lock();\n    let mut restore_refused=false;\n"
     }
    ]
   },
@@ -25773,7 +25798,7 @@
    "dest": "src/runtime/mii/mii_ordinary_player.rs",
    "crate": "root",
    "src_sha256": "73e84c925f3aaedd6c09fd082ba41364d160e8cca38cc604617d5fdc38431b8d",
-   "dest_sha256": "135e75a842a58fe5fa205686e78a8828bf875ef6c91e344f90369b1eb347df52",
+   "dest_sha256": "faac3f91d685d8842bff38dc0342dcd2a4775ad68c0803d5222f71ae4e2d9ae2",
    "edits": [
     {
      "old": "fn note(reason:&str) { trace!(\"[MiiOrdinaryPlayer] {reason}\"); }",
@@ -26701,6 +26726,16 @@
      "reason": "Toggle fix (tr-primary-2 2026-11-27 01:02:26Z): the mark is a call, never inlined, so the native service path's frames stay within their stack bound.",
      "old": "}\n/// The clip editor's fighter switch (`roster_requests::note_drop`): this owner gave a request up after admission.\n/// `direct` is the request's own fighter; a cycle or a refresh marks nothing.\nfn request_dropped(direct:Option<u32>) {\n    if direct.is_some() {crate::runtime::roster::roster_requests::note_drop(true,direct);}\n}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(true,None);}\nfn clear_request(request:Request) {\n    let mut s=STATE.lock();\n",
      "new": "}\n/// The clip editor's fighter switch (`roster_requests::note_drop`): this owner gave a request up after admission.\n/// `direct` is the request's own fighter; a cycle or a refresh marks nothing.\n#[inline(never)]\nfn request_dropped(direct:Option<u32>) {\n    if direct.is_some() {crate::runtime::roster::roster_requests::note_drop(true,direct);}\n}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(true,None);}\nfn clear_request(request:Request) {\n    let mut s=STATE.lock();\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "    let replace_restore=manual_direct && s.restore.is_some();\n    let accepted=!s.busy() && (s.request.is_none() || replace_restore) && request.is_some();\n    if accepted {\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}\n        s.request=request;\n",
+     "new": "    let replace_restore=manual_direct && s.restore.is_some();\n    let accepted=!s.busy() && (s.request.is_none() || replace_restore) && request.is_some();\n    if accepted {\n        if !clip_commits(role,selection,user_request) {\n            return Some(crate::engine::swap::cycle_members::Admission::Unavailable);\n        }\n        s.restore=None;\n        if user_request {WAITING_MEMORY.lock().manual_request(Role::Player as usize);}\n        s.request=request;\n"
+    },
+    {
+     "reason": "Toggle review: keep the ticket and the editor aligned at withdrawal, commit, and teardown",
+     "old": "}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_drop(true,None);}\nfn clear_request(request:Request) {\n    let mut s=STATE.lock();\n    let restore_refused=s.request==Some(request) && s.restore.is_some();\n",
+     "new": "}\n/// The same for a track or a bank that ends without the fighter: no other request can own one while the switch waits here.\n#[inline(never)]\nfn load_dropped() {crate::runtime::roster::roster_requests::note_owner_drop(true);}\nfn clear_request(request:Request) {\n    let mut s=STATE.lock();\n    let restore_refused=s.request==Some(request) && s.restore.is_some();\n"
     }
    ]
   },

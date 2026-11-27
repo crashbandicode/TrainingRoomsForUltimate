@@ -62,6 +62,17 @@ admitted, refused, dropped, withdrawn, committed.
 - A request a Mii owner took cannot be withdrawn here; B then follows the roster.
 - Host tests only. dup-audit flies the Eden rows after the fold.
 
+### Reviewer correction: the ticket at its boundaries
+
+A role's departure invalidates even a switch not yet admitted. A failed Mii track or bank does not own an unadmitted
+switch. Mailbox overflow reports the exact slot it evicted; a different ticket or a legacy message cannot refuse
+the current switch. A terminal mark is consumed before a matching observed fighter can report success.
+
+The game frame drains the mailbox before the native fighter callback. Sampling a pending request there would leave
+one frame in which the strip could still promise cancellation after commitment. Instead, an accepted Mii handoff,
+an already-active direct selection, or a generic direct reload about to start arbitrates against B on the existing
+ticket. B wins before commitment; after it, the worker follows the roster without a B prompt. No lock is added.
+
 ## Requirement trace
 
 The clauses are tr-primary-2's orders of 2026-11-27 00:40:25Z and 01:02:26Z.

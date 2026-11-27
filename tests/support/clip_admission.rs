@@ -110,6 +110,21 @@ fn toggle_cases(role: usize, kind: i32, failed: &mut Vec<String>) {
     roster_requests::service();
     service_wanted_fighter();
     check("an older evicted message is not this ticket", pending(role) == Some(kind as u32) && loading().is_some());
+    admitted();
+    check("an unrelated handoff runs", roster_requests::commit_direct(role != 0, kind as u32)
+        && roster_requests::commit_direct(role == 0, kind as u32 + 1));
+    service_wanted_fighter();
+    check("an unrelated handoff does not hide B", !EDITOR.lock().unwrap().as_ref().unwrap().committed);
+    check("commit immediately wins before any B", roster_requests::commit_direct(role == 0, kind as u32));
+    service_wanted_fighter();
+    check("the worker learns of commit without a B or another game-frame drain",
+        EDITOR.lock().unwrap().as_ref().unwrap().committed);
+    admitted();
+    press_b();
+    check("a B after the drain but before native handoff wins",
+        !roster_requests::commit_direct(role == 0, kind as u32));
+    service_wanted_fighter();
+    check("pre-handoff B is acknowledged without pretending the load began", loading().is_none() && notice().is_empty());
     // The roster keeps the request for as long as it likes: the editor keeps loading and says nothing.
     admitted();
     for _ in 0..2_000 { roster_requests::service(); service_wanted_fighter(); }
@@ -122,6 +137,8 @@ fn toggle_cases(role: usize, kind: i32, failed: &mut Vec<String>) {
     check("another fighter's drop is not this switch's", loading() == Some((role, kind)) && notice().is_empty());
     character_roster::PENDING.lock().unwrap()[role] = None;
     roster_requests::note_drop(role == 0, Some(kind as u32));
+    check("a terminal mark cannot settle first on an incidentally matching live fighter",
+        !roster_requests::clip_can_settle());
     service_wanted_fighter();
     check("a dropped switch ends the load", loading().is_none());
     check("a dropped switch shows the refusal", notice() == FIGHTER_REFUSED);
