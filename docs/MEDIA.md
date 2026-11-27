@@ -7,9 +7,13 @@ they include retired takes, not just files still published. The 68 original comp
 The [zone-editor proof still](decisions/rc15-zone-editor-crop-proving-boot.png) omits the 28-row test banner at the top. The remaining 1280×646 pixels are unchanged.
 
 The [crop-editor GIF receipt](media/rc15-crop-editor.json) lists the source-frame hashes and output hash for the
-[November 15 crop-editor take](EVIDENCE-rc15-crop-editor.md).
+[November 15 crop-editor take](EVIDENCE.md#evidence-rc15-crop-editor).
 
 ## README menu tour
+
+| Picture (`docs/media/`) | Source | Frame or time |
+| --- | --- | --- |
+| `readme-tour-key.png` | `tut-menu-tour.mp4`, CPU tab; navigation labels added outside the rows | 1.30 s |
 
 ![Menu pages, sections and rows](media/readme-tour-key.png)
 
@@ -28,6 +32,10 @@ The labelled menu key and six detail pictures in the [menu tour](../README.md#ab
 The README showcase also embeds the existing `tut-guard-edge-setup-and-score`, `tut-input-drill-record`, `tut-clip-snap`, `tut-fighter-cycle`, `tut-stage-change`, `tut-kirby-hat` and `tut-mii-pick` MP4s from the tutorial table. The three interim GIFs are `rc13-replay-capture`, `rc11-lobby-practice` and `rc11-give-item`.
 
 ## Tutorial clips (2026-11-25 through 2026-11-27)
+
+| Cut by the crop | Clips |
+| --- | --- |
+| The frame strip's top rows (IN, "now", the ADVANTAGE heading) | `tut-menu-tour`, `tut-menu-change-option`, `tut-controls-change-chord`, `tut-input-delay`, `tut-input-display`, `tut-input-drill-record` |
 
 ![Clip editor with In selected](diagrams/clip-editor-legend.svg)
 
@@ -238,11 +246,15 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 
 ## Capture history
 
+| File | Shows | Picture | Bytes | sha256 |
+| --- | --- | --- | ---: | --- |
+| `media/i4-replay-editor-timeline.mp4` (removed) | The clip editor over the game | 1280×720 | 1,177,939 | `48a92a57` |
+
 ![Combos recorded for the rc.13 library](media/rc13-combo-library.png)
 
 ### rc.15 install 4 clips (2026-11-25)
 
-Nineteen clips were recorded for install 4; the [release notes](RELEASE-NOTES-rc15.md#install-4) show the nine clean takes and describe the ten whose recordings carried a test banner.
+Nineteen clips were recorded for install 4; the [release notes](RELEASE-NOTES.md#release-notes-rc15--install-4) show the nine clean takes and describe the ten whose recordings carried a test banner.
 
 - **Run/build:** Eden runs `i4-media-qp-yoga-01` (the Quick Play capture) and `i4-media-yoga-01` (Training), the
   installed build `a945b0c1` with the card's 21 plugins; Eden only, not checked on the console.
@@ -1716,7 +1728,7 @@ Lockout", then "Recording".
 
 In rc.8 (`8607526b`, merged into `eca14e4b`), the Record chord began refusing an AI-driven Player 1. The rc.10
 evidence take was `rc10-pilot-refusals.gif` (outside git). That refusal was retired on 2026-11-25; see
-[recording while an AI plays](RELEASE-NOTES-rc15.md#record-works-while-an-ai-plays-player-1).
+[recording while an AI plays](RELEASE-NOTES.md#release-notes-rc15--record-works-while-an-ai-plays-player-1).
 
 Retired from the README (each carried the bar):
 - `mii-editor.gif` and `mii-editor-list.gif` (2026-11-05): `rc7-mii-editor.gif` shows the editor, the new row and the
@@ -3122,6 +3134,6 @@ rc.1 clip above; it and its provenance note remain in the history up to v0.2.0-r
 - It shows Drill 1’s Crop range changing from 4 to 3, back to 4, then to 3.
 - It does not show Record drill, Make combo, grading or save-as-new.
 - The early build's helper overlaps the editor; the integrated build corrected that issue.
-- The [dated evidence](EVIDENCE-rc15-input-drill.md) keeps the original limitations and separate runtime checks.
+- The [dated evidence](EVIDENCE.md#evidence-rc15-input-drill) keeps the original limitations and separate runtime checks.
 
 At the time, the macro and drill GIFs showed range selection, not the full preview/save flow. The `rc15-article-hurtboxes` take showed Pikmin, not every supported item. For later Record drill and colour legend footage, see [Tutorial clips](#tutorial-clips-2026-11-25-through-2026-11-27).
