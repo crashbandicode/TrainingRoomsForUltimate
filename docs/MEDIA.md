@@ -1,8 +1,7 @@
 # Media
 
-Every GIF in [`media/`](media) is actual Eden footage: one clip per behaviour, under 10 s,
-game-speed timing kept, trimmed at the ends (any cut inside a clip is listed with it). A single take is the whole
-screen at 1280×720. Side-by-sides and composites are 1280 wide and 404, 436 or 764 high: 68 of the 270 GIFs. Frames were reviewed (start,
+The gameplay GIFs in [`media/`](media) use actual Eden footage. See each entry for timing, cuts and any comparison.
+Single takes are 1280×720; the 68 comparison and composite GIFs are 1280 wide and 404, 436 or 764 high. Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
 ## Tutorial clips (2026-11-25 through 2026-11-27)

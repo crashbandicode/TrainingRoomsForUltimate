@@ -99,7 +99,7 @@ All three changes are in the clip editor of the [Replay window](menu/recording.m
 
 ### Y on In makes a capture previewable
 
-*No clip: it is held until the known issue with X after a snap is fixed.*
+No install 6 clip shows a successful match-capture preview after this snap. The [later preview-build clip](media/tut-clip-snap.mp4) shows Y snapping In and X playing the capture.
 
 On a match capture, plain Y could leave In in the middle of an action, and X and A were then refused. The operator
 found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CURRENT-RELEASE.md#known-issues).
@@ -426,11 +426,11 @@ embedded; each is described where it stood.
 
 **Drill steps are listed by move**
 
-*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: DRILLS, with a three-step drill selected: its help line reads S1 jab, S2 side tilt, S3 up b. It carries the test tool's banner, so it is not embedded.*
+The selected drill lists S1 jab, S2 side tilt and S3 up b.
 
 **Move names Off and On**
 
-*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: With Move names Off the drill reads jab, side tilt, up b. With it On it reads Jab 1, Forward tilt, Final Cutter. It carries the test tool's banner, so it is not embedded.*
+Move names changes the labels from jab, side tilt and up b to Jab 1, Forward tilt and Final Cutter.
 
 **Match angle and deflection, Off**
 
@@ -459,11 +459,11 @@ embedded; each is described where it stood.
 
 **A get-up attack, recorded**
 
-*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: Place fighters starts Kirby lying down, and his get-up attack is recorded. It carries the test tool's banner, so it is not embedded.*
+Place fighters starts Kirby lying down; Record captures his get-up attack.
 
 **A get-up attack, played back**
 
-*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: Playing the take puts Kirby down again and repeats the get-up attack. It carries the test tool's banner, so it is not embedded.*
+Playing the take puts Kirby down again and repeats the get-up attack.
 
 **L + R + A by itself**
 
@@ -494,19 +494,19 @@ embedded; each is described where it stood.
 
 **The clip editor over the game**
 
-*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: Crop opens the editor as a strip under the fighters. The End handle moves in, and Y snaps it to the end of the jab. It carries the test tool's banner, so it is not embedded.*
+Crop opens a strip below the fighters; Y snaps the End handle to the end of the jab.
 
 **Preview on Player 1, then on the CPU**
 
-*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: X previews the kept part on Player 1. A ZR tap switches to the CPU and X previews it there. It carries the test tool's banner, so it is not embedded.*
+X previews the cut on Player 1. After a ZR tap, X previews it on the CPU.
 
 **Recordings**
 
-*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: RECORDINGS lists a Quick Play capture. A opens its screen: Inputs from, Plays on, Play back and the three Make rows. It carries the test tool's banner, so it is not embedded.*
+Opening a Quick Play capture shows Inputs from, Plays on, Play back and the three Make rows.
 
 **Playing a capture back**
 
-*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: Play back runs the captured King K. Rool on the CPU, with the timeline of its moves under the game. It carries the test tool's banner, so it is not embedded.*
+Play back runs King K. Rool on the CPU, with the capture's timeline below.
 
 **Trim: Off, Start, End and Both**
 
@@ -530,7 +530,7 @@ embedded; each is described where it stood.
 
 **Scrolling the input display back**
 
-*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: Close-up of the input display. With R3 held, D-pad Left scrolls back (the label reads -0.2 s, then -5.0 s), and the display then returns to now. It carries the test tool's banner, so it is not embedded.*
+R3 and D-pad Left scroll back to -0.2 s, then -5.0 s, before the strip returns to live.
 
 | Change | What it does | More |
 | --- | --- | --- |
@@ -540,7 +540,7 @@ embedded; each is described where it stood.
 
 **Damage range sliders**
 
-*No clean clip. The take of 2026-11-25 on build `a945b0c1` showed: CPU damage range: Min goes 0, 0.5, 3, 8% and Max 150, 148.5, 144%, by taps and a hold. It carries the test tool's banner, so it is not embedded.*
+Taps and a hold move Min from 0 through 0.5 and 3 to 8%, and Max from 150 through 148.5 to 144%.
 
 | Change | What it does | More |
 | --- | --- | --- |
