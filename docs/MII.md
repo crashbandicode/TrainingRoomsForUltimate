@@ -13,27 +13,129 @@ that ran them are listed under [Eden, rc.6](#eden-rc-6).
 
 | # | Behaviour | Fork | Here | Status |
 | --- | --- | --- | --- | --- |
-| 1 | **Add New** opens Smash's own Mii Fighter editor from Training, Quickplay or Local Wireless waiting practice | `src/mii_editor_bridge/mod.rs` `request`, `editor_origin.rs` `admit` | `src/runtime/mii/mii_editor_bridge/mod.rs:146` `request`, `editor_origin.rs:14`; `NATIVE_EDITOR_AVAILABLE = true` (`src/model/mii_root/mii_menu.rs:12`) | present |
-| 2 | Add New starts from a copy of the role's Player choice, else the first saved Mii of the class, else the game's default | `training_mod_tui/src/mii_menu.rs:337-352`, `native_default.rs` | `mii_menu.rs:311` `editor_seed`, `native_default.rs` | present |
-| 3 | Add New with a Player/CPU choice made in the same opening: the choice stays saved, its reload is dropped, the editor opens alone | `training_mod_tui/src/containers/app.rs:923-931`, `src/common/menu.rs:483-491` | `src/editors/mii.rs` `close_for`, `src/runtime/mii/menu_handoff.rs` (editor request before the catalog close) | **ported 2026-11-05** |
-| 4 | **Save** makes a new native Smash Mii: only a fresh draft reaches the game's allocator (a new slot); a saved ID never enters, so no saved Mii or protected original is overwritten; an identical configuration reuses the saved one and says so: the notice "Same as ‹saved name›, nothing new saved" names the matched saved Mii (decision C, 2026-11-08; a rename alone is identical, row 12); refused when the catalog is incomplete or holds 99 files | `src/mii_editor_bridge/mod.rs:592-645` `edit_decide` | `mii_editor_bridge/mod.rs:632` `edit_decide`; post-save check `save_ready_for_return` `:728`, `catalog_read` `:755` | present |
-| 5 | **Name**: the editor's Name row uses the shared inline keyboard (10 UTF-16 units; empty Enter cancels; one keyboard lease shared with the macro keyboard) | `src/mii_editor_bridge/name_keyboard.rs` | `mii_editor_bridge/name_keyboard.rs:153`, `src/model/mii/inline_keyboard.rs` | present |
-| 6 | **Interrupted editor**: a match starting in Quickplay/Local Wireless while editing keeps the confirmed draft and the exact screen (Settings row, Name text and caret, Headgear/Outfit/Colour/Voice cursors, Specials picks, Test), in memory only; returning to the same lobby resumes it without saving | `connected.rs`, `resume_adapter.rs`, `ui_resume.rs`, `*_resume.rs` | the same files under `src/runtime/mii/mii_editor_bridge/` (`connected.rs:298/341` → `resume_adapter.rs:413` `try_auto_return` → `mod.rs:221` `resume_checkpoint`); `src/model/mii_root/resume.rs` | present |
-| 7 | **Leaving**: B / Exit Without Saving / Cancel discards the draft and creates nothing; the copied Mii never changes; Training (or the lobby's practice fighter and Ready card) comes back | `mod.rs` `editor_parent`, `training_state`; `connected.rs` `owner.reenter` | `mod.rs:501` `editor_parent`, `:345` `training_state`; `connected.rs` | present |
+| 1 | [Open the native Mii editor](#mii-1) | `src/mii_editor_bridge/mod.rs` `request`, `editor_origin.rs` `admit` | `src/runtime/mii/mii_editor_bridge/mod.rs:146` `request`, `editor_origin.rs:14`; `NATIVE_EDITOR_AVAILABLE = true` (`src/model/mii_root/mii_menu.rs:12`) | present |
+| 2 | [Choose a starting template](#mii-2) | `training_mod_tui/src/mii_menu.rs:337-352`, `native_default.rs` | `mii_menu.rs:311` `editor_seed`, `native_default.rs` | present |
+| 3 | [Open the editor after changing a role](#mii-3) | `training_mod_tui/src/containers/app.rs:923-931`, `src/common/menu.rs:483-491` | `src/editors/mii.rs` `close_for`, `src/runtime/mii/menu_handoff.rs` (editor request before the catalog close) | **ported 2026-11-05** |
+| 4 | [Save a new or identical Mii](#mii-4) | `src/mii_editor_bridge/mod.rs:592-645` `edit_decide` | `mii_editor_bridge/mod.rs:632` `edit_decide`; post-save check `save_ready_for_return` `:728`, `catalog_read` `:755` | present |
+| 5 | [Name a Mii](#mii-5) | `src/mii_editor_bridge/name_keyboard.rs` | `mii_editor_bridge/name_keyboard.rs:153`, `src/model/mii/inline_keyboard.rs` | present |
+| 6 | [Resume an interrupted edit](#mii-6) | `connected.rs`, `resume_adapter.rs`, `ui_resume.rs`, `*_resume.rs` | the same files under `src/runtime/mii/mii_editor_bridge/` (`connected.rs:298/341` → `resume_adapter.rs:413` `try_auto_return` → `mod.rs:221` `resume_checkpoint`); `src/model/mii_root/resume.rs` | present |
+| 7 | [Leave without saving](#mii-7) | `mod.rs` `editor_parent`, `training_state`; `connected.rs` `owner.reenter` | `mod.rs:501` `editor_parent`, `:345` `training_state`; `connected.rs` | present |
 | 8 | Local Wireless waiting practice greys Headgear, Outfit, Colour, Voice and Random in the editor | `settings_resume.rs:128-133` | `settings_resume.rs:129-134` | present |
-| 9 | **Edit an existing Mii**: the fork has none (a saved Mii is only a template; the game's own saved-Mii page is cancelled) | `mii_menu.rs:337`, `editor_row.rs:1` | same | same (absent in both) |
-| 10 | **Restore** in the fork means resuming an interrupted editor (row 6) and re-entering practice after Exit Without Saving (row 7); there is no "revert a Mii" | `resume_adapter.rs:281-311`, `connected.rs:239-246` | same | present |
-| 11 | **Replay Miis**: with replay capture on, Save Replay stores the match's Mii data; entering Training or waiting practice imports it | `src/live_replay.rs:339-371`, `src/mii_replay.rs:146-245` | `src/runtime/macros/live_replay.rs:514` `copy_record`, `src/runtime/mii/mii_replay.rs` | present |
-| 12 | Matching: two Miis are the same when class, look (CharInfo without its create ID and name), the four specials, colour, voice, outfit and hat match; names never count. Identical to a saved native Mii: that one is used and nothing is stored. Otherwise added once to the modpack library as "Replay Brawler/Swordfighter/Gunner"; the same capture again adds no copy | `training_mod_mii/src/inventory.rs:5-16`, `draft.rs:119-131,170-177` | `src/model/mii/inventory.rs`, `src/model/mii/draft.rs:122` `insert` | present |
-| 13 | Replay Miis are modpack-only (`sd:/ultimate/TrainingRooms/mii-presets.json`, up to 256, never written to Smash's Mii list); a replay Mii is listed after the saved ones, and one equal to a saved Mii is hidden | `draft_store.rs:6-7`, `inventory.rs:298-309` | `src/model/mii/draft_store.rs:9`, `src/model/mii/draft.rs:8`, `inventory.rs` | present (the folder is TrainingRooms') |
+| 9 | [Use a saved Mii as a template](#mii-8) | `mii_menu.rs:337`, `editor_row.rs:1` | same | same (absent in both) |
+| 10 | [Restore an interrupted session](#mii-9) | `resume_adapter.rs:281-311`, `connected.rs:239-246` | same | present |
+| 11 | [Import replay Miis](#mii-10) | `src/live_replay.rs:339-371`, `src/mii_replay.rs:146-245` | `src/runtime/macros/live_replay.rs:514` `copy_record`, `src/runtime/mii/mii_replay.rs` | present |
+| 12 | [Match a captured Mii to the catalog](#mii-11) | `training_mod_mii/src/inventory.rs:5-16`, `draft.rs:119-131,170-177` | `src/model/mii/inventory.rs`, `src/model/mii/draft.rs:122` `insert` | present |
+| 13 | [Store and list replay Miis](#mii-12) | `draft_store.rs:6-7`, `inventory.rs:298-309` | `src/model/mii/draft_store.rs:9`, `src/model/mii/draft.rs:8`, `inventory.rs` | present (the folder is TrainingRooms') |
 | 14 | Each role saves a choice per class. See the reload rules below. | `mii_menu.rs`, `selection.rs:186-252` | `src/model/mii_root/mii_menu.rs`, `src/editors/mii.rs`, `src/model/mii/selection.rs` | present (one list per class, ZR switches the role: the decided menu) |
 | 15 | A portrait pick in Player/CPU Character drops that role's Mii reload from the same opening | `app.rs:522-531` | `src/editors/mii.rs` `close_for` (`picked`), `src/runtime/ui/worker.rs` `begin_close` | **ported 2026-11-05** |
-| 16 | Stored Mii choices are read one by one: a bad entry or an unknown field leaves the other choices | `training_mod_consts/src/menu_json.rs:17-37` | `src/model/compat/menu.rs` `mii_preferences_of` | **ported 2026-11-05** |
-| 17 | Mii tiles in Character Cycles, the portrait picks and Kirby Hats: a class with no admitted Mii for that role is greyed and refuses A ("… - unavailable"); admitted Mii tiles take their cycle number; the role's original Mii takes the grey 0 only without a numbered place. **P-CYCLE (2026-11-05):** the CPU cycle's numbers are its walkers' own list (`engine::swap::cycle_members`: All and the ranks, with the Mii classes the CPU Mii owner admits; All includes them, numbered), so a greyed class never cycles and every cycled class is numbered; the 0 is the runtime's slot 0 (the scene's original), not the saved pick | `app.rs:563-685,745-800`, `src/training/ui/roster_grid.rs:197-206,304-308` | `src/editors/roster.rs` `MiiTiles`, `roster_badges`; `src/editors/mii.rs` `tiles`; `src/model/swap/cycle_members.rs`; `src/runtime/ui/view.rs` (greyed tint) | **ported 2026-11-05**; fixed by P-CYCLE |
+| 16 | [Recover other preferences after a bad entry](#mii-13) | `training_mod_consts/src/menu_json.rs:17-37` | `src/model/compat/menu.rs` `mii_preferences_of` | **ported 2026-11-05** |
+| 17 | [Number and admit Mii cycle tiles](#mii-14) | `app.rs:563-685,745-800`, `src/training/ui/roster_grid.rs:197-206,304-308` | `src/editors/roster.rs` `MiiTiles`, `roster_badges`; `src/editors/mii.rs` `tiles`; `src/model/swap/cycle_members.rs`; `src/runtime/ui/view.rs` (greyed tint) | **ported 2026-11-05**; fixed by P-CYCLE |
 | 18 | Cycles load the chosen Mii; preloaded helpers and the body bank carry it | `training_mod_consts/src/mii_cycle.rs`, `mii_managed_helper.rs` | `src/model/swap/mii_cycle.rs`, `src/runtime/mii/mii_managed_helper.rs` | present |
-| 19 | HUD portraits show the chosen Mii (Training, the Local Wireless CPU icon, the Quickplay CPU); the Ready card keeps the real-match fighter | `mii_hud_portrait.rs` | `src/runtime/mii/mii_hud_portrait.rs` | present |
-| 20 | The exact Mii is kept across L+R+A, save-state loads, swaps, stage changes and a same-lobby return | `character_lifecycle.rs`, `mii_ordinary_*` | same files under `src/runtime/` | present |
+| 19 | [Display the selected portrait](#mii-15) | `mii_hud_portrait.rs` | `src/runtime/mii/mii_hud_portrait.rs` | present |
+| 20 | [Keep the selected Mii across transitions](#mii-16) | `character_lifecycle.rs`, `mii_ordinary_*` | same files under `src/runtime/` | present |
 | 21 | With no Mii catalog for an opening the fork showed no Mii pages | `app.rs:287-301` | the pages stay and say "Mii lists open in Training and in waiting practice." (`menu_app::no_catalog`) | differs (the decided menu keeps its rows) |
+
+<a id="mii-1"></a>
+
+**Open the native Mii editor**
+
+- **Add New** opens Smash's own Mii Fighter editor from Training, Quickplay or Local Wireless waiting practice
+
+<a id="mii-2"></a>
+
+**Choose a starting template**
+
+- Add New starts from a copy of the role's Player choice, else the first saved Mii of the class, else the game's default
+
+<a id="mii-3"></a>
+
+**Open the editor after changing a role**
+
+- Add New with a Player/CPU choice made in the same opening: the choice stays saved, its reload is dropped, the editor opens alone
+
+<a id="mii-4"></a>
+
+**Save a new or identical Mii**
+
+- **Save** makes a new native Smash Mii: only a fresh draft reaches the game's allocator (a new slot); a saved ID never enters, so no saved Mii or protected original is overwritten;
+- an identical configuration reuses the saved one and says so: the notice "Same as ‹saved name›, nothing new saved" names the matched saved Mii (decision C, 2026-11-08; a rename alone is identical, row 12); refused when the catalog is incomplete or holds 99 files
+
+<a id="mii-5"></a>
+
+**Name a Mii**
+
+- **Name**: the editor's Name row uses the shared inline keyboard (10 UTF-16 units; empty Enter cancels; one keyboard lease shared with the macro keyboard)
+
+<a id="mii-6"></a>
+
+**Resume an interrupted edit**
+
+- **Interrupted editor**: a match starting in Quickplay/Local Wireless while editing keeps the confirmed draft and the exact screen (Settings row, Name text and caret, Headgear/Outfit/Colour/Voice cursors, Specials picks, Test), in memory only; returning to the same lobby resumes it without saving
+
+<a id="mii-7"></a>
+
+**Leave without saving**
+
+- **Leaving**: B / Exit Without Saving / Cancel discards the draft and creates nothing; the copied Mii never changes; Training (or the lobby's practice fighter and Ready card) comes back
+
+<a id="mii-8"></a>
+
+**Use a saved Mii as a template**
+
+- **Edit an existing Mii**: the fork has none (a saved Mii is only a template; the game's own saved-Mii page is cancelled)
+
+<a id="mii-9"></a>
+
+**Restore an interrupted session**
+
+- **Restore** in the fork means resuming an interrupted editor (row 6) and re-entering practice after Exit Without Saving (row 7); there is no "revert a Mii"
+
+<a id="mii-10"></a>
+
+**Import replay Miis**
+
+- **Replay Miis**: with replay capture on, Save Replay stores the match's Mii data; entering Training or waiting practice imports it
+
+<a id="mii-11"></a>
+
+**Match a captured Mii to the catalog**
+
+- Matching: two Miis are the same when class, look (CharInfo without its create ID and name), the four specials, colour, voice, outfit and hat match; names never count. Identical to a saved native Mii: that one is used and nothing is stored. Otherwise added once to the modpack library as "Replay Brawler/Swordfighter/Gunner";
+- the same capture again adds no copy
+
+<a id="mii-12"></a>
+
+**Store and list replay Miis**
+
+- Replay Miis are modpack-only (`sd:/ultimate/TrainingRooms/mii-presets.json`, up to 256, never written to Smash's Mii list); a replay Mii is listed after the saved ones, and one equal to a saved Mii is hidden
+
+<a id="mii-13"></a>
+
+**Recover other preferences after a bad entry**
+
+- Stored Mii choices are read one by one: a bad entry or an unknown field leaves the other choices
+
+<a id="mii-14"></a>
+
+**Number and admit Mii cycle tiles**
+
+- Mii tiles in Character Cycles, the portrait picks and Kirby Hats: a class with no admitted Mii for that role is greyed and refuses A ("… - unavailable"); admitted Mii tiles take their cycle number; the role's original Mii takes the grey 0 only without a numbered place.
+- **P-CYCLE (2026-11-05):** the CPU cycle's numbers are its walkers' own list (`engine::swap::cycle_members`: All and the ranks, with the Mii classes the CPU Mii owner admits; All includes them, numbered), so a greyed class never cycles and every cycled class is numbered;
+- the 0 is the runtime's slot 0 (the scene's original), not the saved pick
+
+<a id="mii-15"></a>
+
+**Display the selected portrait**
+
+- HUD portraits show the chosen Mii (Training, the Local Wireless CPU icon, the Quickplay CPU); the Ready card keeps the real-match fighter
+
+<a id="mii-16"></a>
+
+**Keep the selected Mii across transitions**
+
+- The exact Mii is kept across L+R+A, save-state loads, swaps, stage changes and a same-lobby return
+
+
 
 The Brawler, Swordfighter and Gunner lists grey out each role's character-select Mii.
 
@@ -112,15 +214,35 @@ The Brawler, Swordfighter and Gunner lists grey out each role's character-select
 | Rows above | Eden row | Run (build) | Result |
 | --- | --- | --- | --- |
 | 1, 2, 4, 7 | `cr-mii-exit`, `cr-mii-identical`, `cr-mii-changed`: no save on exit, the saved Mii reused, one new `mii_<id>.bin` | `covrest-16` (`1f6285c`) | pass |
-| 4 | `cr-mii-rename-same`: a rename-only Save reuses the saved Mii and shows "Same as ‹name›, nothing new saved" | `covrest-07` (`f5a73c0`) | pass |
+| 4 | [Verify rename-only Save](#mii-17) | `covrest-07` (`f5a73c0`) | pass |
 | 5 | `cr-mii-name-test`: the Name keyboard and Test | `covrest-07` (`f5a73c0`) | pass |
-| 6 | `p00`–`p07` and the resume rows: a match starts while the editor is open in a Local Wireless room; the editor comes back with the typed name | `covrest-pair-y3` (`8e50b22`) | pass |
+| 6 | [Verify an interrupted name edit](#mii-18) | `covrest-pair-y3` (`8e50b22`) | pass |
 | 11, 12 | `cov-replay-window`: the capture's Mii track asks, and Switch loads the recorded Mii | `covrest-yoga-04` (`cbe961a`) | pass |
 | Recorded macros | `cov-named-mii`: a CPU macro recorded on an exact Mii, Switch loads it, 0 Unmapped | `covrest-yoga-04` (`cbe961a`) | pass |
 | 14, 17, 18 | `cr-cpu-cycle-list`, `cr-player-cycle-list`: the Mii classes load in both cycles | `covrest-16` (`1f6285c`) | pass |
-| 18, seats | `cr-f9-raise-again`, `cr-f9-mii-cycles`: a Mii seat loads the saved Mii; the classes stay in both cycles after a raise and a drop | `covrest-09` (`f98813b`), `covrest-14` (`0c4b48b`) | pass |
+| 18, seats | [Verify CPU seats and cycle membership](#mii-19) | `covrest-09` (`f98813b`), `covrest-14` (`0c4b48b`) | pass |
 | 20 | `cr-p2-lra-mii`: Player 2 controls a Mii CPU, after L+R+A too | `covrest-16` (`1f6285c`) | pass |
 | Async build, warm exit | `me-p1-lap`, `me-cpu-lap`: every press applied, one Mii build per role, the exit 50–114 ms | `rc6-hot-xps6` (`d6a485f`) | pass |
+
+<a id="mii-17"></a>
+
+**Verify rename-only Save**
+
+- `cr-mii-rename-same`: a rename-only Save reuses the saved Mii and shows "Same as ‹name›, nothing new saved"
+
+<a id="mii-18"></a>
+
+**Verify an interrupted name edit**
+
+- `p00`–`p07` and the resume rows: a match starts while the editor is open in a Local Wireless room; the editor comes back with the typed name
+
+<a id="mii-19"></a>
+
+**Verify CPU seats and cycle membership**
+
+- `cr-f9-raise-again`, `cr-f9-mii-cycles`: a Mii seat loads the saved Mii; the classes stay in both cycles after a raise and a drop
+
+
 
 Each run above used a diagnostic build of the named commit on 2026-11-08; see `artifacts/phase23/rc6-eden/<run>/` and `artifacts/phase23/rc6-item3-re/`.
 

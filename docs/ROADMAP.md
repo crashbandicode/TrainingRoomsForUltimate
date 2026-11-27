@@ -10,23 +10,105 @@ on 2026-11-05; no item was dropped.
 | Sequence drilling: the sequence bar, the joining link, streak and best in the file | `p23/rc6-seq-drill` | Eden `rc6-seq-diag1` 18/18, `rc6-seq-rel1` 5/5 |
 | *+ Save last combo…* at the top of COMBOS (decision SAVE-LAST-COMBO) | `p23/rc6-cov-rec` | Eden `rc6-covrec-diag10` 12/12; a local-wireless room `covrest-pair-y1` |
 | The r8 recording pop-up: role and page tabs, counts, CONNECTIONS column, lines, badges, footer | `p23/rc6-cov-rec` | Eden `rc6-covrec-diag10`, `-rel7` 3/3 |
-| Recording fixes: the bound save drives Save, Load and Auto-load; CONNECTIONS; Make combo events; mash; setup restore; Edit placement; Edit and Delete written | `p23/rc6-cov-rec`, `p23/rc6-seq-drill` | Eden `rc6-covrec-diag3` 32/35 then `-diag10`; `rc6-seq-diag1` |
+| [Recording, setup restore and editor fixes](#roadmap-1) | `p23/rc6-cov-rec`, `p23/rc6-seq-drill` | Eden `rc6-covrec-diag3` 32/35 then `-diag10`; `rc6-seq-diag1` |
 | Hot fighters at Training entry (start-up windows, hats at entry), the group-receipt and back-to-the-original fixes | `p23/rc6-hot-slots` | Eden `rc6-hot-xps3` 21/21; console F6 on the test card |
-| Group speed (decision GROUP-SPEED): warm exit from a Mii, async Mii build, groups built in the background | `p23/rc6-hot-slots` | Eden `rc6-hot-xps6` 5/5, `rc6-hot-xps8`, `rc6-hot-xps13` 13/14 (the 14th is the fallback allocation, fixed in integration); on the candidate `b04856b2`: Mii groups built in the background, `yoga-i3-mii-r2` 19/19 (the first switch into the Mii warm, every exit warm); Pokémon Trainer, Samus and the Ice Climbers pair built beside a live Mii, and Pyra/Mythra in a session that starts on Pokémon Trainer, `yoga-i3-x6-r2` 14/14; sessions that start on Ice Climbers (`surface-i3-ic` `ic-start-loaded`; its one failure a first-execution gap) and on Pokémon Trainer (`surface-i3-native4` 14/14), the cross cells (`surface-i3-xc` 11/11), and the Kirby wait and re-arm (`surface-i3-kr` 10/10; in `surface-i3-ptexit2` the CPU entered as Kirby, its group waited and built 15 ms after the CPU's first switch away) |
-| A cycle change makes things hot (decision CYCLE-CHANGE-HOT) | `p23/rc6-hot-slots` | Eden `rc6-hot-xps13`; on the candidate `b04856b2`, the longest pause during the background build after a change is 4 frames (target 4: the Mii build's start, `yoga-i3-cc` `cc-mii-change`), 1–2 in `yoga-i3-mii-r2` and `yoga-i3-x6-r2`; a press during that build is served when it ends (`yoga-i3-press-r2` 6/6, 118 ms after) |
-| A cycle change takes effect at once: groups that left the cycle free at the next pause, or at once when the new fighters need their room | `p23/rc6-preload-priority` (`06afa00d`) | Eden `pp-rel-2` 8/8 (`x6-fit`, `x6-cc`); `pp-base-1` reproduced the old wait on `e39479df`; `06afa00d` hands a freed group's memory back once the game has unloaded it, then decides on a group the cycle still uses (`pp-purge-2` 8/8, `pp-purge-4` 9/9); last candidate `72344fd9`: `surface-i3-pf` 9/9 (`x6-cc` settled on the purge, `x6-churn` flat over 10 changes) |
+| [Warm Mii exits and background group builds](#roadmap-2) | `p23/rc6-hot-slots` | [Mii build and cycle measurements](#roadmap-3) |
+| A cycle change makes things hot (decision CYCLE-CHANGE-HOT) | `p23/rc6-hot-slots` | [Background-build latency and queued presses](#roadmap-4) |
+| [Release unused cycle groups](#roadmap-5) | `p23/rc6-preload-priority` (`06afa00d`) | [Group release and memory reuse measurements](#roadmap-6) |
 | A switch's window takes only the fighters that fit in memory (the `hs08b` abort) | `p23/rc6-window-admission` | Eden `wa-79cc-xps-hot` 21/21, no abort; on the candidate `xps-hot` 21/21 (`hs08b-heavy-both`) |
-| Lock-order audit: the macro-naming freeze fixed; the stall watchdog (diag) | `p23/rc6-menu-freeze` | Eden `ally-hang1` 5/5 (40 menu closes, no stall); it doesn't cover the menu-close freeze (`rc6-qpf1`, below) |
+| Lock-order audit: the macro-naming freeze fixed; the stall watchdog (diag) | `p23/rc6-menu-freeze` | [Menu-close stall coverage](#roadmap-7) |
 | The waiting room remembers its partners | `p23/rc6-lobby-persist` | Eden `rc6-lp-qp1` 13/13, `rc6-lp-ldn2` 14/14; on the candidate `lp-ldn` 14/14 and `rc6-bg-final1-1261f56c` |
-| CPU Level (Off, Lv 1–9) for Training and the waiting room's practice | `p23/rc6-lobby-cpu` | Eden `lc-xps-02`, `lc-xps-04` 6/6; on the candidate `surface-lc` 11/11 (Training) and `rc6-bg-final1-1261f56c` (the waiting room; nothing in the match) |
+| CPU Level (Off, Lv 1–9) for Training and the waiting room's practice | `p23/rc6-lobby-cpu` | [CPU Level test coverage](#roadmap-8) |
 | Lobby Items Off stops the timed drops in Quickplay's waiting area (#62) | `p23/rc6-qp-items` | Eden `rc6-bg-qp7`, `rc6-bg-ldn62`; on the candidate `rc6-bg-final1-1261f56c` (`f1-items62`: Off made 0 items) and `yoga-pair-r2` 17/17 |
 | P1 CPU Control in an online match | `p23/rc6-qp-pilot` | [Feature ledger, row 77](FEATURE-LEDGER.md): branch and final Quickplay sessions |
-| No. of CPUs seats: the first raise, a Mii seat's configuration, the proof of a promoted seat, the portrait race, the seats after a cycle change | `p23/rc6-cov-rest` | Eden `covrest-10`, `-14`, `covrest-yoga-06` |
+| [CPU seat promotion and portrait fixes](#roadmap-9) | `p23/rc6-cov-rest` | Eden `covrest-10`, `-14`, `covrest-yoga-06` |
 | The "Same as ‹name›, nothing new saved" notice (decision MII-SAME-NOTICE) | `p23/rc6-cov-rest` | Eden `covrest-07` |
-| Open readings (decisions SETUP-Y-BIND, PLAY-MOMENTUM, F9-SEAT-NOTICE): Y on a setup, Play's Momentum, the start save at Record's start, a seat held for memory in the notice | `p23/rc6-open-fixes` | Eden `rc6-openfix-2` (`of-setup-y`, `of-momentum`), `rc6-openfix-5` (`of-seat-notice`); z-gates clean on both |
-| The exact Mii on a recorded macro (#54), the Replay window's Mii track (#68), the notice plates (#64) | `p23/rc6-cov-rest` | Eden `covrest-yoga-04`, `covrest-07`; `rc6-int-smoke2` for the plates |
+| [Setup binding, playback momentum and recording start](#roadmap-10) | `p23/rc6-open-fixes` | Eden `rc6-openfix-2` (`of-setup-y`, `of-momentum`), `rc6-openfix-5` (`of-seat-notice`); z-gates clean on both |
+| [Recorded Miis and notice plates](#roadmap-11) | `p23/rc6-cov-rest` | Eden `covrest-yoga-04`, `covrest-07`; `rc6-int-smoke2` for the plates |
 | No heap in the CPU-as-P1 fallback's hooks | `p23/rc6-integration` `6d6994e` | Eden `rc6-int-smoke2` 11/11 |
-| rc.5 features first proven in Eden: P2 L+R+A and Mii swaps, respawn, intro once, the online flag, the Lobby Items online smoke, the timer capture through sudden death, the Mii editor's interrupt and resume, combos in a local-wireless room | the lane branches | Eden `covrest-16`, `-04`, `-13`/`-15`, `covrest-pair-02`/`-03`, `rc6-int-vs3`, `covrest-pair-y3`/`-y1`. Lobby Items #62: PASS on the spawner-level proof (`rc6-int-li1` li-02/li-04, `rc6-int-lipair1`; decided 2026-11-08 23:43Z); the game spawns no item in Eden's local-wireless rooms |
+| [First rc.5 Eden coverage](#roadmap-12) | the lane branches | [Paired-room and Lobby Items evidence](#roadmap-13) |
+
+<a id="roadmap-1"></a>
+
+**Recording, setup restore and editor fixes**
+
+- Recording fixes: the bound save drives Save, Load and Auto-load; CONNECTIONS; Make combo events; mash; setup restore; Edit placement; Edit and Delete written
+
+<a id="roadmap-2"></a>
+
+**Warm Mii exits and background group builds**
+
+- Group speed (decision GROUP-SPEED): warm exit from a Mii, async Mii build, groups built in the background
+
+<a id="roadmap-3"></a>
+
+**Mii build and cycle measurements**
+
+- Eden `rc6-hot-xps6` 5/5, `rc6-hot-xps8`, `rc6-hot-xps13` 13/14 (the 14th is the fallback allocation, fixed in integration); on the candidate `b04856b2`: Mii groups built in the background, `yoga-i3-mii-r2` 19/19 (the first switch into the Mii warm, every exit warm);
+- Pokémon Trainer, Samus and the Ice Climbers pair built beside a live Mii, and Pyra/Mythra in a session that starts on Pokémon Trainer, `yoga-i3-x6-r2` 14/14; sessions that start on Ice Climbers (`surface-i3-ic` `ic-start-loaded`;
+- its one failure a first-execution gap) and on Pokémon Trainer (`surface-i3-native4` 14/14), the cross cells (`surface-i3-xc` 11/11), and the Kirby wait and re-arm (`surface-i3-kr` 10/10; in `surface-i3-ptexit2` the CPU entered as Kirby, its group waited and built 15 ms after the CPU's first switch away)
+
+<a id="roadmap-4"></a>
+
+**Background-build latency and queued presses**
+
+- Eden `rc6-hot-xps13`; on the candidate `b04856b2`, the longest pause during the background build after a change is 4 frames (target 4: the Mii build's start, `yoga-i3-cc` `cc-mii-change`), 1–2 in `yoga-i3-mii-r2` and `yoga-i3-x6-r2`; a press during that build is served when it ends (`yoga-i3-press-r2` 6/6, 118 ms after)
+
+<a id="roadmap-5"></a>
+
+**Release unused cycle groups**
+
+- A cycle change takes effect at once: groups that left the cycle free at the next pause, or at once when the new fighters need their room
+
+<a id="roadmap-6"></a>
+
+**Group release and memory reuse measurements**
+
+- Eden `pp-rel-2` 8/8 (`x6-fit`, `x6-cc`); `pp-base-1` reproduced the old wait on `e39479df`; `06afa00d` hands a freed group's memory back once the game has unloaded it, then decides on a group the cycle still uses (`pp-purge-2` 8/8, `pp-purge-4` 9/9); last candidate `72344fd9`: `surface-i3-pf` 9/9 (`x6-cc` settled on the purge, `x6-churn` flat over 10 changes)
+
+<a id="roadmap-7"></a>
+
+**Menu-close stall coverage**
+
+- Eden `ally-hang1` 5/5 (40 menu closes, no stall); it doesn't cover the menu-close freeze (`rc6-qpf1`, below)
+
+<a id="roadmap-8"></a>
+
+**CPU Level test coverage**
+
+- Eden `lc-xps-02`, `lc-xps-04` 6/6; on the candidate `surface-lc` 11/11 (Training) and `rc6-bg-final1-1261f56c` (the waiting room; nothing in the match)
+
+<a id="roadmap-9"></a>
+
+**CPU seat promotion and portrait fixes**
+
+- No. of CPUs seats: the first raise, a Mii seat's configuration, the proof of a promoted seat, the portrait race, the seats after a cycle change
+
+<a id="roadmap-10"></a>
+
+**Setup binding, playback momentum and recording start**
+
+- Open readings (decisions SETUP-Y-BIND, PLAY-MOMENTUM, F9-SEAT-NOTICE): Y on a setup, Play's Momentum, the start save at Record's start, a seat held for memory in the notice
+
+<a id="roadmap-11"></a>
+
+**Recorded Miis and notice plates**
+
+- The exact Mii on a recorded macro (#54), the Replay window's Mii track (#68), the notice plates (#64)
+
+<a id="roadmap-12"></a>
+
+**First rc.5 Eden coverage**
+
+- rc.5 features first proven in Eden: P2 L+R+A and Mii swaps, respawn, intro once, the online flag, the Lobby Items online smoke, the timer capture through sudden death, the Mii editor's interrupt and resume, combos in a local-wireless room
+
+<a id="roadmap-13"></a>
+
+**Paired-room and Lobby Items evidence**
+
+- Eden `covrest-16`, `-04`, `-13`/`-15`, `covrest-pair-02`/`-03`, `rc6-int-vs3`, `covrest-pair-y3`/`-y1`. Lobby Items #62: PASS on the spawner-level proof (`rc6-int-li1` li-02/li-04, `rc6-int-lipair1`; decided 2026-11-08 23:43Z); the game spawns no item in Eden's local-wireless rooms
+
+
 
 The [feature ledger](FEATURE-LEDGER.md) records the candidate's tests, and the [rc.6 notes](RELEASE-NOTES-rc6.md) describe the changes.
 
@@ -66,14 +148,40 @@ The rc.6 investigation saw freezes in `covrest-yoga-05`, `rc6-bg-qp3`, `rc6-qpf1
 
 | Work deferred at rc.1 | Later outcome |
 | --- | --- |
-| F9 helper promotion, fixed-seat ownership, hat/item cutover | Done in rc.5 (`p23/f9`): fixed CPU seats, slow mode on live entries, hat and item cutover, and the option-1 same-close raise from 1 to 3. |
+| F9 helper promotion, fixed-seat ownership, hat/item cutover | [Fixed CPU seats and helper promotion](#roadmap-14) |
 | Hurtboxes (HB1) | Deferred at rc.1; see [Hitbox Visualization](menu/display-and-controls.md#on-screen) for the supported layers. |
-| Ten hot fighters plus five separate hot hats | Done in rc.5 (`p23/hot-slots`): ten hot fighters and five hot hats, hats off the fighter budget. No separate 15-body feature. |
+| Ten hot fighters plus five separate hot hats | [Separate fighter and hat budgets](#roadmap-15) |
 | Saved/replay Mii bust provider (Q15) | No new provider or hook; the native saved-Mii selection stays. |
-| Frame/status text backgrounds (UI22) | Done in rc.5: a dark plate behind each notice text (header, short body, long body). The input-log plates stay reverted. The frame strip keeps its own backdrop. |
-| Further latency work (F6) | rc.6, console test of 2026-11-08 (release `1e6c6a0e`): Player 1's first switch 53 ms and hats 7–23 ms, the first included, with no hitch. The slow group switches it found became the rc.6 group-speed work (decision GROUP-SPEED). |
+| Frame/status text backgrounds (UI22) | [Notice and frame-strip backgrounds](#roadmap-16) |
+| Further latency work (F6) | [Console switch latency](#roadmap-17) |
 | Hitbox sphere replacement | Fighter discs in rc.3; [projectile hitboxes](TECHNICAL.md#hitboxes-and-grab-boxes) followed in rc.13. |
 | Remaining feature/edge-case inventory | Kept for later planning. |
+
+<a id="roadmap-14"></a>
+
+**Fixed CPU seats and helper promotion**
+
+- Done in rc.5 (`p23/f9`): fixed CPU seats, slow mode on live entries, hat and item cutover, and the option-1 same-close raise from 1 to 3.
+
+<a id="roadmap-15"></a>
+
+**Separate fighter and hat budgets**
+
+- Done in rc.5 (`p23/hot-slots`): ten hot fighters and five hot hats, hats off the fighter budget. No separate 15-body feature.
+
+<a id="roadmap-16"></a>
+
+**Notice and frame-strip backgrounds**
+
+- Done in rc.5: a dark plate behind each notice text (header, short body, long body). The input-log plates stay reverted. The frame strip keeps its own backdrop.
+
+<a id="roadmap-17"></a>
+
+**Console switch latency**
+
+- rc.6, console test of 2026-11-08 (release `1e6c6a0e`): Player 1's first switch 53 ms and hats 7–23 ms, the first included, with no hitch. The slow group switches it found became the rc.6 group-speed work (decision GROUP-SPEED).
+
+
 
 The release criterion was M5q parity plus the new UI and clean MIT provenance; the deferred list was not an RC gate.
 
