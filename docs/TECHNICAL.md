@@ -140,7 +140,7 @@ Where the frame strip code is (moved here from the [Frame strip](guide/frame-str
 
 | Strip detail | Mechanism |
 | --- | --- |
-| Link | `src/model/frame_strip.rs::Tracker::on_hit` subtracts the CPU's free frame from the follow-up hit. |
+| Link | `Tracker::on_hit`: follow-up hit minus CPU free frame; unknown if no free frame is available. |
 | Input | `Tracker::on_hit` subtracts Player 1's first actionable frame from the follow-up press. |
 | Step | `src/model/strip_scroll.rs::stepped` moves 15 columns per step. |
 | Repeat | `Scroll::poll` repeats after 18 held polls, then every six. |
@@ -312,9 +312,10 @@ Where the recording code is (moved here from the Recording guide; named by funct
 | --- | --- |
 | Positions | `src/model/macros/positions.rs` stores both fighters in `<id>.pos`, bound to macro ID and inputs. |
 | Playback sampling | `rr_host.rs::open_play_track` samples matching fighters from frame zero, excluding chains. |
-| Backfill | `PlayTrack::write_wanted` keeps, replaces or merges tracks; partial plays can save positions. |
+| Backfill | `PlayTrack::write_wanted` can replace a shorter recorded track with a longer partial playback. |
+| Pose upgrade | A full playback can add poses without replacing complete, move-less recorded positions. |
 | Crop | `ClipEditor::export_selection` retains the selected macro frames and their tracked positions. |
-| Origin | `src/model/macro_ui/scrub_track.rs::deltas` anchors both fighters to the selected fighter's starting position. |
+| Origin | `scrub_track.rs::deltas` subtracts the selected fighter's position at the anchor frame from both tracks. |
 | Poses | `scrub_pose.rs::{asked_of,decide}` needs an available animation, matching fighter kind and held body. |
 | Marks | `src/model/macros/recording.rs::ActionMark` stores move, variant and side-attack angle. |
 | Naming | `clip_panel.rs::saved_namer` uses recorded fighter identity, including saved Mii specials. |
@@ -326,12 +327,30 @@ Where the recording code is (moved here from the Recording guide; named by funct
 | Delay | `rr_host.rs::owe_delay` waits once before first input, not on loop passes. |
 | Preview | Editor previews and CPU Playback slots do not use the Play delay. |
 | Tolerance | `src/model/combo.rs::Grade::worst` applies the selected tolerance and held-input band. |
-| Spot | `summarize` compares spots only when enabled and a reference exists. |
-| Warp | `rr_host.rs::warp_pair` offsets the playing role from the freshly restored start save. |
-| Momentum | `play_start_speed` supplies recorded or zero speed after the warp, before first input. |
-| Shared placement | `rr_host.rs::copy_placed` copies the save and relinks only the requesting macro. |
 | Clip window | `src/model/macros/window.rs::Window` bounds handles; `clip_panel.rs::export_selection` applies the selection. |
 | Legacy slots | `src/model/library/migrate.rs::migrate` converts nonempty live slots once, separately from card import. |
+
+![PC5 shows editing the shared save or copying it for one macro](decisions/placement-crosshair/place-next-PC5-shared-start.png)
+
+*PC5: change the shared save or copy it. Design, not footage.*
+
+| Shared placement | Mechanism |
+| --- | --- |
+| Copy from a macro | `rr_host.rs::copy_placed` copies the save and relinks only the requesting macro. |
+| Copy from the save | The new save is unlinked; existing macros keep the original. |
+
+![PC6 shows the same macro offset after its start save moves](decisions/placement-crosshair/place-next-PC6-old-offsets.png)
+
+*PC6: moving the save preserves the offset. Design diagram.*
+
+| Start save | Mechanism |
+| --- | --- |
+| Warp | `rr_host.rs::warp_pair` applies the macro offset to its role before restoring the pair. |
+| Momentum | `play_start_speed` supplies recorded or zero speed after the warp, before first input. |
+
+![Q7 compares a shared menu toggle with INI and Deluxe alone](decisions/07-replay-capture.png)
+
+*Q7: the menu shares the replay setting. Design, not footage.*
 
 | Replay capture | Mechanism |
 | --- | --- |
@@ -386,10 +405,10 @@ restart (`src/model/recording_menu.rs`). A combo drill's Fighter Mismatch questi
 | --- | --- | --- |
 | Codec | `src/model/combo_record.rs::{from_value,to_value}` reads and writes JSON objects. | Maximum 64 KiB. |
 | Location | `sd:/ultimate/TrainingRooms/combos/<id>.json`; filename is the persistent ID. | `shareable_id`: 1–64 characters; no leading dot, surrounding spaces, controls or FAT-invalid characters. |
-| Name | Up to 48 characters; missing or blank names use the filename. | `recorded_on` is optional display metadata. |
+| Name | Up to 48 characters; missing or blank names use the filename. | Optional `recorded_on` names the fighter and can trigger the mismatch prompt. |
 | Versions | 1: hit combo; 2: drill; 3: hit with aims; 4: drill with aims. | Missing `schema_version` means 1. |
 | Root | Hit combos have `links`; drills have `kind: input_drill` and `input_steps`. | 1–16 links or steps. |
-| Identity | Optional `recorded_fighter`: hexadecimal `ui_chara` and four `specials`. | Each special is 0–2; invalid identity becomes absent. |
+| Identity | Optional `recorded_fighter`: nonzero `ui_chara` (1–10 hex digits) and four `specials`. | Each special is 0–2; invalid identity becomes absent. |
 | Source | Optional `made_from`, `take` and drill `trim`. | `take` names the owned macro; trim is `start`, `end`, `both` or `off`. |
 | Hit link | `from`, `to`, `verdict`, and `steps` or `events`; optional `window`, `spot`, `drift`. | Window is a pair of frame numbers. |
 | Verdict | `kind` is `true` or `drop`. | `link` is nullable only for `true`. |
@@ -398,19 +417,26 @@ restart (`src/model/recording_menu.rs`). A combo drill's Fighter Mismatch questi
 | Descriptions | `from_shown`, `to_shown`: optional `of`, `angle`, `variant`, `move`. | Both describe a hit link; angle is `up`/`down`, variant 0–31. |
 | Exact move | A hit description's `move` extends an `other` endpoint. | Final Smash uses `other` plus `move: final_smash`, never a bare endpoint. |
 | Steps | At most four `button`, `aim`, `offset` objects; required without `events`. | Buttons: `attack`, `special`, `jump`, `shield`, `grab`; aims: `neutral`, `up`, `down`, `side`. |
+| Hit offsets | Frames from Player 1's first actionable frame after this link's first hit. | Negative offsets mean buffered inputs; `events` takes precedence over `steps`. |
 | Events | At most 12 per link; each has `kind`, `dir`, `offset`. | Kinds: `press`, `release`, `cstick`, `flick`; `aim` requires version 3 or 4. |
 | Event fields | Press/release use `button`; flick uses `flick`; aim uses `part` 1 or 2. | Flick values: `fast_fall`, `dash`, `tap_jump`. |
 | Directions | `neutral`, `forward`, `forward_up`, `up`, `back_up`. | `back`, `back_down`, `down`, `forward_down`; relative to facing. |
 | Spot and drift | `spot` is `sweet`, `sour` or `late`; `drift` uses a direction. | Unknown spot becomes absent; drift is display-only. |
 | Drill steps | Each has 1–12 events; descriptions require `move`. | Offsets start at zero and never decrease across steps. |
 | Release | Optional `hold` is nonnegative; drill releases may contain boolean `reacted`. | Without `reacted`, older held releases use the legacy hold-band rule. |
-| Travel | Drill aim, special and C-stick events may carry `heading`, `distance`, `path`. | `path` has eight signed coordinate pairs; optional `stick` has `angle`, `deflection`. |
+| Travel | Drill aim, special press and C-stick events can carry `path`. | Eight integer coordinate pairs, each component −127 to 127. |
+| With a path | `heading` and `distance` are required; optional `stick` requires `angle` and `deflection`. | Angles: 0 to below 360 degrees; distance nonnegative; deflection 0–100 percent. |
 | Entry | Optional `entry_x`, `entry_y`, `entry_change` describe travel entry velocity. | Both coordinates are required together. |
-| Compatibility | Readers skip unsupported versions and unrecognized endpoint keys. | Unknown top-level, link and event fields are retained on rename. |
+| Compatibility | An unsupported version or unrecognized endpoint skips the entire file, not just the link. | Rename preserves unknown top-level, link, step and event fields. |
 
 | Scoring | Specification |
 | --- | --- |
 | Model | [Action model](design/action-model.md) describes scoring, reacted releases, joins and recovery. |
+| Spot | `summarize` compares spots only when matching is enabled and the reference has a spot. |
+
+![SP4 compares a saved Sweet hit with a Sour attempt](decisions/rc14-spots-SP3-combo.png)
+
+*SP4: a saved spot can affect the grade. Design, not footage.*
 
 **Clip** [`rc7-sequence-drill.gif`](media/rc7-sequence-drill.gif): Drill a sequence: combo 1, then combo 2, then a drop back at combo 1
 
@@ -462,7 +488,7 @@ support needed for paired fighters. `live_kirby_gate` in `src/runtime/roster/nat
 | Swap group | Keeps ready | Greyed when |
 | --- | --- | --- |
 | Ice Climbers pair bank | Pair and one additional fighter in the role's window. | Ready Fighter Bodies is not 3. |
-| Original fighter bank | The starting fighter in its role's bank, except Miis and Solo Popo. | Never. |
+| Original fighter bank | Eligible starting fighter; Miis and Solo Popo reload. | Never. |
 | Solo Popo groups | Solo Popo in detached groups. | Group Swap is Off. |
 | Ice Climbers pair groups | Detached groups while the pair leads the window. | Group Swap or pair bank is Off. |
 | PT / Aegis groups | Pokémon Trainer and Pyra / Mythra as complete groups. | Group Swap is Off. |
@@ -472,6 +498,7 @@ support needed for paired fighters. `live_kirby_gate` in `src/runtime/roster/nat
 | Group policy | Mechanism |
 | --- | --- |
 | Capacity | Pokémon Trainer needs three bodies; Aegis needs two, allocated whole. |
+| Original eligibility | `original_form_bankable`: paired Climbers need pair bank; PT and Aegis need native groups. |
 | Menu gates | `src/model/menu/mod.rs::swap_entry_grey` checks the conditions above. |
 | Defaults | `src/model/preload/cycle_preload_config.rs` enables all seven entries. |
 
@@ -541,13 +568,17 @@ back through the character select (the same two fighters), Training opens on Big
 | --- | --- |
 | Drill floor | `src/model/edge_juggle.rs::start_stage` uses the floor run under Player 1. |
 | Guard ledges | The drill requires at least one run end with open air. |
-| Egg floors | `src/model/eggs.rs::Run::spawn` samples floors by length; air starts within 25 units above landing. |
+| Egg floors | `eggs.rs::Run::spawn` weights usable floor spans by horizontal width. |
+| Egg height | An airborne start adds up to 25 units above that target's grounded height. |
 | Egg zones | `src/model/egg_zone.rs::Stage::read` uses the run under camera center. |
 | Zone boxes | `Zone::rect` insets each side's rectangle by the target radius. |
 | Zone clipping | `Stage::contains` rejects solids and checks underside, other floors and outline clearance. |
 | Off-stage bounds | Open air stops at another solid or the blast boundary; `Stage::contains` validates points. |
 | Hidden CPU | `eggs.rs::choices` selects the disc when CPU page Hide CPU is On. |
-| CPU behavior | `src/runtime/features/cpu_level.rs` uses stock pause for Control or non-CPU transitions; it may flash. |
+| Training CPU behavior | `cpu_level.rs::step_drill_panel` can briefly open stock pause for Control or non-CPU transitions. |
+| Waiting-room opponent | `step_drill_partner` changes only the first partner's behavior, restoring it on Stop without pausing. |
+| Tech Auto start | `tech::solver::Aim` plans zero-stick flight; early collisions or out-of-bounds paths reject candidates. |
+| Ceiling contact | `Aim::at` rejects ceiling contact unless the predicted vertical velocity is upward. |
 
 ### Waiting rooms
 
