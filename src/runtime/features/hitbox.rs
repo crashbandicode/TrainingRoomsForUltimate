@@ -1567,9 +1567,7 @@ fn hand_off(command: orbs::Command) {
 
 /// Phase 8 applies what the command hooks handed over since its last pass, in the order they handed it over.
 fn apply_commands() {
-    let Some(list) = COMMANDS.get() else { return };
     let (Some(mut store), Some(mut articles)) = (STORE.try_lock(), ARTICLES.try_lock()) else { return };
-    let _ = list;
     drain_commands(&mut store, &mut articles, None);
 }
 

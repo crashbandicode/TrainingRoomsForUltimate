@@ -1,3 +1,5 @@
+//! A fixed pool of nodes allocated once, with lock-free free and queued stacks: any thread pushes a `Copy` value without
+//! allocating or waiting on a lock, and `drain` hands values over in push order and returns their nodes.
 //! Nodes are free, owned by a producer until publication, queued, or owned by a drainer until returned. Links are atomic
 //! because a suspended pop can still read a node another thread took. Only the owner writes a payload before publication;
 //! only its drainer reads it after the swap. The generation never wraps: at its last value the pool is retired and every
@@ -29,11 +31,13 @@ unsafe impl<T: Copy + Send> Sync for PoolList<T> {}
 unsafe impl<T: Copy + Send> Send for PoolList<T> {}
 
 impl<T: Copy> PoolList<T> {
+    /// `None` for zero or more than `0xfffe` nodes, or a failed allocation.
     pub fn new(capacity: usize) -> Option<Self> {
         Self::make(capacity, (1 << 48) - 1)
     }
 
     #[cfg(test)]
+    /// A test pool that retires after `last` checkouts.
     fn with_last_generation(capacity: usize, last: u64) -> Option<Self> {
         Self::make(capacity, last)
     }
@@ -79,6 +83,7 @@ impl<T: Copy> PoolList<T> {
         }
     }
 
+    /// False when no node is free or the pool is retired; nothing else changes.
     pub fn push(&self, value: T) -> bool {
         let index = loop {
             let Some(seen) = self.free_top() else { return false };
@@ -97,6 +102,7 @@ impl<T: Copy> PoolList<T> {
         }
     }
 
+    /// Any thread can hand over each queued value once in push order; returns the count.
     pub fn drain(&self, mut f: impl FnMut(T)) -> usize {
         let mut head = self.queued.swap(0, Acquire);
         let mut reversed = 0;
@@ -173,6 +179,7 @@ mod tests {
     }
 
     fn the_last_generation_retires_the_free_stack_before_it_can_wrap() {
+        // Reduced-generation control: a wrapping counter of the same width would restore the first head value after its fourth pop.
         let list = PoolList::with_last_generation(2, 3).unwrap();
         let seen = list.free_top().unwrap();
         let mut values = Vec::new();
