@@ -281,17 +281,26 @@ mod tests {
             assert!(!other.contains("restore_posed(") && !other.contains("change_motion_cut(") && !other.contains("ground_update_shape("));
         }
         assert!(!placement.contains("jostle") && !placement.contains("as *mut"), "no push switch, and no write to a field");
-        // The game's one-shot is armed only when the change is certain to follow, and nothing stands between the two.
+        // The game's one-shot is armed only when the change is certain to follow, and nothing stands between the two:
+        // the change's native is in hand first, the fighter has the animation, and the very next call is the change.
         let game = include_str!("../../runtime/game.rs");
-        let head = "pub unsafe fn change_motion_cut(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool) -> bool {";
-        let cut = game.split(head).nth(1).unwrap_or("").split("\n    }").next().unwrap_or("");
-        assert_eq!(lines(cut), [
-            "let arm = at::<extern \"C\" fn(usize)>(sites_pkg2::MOTION_SET_NEXT_NO_COMP_OFFSET);",
-            "if let Some(arm) = arm.filter(|_| super::granted(sites_pkg2::MOTION_CHANGE_HOOK_OFFSET) && is_anim_resource(accessor, motion)) {",
-            "arm(accessor);",
-            "}",
-            "change_motion(accessor, motion, frame, rate, run_lines)",
+        let native = |head: &str| lines(game.split(head).nth(1).unwrap_or("").split("\n    }").next().unwrap_or(""));
+        assert_eq!(native("unsafe fn change_motion_with(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool, arm: impl FnOnce()) -> bool {"), [
+            "let Some(f) = at::<extern \"C\" fn(usize, u64, f32, f32, bool, f32, bool, bool) -> u64>(sites_pkg2::MOTION_CHANGE_HOOK_OFFSET) else { return false };",
+            "arm();",
+            "f(accessor, motion, frame, rate, false, 0.0, false, !run_lines);",
+            "true",
         ]);
+        assert_eq!(native("pub unsafe fn change_motion_cut(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool) -> bool {"), [
+            "change_motion_with(accessor, motion, frame, rate, run_lines, || {",
+            "if is_anim_resource(accessor, motion) {",
+            "at::<extern \"C\" fn(usize)>(sites_pkg2::MOTION_SET_NEXT_NO_COMP_OFFSET).map_or_else(Default::default, |arm| arm(accessor));",
+            "}",
+            "})",
+        ]);
+        // Every other change is the plain one, as it was.
+        assert_eq!(native("pub unsafe fn change_motion(accessor: usize, motion: u64, frame: f32, rate: f32, run_lines: bool) -> bool {"),
+            ["change_motion_with(accessor, motion, frame, rate, run_lines, || ())"]);
         assert_eq!(game.matches("MOTION_SET_NEXT_NO_COMP_OFFSET").count(), 1, "armed in one place");
         assert!(game.contains("at::<extern \"C\" fn(usize, bool)>(sites_pkg2::GROUND_UPDATE_SHAPE_OFFSET).map_or_else(Default::default, |f| f(accessor, update))"));
     }

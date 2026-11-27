@@ -36,6 +36,9 @@
 //! F5 adds five label rows in a 31st data file; the historical digests stay unchanged.
 //! Scrub moves (SM1) adds the Called `motion_is_anim_resource` row to `sites_pkg2` (the scrub asks whether a fighter has an
 //! animation before it starts it): 282 site rows to 283, and the site digest with them.
+//! The slide after a release adds two Called rows to `sites_pkg2` (`motion_set_next_no_comp`, `ground_update_shape`: a
+//! posed fighter is let go with no blend and its ground shape is made again): 283 site rows to 285, and the site digest
+//! with them.
 
 use crate::model::sha256::sha256_hex;
 use std::fmt::Write;
@@ -111,8 +114,8 @@ const SEAM_DIGEST: &str = "cb2c75e34e6f3258900a157be9b79d08b7ed396c5500f98d132e7
 const EDGE_JUGGLE_ROWS: usize = 24;
 const EDGE_JUGGLE_DIGEST: &str = "e2f841548afadaa39460582c2df3cc5ec6d78090b78c388174d947a5f6478fde";
 // The shared overlay sampler adds the guarded stock process_end entry.
-const SITE_ROWS: usize = 283;
-const SITE_DIGEST: &str = "255723a7cd074febfd19ae5adfe425abb966617c656fe8d36d66b0f3aeb902f9";
+const SITE_ROWS: usize = 285;
+const SITE_DIGEST: &str = "28319671dd2ac630462742a823d106052cbf078a1da7d4d4235cb8e3328fd70f";
 const UI_ROWS: usize = 6;
 const UI_DIGEST: &str = "35ddb9f164a3ac26ba2e5c45c35066ee738e796589d58e2c697c82e486567b15";
 const COMMON_ROWS: usize = 4;
