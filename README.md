@@ -8,7 +8,7 @@ Practise matchups, edit recordings and play training games in Super Smash Bros. 
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3609165db1d1675f019de9a7f3b7d1b6f7b8ebf0" autoplay muted loop playsinline controls></video>
 
-*Guard the Edge counts one secured attempt out of three.* [Open clip](docs/media/tut-guard-edge-setup-and-score.mp4)
+*Guard the Edge counts one secured attempt out of three.* [Open the clip](docs/media/tut-guard-edge-setup-and-score.mp4)
 
 Pick a spot offstage and practise denying the recovery; [Guard the Edge](docs/guide/guard-the-edge.md) keeps score when you make it back, too.
 
@@ -16,7 +16,7 @@ Pick a spot offstage and practise denying the recovery; [Guard the Edge](docs/gu
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b635893c4df02daaae5535f19b5b3f5c2346245b" autoplay muted loop playsinline controls></video>
 
-*Kirby's recording becomes a drill in the library.* [Open clip](docs/media/tut-input-drill-record.mp4)
+*Kirby's recording becomes a drill in the library.* [Open the clip](docs/media/tut-input-drill-record.mp4)
 
 Record a dash-back or a string of short hops, then [try to match your timing](docs/guide/recording.md#input-drills) without needing to hit an opponent.
 
@@ -24,21 +24,21 @@ Record a dash-back or a string of short hops, then [try to match your timing](do
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7c00d97bf3abf99b2191b84d54bf130ffe0620ed" autoplay muted loop playsinline controls></video>
 
-*Snap to the aerial's start, then preview it on the CPU.* [Open clip](docs/media/tut-clip-snap.mp4)
+*Snap to the aerial's start, then preview it on the CPU.* [Open the clip](docs/media/tut-clip-snap.mp4)
 
-Scrub through the recorded poses to find a move, snap the start of your [clip](docs/guide/recording.md#crop) to it and press X to try it.
+[Scrub and trim a take](docs/guide/recording.md#crop) by position on install 6, or by recorded pose on a matching fighter in the preview build.
 
 ### Match recordings in practice
 
 ![The results screen confirms that the replay was saved](docs/media/rc13-replay-capture.gif)
 
-Keep a match capture alongside its saved replay, then [open the recording](docs/guide/recording.md#change-placement-and-the-replay-window) to practise against a sequence from that match.
+With Replay capture on, save the replay and [choose a fighter's recorded inputs](docs/menu/recording.md#recordings) to practise against.
 
 ### Fighter swaps and cycles
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6d08f7457ab8d11ca30c8d7ed1140dd4611397e9" autoplay muted loop playsinline controls></video>
 
-*Donkey Kong takes Mario's place on stage.* [Open clip](docs/media/tut-fighter-cycle.mp4)
+*Donkey Kong takes Mario's place on stage.* [Open the clip](docs/media/tut-fighter-cycle.mp4)
 
 Stay on stage between matchups: pick a different fighter or [set a rotation](docs/guide/fighter-cycles.md) for yourself and your opponent.
 
@@ -52,15 +52,15 @@ While you wait in Quickplay or local wireless, [practise against the first partn
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e0de6dbeba09dd60aa5dc2ec3c5fbde73470d79a" autoplay muted loop playsinline controls></video>
 
-*The fighters move to the Omega form of Battlefield.* [Open clip](docs/media/tut-stage-change.mp4)
+*The fighters move to the Omega form of Battlefield.* [Open the clip](docs/media/tut-stage-change.mp4)
 
 Try the same matchup on a different stage without leaving Training, or [choose a rotation](docs/guide/stages.md) for future visits.
 
-### Kirby's copy hats
+### Choose Kirby's hat lineup
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0858b8e26cf6db1c8d16f3d935c486380ffa303f" autoplay muted loop playsinline controls></video>
 
-*Kirby puts on Mario's cap without inhaling Mario.* [Open clip](docs/media/tut-kirby-hat.mp4)
+*Kirby puts on Mario's cap without inhaling Mario.* [Open the clip](docs/media/tut-kirby-hat.mp4)
 
 Give Kirby a [lineup of copy abilities](docs/guide/fighter-cycles.md#kirby-hats) to practise without changing the opposing fighter.
 
@@ -68,7 +68,7 @@ Give Kirby a [lineup of copy abilities](docs/guide/fighter-cycles.md#kirby-hats)
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/cc2afdd8e4395fc04dd9a9d05b72a78b3f3462d8" autoplay muted loop playsinline controls></video>
 
-*A saved Mii Brawler cycles into Player 1's spot.* [Open clip](docs/media/tut-mii-pick.mp4)
+*A saved Mii Brawler cycles into Player 1's spot.* [Open the clip](docs/media/tut-mii-pick.mp4)
 
 [Choose the saved Mii](docs/guide/mii.md) you want for either side instead of settling for a default Brawler, Swordfighter or Gunner.
 
@@ -76,7 +76,7 @@ Give Kirby a [lineup of copy abilities](docs/guide/fighter-cycles.md#kirby-hats)
 
 ![Captain Falcon takes Daisy's Bob-omb from the item grid](docs/media/rc11-give-item.gif)
 
-Lab an item without loading a save: [choose it from the grid](docs/menu/fighters-and-stages.md#give-item) and Player 1 receives it when the menu closes.
+[Choose an item for Player 1](docs/menu/fighters-and-stages.md#give-item) and close the menu to use it, without loading a save.
 
 ## About TrainingRooms
 
