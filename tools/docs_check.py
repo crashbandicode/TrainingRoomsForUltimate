@@ -196,7 +196,6 @@ WALL_PENDING = {
     "docs/menu/cpu.md": 134,
     "docs/menu/display-and-controls.md": 69,
     "docs/menu/practice-games.md": 3,
-    "docs/menu/recording.md": 135,
     "docs/menu/saves.md": 47,
 }
 
