@@ -2,11 +2,11 @@
 
 | Ledger key | Meaning |
 | --- | --- |
-| Regenerate | Run `python3 -I tools/carry_pkg4.py ledger` after updating `pkg4-carry-manifest.json`. |
+| Regenerate | Edit `pkg4-carry-manifest.json`, not this ledger; run `python3 -I tools/carry_pkg4.py ledger`. |
 | Module paths | Manifest field `modules` maps `crate::x` and `training_mod_*::x` to clean-room paths. |
 | Edits | Each row records exact-text changes to the copy after path rewriting. |
-| `src sha256` | Hash of the source file before the carry. |
-| `here sha256` | Hash of the repository copy after the carry. |
+| `src sha256` | First 16 hex digits of the source SHA-256. |
+| `here sha256` | First 16 hex digits of the destination SHA-256, or `removed`. |
 | `smd` source root | Standalone `smash-match-data-design` crate at `faac04e`. |
 
 | Here | Fork path | src sha256 | here sha256 | edits (clean-room changes, each with its reason) |
