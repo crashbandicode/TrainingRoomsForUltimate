@@ -28,6 +28,7 @@ A on a save state, macro or chain opens its own screen ([page and pop-up control
 | --- | --- | --- |
 | <a id="recordings"></a>RECORDINGS > | Vault and saved captures | Play one back, or make a macro, a combo or a drill from it. |
 | <a id="a-file-s-own-screen"></a>Bind to Save / Load | On, Off | Save writes here; Load uses it unless a [named setup](saves.md#setup-library) is selected. |
+| Change placement | On saves and files with a start save | Move the saved fighters before playback. |
 | Start save | On, Off | On: warps both fighters to the macro's start save once, before it plays. |
 | Momentum | **Keep recorded speed**, Start at rest | The speed the playing side has on its first input. |
 | Offset | Only on macros with an old offset | A clears the offset from the start position. |
