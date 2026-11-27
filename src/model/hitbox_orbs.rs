@@ -482,8 +482,8 @@ impl Articles {
         self.link = Some(link);
     }
 
-    /// Change the slots: its own, or the link's. Linked, the change carries the attacking flags the pass set (assigned when nothing
-    /// changed the slots since they were read, else only raised), and what the command hooks changed is adopted: a slot with a new
+    /// Change the slots: its own, or the link's. Linked, the pass can lower a flag unless a newer hook commanded that same slot.
+    /// What the command hooks changed is adopted: a slot with a new
     /// article forgets its set, and the board is to be cleared of what left. Without a buffer (which `handoff::BUFFERS` rules out)
     /// the change stays on its own view.
     fn change<R>(&mut self, mut op: impl FnMut(&mut Members, u64) -> R) -> R {
@@ -491,7 +491,7 @@ impl Articles {
         let changed = self.link.and_then(|link| link.change_articles(|members, version| {
             for (i, &flag) in flags.iter().enumerate() {
                 if view.attacking[i] != flag && (members.ids[i], members.ages[i]) == (view.ids[i], view.ages[i]) {
-                    members.attacking[i] = view.attacking[i] || (version != seen + 1 && members.attacking[i]);
+                    members.attacking[i] = view.attacking[i] || members.touched[i] > seen;
                 }
             }
             op(members, version)
