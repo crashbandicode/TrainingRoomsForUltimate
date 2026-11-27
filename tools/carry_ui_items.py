@@ -63,7 +63,7 @@ def main():
         assert hashlib.sha256(target.read_bytes()).hexdigest() == row["sha256"], destination
         ledger.append(f"| `{source}` | `{destination}` | `{row['sha256']}` | identity |")
     content = "\n".join(ledger) + "\n"
-    target = root / "docs/provenance/ui-item-assets-ledger.md"
+    target = root / "tools/provenance-data/ui-item-assets-ledger.txt"
     if args.carry:
         target.write_text(content)
     else:
