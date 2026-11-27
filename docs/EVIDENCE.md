@@ -81,9 +81,7 @@ Neither stock layout has a pane-name collision with the owned prefixes. Mutating
 Private evidence: main-r15/stock-texture-preservation.json, SHA256
 8f558fcd3c5c117cdf48a7eac097d50f47161af145bd007c11f5b985d9f126fb;
 verifier tmp-lead-astra4/audit-stock-textures.py. This supplies the missing
-host evidence for core07.3. Re-run the scoped checks on the next generated
-assets and final candidate; no final RC row is closed by this development
-result. No compiler, native build or live profile was used.
+host evidence for core07.3. At that checkpoint, the next generated assets and final candidate still needed the scoped checks. This development result closed no final RC row. No compiler, native build or live profile was used.
 
 <a id="evidence-rc15-crop-editor"></a>
 
@@ -140,7 +138,10 @@ The table records the November 15 observations. Its paths name the original capt
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6c4e54f1a6ff824e0533926e25d16fae9eab36ed" autoplay muted loop playsinline controls></video>
 
-*Eden,2026-11-15,rc.15 d520d325; hardware untested. Real crop selection,1280×720,5fps,4.6s. First/action/end frames reviewed. The final actual frame is held for readability. This GIF shows range selection; preview/save/play/exit use the separate evidence above. Source hashes and review are in gif-source-map.json and gif-review/REVIEW.md. GIF SHA256115e7f4562dc9f057c26258ee06756c09c83ba503280e3f95a31a3dd8dad0e2e.* [Open the clip](media/rc15-crop-editor.mp4)
+*Selecting the crop range.* [Open the clip](media/rc15-crop-editor.mp4)
+
+- Original GIF, 2026-11-15: rc.15 `d520d325`, Eden, 1280×720, 5 fps, 4.6 s. Hardware was untested. The review covered the first, action and end frames. The final frame was held for readability.
+- The take shows range selection. The preceding rows cover preview, save, play and exit. Source hashes and review: `gif-source-map.json` and `gif-review/REVIEW.md`. Original GIF SHA-256: `115e7f4562dc9f057c26258ee06756c09c83ba503280e3f95a31a3dd8dad0e2e`.
 
 - Archived hooks, manifests, fixtures and recorded segments: `eden/rc15-crop-editor/`.
 - They use the unchanged shared runner/lifecycle; they are evidence for these owned runs, not permission to drive another owner's paths.
@@ -204,7 +205,10 @@ The original late-before still already had streak0 after source selection, so th
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b01d3788d21072c6f728edd38e2ba35aa3a89f94" autoplay muted loop playsinline controls></video>
 
-*Eden,2026-11-15,rc.15 source2eb3903e; hardware untested. Real Drill1 range selection4→3→4→3,1280×720,3.78s,5fps request, nine encoded frames from19 captured frames. Start/middle/end and contact sheet reviewed. GIF SHA256 `a7f8a550de084758ed076c81b4dff39bc4503b2eacc80a8b7c9bb317b4fa9ccc`.* [Open the clip](media/rc15-input-drill.mp4)
+*Drill 1 range changes from 4 to 3, back to 4, then to 3.* [Open the clip](media/rc15-input-drill.mp4)
+
+- Original GIF, 2026-11-15: rc.15 `2eb3903e`, Eden, 1280×720, 3.78 s. Hardware was untested. The capture requested 5 fps and encoded nine of 19 frames. The review covered the start, middle, end and contact sheet.
+- Original GIF SHA-256: `a7f8a550de084758ed076c81b4dff39bc4503b2eacc80a8b7c9bb317b4fa9ccc`.
 
 Visual issue in this take: after the first handle action, the helper HUD redraws over the editor's upper centre. The range and handle result remain readable. This capture preserves that overlap; it is reported to the editor/integration owner, not called a clean editor-layout pass. Native grading/step interfaces and save-as-new are established separately above.
 
@@ -227,9 +231,9 @@ Visual issue in this take: after the first handle action, the helper HUD redraws
 
 ## rc.15: what was installed and what was tested
 
-| Check | Result | Source |
-| --- | --- | --- |
-| Card readback, 2026-11-27 10:36 UTC | `dc5302f1`, release SHA-256 `1bc8e7b87780a9f4801679c9bb25db43223ac6f27110d9c2fa67a6478a66a8b7`; replaced install 6. | `artifacts/phase23/card-install/20261127-1036Z-card-dc5302f1/verify.json` |
+| rc.15 evidence | Record |
+| --- | --- |
+| Installed file and Eden results | [Fixed build](#evidence-rc15-installs--fixed-build) |
 
 Through 2026-11-27. The receipts behind [the rc.15 release notes](RELEASE-NOTES.md#release-notes-rc15) and the status on
 [Current release](CURRENT-RELEASE.md). Three claims are kept apart:
