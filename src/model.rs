@@ -291,6 +291,8 @@ pub mod menu_writeback;
 pub mod drop_ring;
 #[path = "model/box_handoff.rs"]
 pub mod box_handoff;
+#[path = "model/handoff.rs"]
+pub mod handoff;
 #[path = "model/owned_ring.rs"]
 pub mod owned_ring;
 /// The test-only reader's export table and line ring (ssbu-hw-bridge).

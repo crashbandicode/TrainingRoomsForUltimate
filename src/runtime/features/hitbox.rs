@@ -11,7 +11,7 @@
 //! `model::hitbox::HandleSet` holds them through `OrbSink` (never refused, ended at a status change), keeps the unchanged ones
 //! and drops the ones that changed or went away. The pass publishes the held spheres' world positions; `draw_orbs` draws them.
 //!
-//! The animation hooks keep track of live shapes and grabs. The CPU frame wrapper queues the fighter identities
+//! The animation hooks change the tracked membership and hand grabs and rebounds to phase 8, which applies them before or after sampling. The CPU frame wrapper queues the fighter identities
 //! and runs practice gameplay. The phase-8 `process_end` hook samples world geometry after the stock model updates.
 //! All entry points are behind the install gates and the phase-8 sampling uses bounded lock acquisitions.
 //!
@@ -39,6 +39,7 @@ use crate::model::guard::GuardOutcome;
 use crate::model::hitbox::{self, layout, AttackReader, Cell, Counts, FighterGenerations, FighterLife, FrameFacts, Indices, SetTable, Sphere, StatusIds};
 use crate::model::panes::EggLook;
 use crate::model::hitbox_orbs::{self as orbs, Board, Orb, OrbSink};
+use crate::model::handoff::{Handoff, Put, Record};
 use crate::model::install_line::SiteReport;
 use crate::model::legend;
 use crate::model::practice_games::{self, Game};
@@ -709,9 +710,9 @@ static FIGHTERS: Mutex<[Option<(u32, usize)>; hitbox::FIGHTER_SETS]> =
     Mutex::new([None; hitbox::FIGHTER_SETS]);
 
 /// The renderer can hold its last board while projecting. A fighter frame never waits on it.
-fn clear_board(accessor: usize) {
+fn clear_board(accessor: usize, life: FighterLife, frame: u32) {
     if let Some(mut sample) = BOARD.try_lock() {
-        sample.board.clear(accessor);
+        sample.board.clear_publication(accessor, life, frame);
     }
 }
 
@@ -1199,6 +1200,8 @@ impl hitbox::AttackReader for GameAttacks {
 
 /// Articles tracked by animation commands and active items. The post-update overlay pass samples their world shapes.
 static ARTICLES: Mutex<orbs::Articles> = Mutex::new(orbs::Articles::new());
+/// The command hooks' handoff, made by `install`.
+static COMMANDS: std::sync::OnceLock<Handoff> = std::sync::OnceLock::new();
 /// An Off transition clears tracked articles even when no fighter orbs are held.
 static CLEAR_ARTICLES: AtomicBool = AtomicBool::new(false);
 
@@ -1284,6 +1287,7 @@ unsafe fn draw_articles(
             articles.forget(id, board);
         }
     }
+    articles.settle();
     board.finish_articles(hide.generation());
     dropped
 }
@@ -1375,6 +1379,7 @@ unsafe fn sample_overlay() {
     if !INSTALLED.load(Ordering::Acquire) {
         return;
     }
+    apply_commands();
     let Some(mut fighters) = FIGHTERS.try_lock() else { return };
     if fighters[0].is_none() {
         // A paused simulation has no new fighter pose to publish.
@@ -1386,6 +1391,7 @@ unsafe fn sample_overlay() {
     let Some(mut sample) = BOARD.try_lock() else { return };
     let Some(mut store) = STORE.try_lock() else { return };
     let Some(mut articles) = ARTICLES.try_lock() else { return };
+    drain_commands(&mut store, &mut articles, None);
     store.table.forget_retired(&FIGHTER_GENERATIONS);
     let OverlaySample { board, scene: sampled_scene, pictures, anchors } = &mut *sample;
     board.begin_frame(sample_id);
@@ -1444,6 +1450,8 @@ unsafe fn sample_overlay() {
     } else {
         ([None; 3], [None; btt::LOOKS])
     };
+    drop(sample);
+    drain_commands(&mut store, &mut articles, Some(sample_id));
 }
 
 unsafe fn sample_fighter(store: &mut Store, board: &mut Board, accessor: usize, life: FighterLife, enabled: bool) {
@@ -1519,6 +1527,54 @@ unsafe fn lua_cell(lua: usize, index: usize) -> Cell {
     hitbox::stack_cell(base, top, index, |slot| Cell { raw: (slot as *const u64).read(), tag: ((slot + layout::TAG_FIELD) as *const u32).read() })
 }
 
+/// What phase 8 does after a waiting command was applied.
+fn applied(record: &Record, did: orbs::Applied, published: Option<u32>) {
+    match did {
+        orbs::Applied::Rebound(Some((c, held))) => {
+            HELD.store(held, Ordering::Relaxed);
+            if let (Record::Rebound { key, life }, Some(frame)) = (*record, published) {
+                clear_board(key, life, frame);
+            }
+            #[cfg(feature = "diag")]
+            stats::rebound_cleared(c.killed);
+            #[cfg(not(feature = "diag"))]
+            let _ = c;
+        }
+        orbs::Applied::Grab(Some(made)) => {
+            #[cfg(feature = "diag")]
+            if let Record::Grab { life, shape, .. } = *record {
+                stats::command(true, life.is_some(), shape.id, shape.joint, shape.size, shape.b.is_some(), made);
+            }
+            #[cfg(not(feature = "diag"))]
+            let _ = (record, made);
+        }
+        _ => {}
+    }
+}
+
+fn handed(put: Put) {
+    #[cfg(feature = "diag")]
+    stats::handed(put);
+    #[cfg(not(feature = "diag"))]
+    let _ = put;
+}
+
+/// Phase 8 applies the sets' waiting commands since its last pass.
+fn apply_commands() {
+    let (Some(mut store), Some(mut articles)) = (STORE.try_lock(), ARTICLES.try_lock()) else { return };
+    drain_commands(&mut store, &mut articles, None);
+}
+
+/// Apply a batch under the caller's guards, optionally clearing a newly published board.
+fn drain_commands(store: &mut Store, articles: &mut orbs::Articles, published: Option<u32>) {
+    let count = orbs::apply_fighters(&mut store.table, &FIGHTER_GENERATIONS, &mut |record, did| applied(record, did, published))
+        + articles.apply_grabs(&mut |record, did| applied(record, did, None));
+    #[cfg(feature = "diag")]
+    stats::drained(count);
+    #[cfg(not(feature = "diag"))]
+    let _ = count;
+}
+
 /// Fighter attacks are read from active slots in the post-update pass. A grab is queued with its command status,
 /// and an article is tracked by its battle-object id.
 unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
@@ -1539,29 +1595,19 @@ unsafe fn animation_command(lua: usize, indices: Indices, grab: bool) {
     let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
     let life = fighter.then(|| FIGHTER_GENERATIONS.stamp(id)).flatten();
     let Some(shape) = hitbox::parse(indices, |i| lua_cell(lua, i)) else { return };
-    let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
-    let mut len = 0;
-    let tint = hitbox::legend_colour(hitbox::KIND_GRAB, None, 0);
-    hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, tint);
-    let status = Some(natives::status_kind(accessor));
-    let (mut store, mut articles);
-    let set = if fighter {
-        let Some(life) = life else { return };
-        store = STORE.lock();
-        if !FIGHTER_GENERATIONS.is_current(life) {
-            return;
-        }
-        let i = store.table.index_for(accessor, life);
-        &mut store.table.sets[i]
-    } else {
-        articles = ARTICLES.lock();
-        articles.track(id, accessor, None, true).unwrap().0
+    let status = natives::status_kind(accessor);
+    if fighter && life.is_none() { return; }
+    let Some(link) = COMMANDS.get() else { return };
+    let put = match life {
+        Some(life) if !FIGHTER_GENERATIONS.is_current(life) => return,
+        Some(life) => link.catch_command(accessor, life, shape, status),
+        None => link.article_command(id, accessor, grab.then_some((shape, status))),
     };
-    let made = wants[..len].iter().filter(|w| grab && set.push_grab(**w, status)).count() as u32;
+    handed(put);
     #[cfg(feature = "diag")]
-    stats::command(grab, fighter, shape.id, shape.joint, shape.size, shape.b.is_some(), made);
-    #[cfg(not(feature = "diag"))]
-    let _ = made;
+    if life.is_none() && !grab {
+        stats::command(false, false, shape.id, shape.joint, shape.size, shape.b.is_some(), 0);
+    }
 }
 
 /// `sv_animcmd::ATTACK`: the plugin part first, then the game's own command.
@@ -1596,8 +1642,9 @@ unsafe fn wind_command(lua: usize) {
         return;
     }
     let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
-    let mut articles = ARTICLES.lock();
-    articles.track(id, accessor, None, true).unwrap();
+    if let Some(link) = COMMANDS.get() {
+        handed(link.article_command(id, accessor, None));
+    }
 }
 
 /// `sv_animcmd::AREA_WIND_2ND` (a box): the plugin part first, then the game's own command.
@@ -1641,15 +1688,12 @@ pub unsafe fn hitbox_rebound_hook(accessor: usize, rebound: bool) {
     let Some(life) = FIGHTER_GENERATIONS.stamp(id) else { return };
     let shielding = status_ids().shielding(natives::status_kind(accessor));
     if hitbox::kill_on_rebound(rebound, true, true, shielding) {
-        let mut store = STORE.lock();
-        if let Some(i) = store.table.find_life(accessor, life).filter(|_| FIGHTER_GENERATIONS.is_current(life)) {
-            clear_board(accessor);
-            let c = store.table.sets[i].clear(&mut OrbSink { status: i32::MIN });
-            HELD.store(store.table.held_spheres(), Ordering::Relaxed);
-            #[cfg(feature = "diag")]
-            stats::rebound_cleared(c.killed);
-            #[cfg(not(feature = "diag"))]
-            let _ = c;
+        let frame = SAMPLE.load(Ordering::Acquire);
+        if FIGHTER_GENERATIONS.is_current(life) {
+            if let Some(link) = COMMANDS.get() {
+                handed(link.rebound_command(accessor, life));
+            }
+            clear_board(accessor, life, frame);
         }
     }
 }
@@ -1680,6 +1724,11 @@ pub fn check(poisoned: &dyn Fn(&str) -> bool) -> [GuardOutcome; N] {
 
 /// Install the overlay hooks after its full closure and the CPU frame wrapper pass their guards.
 pub fn install(closure: bool) -> bool {
+    let closure = closure && Handoff::new().is_some_and(|handoff| COMMANDS.set(handoff).is_ok())
+        && COMMANDS.get().zip(STORE.try_lock()).zip(ARTICLES.try_lock()).map(|((link, mut store), mut articles)| {
+            store.table.link(link);
+            articles.link(link);
+        }).is_some();
     if closure {
         skyline::install_hook!(hitbox_attack_hook);
         skyline::install_hook!(hitbox_catch_hook);
@@ -1725,6 +1774,9 @@ mod stats {
     static FAILED: AtomicU32 = AtomicU32::new(0);
     static DROPPED: AtomicU32 = AtomicU32::new(0);
     static COMMANDS: AtomicU32 = AtomicU32::new(0);
+    static HANDOFF_PEAK: AtomicU32 = AtomicU32::new(0);
+    static HANDOFF_FULL: AtomicU32 = AtomicU32::new(0);
+    static HANDOFF_EMPTY: AtomicU32 = AtomicU32::new(0);
     static MAX_HELD: AtomicU32 = AtomicU32::new(0);
     static TICKS: AtomicU64 = AtomicU64::new(0);
     static MAX_TICKS: AtomicU64 = AtomicU64::new(0);
@@ -1802,12 +1854,26 @@ mod stats {
                 MAX_TICKS.swap(0, Ordering::Relaxed),
                 crate::runtime::alloc::hook_allocations()
             ));
+            diagnostic(format_args!("[Hitbox] handoff peak={} full={} empty={} buffers={}",
+                take(&HANDOFF_PEAK), take(&HANDOFF_FULL), take(&HANDOFF_EMPTY), crate::model::handoff::BUFFERS));
         }
+    }
+
+    pub fn handed(outcome: crate::model::handoff::Put) {
+        match outcome {
+            crate::model::handoff::Put::Stored => {}
+            crate::model::handoff::Put::Full => { HANDOFF_FULL.fetch_add(1, Ordering::Relaxed); }
+            crate::model::handoff::Put::NoBuffer => { HANDOFF_EMPTY.fetch_add(1, Ordering::Relaxed); }
+        }
+    }
+
+    pub fn drained(count: usize) {
+        HANDOFF_PEAK.fetch_max(count as u32, Ordering::Relaxed);
     }
 
     pub fn command(grab: bool, fighter: bool, id: i32, joint: u64, size: f32, extended: bool, made: u32) {
         COMMANDS.fetch_add(1, Ordering::Relaxed);
-        diagnostic(format_args!(
+        crate::runtime::diag_log::enqueue_diagnostic(format_args!(
             "[Hitbox] command kind={} fighter={fighter} id={id} joint={joint:#x} size={size:.2} extended={extended} spheres={made}",
             if grab { "catch" } else { "attack" }
         ));
@@ -1882,7 +1948,7 @@ mod stats {
     }
 
     pub fn rebound_cleared(killed: u32) {
-        diagnostic(format_args!("[Hitbox] rebound cleared: killed={killed}"));
+        crate::runtime::diag_log::enqueue_diagnostic(format_args!("[Hitbox] rebound cleared: killed={killed}"));
     }
 
     // ---- own orbs (decision HB-OWN-ORBS) ------------------------------------------------------------------------------

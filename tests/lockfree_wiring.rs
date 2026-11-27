@@ -48,6 +48,49 @@ fn ordered(src: &str, steps: &[&str]) {
 }
 
 #[test]
+fn the_command_hooks_hand_over_and_phase_8_applies_before_it_samples() {
+    let src = include_str!("../src/runtime/features/hitbox.rs");
+    for name in ["animation_command", "wind_command", "hitbox_rebound_hook"] {
+        let hook = body(src, name);
+        assert!(hook.contains("COMMANDS.get()"));
+        for forbidden in ["STORE", "ARTICLES", ".lock()", "try_lock"] {
+            assert!(!hook.contains(forbidden), "{name}: {forbidden}");
+        }
+    }
+    ordered(body(src, "animation_command"), &["FIGHTER_GENERATIONS.is_current(life)", "catch_command("]);
+    ordered(body(src, "hitbox_rebound_hook"), &["call_original!", "kill_on_rebound", "SAMPLE.load",
+        "FIGHTER_GENERATIONS.is_current(life)", "rebound_command(", "clear_board(accessor, life, frame)"]);
+    for lock in ["STORE", "ARTICLES"] {
+        assert_eq!(src.matches(&format!("{lock}.try_lock()")).count(), 3, "{lock}");
+        assert!(!src.contains(&format!("{lock}.lock()")), "{lock}");
+    }
+    assert!(!src.contains("HandOff") && !src.contains("hand_off("));
+    ordered(body(src, "apply_commands"), &["STORE.try_lock()", "ARTICLES.try_lock()", "drain_commands("]);
+    ordered(body(src, "drain_commands"), &["apply_fighters(", "apply_grabs("]);
+    ordered(body(src, "sample_overlay"), &["INSTALLED.load", "apply_commands()", "FIGHTERS.try_lock()",
+        "SAMPLE.fetch_add", "BOARD.try_lock()", "STORE.try_lock()", "ARTICLES.try_lock()",
+        "drain_commands(&mut store, &mut articles, None)", "forget_retired", "drop(sample)",
+        "drain_commands(&mut store, &mut articles, Some(sample_id))"]);
+    ordered(body(src, "install"), &["Handoff::new()", "store.table.link(link)", "articles.link(link)",
+        "install_hook!(hitbox_attack_hook)"]);
+    ordered(body(src, "draw_articles"), &["articles.settle()", "finish_articles"]);
+    let (handoff, _) = include_str!("../src/model/handoff.rs").split_once("#[cfg(test)]\nmod tests {").unwrap();
+    assert!(!handoff.contains("#[cfg(test)]"));
+    for forbidden in ["unsafe", "Mutex", ".lock()", "Box::new", "vec!", "format!"] {
+        assert!(!handoff.contains(forbidden), "{forbidden}");
+    }
+    let clear = body(src, "clear_board");
+    assert!(clear.contains("BOARD.try_lock()") && clear.contains("clear_publication(accessor, life, frame)"));
+    assert!(!body(src, "applied").contains("diagnostic("));
+    let stats = src.split_once("mod stats {").unwrap().1;
+    for name in ["command", "rebound_cleared"] {
+        let stat = stats.split_once(&format!("fn {name}(")).unwrap().1.split_once("\n    }").unwrap().0;
+        assert!(stat.contains("enqueue_diagnostic("));
+        assert!(!stat.replace("enqueue_diagnostic(", "").contains("diagnostic("));
+    }
+}
+
+#[test]
 fn slot_capture_and_library_pad_priority_is_preserved() {
     let recorder = include_str!("../src/runtime/features/recorder.rs");
     ordered(body(recorder, "on_ai_frame"),

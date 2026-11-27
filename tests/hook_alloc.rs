@@ -25,6 +25,88 @@ fn allocating_hook(id: HookId, bytes: usize) -> usize {
 }
 
 #[test]
+fn handing_over_and_applying_overlay_commands_allocates_nothing_in_a_hook() {
+    use model::handoff::{Handoff, Put};
+    use model::hitbox::{FighterGenerations, SetTable, Shape};
+    use model::hitbox_orbs::{self as orbs, Articles, Board};
+    use std::sync::Barrier;
+    let _turn = crate::allocation::hook_counter_turn();
+    let generations = FighterGenerations::new();
+    let lives: Vec<_> = (1..=9).map(|n| generations.stamp((n as u32) << 16).unwrap()).collect();
+    let shape = Shape { id: 0, joint: 1, size: 1.0, a: [0.0; 3], b: None };
+    let link = &*Box::leak(Box::new(Handoff::new().unwrap()));
+    let mut table = Box::new(SetTable::new());
+    let mut articles = Articles::new();
+    let mut board = Box::new(Board::new());
+    table.link(link);
+    articles.link(link);
+    let begin = Barrier::new(4);
+    let rendezvous = Barrier::new(4);
+    let end = Barrier::new(4);
+    std::thread::scope(|scope| {
+        let life = lives[8];
+        let (first, bound, last) = (&begin, &rendezvous, &end);
+        scope.spawn(move || {
+            first.wait();
+            bound.wait();
+            {
+                let _scope = HookScope::enter_hook(HookId::HitboxRebound);
+                assert_eq!(link.rebound_command(9 * 16, life), Put::Stored);
+            }
+            last.wait();
+        });
+        let (first, bound, last) = (&begin, &rendezvous, &end);
+        scope.spawn(move || {
+            first.wait();
+            bound.wait();
+            {
+                let _scope = HookScope::enter_hook(HookId::HitboxWind);
+                for id in 1..=5 {
+                    assert_eq!(link.article_command(id, id as usize * 16, None), Put::Stored);
+                }
+                assert_eq!(link.article_command(5, 80, Some((shape, 1))), Put::Stored);
+            }
+            last.wait();
+        });
+        let (first, bound, last, lives) = (&begin, &rendezvous, &end, &lives);
+        scope.spawn(move || {
+            first.wait();
+            {
+                let _scope = HookScope::enter_hook(HookId::HitboxCatch);
+                for (index, &life) in lives.iter().enumerate() {
+                    assert_eq!(link.catch_command((index + 1) * 16, life, shape, 1), Put::Stored);
+                }
+            }
+            bound.wait();
+            last.wait();
+        });
+        let before = hook_allocations();
+        begin.wait();
+        rendezvous.wait();
+        end.wait();
+        {
+            let _scope = HookScope::enter_hook(HookId::HitboxFrame);
+            orbs::apply_fighters(&mut table, &generations, &mut |_, _| {});
+            articles.apply_grabs(&mut |_, _| {});
+            table.index_for(16, lives[0]);
+            generations.retire(lives[7].id);
+            table.forget_retired(&generations);
+            table.settle();
+            let _ = articles.track(5, 80, Some(&mut board), true);
+            articles.forget(5, &mut board);
+            articles.settle();
+            articles.apply_grabs(&mut |_, _| {});
+        }
+        assert_eq!(hook_allocations(), before);
+        {
+            let _scope = HookScope::enter_hook(HookId::HitboxCatch);
+            std::hint::black_box(vec![1u8; 8]);
+        }
+        assert!(hook_allocations() > before);
+    });
+}
+
+#[test]
 fn preview_checkpoint_first_use_restart_and_retirement_allocate_nothing() {
     use model::state::{preview::Checkpoint, record::SavedState};
     let _turn = crate::allocation::hook_counter_turn();
