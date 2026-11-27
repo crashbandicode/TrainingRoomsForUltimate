@@ -10,8 +10,8 @@
 //! NOT YET SWITCH-RUN.
 use super::placement;
 use super::stage_geometry::RayProbe;
-use crate::engine::macro_ui::scrub_pose::{asked_of, decide, drawn, Act, FALL, WAIT};
-use crate::engine::macro_ui::scrub_track::{can_stand, in_bounds, Block, Spot, POSE_NONE, POSE_SHOWN, SEEN_HELD, SEEN_IDLE, SEEN_OFF, SLOT};
+use crate::engine::macro_ui::scrub_pose::{asked_of, decide, drawn, partner_sleep, takes_partner, Act, FALL, WAIT};
+use crate::engine::macro_ui::scrub_track::{can_stand, in_bounds, Ask, Block, Spot, POSE_NONE, POSE_SHOWN, SEEN_HELD, SEEN_IDLE, SEEN_OFF, SLOT};
 use crate::engine::macros::{PackedPose, Pose};
 use crate::model::crosshair::CpuPreview;
 use crate::model::stage_geometry::{classify, Unread};
@@ -37,20 +37,76 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
             block.forget();
             block.set_pose(slot ^ 1, partner.0, partner.1);
         }
-        let seen = match point(block, &holds, slot, accessor) {
+        // Nobody is asked any more: the other role's body is put back here too, on this callback, so the game never
+        // tests the two fighters against each other with one home and one still held. It stays asleep and keeps its
+        // hold: its own frame wakes it and lets it go (`put_back`).
+        let ask = block.frame_ask(generation);
+        if let (Ask::None, Some(hold)) = (ask, holds[slot ^ 1].as_mut()) {
+            if let Some(partner) = other_body(slot).filter(|&body| hold.body() == natives::battle_object_id(body)) {
+                put_back(block, slot ^ 1, hold, partner);
+            }
+        }
+        let began = holds[slot].is_none();
+        let seen = match point(block, &ask, &holds, slot, accessor) {
             Some(spot) => hold(block, generation, slot, &mut holds[slot], accessor, spot),
             None => release(block, slot, &mut holds[slot], accessor),
         };
+        // This role's hold began here: the other role's first hold step runs here too, so neither body is free
+        // beside a held one for a frame, to be pushed before its hold reads where it stands (`takes_partner`). It
+        // is left asleep at its point: its own frames place it awake, as a hold that began on its own frame.
+        if takes_partner(began, holds[slot].is_some(), holds[slot ^ 1].is_some()) {
+            if let Some(partner) = other_body(slot) {
+                if let Some(spot) = point(block, &ask, &holds, slot ^ 1, partner) {
+                    let taken = hold(block, generation, slot ^ 1, &mut holds[slot ^ 1], partner, spot);
+                    block.set_seen(slot ^ 1, taken);
+                    if let Some(hold) = holds[slot ^ 1].as_mut() {
+                        leave_asleep(hold, partner);
+                    }
+                }
+            }
+        }
         block.set_seen(slot, seen);
         block.ack(slot, generation);
     });
 }
 
+/// The other role's body, found as the placement picker finds the two: the CPU's for Player 1, Player 1's for the
+/// CPU.
+unsafe fn other_body(slot: usize) -> Option<usize> {
+    if slot == 0 {
+        super::recorder::cpu_body().map(|body| body.accessor)
+    } else {
+        natives::module_accessor(0)
+    }
+}
+
+/// Nobody is asked any more, and this is the other role's frame: the body goes back where its hold found it, a
+/// posed one with its plain animation and its ground shape made again. It is not woken here and its hold stays:
+/// its own frame, after the game's frame function of that body, wakes it and lets it go (`partner_sleep`).
+unsafe fn put_back(block: &Block, index: usize, hold: &mut CpuPreview, accessor: usize) {
+    if block.pose(index).0 == POSE_SHOWN {
+        placement::restore_posed(accessor, hold.origin(), if hold.origin().grounded { WAIT } else { FALL });
+        block.set_pose(index, POSE_NONE, PackedPose::NONE);
+    } else {
+        placement::restore(accessor, hold.origin());
+    }
+    leave_asleep(hold, accessor);
+}
+
+/// A body placed from the other role's frame is asleep when that frame ends (`partner_sleep`): one still being
+/// placed awake is put to sleep, and the hold is told (`CpuPreview::rest`).
+unsafe fn leave_asleep(hold: &mut CpuPreview, accessor: usize) {
+    if let Some(asleep) = partner_sleep(hold.asleep) {
+        state::set_sleep(accessor, asleep);
+        hold.rest();
+    }
+}
+
 /// Where this role's body is asked to be. The group's home is where the hold found the target role's body: its
 /// hold's origin, which the block keeps when the target is let go while its partner is held (`Block::point`), or
 /// where it stands now when it was not held.
-unsafe fn point(block: &Block, holds: &[Option<CpuPreview>; 2], slot: usize, accessor: usize) -> Option<Spot> {
-    block.point(slot, |target| holds[target].map(|hold| hold.origin().at), |target| {
+unsafe fn point(block: &Block, ask: &Ask, holds: &[Option<CpuPreview>; 2], slot: usize, accessor: usize) -> Option<Spot> {
+    block.point_for(ask, slot, |target| holds[target].map(|hold| hold.origin().at), |target| {
         if target == slot {
             return Some([natives::pos_x(accessor), natives::pos_y(accessor)]);
         }
@@ -67,7 +123,7 @@ unsafe fn point(block: &Block, holds: &[Option<CpuPreview>; 2], slot: usize, acc
 unsafe fn hold(block: &Block, generation: u32, index: usize, slot: &mut Option<CpuPreview>, accessor: usize, spot: Spot) -> u32 {
     let Some(limits) = natives::camera_limit_range() else { return release(block, index, slot, accessor) };
     let body = natives::battle_object_id(accessor);
-    if !in_bounds(spot.at, limits) || block.refused(index, generation, body, spot.at) || !block.standable(index, spot.at, || stands(accessor, spot.at)) {
+    if !in_bounds(spot.at, limits) || block.refused(index, generation, body, spot.at) || !block.standable(index, generation, spot.at, || stands(accessor, spot.at)) {
         release(block, index, slot, accessor);
         return SEEN_OFF;
     }
@@ -122,14 +178,14 @@ unsafe fn pose(block: &Block, index: usize, accessor: usize, spot: Spot, asleep:
 }
 
 /// Let the body go: awake again and back where the hold found it. A body the scrub posed gets its plain animation
-/// first and is woken last (the order Eden run `pose-probe-yoga-03` flew), so it never wakes with a move on it;
-/// any other body is let go as before. A hold of another body (a swapped fighter, a new scene) is only forgotten.
+/// first, with no blend from the pose, and its ground shape made again before its place is written
+/// (`placement::restore_posed`); it is woken last, so it never wakes with a move on it. Any other body is let go
+/// as before. A hold of another body (a swapped fighter, a new scene) is only forgotten.
 unsafe fn release(block: &Block, index: usize, slot: &mut Option<CpuPreview>, accessor: usize) -> u32 {
     if let Some(hold) = slot.take() {
         if hold.body() == natives::battle_object_id(accessor) {
             if block.pose(index).0 == POSE_SHOWN {
-                natives::change_motion(accessor, if hold.origin().grounded { WAIT } else { FALL }, 0.0, 1.0, true);
-                placement::restore(accessor, hold.origin());
+                placement::restore_posed(accessor, hold.origin(), if hold.origin().grounded { WAIT } else { FALL });
                 if hold.asleep {
                     state::set_sleep(accessor, false);
                 }

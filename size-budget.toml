@@ -3272,3 +3272,11 @@ ceiling = 209387
 date = "2026-11-27"
 reason = "The fighter toggle's lifecycle, the reviewer's fixes on the toggle fix (209286): +101, measured by rv-hit-streak's size run on 783c1309. The switch's ticket is decided at the roster's own points of no return (B against the commit), ends with its role's departure and with an evicted request, carries the owner generation of its toggle, and the roster's own install keeps the editor that asked for it open."
 approved_by = "tr-primary-2 2026-11-27 02:37:11Z (+60) and 02:56Z (+41; +296 in all on 209091)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 209559
+date = "2026-11-27"
+reason = "The fold of the fixes for the build after install 6, on rc-next 0a63c101 (209091): one total, the sum of what each fix was granted. The fighter toggle +296 (the two entries above, 209387); the slide after a release +25 (a fighter the clip editor's scrub had posed is let go without a blend and with its ground shape recomputed); the staggered release +40 (the first callback to read the release handles its partner in the same callback, and the hold start likewise); one read of the request per callback +11; a body placed from its partner's callback is left asleep and woken only on its own +27; the Loading help text +0; Tech practice's aim +69 (a target is its line and a parameter with one membership rule, and an attempt draws up to eight candidates). 209091 + 296 + 25 + 40 + 11 + 27 + 0 + 69 = 209559, and the size step measures 209559 on the merged tree. The entries the fix branches carried (the release fixes' 209116, 209156, 209167 and 209194, and the Tech aim's 209156 and 209160) were each counted on a base without the other fixes; this entry replaces them, and their text is in the merges' second parents f48e1214 and b0e99d7a."
+approved_by = "tr-primary-2 2026-11-27 06:57:18Z (the fold: one total, shown as a sum against each grant), on its grants of 02:12:25Z (+195), 02:37:11Z (+60) and 02:56Z (+41) for the toggle, 01:40:58Z (+25) for the slide, 03:28:58Z (+40), 03:57:26Z (+11) and 06:19:43Z (+27) for the staggered release, 06:25:27Z (+65) and 06:46:36Z (+4) for Tech practice's aim."

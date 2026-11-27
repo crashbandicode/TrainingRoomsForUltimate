@@ -260,6 +260,19 @@ pub mod natives {
         } else { false }
     }
 
+    /// `MotionModule::set_next_no_comp(accessor)`: the fighter's next animation change starts with no blend from the
+    /// one before it, once. Left armed, an unrelated change would use it: the caller arms it only when its own
+    /// change is certain to follow at once.
+    pub unsafe fn set_next_no_comp(accessor: usize) {
+        at::<extern "C" fn(usize)>(sites_pkg2::MOTION_SET_NEXT_NO_COMP_OFFSET).map_or_else(Default::default, |f| f(accessor))
+    }
+
+    /// `GroundModule::update_shape(accessor, update)`: the game makes the fighter's ground shape again from its
+    /// joints, now.
+    pub unsafe fn ground_update_shape(accessor: usize, update: bool) {
+        at::<extern "C" fn(usize, bool)>(sites_pkg2::GROUND_UPDATE_SHAPE_OFFSET).map_or_else(Default::default, |f| f(accessor, update))
+    }
+
     pub unsafe fn is_enable_cancel(accessor: usize) -> bool {
         at::<extern "C" fn(usize) -> bool>(sites_pkg2::CANCEL_IS_ENABLE_OFFSET).map_or_else(Default::default, |f| f(accessor))
     }

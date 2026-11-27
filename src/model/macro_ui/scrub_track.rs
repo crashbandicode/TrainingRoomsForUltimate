@@ -32,6 +32,14 @@ pub enum Ask {
     Group { target: u8, deltas: [Option<Spot>; 2] },
 }
 
+impl Ask {
+    fn held_at(&self, slot: usize, home: [f32; 2]) -> Option<Spot> {
+        let Self::Group { deltas, .. } = self else { return None };
+        let delta = (*deltas.get(slot)?)?;
+        Some(Spot { at: [home[0] + delta.at[0], home[1] + delta.at[1]], ..delta })
+    }
+}
+
 /// What the editor's key line says about positions.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Pos {
@@ -218,18 +226,25 @@ impl Block {
         if self.forgotten() {
             return None;
         }
-        let Ask::Group { deltas, .. } = self.ask() else { return None };
-        let delta = (*deltas.get(slot)?)?;
-        Some(Spot { at: [home[0] + delta.at[0], home[1] + delta.at[1]], facing: delta.facing,
-            kind: delta.kind, pose: delta.pose })
+        self.ask().held_at(slot, home)
+    }
+
+    /// Under the holds lock, take one request for both bodies. The callback that forgot a body releases it
+    /// even if the worker has already published a new request. A later callback may use the new request.
+    pub fn frame_ask(&self, generation: u32) -> Ask {
+        if self.home.0.load(Ordering::Relaxed) == FORGOT || self.dropped.load(Ordering::Acquire) == generation.wrapping_add(1) {
+            self.home.0.store(0, Ordering::Relaxed);
+            return Ask::None;
+        }
+        self.ask()
     }
 
     /// Recheck on a new ask even at identical coordinates, or if a moving anchor changes this ask's world point.
-    pub fn standable(&self, slot: usize, at: [f32; 2], class: impl FnOnce() -> bool) -> bool {
+    pub fn standable(&self, slot: usize, generation: u32, at: [f32; 2], class: impl FnOnce() -> bool) -> bool {
         let (Some(point), Some(verdict)) = (self.classed.get(slot), self.stands.get(slot)) else { return false };
         let key = key(at);
         // Zero means invalid; the low bit of a tagged answer is the verdict.
-        let tag = (u64::from(self.ask.generation()) + 1) << 1;
+        let tag = (u64::from(generation) + 1) << 1;
         let cached = verdict.load(Ordering::Relaxed);
         if cached & !1 == tag && point.load(Ordering::Relaxed) == key {
             return cached & 1 != 0;
@@ -244,12 +259,12 @@ impl Block {
     /// body, when it is held; `free`: where the target stands when it is not. A target that was held keeps its home when it
     /// is let go while a group is still asked for: its published position is read before the hold's step, so on that
     /// frame it is still the point it was held at, and its partner would be placed from there.
-    pub fn point(&self, slot: usize, origin: impl FnOnce(usize) -> Option<[f32; 2]>, free: impl FnOnce(usize) -> Option<[f32; 2]>) -> Option<Spot> {
-        let (forgot, target) = (self.home.0.load(Ordering::Relaxed) == FORGOT, self.target_slot());
-        let Some(target) = target.filter(|_| !forgot) else {
+    pub fn point_for(&self, ask: &Ask, slot: usize, origin: impl FnOnce(usize) -> Option<[f32; 2]>, free: impl FnOnce(usize) -> Option<[f32; 2]>) -> Option<Spot> {
+        let Ask::Group { target, .. } = ask else {
             self.home.0.store(0, Ordering::Relaxed);
             return None;
         };
+        let target = usize::from(*target);
         let role = target as u32 + 1;
         let home = if let Some(at) = origin(target) {
             self.home.1.store(key(at), Ordering::Relaxed);
@@ -261,7 +276,12 @@ impl Block {
         } else {
             free(target)?
         };
-        self.held_at(slot, home)
+        ask.held_at(slot, home)
+    }
+
+    #[cfg(test)]
+    fn point(&self, slot: usize, origin: impl FnOnce(usize) -> Option<[f32; 2]>, free: impl FnOnce(usize) -> Option<[f32; 2]>) -> Option<Spot> {
+        self.point_for(&self.frame_ask(self.generation()), slot, origin, free)
     }
 
     /// The game thread, after the hold's step for the role in `slot`. `moved`: where the game has the body, when the
@@ -345,14 +365,6 @@ impl Block {
     /// The game thread: the released CPU was seen settled, or will not settle; the wait is over.
     pub fn settled(&self) {
         self.settle.store(0, Ordering::Release);
-    }
-
-    /// A forgotten group has no anchor, even while its old hold awaits release.
-    pub fn target_slot(&self) -> Option<usize> {
-        match self.ask() {
-            Ask::Group { target, .. } if !self.forgotten() => Some(usize::from(target)),
-            _ => None,
-        }
     }
 
     pub fn seen(&self, slot: usize) -> u32 {
@@ -707,6 +719,19 @@ mod tests {
         Spot { kind: recorded.start.fighter_kind, pose: recorded.pose, ..spot(x, y, facing) }
     }
 
+    #[test]
+    fn release_published_inside_last_callback_cannot_split_the_held_pair() {
+        let block = Block::new();
+        let delta = spot(2.0, 0.0, 1.0);
+        block.set_ask(Ask::Group { target: 0, deltas: [Some(delta); 2] });
+        // Last callback of the tick. Publish B after reading the group but before resolving its body point.
+        let ask = block.frame_ask(block.generation());
+        let partner_still_held = ask != Ask::None;
+        let own = block.point_for(&ask, 1, |_| { block.set_ask(Ask::None); Some([0.0; 2]) }, |_| None);
+        assert_eq!([partner_still_held, own.is_some()], [true, true], "split at the pair test");
+        assert_eq!(block.point(1, |_| None, |_| None), None, "B applies on the next callback");
+    }
+
     fn capture(tracks: usize) -> ClipEditor {
         let tracks = (0..tracks).map(|fighter| ReplayTrack { fighter: None, entry: fighter as i32,
             frames: (0..10).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: i, ..InputFrame::default() }, ..state(fighter, i) }).collect(),
@@ -858,7 +883,7 @@ mod tests {
         // The target (the CPU) was found at (100, 7): its fighter is 12 right and 4 up of the anchor; the other
         // fighter keeps the recorded spacing to it.
         let home = [100.0, 7.0];
-        assert_eq!(block.target_slot(), Some(1));
+        assert!(matches!(block.frame_ask(block.generation()), Ask::Group { target: 1, .. }));
         assert_eq!(block.held_at(1, home), Some(recorded_spot(0, 4, 112.0, 11.0, 1.0)));
         assert_eq!(block.held_at(0, home), Some(recorded_spot(1, 4, 100.0 + (-24.0 - 20.0), 7.0 + 42.0, 1.0)));
         // A capture with one track moves one body.
@@ -1402,7 +1427,7 @@ mod tests {
         let read = |path: &str| std::fs::read_to_string(format!("{}{path}", env!("CARGO_MANIFEST_DIR"))).unwrap_or_default();
         let hold = read("/src/runtime/features/scrub_hold.rs");
         let generation = hold.find("let generation = block.generation();").expect("the generation is read");
-        assert!(generation < hold.find("point(block, &holds, slot, accessor)").unwrap(), "the generation is read before the ask");
+        assert!(generation < hold.find("let ask = block.frame_ask(generation);").unwrap(), "the generation is read before the ask");
         assert!(hold.contains("block.set_seen(slot, seen);\n        block.ack(slot, generation);"));
         // The worker: X is kept while a body is held, and started only on a pass that finds the bodies released.
         let worker = read("/src/runtime/macros/replay_capture.rs");
@@ -1427,16 +1452,16 @@ mod tests {
         };
         block.ask_at(Some(10), ask);
         for slot in 0..2 {
-            assert!(block.standable(slot, [0.0, 0.0], || permits(-4.0)));
+            assert!(block.standable(slot, block.generation(), [0.0, 0.0], || permits(-4.0)));
         }
         block.ask_at(Some(10), ask);
         for slot in 0..2 {
-            assert!(block.standable(slot, [0.0, 0.0], || panic!("rechecked an unchanged hold")));
+            assert!(block.standable(slot, block.generation(), [0.0, 0.0], || panic!("rechecked an unchanged hold")));
         }
         block.ask_at(Some(11), ask);
         for slot in 0..2 {
-            assert!(!block.standable(slot, [0.0, 0.0], || permits(4.0)), "frame 11: role {slot} is inside the floor");
-            assert!(!block.standable(slot, [0.0, 0.0], || panic!("rechecked an unchanged refusal")));
+            assert!(!block.standable(slot, block.generation(), [0.0, 0.0], || permits(4.0)), "frame 11: role {slot} is inside the floor");
+            assert!(!block.standable(slot, block.generation(), [0.0, 0.0], || panic!("rechecked an unchanged refusal")));
         }
     }
 
@@ -1616,7 +1641,7 @@ mod tests {
         assert!(order(&["block.refused(index, generation, body, spot.at)", "placement::hold_at(slot, accessor, body, spot.at, false)", judged, "state::set_lr(accessor, spot.facing);"]));
         assert!(hold.contains(&format!("{judged}\n        release(block, index, slot, accessor);\n        return SEEN_OFF;")), "a pushed body is let go and reads off");
         assert!(runtime.contains("Some(spot) => hold(block, generation, slot, &mut holds[slot], accessor, spot),"), "the request the callback read");
-        assert!(runtime.contains("block.point(slot, |target| holds[target].map(|hold| hold.origin().at), |target| {"), "the group's home is the model's");
+        assert!(runtime.contains("block.point_for(ask, slot, |target| holds[target].map(|hold| hold.origin().at), |target| {"), "the group's home is the model's");
     }
 
     #[test]
@@ -1634,7 +1659,7 @@ mod tests {
         for slot in 0..2 {
             let at = block.held_at(slot, [-30.0, 0.01]).unwrap().at;
             assert!(at[1] < -15.0 && !stands(at), "a capture point inside the ground: {at:?}");
-            assert!(!block.standable(slot, at, || stands(at)));
+            assert!(!block.standable(slot, block.generation(), at, || stands(at)));
         }
         // A point outside the blast lines, and a stage that cannot be read.
         assert!(!stands([0.0, -139.5]) && !stands([-239.5, 50.0]));
@@ -1645,17 +1670,17 @@ mod tests {
         block.set_ask(Ask::Group { target: 0, deltas: [Some(spot(landed[0] - anchor[0], landed[1] - anchor[1], 1.0)), None] });
         let at = block.held_at(0, home).unwrap().at;
         assert_eq!(at, [40.0, 0.01 - 60.01 + 30.01]);
-        assert!(!block.standable(0, at, || stands(at)), "a shifted macro point in the ground");
+        assert!(!block.standable(0, block.generation(), at, || stands(at)), "a shifted macro point in the ground");
         // Open ground is held exactly: on the ground, on a platform, in the air, a little under a floor's surface (the
         // rule's slack: the body stands on the floor), and off the stage's side.
         for at in [[-58.285, 0.01], home, [0.0, 50.0], [0.0, -0.5], [-200.0, -15.0]] {
-            assert!(stands(at) && block.standable(0, at, || stands(at)), "{at:?}");
+            assert!(stands(at) && block.standable(0, block.generation(), at, || stands(at)), "{at:?}");
         }
         block.set_ask(Ask::Group { target: 0, deltas: [Some(spot(0.0, 0.0, 1.0)), None] });
         assert_eq!(block.held_at(0, home), Some(spot(home[0], home[1], 1.0)));
         // The stage is asked once per point and role: again for another point, and again after the hold is dropped.
         let asked = core::cell::Cell::new(0);
-        let ask = |at: [f32; 2]| block.standable(1, at, || { asked.set(asked.get() + 1); stands(at) });
+        let ask = |at: [f32; 2]| block.standable(1, block.generation(), at, || { asked.set(asked.get() + 1); stands(at) });
         assert!(ask([0.0, 0.01]) && ask([0.0, 0.01]) && ask([0.0, 0.01]));
         assert_eq!(asked.get(), 1);
         assert!(!ask([0.0, -20.0]) && !ask([0.0, -20.0]));
@@ -1666,7 +1691,7 @@ mod tests {
         // The line is true for a point in the ground and for one past a blast line; the bridge's word is unchanged.
         assert_eq!((Pos::Off.text(), Pos::Off.word()), ("Can't stand there on this stage.", "off"));
         let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/scrub_hold.rs")).unwrap_or_default();
-        assert!(runtime.contains("if !in_bounds(spot.at, limits) || block.refused(index, generation, body, spot.at) || !block.standable(index, spot.at, || stands(accessor, spot.at)) {"));
+        assert!(runtime.contains("if !in_bounds(spot.at, limits) || block.refused(index, generation, body, spot.at) || !block.standable(index, generation, spot.at, || stands(accessor, spot.at)) {"));
         assert!(runtime.contains("RayProbe::new(accessor).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at))"));
         assert!(!runtime.contains(".lock()"), "the fighter frame takes no blocking lock");
     }
