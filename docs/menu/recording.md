@@ -4,8 +4,8 @@ Press R twice from the CPU page for your recordings, your combos and their playb
 
 ## The page and its pop-up
 
-![The pop-up and the page side by side: both show the same two lists, the hot five and CONNECTIONS](../diagrams/recording-page-popup.png)<br>
-*The pop-up and the page show the same lists.*
+![The same saves and macros in both views, with RECORDINGS on the page only](../diagrams/recording-page-popup.png)<br>
+*The page also opens match recordings.*
 
 Use your [Recording pop-up chord](display-and-controls.md#button-chords) to open the library over practice.
 
@@ -95,7 +95,7 @@ How a macro plays back, and how the Combo helper grades.
 | <a id="loop"></a>Loop | ∞, **1**, 2, 3, 5, 10 | How many times the active macro plays. X cycles it in MACROS. |
 | <a id="settings-override-playback"></a>Settings override playback | On, **Off** | Off: a playing recording wins over the DI, SDI, air-dodge, tech and throw settings. |
 | <a id="shared-start-save"></a>Shared start save | **Prompt**, Always change, Always copy | What Change placement does to a start save that several macros share. |
-| <a id="combo-helper"></a>Combo helper | **On**, Off | On: each attempt is graded under the frame strip, link by link. |
+| <a id="combo-helper"></a>Combo helper | **On**, Off | The card shows the result; cells under the strip grade individual links. |
 | <a id="match-sweet-sour-spot"></a>Match sweet/sour spot | On, **Off** | On: a link counts only if it lands the saved spot. |
 | <a id="match-angle-and-deflection"></a>Match angle and deflection | On, **Off** | On: an aimed special must match the saved stick angle and deflection. |
 | <a id="move-names"></a>Move names | On, **Off** | On: moves show their names. Off: the short names. |
@@ -120,7 +120,7 @@ How a macro plays back, and how the Combo helper grades.
 
 | If | Then |
 | --- | --- |
-| You press X or Y on this page | X never saves your defaults here, and Y does nothing. |
+| You press X or Y in the main lists | Neither changes defaults; the [capture list](../guide/recording.md#crop) has its own delete key. |
 | A file was recorded on another fighter | Play asks first, unless Ask before switching fighter is Off. |
 | You reset this page | Your files, the bound save, the active macros and the drill stay. |
 | The take has no pose for this frame | Switching fighters cannot show a pose the take did not store. |
