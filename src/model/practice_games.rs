@@ -123,6 +123,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn ledge_trap_is_its_own_practice_game() {
+        let trap = Game::ALL.iter().copied().find(|game| game.title() == "Ledge Trap")
+            .expect("Ledge Trap has its own practice game entry");
+        assert_eq!((trap.code(), Game::from_code(trap.code())), (8, Some(trap)), "appended: the seven older codes stay");
+        assert_eq!(Game::from_code(7).map(Game::title), Some("Juggler"));
+    }
+
+    #[test]
     fn edge_juggle_are_independent_practice_games() {
         let edge = Game::ALL.iter().copied().find(|game| game.title() == "Guard the Edge")
             .expect("Guard the Edge has its own practice game entry");
