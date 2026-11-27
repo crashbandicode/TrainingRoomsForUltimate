@@ -82,48 +82,72 @@ pub struct Flight {
     pub gravity_speed: f32,
 }
 
+/// A flight one frame at a time; [`flight`] is `frames` steps of it.
+pub struct Path {
+    state: Flight,
+    speed: f32,
+    direction: Vec2,
+    params: FlightParams,
+}
+impl Path {
+    pub fn new(initial: Vec2, params: FlightParams) -> Option<Self> {
+        if !initial.finite()
+            || ![params.brake, params.gravity, params.fall_speed_cap]
+                .iter()
+                .all(|v| v.is_finite() && *v >= 0.0)
+        {
+            return None;
+        }
+        let speed = initial.length();
+        if !speed.is_finite() {
+            return None;
+        }
+        let direction = if speed == 0.0 {
+            Vec2::default()
+        } else {
+            Vec2 {
+                x: initial.x / speed,
+                y: initial.y / speed,
+            }
+        };
+        Some(Self {
+            state: Flight { damage_velocity: initial, ..Flight::default() },
+            speed,
+            direction,
+            params,
+        })
+    }
+
+    /// The flight one frame later, or None when it is no longer finite.
+    pub fn step(&mut self) -> Option<Flight> {
+        self.state.displacement.x += self.state.damage_velocity.x;
+        self.state.displacement.y += self.state.damage_velocity.y - self.state.gravity_speed;
+        self.speed = (self.speed - self.params.brake).max(0.0);
+        self.state.damage_velocity = Vec2 {
+            x: self.direction.x * self.speed,
+            y: self.direction.y * self.speed,
+        };
+        self.state.gravity_speed = (self.state.gravity_speed + self.params.gravity).min(self.params.fall_speed_cap);
+        (self.state.displacement.finite()
+            && self.state.damage_velocity.finite()
+            && self.state.gravity_speed.is_finite())
+        .then_some(self.state)
+    }
+}
+
 /// Approximation convention: move with current damage and gravity speed, then decay damage
 /// along its initial direction and accelerate gravity for the next step. `frames=0` is launch.
 /// Fighter gravity/cap come from runtime parameters; this module supplies no fighter defaults.
 pub fn flight(initial: Vec2, params: FlightParams, frames: u16) -> Option<Flight> {
-    if !initial.finite()
-        || frames > MAX_FRAMES
-        || ![params.brake, params.gravity, params.fall_speed_cap]
-            .iter()
-            .all(|v| v.is_finite() && *v >= 0.0)
-    {
+    if frames > MAX_FRAMES {
         return None;
     }
-    let mut speed = initial.length();
-    if !speed.is_finite() {
-        return None;
-    }
-    let direction = if speed == 0.0 {
-        Vec2::default()
-    } else {
-        Vec2 {
-            x: initial.x / speed,
-            y: initial.y / speed,
-        }
-    };
-    let mut state = Flight {
-        damage_velocity: initial,
-        ..Flight::default()
-    };
+    let mut path = Path::new(initial, params)?;
+    let mut end = Some(path.state);
     for _ in 0..frames {
-        state.displacement.x += state.damage_velocity.x;
-        state.displacement.y += state.damage_velocity.y - state.gravity_speed;
-        speed = (speed - params.brake).max(0.0);
-        state.damage_velocity = Vec2 {
-            x: direction.x * speed,
-            y: direction.y * speed,
-        };
-        state.gravity_speed = (state.gravity_speed + params.gravity).min(params.fall_speed_cap);
+        end = path.step();
     }
-    (state.displacement.finite()
-        && state.damage_velocity.finite()
-        && state.gravity_speed.is_finite())
-    .then_some(state)
+    end
 }
 
 /// Translate the provisional path to the target. Normal points OUT of the solid; arrival must

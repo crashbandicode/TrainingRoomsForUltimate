@@ -18,7 +18,7 @@ use crate::model::tech::{
     picker::{self, Pick, Picker},
     planner,
     practice_state::{self as state, View as StateView},
-    session::{Bests, Length, Phase, Session},
+    session::{self, Bests, Length, Phase, Session},
     solver,
     surface::{Kind as SurfaceKind, MaterialDraws, MaterialHint, RememberedSpot, StageEpoch, Surfaces, MAX_LINES},
     wizard::{Action as WizardAction, Outcome as WizardOutcome, Step, Wizard},
@@ -101,6 +101,7 @@ struct Practice {
     rng: Rng,
     after_reaction: u16,
     planning_failed: bool,
+    search: planner::Search,
     decision: Option<(DecisionSnapshot, u16)>,
     remembered: Option<RememberedSpot>,
     recovering: bool,
@@ -700,6 +701,7 @@ pub unsafe fn frame(fighter: usize) {
                 )),
                 after_reaction: 0,
                 planning_failed: false,
+                search: planner::Search::default(),
                 decision: None,
                 remembered: None,
                 recovering: false,
@@ -710,6 +712,7 @@ pub unsafe fn frame(fighter: usize) {
             });
         }
         let run = slot.as_mut().unwrap();
+        let mut search = core::mem::take(&mut run.search);
         camera = run.config.camera;
         RUNNING.store(true, Ordering::Release);
         // rc.15 practice menu (Q1, tr-review-astra-3 16:37Z): a menu visit suspends the session, it never stops it. The
@@ -886,6 +889,7 @@ pub unsafe fn frame(fighter: usize) {
             run.reroll = true;
             run.sampled = None;
             run.planning_failed = false;
+            search = planner::Search::default();
             let placing = EDIT.swap(false, Ordering::AcqRel)
                 || wizard_active()
                 || config.surface == 4 && view.picker.selected.is_none();
@@ -999,7 +1003,7 @@ pub unsafe fn frame(fighter: usize) {
             let left_tumble = run.adapter.attempt().ok().is_some_and(|attempt| {
                 attempt.state == crate::model::tech_launch::AttemptState::Flying
             }) && still_tumbling(at) == Some(false);
-            if (run.after_reaction > 120 || left_tumble) && !run.controller.awaiting_outcome() {
+            if (run.after_reaction > session::ABANDON || left_tumble) && !run.controller.awaiting_outcome() {
                 match Controller::abandon(&mut run.controller) {
                     Event::NeedSetup { reroll } => {
                         run.pending = true;
@@ -1026,6 +1030,7 @@ pub unsafe fn frame(fighter: usize) {
                     Rebuild,
                     Choose,
                     Wait,
+                    Stop,
                 }
                 let mut why = planner::Refused::Values;
                 let drawn = planner::draw_attempt(|| -> Result<_, Ended> {
@@ -1034,6 +1039,8 @@ pub unsafe fn frame(fighter: usize) {
                             return Err(Ended::Rebuild);
                         }
                         view.picker.selected.ok_or(Ended::Choose)?
+                    } else if search.running() {
+                        view.picker.selected.filter(|s| s.current(&mut source)).ok_or(Ended::Rebuild)?
                     } else {
                         picker::random_spot(
                             &view.surfaces,
@@ -1051,17 +1058,27 @@ pub unsafe fn frame(fighter: usize) {
                     };
                     view.picker.selected = Some(spot);
                     let context = plan_context(view, spot, run.config, at, multiplier).ok_or(Ended::Wait)?;
-                    Ok(match planner::plan(run.config, context, &mut |n| draw(&mut run.rng, n)) {
+                    Ok(match planner::plan_frame(run.config, &context, &mut |n| draw(&mut run.rng, n), &mut search) {
                         Ok(plan) => Some((plan, spot)),
+                        Err(planner::Refused::Checking) => {
+                            run.search = search;
+                            return Err(Ended::Wait);
+                        }
                         Err(refused) => {
                             why = refused;
+                            search.refused += 1;
+                            if search.refused >= planner::CANDIDATES
+                                || run.config.surface == 4 && run.config.start.mode != tech_settings::Mode::Auto
+                            {
+                                return Err(Ended::Stop);
+                            }
                             None
                         }
                     })
                 });
                 let (plan, spot) = match drawn {
                     Ok(Some((taken, _))) => taken,
-                    Ok(None) => {
+                    Ok(None) | Err(Ended::Stop) => {
                         run.planning_failed = true;
                         crate::runtime::diag_log::diagnostic(format_args!(
                             "[Tech] no launch fits: {why:?} on the last of {} candidates",

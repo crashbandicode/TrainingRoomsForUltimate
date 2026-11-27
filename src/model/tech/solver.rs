@@ -4,7 +4,7 @@ use super::super::tech_launch::{self as flight, FlightParams};
 use super::{
     add, finite, scale, sub,
     picker::Spot,
-    surface::{self, Kind, Surfaces, Walk},
+    surface::{self, Kind, Line, Surfaces, Walk},
     Vec2,
 };
 
@@ -48,6 +48,18 @@ pub(super) fn contact_frames(knockback: f32) -> core::ops::RangeInclusive<f32> {
     10.0..=(knockback * flight::DAMAGE_FRAME_MUL - 2.0).min(60.0)
 }
 
+/// Whether the game takes a touch of `line` by a flight in this state as a contact: any floor; in hitstun a wall met
+/// with horizontal damage speed into it (stock tests signed horizontal speed, not speed along the normal) and a
+/// ceiling met rising.
+fn takes(line: Line, end: flight::Flight, hitstun: bool) -> bool {
+    match line.kind() {
+        Some(Kind::Floor) => true,
+        Some(Kind::Wall) => hitstun && end.damage_velocity.x * line.normal.x < 0.0,
+        Some(Kind::Ceiling) => hitstun && end.damage_velocity.y > end.gravity_speed,
+        None => false,
+    }
+}
+
 pub struct Aim<'a> {
     pub surfaces: &'a Surfaces,
     pub spot: Spot,
@@ -61,7 +73,7 @@ impl Aim<'_> {
     /// start, an out-of-bounds path or a contact outside the timed passive regime.
     pub fn at(&self, angle: f32, frames: u16) -> Option<Solution> {
         let (line, target) = (self.spot.line, self.spot.point());
-        let kind = line.kind()?;
+        line.kind()?;
         if self.surfaces.state != Walk::Closed
             || !self.spot.on_segment()
             || !contact_frames(self.knockback).contains(&f32::from(frames))
@@ -98,10 +110,7 @@ impl Aim<'_> {
             previous = p;
         }
         let end = flight::flight(velocity, self.params, frames)?;
-        // Stock wall reflection tests signed horizontal damage speed, not speed along the normal.
-        if kind == Kind::Wall && end.damage_velocity.x * line.normal.x >= 0.0
-            || kind == Kind::Ceiling && end.damage_velocity.y <= end.gravity_speed
-        {
+        if !takes(line, end, true) {
             return None;
         }
         Some(Solution {
@@ -109,6 +118,39 @@ impl Aim<'_> {
             angle,
             frames,
         })
+    }
+
+    /// A launch flown forward from `start` with neutral input: the frame of its first touch the session grades, and the
+    /// frames flown. Any face `takes` in hitstun, then floors until the session abandons the attempt.
+    pub fn contact(&self, start: Vec2, angle: f32) -> (Option<u16>, u16) {
+        let reaction = self.knockback * flight::DAMAGE_FRAME_MUL;
+        let Some(mut path) = flight::direction_degrees(angle)
+            .and_then(|direction| flight::launch_velocity(self.knockback, direction))
+            .and_then(|velocity| flight::Path::new(velocity, self.params))
+        else {
+            return (None, 0);
+        };
+        let mut previous = start;
+        let mut flown = 0;
+        for f in 1..=flight::MAX_FRAMES {
+            if f32::from(f) >= reaction + f32::from(super::session::ABANDON) {
+                break;
+            }
+            flown = f;
+            let Some(end) = path.step() else { return (None, f) };
+            let p = add(start, end.displacement);
+            if !self.blast.contains(p) {
+                return (None, f);
+            }
+            if let Some((_, line)) = self.surfaces.lines()
+                .filter_map(|line| surface::crossing(previous, p, line).map(|fraction| (fraction, line)))
+                .min_by(|a, b| a.0.total_cmp(&b.0))
+            {
+                return (takes(line, end, f32::from(f) < reaction).then_some(f), f);
+            }
+            previous = p;
+        }
+        (None, flown)
     }
 
     /// Prefer the normal's opposite direction, then every five-degree menu angle.
