@@ -334,24 +334,25 @@ ZL + D-pad Right switches Player 1 to Donkey Kong, Link, then Ness, each standin
 | Cycle chord | Rule |
 | --- | --- |
 | Both | Step through your own order of fighters for that role (red for Player 1, blue for the CPU), drawn with the game's stock icons |
-| The CPU's | Always works |
+| The CPU's | Does not require Player Swapping. Neither cycle chord switches a fighter while the menu owns the input or another shortcut is pending |
 | Player 1's | Works only while Fighters & Stages › Player Swapping is On. It's Off at first |
 
-The fighters of your cycles load hot:
+With [fighter preloading](menu/fighters-and-stages.md#loading) enabled, eligible fighters load before you switch.
+With Cycle Preload Off, the fighter loads when you switch instead.
 
 | When | What happens |
 | --- | --- |
-| Training starts | Each role's first window of fighters is ready |
-| While you play | The other groups are built in the background. Once the notice reads Ready or All loaded, a switch into a group took about 50–70 ms in Eden |
-| A cycle changes in Training | The new fighters are built the same way, at once |
+| Training starts | Each role starts with the fighters its preload settings allow |
+| While you play | Eligible groups build in the background within the Ready Fighters limit. In the [rc.6 Eden measurements](RELEASE-NOTES-rc6.md#fighters-load-hot), switching into a ready group took about 50–70 ms; this was not a preview-build timing |
+| A cycle changes in Training | Preloading starts for eligible newcomers; they are not necessarily ready on that frame |
 | Fighters leave a cycle | They are freed when you next open the pause menu, or right away if the new ones need their room (a brief pause) |
-| You leave a Mii for the fighters it replaced | A warm switch, not a reload |
-| Kirby is on screen | The background build waits |
-| A Mii is on screen | The build of a second Mii group waits |
+| You leave a Mii for a group already built | A warm switch, not a reload |
+| Kirby is on screen | The build waits if the game still handles Kirby's copy-loading step. Kirby alone does not block it when the fighter bank handles that step |
+| A Mii is on screen | A second Mii group waits. Other groups also wait if the loader has not identified the ordinary fighter group the Mii replaced |
 | No. of CPUs is raised | The CPU cycle's next fighters come in, a saved Mii included |
 
-The background build waits in those two cases only; the rule is `background_build_eligible` in
-`src/model/swap/body_bank.rs`.
+`background_build_eligible` in `src/model/swap/body_bank.rs` also checks the target group's identity and the
+support needed for paired fighters. `live_kirby_gate` in `src/runtime/roster/native_body_bank.rs` supplies the Kirby check.
 
 **Clip** [`rc7-kirby-hats.gif`](media/rc7-kirby-hats.gif): Player 1's Kirby: the hat chord twice, two hats in turn
 
@@ -362,13 +363,13 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 
 ### Mii fighters
 
-Each Mii class (Fighters & Stages › Mii Brawler, Swordfighter, Gunner) lists your saved Miis per role; ZR switches
+Each Mii class (Fighters & Stages › Extras › Mii Brawler, Swordfighter, Gunner) lists your saved Miis per role; ZR switches
 Player and CPU. More: [MII.md](MII.md).
 
 | In the list | Result |
 | --- | --- |
 | *Add New…* | Opens Smash's own Mii Fighter editor from Training |
-| Save in the editor | Creates a new Mii and leaves the others untouched |
+| Save a new configuration | Creates a new Mii and leaves the others untouched |
 | Leave without saving | Creates nothing |
 | Save a Mii you already have | Saves nothing new and says "Same as ‹saved name›, nothing new saved" |
 
@@ -397,8 +398,8 @@ Battlefield Ω (`[PracticeStageRequest] native_complete`) and its "Stage ready" 
 | Row (Fighters & Stages › Stages) | What it does |
 | --- | --- |
 | Change Stage | Goes to the stage you pick when the menu closes, in Training and in waiting-room practice. Y picks its form first |
-| Lobby Stages | Pick the stages and their order for Training rotation and waiting-room practice |
-| Training Stage Rotation | On: Training opens on the stage you pick, then on the next stage of the Lobby Stages list at each return through the character select. Off at first |
+| Lobby Stages | Rotation sets the order for new waiting rooms; Direct uses the single stage you pick instead. Both apply to waiting rooms with Lobby Practice On |
+| Training Stage Rotation | Off by default. When On, Training opens on the stage you picked, then advances through the Rotation list when you return through character select, even if Lobby Stages is set to Direct |
 
 **Clip** [`rc11-lobby-stages.gif`](media/rc11-lobby-stages.gif): Lobby Stages: A on Battlefield adds it as number 2
 
@@ -427,21 +428,22 @@ standing still. The log: `[LobbyPersist] entry saved=Saved { partners: Some(2), 
 
 | In a waiting room | Rule |
 | --- | --- |
-| The menu | Works while you wait in an online or local room, while Fighters & Stages › Lobby Practice is On. It's On at first |
+| The menu | Works in local wireless and Quickplay waiting rooms when Fighters & Stages › Stages › Lobby Practice is On. On is the default; a saved Off stays Off |
 | Training partners and CPU action | What you set in the game's own waiting-room menu is remembered for the next room |
 | The partners' level | CPU › Level › CPU Level |
-| Leaving a Quickplay room before the match | Close the TrainingRooms menu first: while it is open, Plus doesn't reach the game. The game's Pause › Leave Battle is kept open for a few seconds after you join by the QuickPlay cancel fix plugin |
+| Leaving a Quickplay room before the match | Close the TrainingRooms menu so Plus reaches the game. The separate QuickPlay cancel fix plugin keeps Pause › Leave Battle available for a few seconds after you join |
 
 With the CPU pilot plugin 0.2.3 (`libssbu_cpu_pilot.nro`), the pilot can also drive Player 1 in Quickplay's
 waiting-room practice:
 
-| With the pilot driving Player 1 | |
+| With the pilot driving Player 1 | What happens |
 | --- | --- |
 | Arming | From its CPU Pilot page, as in Training |
 | On screen | The practice shows no `CPU Lv` tag |
 | When a match is found | The pilot keeps Player 1 in the match |
-| Refused while it drives | Record, Play on Player 1 and Quick Reset |
-| Still working | The lobby tools above, and the Game speed chord at every speed |
+| Record | Records Player 1's inputs as the game receives them, including the pilot's inputs |
+| Refused in waiting-room practice | Play on Player 1 and Quick Reset (L + R + A) |
+| Game speed | The pilot does not disable the practice speed chord. [Waiting-room speed and frame step](guide/game-speed.md#in-the-waiting-rooms) |
 
 **Clip** [`rc11-lobby-combos.gif`](media/rc11-lobby-combos.gif): Save last combo in a Local Wireless waiting room, then the helper bar drills it and grades a try
 
@@ -486,12 +488,13 @@ Minus; A opens the chord editor, X starts the capture, ZL held with D-pad Up giv
 (`button_config.ini written`); back in Training, Minus opens nothing (no `[Ui] menu opened`), and ZL held (Mario
 shields) with D-pad Up opens the menu. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-Menu shortcuts are changed in the menu and work at once.
+Menu shortcut 1 and Menu shortcut 2 can be changed in the menu. B + D-pad Up is permanent.
 
 ![Two designs for the menu's shortcut rows: A shows them read-only with the INI as the editor; B lets A re-bind a row in the menu, which writes button_config.ini](decisions/09-menu-shortcuts.png)
 
-*The two designs considered. Decided 2026-11-01: B, editable in the menu; the menu writes `button_config.ini` and
-the new chord applies at once. [Decisions](DECISIONS.md)*
+*Left (A, marked “recommended”): the rejected read-only design. Right (B): the design chosen on 2026-11-01.
+Confirm a new shortcut in the menu and it applies at once; the menu writes `button_config.ini`.
+[Shortcut decision Q9](DECISIONS.md#q9-menu-shortcuts)*
 
 **Clip** [`rc11-replay-window.gif`](media/rc11-replay-window.gif): A capture cropped in the Replay window and saved; played on the CPU, which becomes the recorded Mii Gunner and replays the moves
 
