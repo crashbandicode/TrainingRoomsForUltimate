@@ -303,8 +303,8 @@ give the `m5i` numbers. This addendum records what changed in the generated file
   `tools/provenance_scan.py` over `m5q` and the same merge-base tree, and `docs/provenance/feature-groups.json`
   is the output of `tools/feature_groups.py` over that.
 - **Kept in step by a check.** `tools/check_provenance.py` regenerates both JSON files and their text reports in `tools/provenance-data/` from the stage the carry
-  manifests name and compares them byte for byte; `--write` is how they were regenerated. The gate runs the check
-  before every test step, on the machine that holds the stage and the upstream tree.
+  manifests name and compares them byte for byte; `--write` is how they were regenerated. Run the check on the machine that holds the stage and the upstream tree.
+  The remote test preflight verifies the two carry packages and the UI item assets.
 
 | | `m5i`, 2026-11-01 | `m5q`, 2026-11-26 |
 | --- | ---: | ---: |
