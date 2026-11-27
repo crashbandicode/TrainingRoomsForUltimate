@@ -860,8 +860,9 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 ## Miis: what came over from the fork
 
-The Mii code is the fork's own (M5q stage, `parked-reuse175/refactor/stages/m5q/stage`), ported directly. The pkg6
-carry records (`docs/provenance/pkg6-carry-manifest.json`, [pkg6 carry ledger](../tools/provenance-data/pkg6-carry-ledger.txt), checked by
+TrainingRooms ports the fork’s Mii code from M5q (`parked-reuse175/refactor/stages/m5q/stage`).
+
+The pkg6 carry records (`docs/provenance/pkg6-carry-manifest.json`, [pkg6 carry ledger](../tools/provenance-data/pkg6-carry-ledger.txt), checked by
 `python3 -I tools/carry_pkg6.py verify`) name the fork file behind every carried file and every exact-text change.
 This page is the parity checklist of 2026-11-05 (branch `p23/mii-editor`). "Fork" paths are relative to the M5q
 stage; "Here" paths to this repository.
