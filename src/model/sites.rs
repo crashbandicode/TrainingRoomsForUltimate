@@ -51,8 +51,8 @@ features! {
     Mashout => "mashout",
     /// SPEC-cpu-03: the ledge options.
     CpuLedge => "cpu_ledge",
-    /// SPEC-cpu-04: tech, missed tech, hidden tech animations (the camera and the script status-change
-    /// hook need sites this table does not have yet, see `IMPLEMENTATION-PROGRESS.md (removed after v0.2.0-rc.1; see that tag)`).
+    /// SPEC-cpu-04: tech, missed tech, hidden tech animations (the fixed camera is `CpuCamera`; the script
+    /// status-change hook is in the `common` script module, `CpuCommon`).
     CpuTech => "cpu_tech",
     /// Optional Stage tech practicer and its guarded launch natives.
     TechPractice => "tech_practice",
@@ -61,7 +61,7 @@ features! {
     /// Recording placement and start states, on the frame, poll and save-state hooks.
     RecordPlace => "record_place",
     /// SPEC-cpu-05: shield hold, decay override and tilt (the out-of-shield hook is in the `common`
-    /// script module and the damage multiplier needs the param-hook plugin, see `IMPLEMENTATION-PROGRESS.md (removed after v0.2.0-rc.1; see that tag)`).
+    /// script module, `CpuCommon`; the damage multiplier is `CpuShieldDamage`).
     CpuShield => "cpu_shield",
     /// Package 3 (save states): the natives and hooks of SPEC-state-01 (`sites_pkg3.rs`).
     StateCore => "state_core",
