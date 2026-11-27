@@ -2,9 +2,9 @@
 
 ## Place targets and race the clock
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d8dc78d3f34bd83e7c687ed7ce791010bd1556e8" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/19abf9694f4aafea687f9e5c1f00076cfa015643" autoplay muted loop playsinline controls></video>
 
-*Mario turns toward the target and punches it.* [Open the clip](../media/tut-break-the-targets.mp4)
+*Place a target, start the clock, then stop the game.* [Open the clip](../media/tut-btt-place-start-stop.mp4)
 
 | Step | What to do |
 |---|---|
