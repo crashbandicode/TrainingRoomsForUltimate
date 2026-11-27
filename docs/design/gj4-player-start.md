@@ -2,8 +2,9 @@
 
 ![Left: 24 of 26 releases on the floor's last point end in an edge-teeter wait and 2 hang on the ledge. Right: at attempt 18 Player 1 is written above the stage centre](../decisions/gte-next-GJ4-player-start.png)
 
-*The two measured defects, drawn from trace values; not game footage. This page is about where Player 1 is placed.
-When a KO counts is a separate decision: GJ1 in [Decisions](../DECISIONS.md), which also holds GJ4.*
+*Two placement defects reconstructed from trace values.*
+
+The shipped placement rules apply to [Guard the Edge](../guide/guard-the-edge.md) and [Juggler](../guide/juggler.md). [Decisions](../DECISIONS.md) records GJ4 for placement and GJ1 for KO scoring.
 
 ## Measured cause
 
@@ -20,10 +21,9 @@ x −79.9856. The re-read is
 | Wait inside at x −75.13 | 1 | Fall requested at x −81.9956 two frames into Ready, then ledge hang |
 | First attempt, A came through as a jab on the point | 1 | Fall requested one frame into Ready, then ledge hang |
 
-Both falls came after Ready started. What makes the game choose Fall was not recorded: facing and speed are absent.
-The Lucas traces in `docs/DECISIONS.md` GJ4 instead support the inference of a Player 1 KO: Standby was requested,
-then Fall at (0, 150), and the next release showed Player 1 falling. In Training a KO passes through Standby and the
-rebirth platform through Rebirth.
+- Both falls began after Ready started. The trace omitted facing and speed, so it cannot establish the cause.
+- The Lucas traces in GJ4 suggest a Player 1 KO. Standby preceded Fall at (0, 150), and the next release showed Player 1 falling.
+- In Training a KO goes through Standby. A fighter on the rebirth platform goes through Rebirth.
 
 ### The teeter range (2026-11-23 rework)
 
@@ -33,10 +33,14 @@ x −78.9856 and rested at −79.025604 (−79.9856 + 0.96), status 126 in Train
 
 ## Rule
 
-Placement waits while Player 1 is Dead, Standby or Rebirth. A restart wakes the CPU if this placement held it asleep.
-Player 1's damage remains unchanged. A Guard the Edge Player point is clamped 1.25 units inside each main-floor end; if
-the floor is narrower than 2.5 units, use its midpoint. Juggler's point is unchanged. The wizard and the placement
-use the same rule.
+| Placement case | Shipped rule |
+| --- | --- |
+| Player 1 is Dead, in Standby or in Rebirth | Wait. On restart, wake the CPU if placement held it asleep. |
+| Player 1 damage | Preserve it between attempts. |
+| Guard the Edge | Clamp the Player point 1.25 units inside each main-floor end. |
+| Main floor narrower than 2.5 units | Use the midpoint. |
+| Juggler | Keep the Player point without the inset. |
+| Wizard and placement | Use the same rule for both. |
 
 ## Requirement trace
 
@@ -50,7 +54,6 @@ Clauses are the decided GJ4 of `docs/DECISIONS.md` (2026-11-22); the item was or
 
 ## Limits and proof
 
-- The 1.06 range is read from the game's code; the 1.25 inset is not yet flown. The fix boot's rows must read
-  status 0 and the written x at each release on both ends.
+- The 2026-11-23 design derived 1.06 from game code. Its planned flight check for the 1.25 inset required standing Wait (status 0) at the written x on both ends.
 - The edge-teeter start is no longer selectable. Juggler's point is not clamped.
 - A KO during Ready, after the write, is not handled. Player 1's damage between attempts is left alone.
