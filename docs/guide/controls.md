@@ -17,6 +17,6 @@
 |---|---|
 | <a id='opening-the-menu'></a>GameCube pad | L maps to ZL, R to ZR, Z to R; use the [permanent opener](../menu/display-and-controls.md#permanent-shortcut). |
 | The TrainingRooms menu | Close it before using a gameplay chord. |
-| <a id='online-deluxe'></a>Online Deluxe | A conflicting chord waits for Deluxe's controls; [button priorities](../TECHNICAL.md#game-speed). |
+| <a id='online-deluxe'></a>Online Deluxe | Release the conflicting Deluxe controls, then press your chord again. See [button priorities](../TECHNICAL.md#game-speed). |
 | <a id='when-the-cpu-pilot-plays-player-1'></a>A CPU pilot | [Waiting-room controls](waiting-rooms.md#what-is-different-or-refused) explain which actions still work. |
 | <a id='fixed-buttons'></a>Fixed controls | See [Reset](../menu/display-and-controls.md#l-r-a-reset), [hat controls](fighter-cycles.md#kirby-hats) or [scroll-back](frame-strip.md#scroll-back). |

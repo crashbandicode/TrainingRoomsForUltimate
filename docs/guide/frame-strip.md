@@ -2,9 +2,9 @@
 
 ## Read an exchange
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d0bf47fda93c3d22e02adf41433160fe425fd865" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/62a7ba95329b234951cd8b4f60432f4a27dbb055" autoplay muted loop playsinline controls></video>
 
-*Two jabs leave a link verdict on the strip.* [Open the clip](../media/tut-input-display.mp4)
+*Two jabs leave two A presses on the frame strip.* [Open the clip](../media/tut-input-display-whole.mp4)
 
 | Look at | What it tells you |
 |---|---|

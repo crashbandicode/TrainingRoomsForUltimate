@@ -6,8 +6,8 @@
 
 | Step | What to do |
 |---|---|
-| 1. Identify it | In **Recording → Combos & Sequences**, note the combo name and recorded fighter. |
-| 2. Copy its file | Find the matching JSON under `sd:/ultimate/TrainingRooms/combos/`; copy just that file. |
+| 1. Identify it | Under Recording, switch to Player with ZR if needed. Open **Combos & Sequences**. |
+| 2. Copy its file | Match the combo name and recorded fighter to its JSON in `sd:/ultimate/TrainingRooms/combos/`. Copy that file. |
 | 3. Import it | Put it in the other card's `combos/` folder without overwriting a different combo. |
 | 4. Practise | Reopen the menu, select the combo and choose **Drill**. No restart needed. |
 | Different fighter? | Answer [Fighter Mismatch](recording.md#fighter-mismatch); keeping your fighter still lets you practise. |
