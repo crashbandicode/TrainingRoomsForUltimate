@@ -65,7 +65,7 @@ Use the [chord editor](../guide/controls.md#changing-a-chord) to replace or disa
 
 | Setting | Choices; default in bold | What it does |
 | --- | --- | --- |
-| <a id="button-chords"></a>Button chords | Ten editable chords | Opens the bindings listed below. |
+| <a id="button-chords"></a>Button chords | Ten editable chords | Hold one button, then press the others to enter a chord. |
 | <a id="l-r-a-reset"></a>L+R+A Reset | **On**, Off | Resets Training; restores waiting-room starting spots unless AI controls Player 1. |
 | <a id="taunts"></a>Taunts | **On**, Off | Off blocks practice taunts; Kirby still drops his copy hat with Up. |
 
