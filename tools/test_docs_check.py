@@ -67,7 +67,8 @@ def cfg(**changes):
     """A config with no allowance and no notice pages: the real lists name pages the small fixtures do not have.
     No word budget either: the fixtures of the other rules add a sentence to a guide page (`Budgets` turns it on)."""
     base = dict(historical=[("docs/RELEASE-NOTES-rc*.md", "a past release")], orphan_ok=[], claim_ok=[], must_name=d.MUST_NAME,
-                notice_ok=[], notice_pages=[], notice_columns={}, wall_pending={}, budget_words=[], budget_pending={})
+                notice_ok=[], notice_pages=[], notice_columns={}, wall_pending={}, budget_words=[], budget_pending={},
+                budget_visuals={})
     return d.Config(**dict(base, **changes))
 
 
@@ -456,7 +457,8 @@ class Walls(unittest.TestCase):
 def budget_problems(text, page=WALL_PAGE, **config):
     """budget and allowlist problems of `page` with `text`; walls are left to the wall rule's own tests."""
     files = dict(CLEAN, **{"docs/README.md": CLEAN["docs/README.md"] + f"- [p]({page[len('docs/'):]})\n", page: text})
-    return [(r, p, t) for r, p, t in problems(files, config=cfg(budget_words=d.BUDGET_WORDS, **config)) if r in ("budget", "allowlist-stale")]
+    found = problems(files, config=cfg(budget_words=d.BUDGET_WORDS, **config))
+    return [(r, p, t) for r, p, t in found if r in ("budget", "allowlist-stale") and p in (page, "tools/docs_check.py")]
 
 
 TABLE = "| Setting | Values | What it does |\n| --- | --- | --- |\n"
@@ -504,6 +506,28 @@ class Budgets(unittest.TestCase):
         self.assertEqual([("6 rows" in t) for _, _, t in got], [True])
         got = budget_problems(f"# T\n\n{five}\n{five}")
         self.assertEqual([("second" in t) for _, _, t in got], [True])
+
+    def test_a_visual_is_not_counted_as_words(self):
+        table = TABLE + "".join(f"| Row {n} | On | x |\n" for n in range(120))
+        visual = f"![{'word ' * 400}](../media/pic.gif)<br>\n*Caption words here.*\n\n<video src=\"x y z\"></video>\n\n"
+        self.assertEqual(budget_problems(f"# T\n\n{visual}{table}", page="docs/menu/page.md"), [])
+        self.assertEqual(d.counted_words("# T\n\n![a b c](x.gif)<br>\n*d e.* [Open the clip](x.gif)\n\nOne two.\n"), 4)
+
+    def test_every_section_of_a_menu_page_opens_with_a_visual(self):
+        on = dict(budget_visuals=d.BUDGET_VISUALS)
+        good = "# T\n\nOne.\n\n## A\n\n![a](../media/pic.gif)<br>\n*Caption.*\n\nTwo.\n\n## B\n\n<video src=\"x\"></video>\n\n*Caption.* [Open the clip](../media/pic.gif)\n"
+        self.assertEqual(budget_problems(good, **on), [])
+        got = budget_problems("# T\n\n## A\n\nTwo.\n\n![a](../media/pic.gif)\n", **on)
+        self.assertEqual([("does not open with a clip or picture" in t) for _, _, t in got], [True])
+        got = budget_problems("# T\n\n## A\n\n![a](../media/pic.gif)\n\n## B\n", **on)
+        self.assertEqual(len(got), 1)
+        self.assertEqual(budget_problems("# T\n\n## A\n\n![a](../media/pic.gif)\n\n### Sub\n\nTwo.\n", **on), [])
+
+    def test_a_guide_page_has_at_least_one_visual(self):
+        on = dict(budget_visuals=d.BUDGET_VISUALS)
+        got = budget_problems("# T\n\nOne.\n\n## A\n\nTwo.\n", page="docs/guide/page.md", **on)
+        self.assertEqual([("no clip or picture" in t) for _, _, t in got], [True])
+        self.assertEqual(budget_problems("# T\n\n![a](../media/pic.gif)\n\n## A\n\nTwo.\n", page="docs/guide/page.md", **on), [])
 
     def test_only_menu_and_guide_pages_have_a_budget(self):
         self.assertEqual(budget_problems("# T\n\nOne. Two. Three.\n", page="docs/other.md"), [])

@@ -47,9 +47,11 @@ Rules (a problem's rule name is the first word of its line):
                    **Values:**, **Default:** or **How:**. Table rows, headings, code blocks, HTML and an image's alt
                    text are not read. A page still to be rewritten is in `WALL_PENDING` with its count, which only falls.
   budget           a menu or guide page over its word budget (`BUDGET_WORDS`): more than 1,500 words on a menu page or
-                   800 on a guide page, counted as the file's text split on white space; a table cell of more than 15
+                   800 on a guide page, counted as the file's text split on white space, its visuals (video lines,
+                   images, captions) left out; a table cell of more than 15
                    words; a caption of more than 60 visible characters; a section (the text under one heading) with
-                   more than one sentence of prose; a second "Good to know" heading, or more than five rows under it.
+                   more than one sentence of prose; a second "Good to know" heading, or more than five rows under it;
+                   a `##` section of a menu page that does not open with a clip or picture; a guide page with none.
                    A page not yet cut is in `BUDGET_PENDING` with its word count, which only falls.
   allowlist-stale  an entry of the lists below that matches no file, or whose sentence or text is gone.
 
@@ -211,35 +213,38 @@ BUDGET_CELL = 15
 BUDGET_CAPTION = 60
 BUDGET_SENTENCES = 1
 BUDGET_GOOD_ROWS = 5
+# Visuals (operator, through tr-primary-2 03:32:34Z): on a menu page every `##` section opens with one embedded clip or
+# picture; a guide page has at least one. A visual (its video or image line and its caption) is not counted as words.
+BUDGET_VISUALS = {"docs/menu/*.md": "sections", "docs/guide/*.md": "page"}
 # page -> its word count, for the pages not yet cut to the budget. Such a page is not held to the rule, but it may not
 # grow, a shorter page lowers its number, and a page that meets the budget leaves the list. Empty before a release.
 BUDGET_PENDING = {
-    "docs/guide/break-the-targets.md": 257,
-    "docs/guide/combos.md": 2259,
-    "docs/guide/controls.md": 922,
-    "docs/guide/cpu-behaviour.md": 1241,
-    "docs/guide/eggs-ercise.md": 309,
-    "docs/guide/fighter-cycles.md": 838,
-    "docs/guide/frame-strip.md": 1153,
-    "docs/guide/game-speed.md": 474,
-    "docs/guide/getting-started.md": 552,
-    "docs/guide/guard-the-edge.md": 319,
-    "docs/guide/juggler.md": 304,
-    "docs/guide/mash-out.md": 200,
-    "docs/guide/mii.md": 682,
-    "docs/guide/parry-practice.md": 159,
-    "docs/guide/recording.md": 7517,
-    "docs/guide/save-states.md": 919,
-    "docs/guide/stages.md": 711,
-    "docs/guide/tech-practice.md": 284,
-    "docs/guide/troubleshooting.md": 1455,
-    "docs/guide/using-the-menu.md": 729,
-    "docs/guide/waiting-rooms.md": 635,
-    "docs/menu/cpu.md": 4895,
-    "docs/menu/display-and-controls.md": 4116,
+    "docs/guide/break-the-targets.md": 215,
+    "docs/guide/combos.md": 2192,
+    "docs/guide/controls.md": 841,
+    "docs/guide/cpu-behaviour.md": 1060,
+    "docs/guide/eggs-ercise.md": 307,
+    "docs/guide/fighter-cycles.md": 733,
+    "docs/guide/frame-strip.md": 983,
+    "docs/guide/game-speed.md": 367,
+    "docs/guide/getting-started.md": 518,
+    "docs/guide/guard-the-edge.md": 263,
+    "docs/guide/juggler.md": 246,
+    "docs/guide/mash-out.md": 133,
+    "docs/guide/mii.md": 582,
+    "docs/guide/parry-practice.md": 157,
+    "docs/guide/recording.md": 6118,
+    "docs/guide/save-states.md": 848,
+    "docs/guide/stages.md": 584,
+    "docs/guide/tech-practice.md": 230,
+    "docs/guide/troubleshooting.md": 1408,
+    "docs/guide/using-the-menu.md": 647,
+    "docs/guide/waiting-rooms.md": 605,
+    "docs/menu/cpu.md": 3764,
+    "docs/menu/display-and-controls.md": 3394,
     "docs/menu/practice-games.md": 1589,
-    "docs/menu/recording.md": 10623,
-    "docs/menu/saves.md": 2912,
+    "docs/menu/recording.md": 9606,
+    "docs/menu/saves.md": 2195,
 }
 
 
@@ -265,6 +270,7 @@ class Config(NamedTuple):
     wall_pending: dict = WALL_PENDING
     budget_words: list = BUDGET_WORDS
     budget_pending: dict = BUDGET_PENDING
+    budget_visuals: dict = BUDGET_VISUALS
 
 
 class Link(NamedTuple):
@@ -1047,11 +1053,33 @@ def shown_words(text):
     return claim_text(re.sub(r"<[^>]+>", "", text)).replace("*", "").split()
 
 
-def budget(text, limit):
-    """(line, what is wrong) of each way a page is over its word budget."""
-    words = len(text.split())
+def counted_words(text):
+    """The words that count toward a page's budget: its visuals (video lines, images and caption lines) left out."""
+    kept = []
+    for line in text.split("\n"):
+        bare = line.strip()
+        if bare.startswith("<video") or re.match(r"^\*[^*\s]", bare):
+            continue
+        kept.append(re.sub(r"!\[[^\]]*\]\([^)]*\)(?:<br>)?", "", line))
+    return len(" ".join(kept).split())
+
+
+def is_visual(block):
+    return block.startswith(("<video", "!["))
+
+
+def budget(text, limit, visuals=None):
+    """(line, what is wrong) of each way a page is over its word budget or lacks its visuals."""
+    words = counted_words(text)
     if words > limit:
         yield 1, f"the page has {words} words (at most {limit})"
+    found = blocks(text)
+    if visuals == "page" and not any(is_visual(block) for _, block in found):
+        yield 1, "the page has no clip or picture (a guide page has at least one)"
+    if visuals == "sections":
+        for index, (line, block) in enumerate(found):
+            if block.startswith("## ") and not (index + 1 < len(found) and is_visual(found[index + 1][1])):
+                yield line, "the section does not open with a clip or picture"
     for number, line in enumerate(mask_blocks(text).split("\n"), 1):
         if not line.lstrip().startswith("|") or re.match(r"^\s*\|[\s:|-]+$", line):
             continue
@@ -1097,7 +1125,8 @@ def check_budgets(tree, config, problems):
         if limit is None:
             continue
         text = tree.text(rel)
-        found, words, allowed = list(budget(text, limit)), len(text.split()), config.budget_pending.get(rel)
+        visuals = next((kind for pattern, kind in config.budget_visuals.items() if fnmatch.fnmatchcase(rel, pattern)), None)
+        found, words, allowed = list(budget(text, limit, visuals)), counted_words(text), config.budget_pending.get(rel)
         if allowed is None:
             problems.extend(Problem("budget", rel, line, what) for line, what in found)
         elif words > allowed:
