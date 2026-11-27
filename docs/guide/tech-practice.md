@@ -14,5 +14,5 @@
 | 4. Launch | A or Plus starts from Preview; **Skip wizard preview** starts immediately after Hit. |
 | 5. Tech | Press shield just before touching the surface; compare the grade and streak. |
 | Factory settings | A miss counts as an attempt; the next launch follows until the set ends. |
-| No launch fits these Tech practice values | No launch works with your choices; change the values or restore defaults, then restart. |
+| No launch fits these Tech practice values | No valid launch was drawn; adjust your values or restore defaults, then restart. |
 | Pick just the impact point | Use **Tech point** instead of the wizard; X starts from a valid point. |

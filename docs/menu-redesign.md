@@ -1,10 +1,8 @@
-# Menu redesign: mockup and grouping table (draft for the operator's approval)
+# Menu redesign: first proposal
 
-Draft 1, 2026-11-01, by the project lead. **Superseded by `../MENU-DRAFT.md`
-(draft 2: today's full inventory, the per-row options/defaults/origin, and the
-reconciliation with the coordinator's interactive mockup v1)**; this page keeps
-the wireframe and the control definitions. Nothing here is built. The operator
-approves or changes the menu before it is implemented (plan phase 2).
+The 2026-11-01 wireframe and controls below record the first proposal, before
+implementation; [the later inventory](../MENU-DRAFT.md) superseded it. For the
+menu in the game, use the [menu pages](README.md).
 
 ## What the fork's menu is today
 
@@ -66,7 +64,7 @@ Controls:
 | **Editor ▸** | `[ summary ]  ▸` | A opens a sub-screen; B returns | overrides, chords, grids, libraries, Mii lists |
 | **Section header** | `▸ Name` | collapsed by default when marked *(advanced)*; A on the header expands | grouping inside a page |
 
-Rules kept from today: Y resets the focused row to its default, ZR resets the
+The draft retained these controls from the fork: Y resets the focused row to its default, ZR resets the
 page, X saves the current values as the defaults, B closes the menu, the help
 text of the focused row shows at the bottom, and the menu opens with Minus or
 the permanent B + D-pad Up.
