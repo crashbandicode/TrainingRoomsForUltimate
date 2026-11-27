@@ -5,6 +5,22 @@ game-speed timing kept, trimmed at the ends (any cut inside a clip is listed wit
 screen at 1280×720. Side-by-sides and composites are 1280 wide and 404, 436 or 764 high: 68 of the 270 GIFs. Frames were reviewed (start,
 action, result) before a clip was kept. The raw takes stay outside git with their runs.
 
+## README menu tour
+
+The labelled menu key and six detail pictures in the [menu tour](../README.md#about-trainingrooms) are crops of actual menu frames, not mock-ups.
+
+| Picture (`docs/media/`) | Source | Frame or time |
+| --- | --- | --- |
+| `readme-tour-key.png` | `tut-menu-tour.mp4`, CPU tab; navigation labels added outside the rows | 1.30 s |
+| `readme-tour-cpu.png` | `tut-menu-tour.mp4`, Reactions list | 1.30 s |
+| `readme-tour-display.png` | `tut-menu-tour.mp4`, On screen list | 7.15 s |
+| `readme-tour-fighters.png` | `tut-menu-tour.mp4`, CPU Character selected | 5.20 s |
+| `readme-tour-games.png` | `rc15-practice-menu-start.gif`, opening entries of the Practice games list | frame 18 (zero-based) |
+| `readme-tour-recording.png` | `rc13-combo-library.png`, named combos | still |
+| `readme-tour-saves.png` | `tut-menu-tour.mp4`, damage and mirroring settings | 3.25 s |
+
+The README showcase also embeds the existing `tut-guard-edge-setup-and-score`, `tut-input-drill-record`, `tut-clip-snap`, `tut-fighter-cycle`, `tut-stage-change`, `tut-kirby-hat` and `tut-mii-pick` MP4s from the tutorial table. The three interim GIFs are `rc13-replay-capture`, `rc11-lobby-practice` and `rc11-give-item`.
+
 ## Tutorial clips (2026-11-25 through 2026-11-27)
 
 The menu tour, menu option and button-chord films come from `tut-c51f4d81-yoga-1` on release build `c51f4d81`.
@@ -14,7 +30,7 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 | Clip | Shows | Film, cut | Bytes | SHA256 (first 16) | Embedded in |
 | --- | --- | --- | ---: | --- | --- |
 | `tut-menu-tour.mp4` | B + D-pad Up opens the menu, R turns through the five pages, B closes it, Mario walks | `t01-menu-tour`, 0.3–9.8 s | 1,301,566 | `866d3984b6c2c2cc` | [Getting started](guide/getting-started.md) |
-| `readme-menu-tour.gif` | The same film as an image preview: 1280×720, 10 fps, 128 colours, no dithering | cut from `tut-menu-tour.mp4` (build `c51f4d81`), its whole 9.5 s | 6,353,868 | `a107cbf0955c5f56` | [README](../README.md) (top) |
+| `readme-menu-tour.gif` | The same film as an image preview: 1280×720, 10 fps, 128 colours, no dithering | cut from `tut-menu-tour.mp4` (build `c51f4d81`), its whole 9.5 s | 6,353,868 | `a107cbf0955c5f56` | Former README opening |
 | `tut-menu-change-option.mp4` | CPU › Crouch flips On with D-pad Right, the menu closes, the CPU crouches | `t02-menu-change-option`, 1.6–8.6 s | 1,514,380 | `9ef6bc2ccd65da7c` | [Using the menu](guide/using-the-menu.md) |
 | `tut-controls-change-chord.mp4` | Button chords: Save State Save is changed to ZL + D-pad Left, which then saves | `t04-controls-change-chord`, 0.2–7.8 s | 1,867,343 | `4b49a4cb454bea75` | [Controls](guide/controls.md) |
 | `tut-save-load.mp4` | ZL + D-pad Down saves, two jabs hit the CPU, ZL + D-pad Up puts both fighters back at 0% | `t06-save-load` of run `tut-c51f4d81-yoga-2` (the diagnostic build of `c51f4d81`), 0.5–7.5 s, whole frame: the capture tool was switched off during the take, so nothing is cropped | 3,748,140 | `435f35b4f8e24e1c` | [Save states](guide/save-states.md) |
