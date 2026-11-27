@@ -17,7 +17,7 @@ TrainingRooms 0.2.0-rc.15 is the November 27, 2026 build for console testing. Th
 ## Install
 
 1. Close Smash. Open `sd:/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/`.
-2. Put `libnro_hook.nro` there if missing. Remove `libtraining_modpack.nro` if present.
+2. Put `libnro_hook.nro` there if missing. For the public rc.13 download, also install `libparam_hook.nro` if missing. Remove `libtraining_modpack.nro` if present.
 3. Copy the `libtraining_rooms.nro` for your chosen version there. Replace the previous copy to update.
 4. Keep your settings and recordings in `sd:/ultimate/TrainingRooms/`.
 5. For the public download, keep `manifest.json` and `SHA256SUMS.txt` on your computer for verification.
