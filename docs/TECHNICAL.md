@@ -296,7 +296,7 @@ If you choose a [CPU Level](menu/cpu.md#cpu-level) that differs from Training's 
 | Log | `state saved slot=1`, `state load_request`, `state placed`. No playback line. |
 | Edits | [Capture and cut details](MEDIA.md). |
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/ac6db771305acddd197471bc728a05b277a41bb4" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a967e585ecafebde5f40d33d7043d51e11440a1a" autoplay muted loop playsinline controls></video>
 
 *2026-11-27 · [Capture record](MEDIA.md)* [Open the clip](media/rc7-respawn-on.mp4)
 
@@ -507,7 +507,7 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 
 ### Fighters, cycles and Kirby hats
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0eb482340dbc31c98eb5a606030d8b2311ea08e0" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bca6f494f2f914709de37012e74c86ec555be46f" autoplay muted loop playsinline controls></video>
 
 *Set a cycle order; Cycle Player switches to Donkey Kong* [Open the clip](media/rc11-cycle-switch.mp4)
 
@@ -607,7 +607,7 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 | Save | Saving immediately showed the notice "Same as 格斗, nothing new saved". |
 | Files | Every Mii file stayed byte-identical. |
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2069d43b18247a5a719e735043dd308134882a1a" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/dcc4a26703433cc45df63ac6d9d779ad5a8150bf" autoplay muted loop playsinline controls></video>
 
 *The Mii Brawler list: the saved Mii and Add New…* [Open the clip](media/rc7-mii-editor.mp4)
 
@@ -636,7 +636,7 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 | Training Stage Rotation | Factory Off. When enabled, Training opens on the selected stage. |
 | Subsequent entries | Returning through character select advances Rotation, including when Lobby Stages uses Direct. |
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2aa3e2c3b00d2368c0007010ff54b9b24a9c300f" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e9f940e46cbd61bc1e9405c5cf353ab49dba1306" autoplay muted loop playsinline controls></video>
 
 *2026-11-27 · [Capture record](MEDIA.md)* [Open the clip](media/rc11-lobby-stages.mp4)
 
