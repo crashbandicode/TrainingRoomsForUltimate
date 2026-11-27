@@ -10,8 +10,10 @@ Choose what you see during practice and which buttons control it.
 
 | Setting | Choices; default in bold | What it does |
 | --- | --- | --- |
-| <a id="hud"></a>HUD | **On**, Off | Hides Training's damage panels, pointers and off-screen bubbles; practice overlays stay visible. |
+| <a id="hud"></a>HUD | **On**, Off | Off hides Training's damage panels, pointers and off-screen bubbles, not practice overlays. |
 | <a id="hitbox-visualization"></a>Hitbox Visualization | Hitboxes, Grab boxes, Hurtboxes, Launch angles, Windboxes, Article hurtboxes; **none** | Draws the ticked layers; the checklist shows their colours. |
+| Fighter windboxes | Crownerang, Blunderbuss, Palutena's Counter, Greninja's down taunt | Sky blue shows where a move pushes or pulls without causing hitstun. |
+| Wind areas | Triforce of Wisdom, Kaboom and items appear in olive. | Stage hazards such as Pac-Land's fire hydrant aren't drawn. |
 
 ## Colour legend
 
@@ -39,7 +41,7 @@ Learn to read the lanes, link timing and advantage in the [frame strip guide](..
 | --- | --- | --- |
 | <a id="input-display"></a>Input Display | **Frame strip**, Off | Shows both fighters' recent frames and inputs during practice. |
 | <a id="frame-advantage"></a>Frame Advantage | On, **Off** | Shows who can act first when the strip is hidden and Mash is empty. |
-| <a id="spacing-grader"></a>Spacing grader | On, **Off** | Grades hit depth on the attacker's lane; keeps the strip visible during play. |
+| <a id="spacing-grader"></a>Spacing grader | On, **Off** | Grades player-controlled hits on the attacker's lane; keeps the strip visible during play. |
 | <a id="spot-labels"></a>Spot labels | On, **Off** | Marks identifiable Sweet, Sour or Late hits on the defender's lane. |
 | <a id="link-history"></a>Link history | **On**, Off | Shows the last four follow-ups; Off keeps only the newest pair in LINK. |
 
@@ -64,13 +66,13 @@ Use the [chord editor](../guide/controls.md#changing-a-chord) to replace or disa
 | Setting | Choices; default in bold | What it does |
 | --- | --- | --- |
 | <a id="button-chords"></a>Button chords | Ten editable chords | Opens the bindings listed below. |
-| <a id="l-r-a-reset"></a>L+R+A Reset | **On**, Off | Resets Training or returns both waiting-room practice fighters to their starting spots. |
+| <a id="l-r-a-reset"></a>L+R+A Reset | **On**, Off | Resets Training; restores waiting-room starting spots unless AI controls Player 1. |
 | <a id="taunts"></a>Taunts | **On**, Off | Off blocks practice taunts; Kirby still drops his copy hat with Up. |
 
 | Binding | Factory chord | Action |
 | --- | --- | --- |
 | Save State Save | ZL + D-pad Down | Writes the bound save or creates one. |
-| Save State Load | ZL + D-pad Up | Loads the bound save. |
+| Save State Load | ZL + D-pad Up | Loads the bound save or [chosen setup](saves.md#setup-library-1). |
 | Record | ZR + D-pad Down | Starts or stops a take. |
 | Play on CPU | ZR + D-pad Up | Plays or stops the CPU's active macro. |
 | Play on Player 1 | ZR + D-pad Left | Plays or stops Player 1's active macro. |

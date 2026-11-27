@@ -12,7 +12,7 @@ Use [save states](../guide/save-states.md) to retry a position, or keep named se
 | --- | --- | --- |
 | <a id="save-states-1"></a>Save States | **On**, Off | Enables Save and Load; turning it off cancels a pending load. |
 | <a id="mirroring"></a>Mirroring | **None**, Alternate, Random | Flips positions and facing; Alternate flips the first load after saving, then every other. |
-| <a id="auto-load-on-death"></a>Auto-load on death | On, **Off** | Loads the bound save when either fighter is KO'd; without one, the fighter respawns. |
+| <a id="auto-load-on-death"></a>Auto-load on death | On, **Off** | KO loads the bound save or chosen setup; without either, the fighter respawns. |
 
 ## Damage on load
 
@@ -59,7 +59,7 @@ Keep a [named setup](../guide/save-states.md#making-a-setup) from the current po
 | Setting | Input | What it does |
 | --- | --- | --- |
 | <a id="save-setup-here"></a>Save setup here... | Name, up to 48 characters | Saves both fighters where they stand without changing the bound save. |
-| <a id="save-setup-from-bound-save"></a>Save setup from bound save... | Name, up to 48 characters | Copies the bound positions, not the current ones; both must share a stage. |
+| <a id="save-setup-from-bound-save"></a>Save setup from bound save... | Name, up to 48 characters | Copies both fighters' saved spots. They must have been saved on the same stage. |
 | <a id="setup-library-1"></a>Setup library | Choose a named setup | Opens its actions; the footer shows both fighters, stage and spots. |
 
 ## A setup's own screen

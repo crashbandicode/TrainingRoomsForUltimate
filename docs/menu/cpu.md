@@ -105,6 +105,6 @@ The rows you see depend on whether the separate [CPU Pilot](../guide/controls.md
 
 | Setting | Choices; default in bold | What it does |
 | --- | --- | --- |
-| <a id="cpu-level"></a>CPU Level | **Off**, 1-9 | Overrides partner level in rooms, or CPU/Control behaviour in Training. |
+| <a id="cpu-level"></a>CPU Level | **Off**, 1-9 | Sets partner level in rooms; in Training, applies only to CPU or Control behaviour. |
 | <a id="hide-cpu"></a>Hide CPU | On, **Off** | Removes the CPU from play without changing its settings; blocks Play on CPU. |
 | <a id="reset-page-to-defaults"></a>Reset page to defaults | Confirm or cancel | Restores this page's [saved defaults](../guide/using-the-menu.md#your-defaults). |
