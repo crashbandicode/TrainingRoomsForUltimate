@@ -182,6 +182,13 @@ impl CpuPreview {
         self.wrote = Some((at, read.frame));
     }
 
+    /// The clip editor's scrub placed the body from its partner's fighter frame and put it to sleep there
+    /// (`scrub_pose::partner_sleep`): whoever lets it go wakes it, and that frame is not one of its placing frames,
+    /// so its own frames place it awake the full count.
+    pub fn rest(&mut self) {
+        // expected-red: nothing yet.
+    }
+
     /// The caller asks for the placing frames again at the point now asked for. Once at a point; `false` when it
     /// has been asked there already.
     pub fn lift_again(&mut self) -> bool {
@@ -320,6 +327,20 @@ mod tests {
         assert!(acts[..settle].iter().all(|act| *act == PreviewAct::Lift));
         assert!(acts[settle..].iter().all(|act| *act == PreviewAct::Hold));
         assert_eq!(slot.unwrap().origin(), origin(3.0));
+    }
+
+    /// The scrub's hold start: a fighter first placed from its partner's frame is left asleep (`CpuPreview::rest`).
+    #[test]
+    fn a_body_placed_from_its_partners_frame_rests_until_its_own() {
+        let mut slot = None;
+        assert_eq!(hold_step(&mut slot, 7, false, || origin(3.0)), PreviewAct::Lift);
+        slot.as_mut().unwrap().rest();
+        assert!(slot.unwrap().asleep, "whoever lets it go, or places it next, wakes it");
+        // Its own frames then place it awake the full count, as a hold that began on its own frame does.
+        let acts: Vec<_> = (0..PREVIEW_SETTLE + 2).map(|_| hold_step(&mut slot, 7, false, || origin(9.0))).collect();
+        let settle = usize::from(PREVIEW_SETTLE);
+        assert!(acts[..settle].iter().all(|act| *act == PreviewAct::Lift) && acts[settle..].iter().all(|act| *act == PreviewAct::Hold));
+        assert_eq!(slot.unwrap().origin(), origin(3.0), "where it was taken from is kept");
     }
 
     #[test]
