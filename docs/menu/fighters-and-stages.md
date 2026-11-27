@@ -450,19 +450,35 @@ opens it, **Y** resets it, **B** goes back to the list.
 
 ### Guard the Edge and Juggler
 
-Guard the Edge's setup has three pages: CPU start, Player 1 start, then Preview. Move the crosshair with the stick
-(2 units a frame at full tilt) or D-pad (1 unit a press). The CPU start must be off the stage; **A** refuses a point
-over the stage or in it, and a point under it unless **Under the stage** is On. On the CPU page, **X** restores that
-side's default and **Y** picks the other side's default. Player 1's crosshair chooses a point on the main floor.
+#### The set-up pages
+
+| Drill | Pages |
+| --- | --- |
+| Guard the Edge | Its setup has three pages: CPU start, Player 1 start, then Preview. |
+| Juggler | Four pages: CPU spot, Percent, Player 1 start, then Preview. |
+
+| Page | Controls |
+| --- | --- |
+| Any crosshair page | Move the crosshair with the stick (2 units a frame at full tilt) or D-pad (1 unit a press). |
+| Guard the Edge, CPU start | The CPU start must be off the stage; **A** refuses a point over the stage or in it, and a point under it unless **Under the stage** is On. **X** restores that side's default and **Y** picks the other side's default. |
+| Guard the Edge, Player 1 start | Player 1's crosshair chooses a point on the main floor. |
+| Juggler, CPU spot and Player 1 start | Its CPU and Player 1 pages use the same crosshair controls; the Player 1 start can be on a floor or platform. |
+| Juggler, Percent | The Percent page still uses the D-pad to change the value by 1 horizontally or 10 vertically. |
+
+While either setup is open the CPU itself waits at its start, under the crosshair on the CPU page. When that point
+is outside the picture, the game shows its own off-screen magnifier of the CPU at the edge, pointing toward it. **B**
+out of the setup puts the CPU back where it stood. (Eden, 2026-11-23; untested on hardware.)
+If the drill has a CPU fighter of its own, **B** puts that fighter at the CPU's place, and the Training CPU returns
+when you close the menu. (Not run in Eden yet.)
+
+#### How the CPU starts in Guard the Edge
 
 2026-11-25. Two rows on the Guard the Edge page change how the CPU starts. Both apply at the next Start.
 
-- **Under the stage** (Off by default). On: **A** on the CPU page also takes a point under the stage. A point over the
-  stage, in it or outside the blast lines is still refused. A start under the stage that you set up is used again by
-  Start only while the row is On; with it Off, Start opens the setup at the default start.
-- **CPU midair jumps** (Kept by default). Used: the CPU starts every attempt with all its midair jumps already spent.
-  The number comes from the fighter's own jump count, so there is no list of fighters. Perfect mode plans its recovery
-  without them.
+| Row | Default | What it does |
+| --- | --- | --- |
+| **Under the stage** | Off | On: **A** on the CPU page also takes a point under the stage. A point over the stage, in it or outside the blast lines is still refused. A start under the stage that you set up is used again by Start only while the row is On; with it Off, Start opens the setup at the default start. |
+| **CPU midair jumps** | Kept | Used: the CPU starts every attempt with all its midair jumps already spent. The number comes from the fighter's own jump count, so there is no list of fighters. Perfect mode plans its recovery without them. |
 
 Known limits:
 
@@ -476,15 +492,17 @@ In an Eden smoke boot on install 5 (2026-11-25) the set-up opened with **Under t
 **CPU midair jumps** set to Used. The drill was not played, so what the CPU does with either option has not been seen
 in a game. [Install evidence](../EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build)
 
+#### The floor you stand on
+
 2026-11-25. Both drills start from the floor you are standing on, not from the middle of the stage. On a stage with
 more than one piece of ground, such as the Training stage, stand on the piece you want to use and choose **Start**.
 
-- Guard the Edge uses each end of that floor that has open air beside it. A floor with one such end has one side:
-  **Y** (the other side) does nothing there. On the Training stage the long floor has its left ledge only, and the
-  island has both.
-- The default CPU start on a side is halfway across the open air beside that ledge and halfway down to the bottom
-  blast line. A fighter with a default start of its own keeps it only where that point is in open air.
-- Juggler needs no ledge. Its CPU spot can be over the stage (the default is above you) or in open air beside it.
+| Drill | What it uses |
+| --- | --- |
+| Guard the Edge | Each end of that floor that has open air beside it. A floor with one such end has one side: **Y** (the other side) does nothing there. On the Training stage the long floor has its left ledge only, and the island has both. |
+| Guard the Edge, default CPU start | On a side, halfway across the open air beside that ledge and halfway down to the bottom blast line. A fighter with a default start of its own keeps it only where that point is in open air. |
+| Juggler | Needs no ledge. Its CPU spot can be over the stage (the default is above you) or in open air beside it. |
+
 - Every point you confirm with **A** on the CPU page is checked against the stage one frame later.
 - A start you set up is used again by **Start** only on the floor it was made on. On another floor Start opens the
   setup at that floor's defaults.
@@ -505,24 +523,24 @@ In an Eden smoke boot on install 5 (2026-11-25), Start opened the set-up on its 
 Edge on the Training stage's long floor, from its island and on Battlefield, and for Juggler on the Training stage.
 Neither drill was played through, and none of these messages has been seen in a game. [Install evidence](../EVIDENCE-rc15-installs.md#the-eden-smoke-boot-of-the-finished-build)
 
-While either setup is open the CPU itself waits at its start, under the crosshair on the CPU page. When that point
-is outside the picture, the game shows its own off-screen magnifier of the CPU at the edge, pointing toward it. **B**
-out of the setup puts the CPU back where it stood. (Eden, 2026-11-23; untested on hardware.)
-If the drill has a CPU fighter of its own, **B** puts that fighter at the CPU's place, and the Training CPU returns
-when you close the menu. (Not run in Eden yet.)
+#### CPU fighter and mode
 
-Juggler has four pages: CPU spot, Percent, Player 1 start, then Preview. Its CPU and Player 1 pages use the same
-crosshair controls; the Player 1 start can be on a floor or platform. The Percent page still uses the D-pad to change
-the value by 1 horizontally or 10 vertically.
+Open **CPU fighter and mode** and press **A** on a portrait.
 
-Open **CPU fighter and mode** and press **A** on a portrait. With the popup open, press **A** to cycle through **CPU**,
-**Perfect**, and any drills for that fighter. In CPU mode, **X** cycles the stock CPU level from 1 to 9 and back to 1.
-**B** closes the popup. Choose **Current CPU** to use the fighter already in Training.
+| Key | What it does |
+| --- | --- |
+| A, with the popup open | Cycles through **CPU**, **Perfect**, and any drills for that fighter. |
+| X, in CPU mode | Cycles the stock CPU level from 1 to 9 and back to 1. |
+| B | Closes the popup. |
+
+Choose **Current CPU** to use the fighter already in Training.
 
 Hero's **Zoom** drill casts Zoom through Command Selection for every recovery attempt in Guard the Edge and every
 escape attempt in Juggler. Hero gets at least the 8 MP needed for each cast. Read where he will return and land a hit
 or grab during his descent or within the **Zoom landing window** after touchdown. The default is 10 frames and you can set it
 from 1 to 30. The notice shows each attempt's result and the running win count.
+
+#### In a waiting room
 
 Both drills also run in a waiting room with [Lobby Practice](#lobby-practice) On, against the first training
 partner ([Waiting rooms](../guide/waiting-rooms.md#what-works-there)). With more than one partner in the room, the
