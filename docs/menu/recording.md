@@ -1,13 +1,13 @@
 # Recording
 
-Press R twice from the CPU page for your recordings, your combos and their playback options ([Recording guide](../guide/recording.md)).
+From CPU, press R twice for recordings, combos and playback options ([Recording guide](../guide/recording.md)).
 
 ## The page and its pop-up
 
 ![The same saves and macros in both views, with RECORDINGS on the page only](../diagrams/recording-page-popup.png)<br>
 *The page also opens match recordings.*
 
-Use your [Recording pop-up chord](display-and-controls.md#button-chords) to open the library over practice.
+Open the library during practice with your [Recording pop-up chord](display-and-controls.md#button-chords).
 
 | Key | On the page | In the pop-up |
 | --- | --- | --- |
@@ -22,12 +22,13 @@ Use your [Recording pop-up chord](display-and-controls.md#button-chords) to open
 
 *Record tints Player 1 red.* [Open the clip](../media/tut-record-macro.mp4)
 
-A on a save state, macro or chain opens its own screen ([page and pop-up controls](../guide/recording.md#a-file-s-own-screen)).
+Press A on a save, macro or chain for its [file controls](../guide/recording.md#a-file-s-own-screen).
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
 | <a id="recordings"></a>RECORDINGS > | Vault and saved captures | Play one back, or make a macro, a combo or a drill from it. |
 | <a id="a-file-s-own-screen"></a>Bind to Save / Load | On, Off | Save writes here; Load uses it unless a [named setup](saves.md#setup-library) is selected. |
+| Change placement | On saves and files with a start save | Move the saved fighters before playback. |
 | Start save | On, Off | On: warps both fighters to the macro's start save once, before it plays. |
 | Momentum | **Keep recorded speed**, Start at rest | The speed the playing side has on its first input. |
 | Offset | Only on macros with an old offset | A clears the offset from the start position. |
@@ -47,7 +48,7 @@ A on a save state, macro or chain opens its own screen ([page and pop-up control
 
 <a id="combos"></a>
 
-Player view only: the combos, input drills and sequences that the Combo helper grades ([Combos](../guide/recording.md#combos)).
+In Player view, the Combo helper grades combos, input drills and sequences ([Combos](../guide/recording.md#combos)).
 
 | Setting | Values | What it does |
 | --- | --- | --- |
@@ -84,7 +85,7 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/290448eb4f0df99be8dd578410f0ed32594febce" autoplay muted loop playsinline controls></video>
 *Loop at 3 plays the macro three times.* [Open the clip](../media/rc12-loop.mp4)
 
-How a macro plays back, and how the Combo helper grades.
+Playback and grading settings.
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
@@ -123,4 +124,4 @@ How a macro plays back, and how the Combo helper grades.
 | You press X or Y in the main lists | Neither changes defaults. The [capture list](../guide/recording.md#crop) has its own delete key. |
 | A file was recorded on another fighter | Play asks first, unless Ask before switching fighter is Off. |
 | You reset this page | Your files, the bound save, the active macros and the drill stay. |
-| The take has no pose for this frame | Switching fighters cannot show a pose the take did not store. |
+| The frame contains no pose | Switching fighters still shows position only. |
