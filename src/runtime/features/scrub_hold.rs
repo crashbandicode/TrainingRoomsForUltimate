@@ -10,7 +10,7 @@
 //! NOT YET SWITCH-RUN.
 use super::placement;
 use super::stage_geometry::RayProbe;
-use crate::engine::macro_ui::scrub_pose::{asked_of, decide, drawn, lets_partner_go, Act, FALL, WAIT};
+use crate::engine::macro_ui::scrub_pose::{asked_of, decide, drawn, lets_partner_go, takes_partner, Act, FALL, WAIT};
 use crate::engine::macro_ui::scrub_track::{can_stand, in_bounds, Block, Spot, POSE_NONE, POSE_SHOWN, SEEN_HELD, SEEN_IDLE, SEEN_OFF, SLOT};
 use crate::engine::macros::{PackedPose, Pose};
 use crate::model::crosshair::CpuPreview;
@@ -47,10 +47,21 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
                 block.set_seen(slot ^ 1, seen);
             }
         }
+        let began = holds[slot].is_none();
         let seen = match point(block, &holds, slot, accessor) {
             Some(spot) => hold(block, generation, slot, &mut holds[slot], accessor, spot),
             None => release(block, slot, &mut holds[slot], accessor),
         };
+        // This role's hold began here: the other role's first hold step runs here too, so neither body is free
+        // beside a held one for a frame, to be pushed before its hold reads where it stands (`takes_partner`).
+        if takes_partner(began, holds[slot].is_some(), holds[slot ^ 1].is_some()) {
+            if let Some(partner) = other_body(slot) {
+                if let Some(spot) = point(block, &holds, slot ^ 1, partner) {
+                    let taken = hold(block, generation, slot ^ 1, &mut holds[slot ^ 1], partner, spot);
+                    block.set_seen(slot ^ 1, taken);
+                }
+            }
+        }
         block.set_seen(slot, seen);
         block.ack(slot, generation);
     });

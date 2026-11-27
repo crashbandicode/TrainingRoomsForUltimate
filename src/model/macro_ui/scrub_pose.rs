@@ -48,8 +48,7 @@ pub fn lets_partner_go(block: &Block) -> bool {
 /// yet held could be pushed by the one already placed, and that pushed place would be its origin: where it is put
 /// back at the release, and the group's home when it is the target.
 pub fn takes_partner(began: bool, held: bool, partner_held: bool) -> bool {
-    let _ = (began, held, partner_held);
-    false
+    began && held && !partner_held
 }
 
 /// One fighter frame of a held role. `asked_kind`, `asked`: the recorded fighter and its animation on the shown
