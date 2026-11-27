@@ -6,7 +6,7 @@ For the shipped build and its test evidence, see [Current release](CURRENT-RELEA
 - The 2026-11-12 updates at 13:35Z and 17:49Z brought rows #1–92 through the rc.11 card build `0c628724`.
 - Rows #1–73 come from the rc.3–rc.6 `RC5-TEST-COVERAGE-AUDIT.md`. Rows #74–79 cover the 2026-11-09 additions and #80–92 cover rc.8–rc.11.
 - The rc.12 Forgejo release notes record that build’s changes. Rows #93–111 record rc.13 Eden results. Hardware testing was pending at that release.
-- Row #27 transcribes the rc.6 Recording footer. The [Recording page](menu/recording.md) now includes `ZL+Up/Down section`.
+- Row #27 transcribes the rc.6 Recording footer. The [Recording menu](menu/recording.md) footer on the installed build includes `ZL+Up/Down section`.
 
 - **Eden verified:** each feature's newest run first.
   - **rc.11:** the rows on the final `0c628724` (diag `bd0bc61b`, the rc.10 ship set, GDB stub on): worker A's
@@ -2794,4 +2794,4 @@ rc.13 showed the same three-slot hint for both. See [Loading](menu/fighters-and-
 
 **Clip observations**
 
-- The film `i4-scrollback-zoom.mp4` showed the test overlay and was removed on 2026-11-27; no clean clip
+- The film `i4-scrollback-zoom.mp4` showed the test overlay and was removed on 2026-11-27. No clean clip accompanied that entry.
