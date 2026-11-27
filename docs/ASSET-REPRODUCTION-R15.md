@@ -31,7 +31,8 @@ A separate inverse starts from each generated target layout, removes only the ad
 
 Neither stock layout has a pane-name collision with the owned prefixes. Mutating an original pane alpha in each target causes the inverse comparison to fail. The173 Training and182 Waiting members other than the modified layout and appended BNTX remain byte-identical to stock. Private scripts, original independent parser and reversed layouts are retained at main-r15/layout-reversal; receipt SHA25695fa7c25314628bcc1d9f4cb38fab3b6debc84bcce589e687c2c0c3429cac684.
 
-This closes the exact layout inverse subcase. Whole BNTX-file reversal and original SARC container padding are not proved, so the 07:38 review kept core07.3 open. The pinned SARC writer explicitly guarantees member preservation rather than original serialization; its untouched-roundtrip differences are not a claim of changed stock payloads. No compiler, native build, live profile change or runtime acceptance is associated with this audit.
+- At 07:38, exact layout reversal passed. Whole BNTX-file reversal and original SARC padding were unproved, so core07.3 stayed open.
+- The pinned SARC writer explicitly guarantees member preservation rather than original serialization; its untouched-roundtrip differences are not a claim of changed stock payloads. No compiler, native build, live profile change or runtime acceptance is associated with this audit.
 
 ## Required preservation contract reconciled, 08:08 UTC
 
