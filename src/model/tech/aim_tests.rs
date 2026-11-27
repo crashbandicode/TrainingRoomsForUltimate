@@ -322,3 +322,31 @@ fn an_unsolvable_draw_is_drawn_again_and_the_stop_is_a_listed_restriction() {
     let row = format!("| `tech-no-launch-fits` | \"{stop}\" |");
     assert!(include_str!("../../../docs/RESTRICTIONS.md").contains(&row));
 }
+
+/// rc15 `ceiling-92ac06d0`: 50 units under a ceiling, straight up at KB 100, rose 34.18 and never touched; 30 did.
+#[test]
+fn a_manual_start_that_touches_no_surface_is_refused_and_no_longer_replays() {
+    let surfaces = block(v(85., 0.), v(-85., 0.));
+    let ceiling = surfaces.lines().find(|l| l.kind() == Some(Kind::Ceiling)).expect("the block's underside");
+    let spot = picker::Spot::at(ceiling, 0.5);
+    let plan = |distance: f32, angle: Option<f32>| {
+        let mut config = factory_floor();
+        config.surface = 4;
+        config.start = Numeric { mode: Mode::Set, lo: distance, hi: distance };
+        if let Some(degrees) = angle {
+            config.angle = Numeric { mode: Mode::Set, lo: degrees, hi: degrees };
+        }
+        planner::plan(config, context(&surfaces, spot), &mut |_| 0)
+    };
+    let near = plan(30., Some(90.)).expect("a start 30 under the ceiling touches it");
+    assert_eq!(near.setup.launch.start, v(spot.point().x, -90.));
+    // Why it matters: a launch without a contact is abandoned, and the session asks for the same setup again.
+    let mut session = session::Session::IDLE;
+    session.start(session::Length::Free);
+    session.placed(1);
+    assert_eq!(session.tick(false, None), session::Action::Launch);
+    assert_eq!(session.abandon(), session::Action::Place { reroll: false });
+    for angle in [Some(90.), None] {
+        assert_eq!(plan(50., angle).err(), Some(planner::Refused::Aim), "50 under the ceiling, angle {angle:?}");
+    }
+}
