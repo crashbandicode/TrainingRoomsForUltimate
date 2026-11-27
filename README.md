@@ -4,13 +4,11 @@ Practise matchups, edit recordings and play training games in Super Smash Bros. 
 
 ## Notable features
 
-### Practice games
-
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3609165db1d1675f019de9a7f3b7d1b6f7b8ebf0" autoplay muted loop playsinline controls></video>
 
 *Guard the Edge counts one secured attempt out of three.* [Open the clip](docs/media/tut-guard-edge-setup-and-score.mp4)
 
-Pick a spot offstage and practise denying the recovery; [Guard the Edge](docs/guide/guard-the-edge.md) keeps score when you make it back, too.
+<a id="practice-games"></a>Pick a spot offstage and practise denying the recovery; [Guard the Edge](docs/guide/guard-the-edge.md) keeps score when you make it back, too.
 
 ### Recordings you can drill
 

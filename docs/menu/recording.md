@@ -120,7 +120,7 @@ How a macro plays back, and how the Combo helper grades.
 
 | If | Then |
 | --- | --- |
-| You press B in the numbered picker | Nothing is saved. X finishes. Older clips show B finishing. |
+| You press B in the numbered picker | Nothing is saved; X finishes the chain. |
 | You press X or Y on this page | X never saves your defaults here, and Y does nothing. |
 | A file was recorded on another fighter | Play asks first, unless Ask before switching fighter is Off. |
 | You reset this page | Your files, the bound save, the active macros and the drill stay. |

@@ -1,11 +1,6 @@
 # Technical notes
 
-The detail behind the [README](../README.md): how TrainingRooms is installed and built, how each feature behaves, and
-where every clip in the README was recorded (build, commit and what the run checked). Release notes are the
-`RELEASE-NOTES-rc*.md` files in this folder: rc.5, rc.6, rc.8, rc.9 and [rc.15](RELEASE-NOTES-rc15.md)
-(rc.7, rc.10 and rc.11 have none). [Earlier releases](CURRENT-RELEASE.md#earlier-releases) links the rc.12, rc.13 and rc.14 release pages.
-
-Practice tools for Training mode and the online waiting rooms of Super Smash Bros. Ultimate 13.0.5, as a Skyline plugin.
+How TrainingRooms works in Training and waiting rooms; see [Media](MEDIA.md) for clip provenance and [release history](CURRENT-RELEASE.md#earlier-releases) for earlier builds.
 
 **Clip** [`rc14-menu-tour.gif`](media/rc14-menu-tour.gif): The TrainingRooms menu: the five pages, then Hitbox Visualization's checklist with Hitboxes, Grab boxes and Hurtboxes ticked, and a neutral air's hitbox
 
@@ -15,15 +10,9 @@ both fighters' hurtboxes are yellow pills; at 1/4 speed Mario's neutral air show
 
 ## Install
 
-| Install | Where and what |
-| --- | --- |
-| Put the NRO at | `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/libtraining_rooms.nro` |
-| Next to | `libnro_hook.nro`, which it needs (`libparam_hook.nro` is the usual companion; this build doesn't call it) |
-| **Never install it together with** | `libtraining_modpack.nro` |
-| Settings and saves live in | `sd:/ultimate/TrainingRooms/` |
-| On first boot | Settings, save states and recordings from the Training Modpack fork's `sd:/ultimate/TrainingModpack/` are imported once by copying |
-
 ![The first-boot import, file by file: what is copied from the fork's folder, what is regenerated and what is left](decisions/S1-import-details.png)
+
+For the plugins and their install path, see [Getting started](guide/getting-started.md#installing).
 
 *The first-boot import decision of 2026-11-01. Published replay captures are copied in the background with no size
 cap; unfinished capture staging folders are skipped. Files in the blocking part are skipped if larger than 8 MiB.
@@ -42,44 +31,7 @@ flowchart LR
 
 ## Controls
 
-| Action | Default chord |
-| --- | --- |
-| Open the menu | B + D-pad Up (always), or Minus (menu shortcut 1, editable) |
-| Save state / load state | ZL + D-pad Down / ZL + D-pad Up |
-| Record / Play on CPU | ZR + D-pad Down / ZR + D-pad Up |
-| Play on Player 1 / recording pop-up | ZR + D-pad Left / ZR + D-pad Right |
-| Cycle the CPU / Player 1 fighter | ZL + D-pad Left / ZL + D-pad Right |
-| Input display on / off | R + D-pad Down |
-| Game speed: hold, then D-pad Left / Right; release to close | R + D-pad Up |
-| Kirby hat: Player 1 / CPU | Special + L3 / Special + R3 |
-| Reset the training room | L + R + A |
-
-R is Z on a GameCube controller.
-
-Game speed shows a small pop-up while the chord is held. In Training it changes the game's Speed setting; in the
-waiting room it changes only your practice. A match always starts at normal speed. See [Game speed](#game-speed)
-for the speeds and how to step one frame.
-
-The first time Training or a waiting room's practice opens on a new install, TrainingRooms also shows six reminders:
-Welcome, Open Menu, Save State, Load State, Input Record and Input Playback. A later launch leaves those reminders off.
-The chords in the table stay available.
-
-| In the menu | Key |
-| --- | --- |
-| Change page | L/R |
-| Jumps to the previous or next section | ZL + Up/Down |
-| Edits | A |
-| Resets a row | Y |
-| Saves the current values as defaults | X |
-| Goes back | B |
-
-Each page ends with *Reset page to defaults*, which asks first. The menu reopens where you left it. The chords are
-edited on Display & Controls › Button chords.
-
-The key hints at the foot of every page end with the build tag: the version, then the build name and the commit the NRO
-was built from, for example `0.2.0-rc.14 · rc14 1a2b3c4d`. Builds before rc.14 kept the version `0.2.0-rc.6` and told
-themselves apart by the build name: rc.13 read `0.2.0-rc.6 · rc13 ed0d7a35`, rc.8 to rc.12 read `rc8` to `rc12` (the clip
-below is rc.11's). A build from uncommitted changes adds `-dirty`.
+See [menu navigation](guide/using-the-menu.md), [factory chords](menu/display-and-controls.md#button-chords), [fixed controls](guide/controls.md#fixed-buttons) and [build identification](CURRENT-RELEASE.md#which-build-is-mine).
 
 **Clip** [`rc11-footer-tag.gif`](media/rc11-footer-tag.gif): the menu opens on two pages whose key hints end with `0.2.0-rc.6 · rc11 0c628724`
 
@@ -100,11 +52,7 @@ their own build; see [MEDIA.md](MEDIA.md).
 (its help line: Tick what to draw. Windboxes: hits that push or pull without hitstun. Launch angles: where each hit sends.), A ticks Hitboxes, Grab boxes and Hurtboxes, B goes back; in Training the yellow hurtbox pills cover both fighters; R + D-pad Up steps the speed to 1/4, and Mario's short-hop
 neutral air keeps its red hitbox on screen for over a second (the frame strip's lane turns red with it). Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-Hitbox Visualization (Display & Controls) draws the fighters' hurtboxes, hitboxes and grab boxes. A normal hurtbox
-is grey; yellow means it cannot be hit, and green means it takes no damage. Since rc.3
-every fighter sphere is the plugin's own disc, so none is ever missing, even with two large fighters; projectiles keep
-the game's effect spheres, and the discs trail the camera by one to two frames while it pans. Since rc.13 a long box
-is drawn as one pill.
+TrainingRooms draws fighter and projectile hitboxes with its own panes, projects them with the game camera at layout time, and draws capsules as single pills; see the [colour legend](menu/display-and-controls.md#colour-legend).
 
 ![Ridley's hurtboxes three ways: the real Eden frame with rows of discs, the same discs redrawn from a dump, and the same capsules as pills](decisions/rc13-hitbox-pills.png)
 
@@ -173,8 +121,6 @@ around. Let go and the pop-up closes; the speed stays.
 | Priority | The speed chord, another input owner, or busy room UI blocks stepping. |
 | Hook | `src/runtime/features/game_speed.rs::frame_step_poll` publishes requests for the waiting-area task. |
 
-<!-- R14 (worker B's r14bc-eca14e4b pair): keep this line only if R14 passes on the final head. -->
-
 **Clip** [`rc8-speed-hud-fixed.gif`](media/rc8-speed-hud-fixed.gif): Hold R + D-pad Up, Right: the stopwatch reads x1.5; Left back to x1: it goes away
 
 *Eden, 2026-11-11, the rc.8 head `3f9d61dd` (diag NRO `61533917`, log lines only), in Training: x1 with no
@@ -206,8 +152,7 @@ Options, Plugins or a plugin's own page) if Deluxe uses its D-pad there.
 *+ Save last combo…* (Recording › Combos & Sequences) saves a combo you landed, and the combo helper grades your next
 attempts against it, link by link. A sequence of combos is drilled the same way, one combo after another. Each saved
 combo is a small JSON file in `sd:/ultimate/TrainingRooms/combos/`. You can edit it, copy it to another card or share
-it, and any fighter can practise it; [COMBOS.md](guide/combos.md) describes the format. The clip is under
-[Combos: the clip and the files](#combos-the-clip-and-the-files).
+it, and any fighter can practise it; see the [sharing guide](guide/combos.md) or the [file format and clip](#combos-the-clip-and-the-files).
 
 ### CPU reactions
 

@@ -91,6 +91,6 @@ Use the [chord editor](../guide/controls.md#changing-a-chord) to replace or disa
 | Setting | Choices; default in bold | What it does |
 | --- | --- | --- |
 | <a id="menu-shortcut-1"></a>Menu shortcut 1 | Custom chord or disabled; **Minus** | Opens the menu; changes take effect immediately. |
-| <a id="menu-shortcut-2"></a>Menu shortcut 2 | Custom chord or **disabled** | Adds another opener; the [three menu shortcuts](../guide/controls.md#opening-the-menu) must differ. |
+| <a id="menu-shortcut-2"></a>Menu shortcut 2 | Custom chord or **disabled** | Adds another opener; it must differ from both other shortcuts. |
 | <a id="permanent-shortcut"></a>Permanent shortcut | **B + D-pad Up**, read-only | Always opens the practice menu; cannot be reassigned. |
 | <a id="reset-page-to-defaults"></a>Reset page to defaults | Confirm or cancel | Restores [saved defaults](../guide/using-the-menu.md#your-defaults); leaves menu shortcuts unchanged. |
