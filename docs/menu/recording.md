@@ -340,6 +340,9 @@ you crop and while a preview plays. The strip shows:
 - the move at the selected handle;
 - one timeline with the In and Out handles, the playhead and a tick for every move.
 
+![The clip editor's strip with twelve numbered labels: what is open, where the preview plays, the kept part, the move at the handle, the grey and red parts of the timeline, the In and Out handles, a move's tick and band, the help lines and the key line](../diagrams/clip-editor-legend.svg)<br>
+*The strip, labelled. The picture under the labels is one frame of the scrub clip of the preview build `cc71537c` (staged, not installed), with In selected; install 6's strip has the same parts, without "ZL+L / ZL+R: fighters" on its key line.*
+
 | Key | What it does |
 | --- | --- |
 | Up/Down | On a capture with two sides, pick whose inputs to take. Nothing for a saved file. |
