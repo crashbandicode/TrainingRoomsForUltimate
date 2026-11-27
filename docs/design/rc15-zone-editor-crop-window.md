@@ -16,7 +16,7 @@ The overview inset remains when a zone extends out of view.
 ![Design 3: each zone is a clear window with a blue top and bottom edge, a yellow inner edge and a purple outer edge; sample targets inside; a two-colour handle on the active top edge](../decisions/rc15-zone-editor-design-3-crop-window.png)
 
 *The design as a model rendering, not an Eden still. The still of the proving boot is in
-[Decisions](../DECISIONS.md), with the test overlay showing.*
+[Decisions](../DECISIONS.md).*
 
 The world view uses up to 19 rectangles: five dims, two limit lines, eight
 edges and four handle rectangles. The inset adds up to ten more limits and
