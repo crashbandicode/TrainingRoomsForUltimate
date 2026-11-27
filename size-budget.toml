@@ -3296,3 +3296,11 @@ ceiling = 209857
 date = "2026-11-27"
 reason = "The overlay's command handoff, a defect fix on main 30f7f21a (209561): +296, measured by the size step of the gate on 1b78c493. The catch, article attack, wind and rebound hooks took blocking STORE and ARTICLES locks on threads nobody has proven (docs/design/rc15-overlay-frame-sync.md: a lossless handoff was owed before rc.15 ships). They now hand each command to a pool of nodes made at install (model/pool_list.rs: a free stack and a queued stack, no allocation and no lock in a hook), and the phase-8 pass applies the queue in issue order with the code the hooks ran under the lock (model/hitbox_orbs.rs: Command, apply, apply_all, hand_off). Beside the lines: release NRO +0 B, raw .bss +0, raw .text +1,968 B, raw .data +288 B (the pool's 48-byte handle among it); heap 64 nodes once at boot."
 approved_by = "tr-primary-3 2026-11-27 16:00:40Z (+296 counted lines and the 1,968 B of text granted; NRO +0 and .bss +0 on the branch)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 210320
+date = "2026-11-27"
+reason = "The overlay's command handoff made lossless, on the 209857 of the entry above: +463, measured by the size step of the gate. The operator rejected the first form's one lossy path (a command skipped when its pool was empty and a lock busy). A hook that may neither wait nor allocate can only keep what the model itself keeps, so the model's two tables of who holds what (the fighter sets, model/hitbox.rs SetMembers; the article slots, model/hitbox_orbs.rs Members) became lock-free values that a command changes at command time with the model's own rule, and what a set must be told later waits in that set's lane (model/handoff.rs: Pool, Lane, Handoff). Beside the lines, against main 30f7f21a: release NRO +12288 B at most, raw .bss +0, heap once at install."
+approved_by = "tr-primary-3 2026-11-27 19:57:57Z (+464 counted lines on top of the +296, release NRO up to +12,288 B, .bss +0, boot heap once at install)."
