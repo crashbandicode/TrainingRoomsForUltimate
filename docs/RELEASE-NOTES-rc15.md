@@ -1,6 +1,6 @@
 # rc.15: the builds of November 2026
 
-Notes for players. rc.15 is one release name for a line of builds. Each build's menu footer reads
+These notes cover the November builds of the untagged rc.15 candidate. Each build's menu footer reads
 `0.2.0-rc.15 · rc15` and then the commit it was made from, so the commit tells the builds apart
 ([Which build you have](guide/getting-started.md#which-build-you-have)).
 
@@ -39,13 +39,14 @@ The runs, verdicts and file hashes behind every line are in [Install evidence](E
 
 ## Preview build
 
-This preview was tested in Eden. Its planned console install was cancelled; it is not the next release.
-
 | Preview | Details |
 | --- | --- |
 | Built from | `cc71537c` (the footer ends with it) |
 | Release file | `78db86f5…`, 5,419,008 bytes |
 | At cancellation | Install 6 was still on the card. |
+
+This preview was tested in Eden. Its planned console install was cancelled; it is not the next release.
+
 
 ### Scrubbing shows the recorded moves
 
@@ -92,7 +93,7 @@ These results describe the cancelled preview, not the [clip editor in the fixed 
 | Eden, on the release file, second boot | No crash. Snapped X, scrub poses and the settings check passed again. The fighter choice failed as above |
 | Eden, on the diagnostic build | Three chosen frames were shown exactly, and X and B let the fighters go. The slide was found there |
 | Not flown | A capture saved and read back in a game; a fighter pushed by a wall; a macro gaining its moves from one Play; the CPU side of the fighter choice; a second player in a waiting room |
-| On the console | Nothing yet |
+| On the console | The preview install was cancelled. |
 
 The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#preview-build-cc71537c).
 
@@ -213,7 +214,7 @@ both fighters stood beside their recorded points while the editor said they were
 | Installed | Yes, and read back. TrainingRooms was the only one of the 21 active plugins replaced. A rollback copy of install 5 was also saved on the card |
 | Host | Every merge passed host tests and builds |
 | Eden, on the build before the fix (`eb39d6bc`), not on this exact build | Play started no later than on install 5; a take was recorded and held at In with no preview; an old macro got its positions from one Play; Y on In made a capture previewable; and the playhead browsed a take. The same session found the defect that the fix addresses |
-| Eden, on install 6's diagnostic build (same commit) | Passed so far: record and hold, release on X and on close, the old macro, a crop, delete, a take on the CPU, the playhead rows, the snap rows up to their preview, and the menu's stack check. Found: the three issues listed under [Known issues](CURRENT-RELEASE.md#known-issues) as found in testing. No smoke boot of the installed release file, and no waiting-room pair, has flown |
+| Eden, on install 6's diagnostic build (same commit) | Passed in this run: record and hold, release on X and on close, the old macro, a crop, delete, a take on the CPU, the playhead rows, the snap rows up to their preview, and the menu's stack check. Found: the three issues listed under [Known issues](CURRENT-RELEASE.md#known-issues) as found in testing. These results cover neither a smoke boot of the installed release file nor a waiting-room pair |
 | On the console | Scrubbing moved the fighters but did not show the moves. The operator requested recorded poses and a choice of recorded or current fighter for each role; neither is in install 6. |
 
 The runs and what they did not cover: [Install evidence](EVIDENCE-rc15-installs.md#install-6-5df3d9dc).
@@ -662,16 +663,17 @@ Taps and a hold move Min from 0 through 0.5 and 3 to 8%, and Max from 150 throug
 
 ## Before install 1
 
-The first rc.15 build (2026-11-15) added the clip editor, input drills, article hurtboxes and the colour legend
-([Current release](CURRENT-RELEASE.md)). Between that build and install 1, more went into rc.15 without notes of its
-own. By theme, with the page that describes each:
-
 | Theme | What went in | More |
 | --- | --- | --- |
 | Practice games | Eggs-ercise, Break the Targets, Tech practice, Mash out, Parry practice, Guard the Edge and Juggler, each with its own screen and a Start row. | [Practice games](menu/fighters-and-stages.md#practice-games) |
 | Waiting rooms | Lobby Practice is On from the first start. | [Lobby Practice is On by default](guide/waiting-rooms.md#lobby-practice-is-on-by-default) |
 | Recording | The pop-up's Player or CPU side stays until you change it, and Place fighters before Record sets both fighters up first. | [Place fighters before Record](menu/recording.md#place-fighters-before-record) |
 | The menu | A held Up or Down repeats and speeds up, and L and R turn the page from inside a game's screen, a fighter grid or an editor. | [Moving around](guide/using-the-menu.md#moving-around) |
+
+The first rc.15 build (2026-11-15) added the clip editor, input drills, article hurtboxes and the colour legend
+([Current release](CURRENT-RELEASE.md)). Between that build and install 1, more went into rc.15 without notes of its
+own. By theme, with the page that describes each:
+
 
 The build on the card just before install 1 (`17060a5e`, installed 2026-11-23 at 11:40) was played by the operator
 that day. What they reported, and what came of it:

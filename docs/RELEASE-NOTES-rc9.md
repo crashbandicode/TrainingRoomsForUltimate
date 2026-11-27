@@ -1,11 +1,14 @@
 # rc.9
 
-The rc.9 menu footer read `0.2.0-rc.6 · rc9` followed by the build's commit. rc.9 fixes the places where a
-TrainingRooms shortcut and another plugin's shortcut on the same buttons both fired, and it ships beside new builds of
-three of those plugins. The fix IDs (C3, C4, …) are the numbers of the conflict survey the fixes came from. What rc.8
-changed is [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md).
+- The rc.9 menu footer read `0.2.0-rc.6 · rc9` followed by the build's commit. rc.9 fixes the places where a TrainingRooms shortcut and another plugin's shortcut on the same buttons both fired, and it ships beside new builds of three of those plugins.
+- The fix IDs (C3, C4, …) are the numbers of the conflict survey the fixes came from.
+- What rc.8 changed is [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md).
 
 ## Fixed
+
+| Fix | Recorded result |
+| --- | --- |
+| Deluxe window shows a page with rows | TrainingRooms D-pad chords are suppressed |
 
 ### The D-pad chords and Online Deluxe's window (C4)
 
@@ -54,6 +57,10 @@ changed is [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md).
 
 ## Good to know
 
+| Quickplay action | Recorded result |
+| --- | --- |
+| Leave Battle | Close the TrainingRooms menu first |
+
 ### Leaving a Quickplay room with the TrainingRooms menu open (C13)
 
 - The QuickPlay cancel fix plugin keeps the game's Pause › Leave Battle available for a few seconds after you join a
@@ -63,9 +70,13 @@ changed is [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md).
 
 ### The build in the menu footer
 
-- The build tag at the foot of every menu page now names rc.9, for example `0.2.0-rc.6 · rc9 01950601`.
+- The rc.9 build tag at the foot of each menu page named the candidate, for example `0.2.0-rc.6 · rc9 01950601`.
 
 ## The plugins that ship beside it
+
+| Companion plugin | Recorded result |
+| --- | --- |
+| Online Deluxe 0.10.5 | Reports its window and page state |
 
 ### Online Deluxe 0.10.5
 
@@ -98,6 +109,10 @@ changed is [RELEASE-NOTES-rc8.md](RELEASE-NOTES-rc8.md).
 - To bring the toggle back, set `gamepad_nav_toggle = on` in `sd:/ultimate/imgui_smash/config.ini`.
 
 ## For developers
+
+| Host suite | Recorded result |
+| --- | --- |
+| Test count | 41,918 before the cut, 865 after the table-driven replacements |
 
 - **The host tests:** the suite went from 41,918 tests to 865, under the 1,000 limit.
   - The cut first took it to 942. Every cut and the reason for it is in [TEST-CUT-LEDGER-rc9.md](TEST-CUT-LEDGER-rc9.md).

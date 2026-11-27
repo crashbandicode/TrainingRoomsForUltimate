@@ -1,11 +1,15 @@
 # 0.2.0-rc.5
 
-0.2.0-rc.5 was withdrawn before players ran it. Its contents ship in 0.2.0-rc.6, with the changes and corrections in
+0.2.0-rc.5 was withdrawn before players ran it. Its contents were included in 0.2.0-rc.6, with the changes and corrections in
 [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
 
-Notes for players. This is the build after `0.2.0-rc.3.1`. There is no separate `0.2.0-rc.4`. How to read the frame strip is [FRAME-STRIP.md](guide/frame-strip.md). How to use recording is [RECORDING.md](guide/recording.md). The pictures for those pages are the list in [MEDIA.md](MEDIA.md).
+Notes for players. rc.5 followed `0.2.0-rc.3.1`. There is no separate `0.2.0-rc.4`. How to read the frame strip is [FRAME-STRIP.md](guide/frame-strip.md). How to use recording is [RECORDING.md](guide/recording.md). The pictures for those pages are the list in [MEDIA.md](MEDIA.md).
 
 ## Frame strip
+
+| Display | Recorded result |
+| --- | --- |
+| Input history | Last second for Player 1 and the CPU |
 
 The input display is the frame strip: the last second of Player 1 and the CPU, a chip for each new button, and readouts for advantage, the link, and the timing of the press.
 
@@ -13,21 +17,29 @@ ADVANTAGE is the CPU's first actionable frame minus yours after the last hit. Pl
 
 A follow-up more than 20 frames after the CPU can act is a new exchange, not a dropped link.
 
-Under Player 1's lane, a stick row shows the held direction on each frame. A C-stick attack, the attack the game marks as coming from the C-stick, takes its chip arrow from the C-stick when that stick is outside the dead zone. Any other press, including a C-stick that stays neutral, keeps the left-stick arrow. The stick row reads the physical left stick either way, so a C-stick attack with the left stick neutral leaves the row blank.
+- Under Player 1's lane, a stick row shows the held direction on each frame.
+- A C-stick attack, the attack the game marks as coming from the C-stick, takes its chip arrow from the C-stick when that stick is outside the dead zone.
+- Any other press, including a C-stick that stays neutral, keeps the left-stick arrow.
+- The stick row reads the physical left stick either way, so a C-stick attack with the left stick neutral leaves the row blank.
 
 Holding one direction long enough can freeze the strip. A new binned direction, including a move out of neutral, starts it scrolling again.
 
 ## Recording
 
-- A save state only warps. Load does not start a recording. Auto-load on death only warps to the bound save, and it does nothing when none is bound.
+| Action | Recorded result |
+| --- | --- |
+| Load | Warps to a save without starting a recording |
+
+- A save state only warps. Load does not start a recording. rc.5 used the old save-state slot for Save, Load and Auto-load on death, regardless of the binding shown in the pop-up. rc.6 made all three follow that binding.
 - Record follows the pop-up's role. It captures Player 1 until that role is CPU. Stopping writes a named macro and that macro's start save.
 - Each role has one active macro, a recording or a chain. Play on Player 1 and Play on CPU play that role's macro, or stop it if it is already playing. A macro plays back frame for frame, on either role.
 - The chords' buttons do not reach the game while held, so Record and Play do not make Player 1 shield, and a recording does not contain the Record chord.
 - The loop never warps back. Later passes continue from where the fighters are.
 - A chain starts at its first macro's start save, plays its recordings in order, and cannot contain a chain.
-- Save last combo still saves the combo you landed. A drilled combo counts without having to be a true combo. A different move drops.
-- Make combo plays the file under the cursor once on Player 1, from that file's own start save, and saves the links as a new combo named Combo N. Crop opens a handle screen and saves a new file. The original stays. Both rows are on the file's screen; what they do is in [RECORDING.md](guide/recording.md).
-- A sequence is an ordered list of combos. You can build and edit sequences in this build; drilling a sequence comes in the next build. The helper drills one combo.
+- rc.5 omitted Save last combo. [rc.6 restored the row](RELEASE-NOTES-rc6.md#save-last-combo). A drilled combo counts without having to be a true combo. A different move drops.
+- Make combo plays the file under the cursor once on Player 1, from that file's own start save, and saves the links as a new combo named Combo N. In rc.5, a playback with no hit saved the previous exchange.
+- Crop opens a handle screen and saves a new file. The original stays. Both rows are on the file's screen; what they do is in [RECORDING.md](guide/recording.md).
+- A sequence is an ordered list of combos. rc.5 could build and edit sequences. Its helper drilled one combo. [rc.6 added sequence drilling](RELEASE-NOTES-rc6.md#sequence-drilling).
 - Play on a macro or a chain whose first macro was recorded on another fighter asks Fighter Mismatch first: Keep, Switch, or B to cancel. The frame strip is hidden while it is up.
 - The pop-up and the Recording page are how you bind a save, set a macro active, and drill.
 
@@ -35,8 +47,8 @@ Holding one direction long enough can freeze the strip. A new binned direction, 
 
 | Chord | Default | Change |
 | --- | --- | --- |
-| Save | ZL + D-pad Down | Writes the bound save. |
-| Load | ZL + D-pad Up | Warps to the bound save. Starts nothing. |
+| Save | ZL + D-pad Down | Writes the old save-state slot. |
+| Load | ZL + D-pad Up | Warps to the old save-state slot. Starts no recording. |
 | Record | ZR + D-pad Down | Same chord. The pop-up's role says who is recorded. |
 | Play on CPU | ZR + D-pad Up | Was Input Playback. Plays the CPU's active macro. |
 | Play on Player 1 | ZR + D-pad Left | Plays Player 1's active macro. |
@@ -50,6 +62,10 @@ The first time Training opens on a new install, the six reminders are still Welc
 
 ## Migration
 
+| Migration input | Recorded result |
+| --- | --- |
+| Empty slots and indexes | Skipped |
+
 On the first build of the new library:
 
 - Empty recording slots and empty save indexes are skipped.
@@ -60,6 +76,10 @@ On the first build of the new library:
 - Loop On becomes infinite. Loop Off, or no loop row, becomes 1. Player 1 and the CPU then keep their own counts.
 
 ## What leaves
+
+| Playback trigger | Recorded result |
+| --- | --- |
+| Macro with a start save | The role’s Play chord |
 
 The playback machine no longer starts a recording because a save loaded. That job is the macro's start save, started by the role's Play chord.
 
@@ -73,13 +93,26 @@ Pins are gone. The five most recently used of each kind are listed first. Y does
 
 ## Since 0.2.0-rc.3.1
 
+| Addition | Recorded result |
+| --- | --- |
+| Combo helper | Shown under the frame strip |
+
 Recording and the stick row are above. The same build also adds:
 
-- The combo helper under the frame strip, and combo files you can copy or share. Any fighter can practise one. Grading uses the recorded presses, releases, C-stick, and stick flicks. Drift is shown and is not graded. A link counts without being a true combo. Switch or Keep can change Player 1 to the combo's recorded fighter, and Player Swapping Off does not block that Switch. Combos open in lobby practice. In an online waiting room a saved combo is named Combo N. A saved combo's footer shows the recorded fighter. Notices sit under the frame strip.
+- The combo helper under the frame strip, and combo files you can copy or share.
+- Any fighter can practise one.
+- Grading uses the recorded presses, releases, C-stick, and stick flicks.
+- Drift is shown and is not graded.
+- A link counts without being a true combo.
+- Switch or Keep can change Player 1 to the combo's recorded fighter, and Player Swapping Off does not block that Switch.
+- Combos open in lobby practice.
+- In an online waiting room a saved combo is named Combo N.
+- A saved combo's footer shows the recorded fighter.
+- Notices sit under the frame strip.
 - Add New on a Mii class opens Smash's own Mii editor. Saving adds one Mii. Leaving without saving adds none.
-- Lobby Items, on Fighters & Stages › Stages. Off stops item spawning in the waiting room.
+- Lobby Items, on Fighters & Stages › Stages. In rc.5, Off removed existing items. Timed drops continued in the Quickplay waiting area until rc.6.
 - The replay window, edit placement, and the setup library. A timer match's replay capture continues through sudden death instead of stopping at the end of regular time.
 - The six intro reminders show once on a new install. Each notice has a dark plate. Respawn on platform is on the Stages page. The Player cycle numbers are the list that cycle loads, and the CPU cycle is one list.
 - Ready Fighters defaults to 10. Ready Hats are counted apart from those fighters. Raising the count promotes a parked CPU body. A Training count closes when that scene closes. A greyed Mii class is not in the CPU cycle.
-- A named macro can carry the exact Mii it was recorded on.
+- Switching to the Mii from a named macro loaded the class default in rc.5. rc.6 loaded the recorded Mii, including its appearance and specials.
 - Waiting-room hitboxes resolve when the waiting room is the first practice of the boot.

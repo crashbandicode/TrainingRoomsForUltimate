@@ -116,13 +116,16 @@ each gate's own; they were not compared test by test here.
 
 ## The operator's reports from the console
 
-The operator's own reports from play on a Switch. Most were relayed by the coordinator (inbox 2026-11-25 17:09:15Z,
-tr-primary-2; the report on install 5, inbox 23:33:51Z). Two were recorded by the coordinator at the time, in its handoff
-(`artifacts/phase23/HANDOFF-PRIMARY-tr-primary-2.md`); their rows name the entry. Each report is placed on the build
-that was on the card at its time, by the install records' times above.
-They say what the operator saw; none is a pass or a fail of a build. "Changed in" names the first install whose
-history holds the change (`git merge-base --is-ancestor`), and what an Eden run showed of it. Reports about other
-plugins are left out, except the first, which was made in Training and turned out to be another plugin's.
+| Evidence source | Recorded result |
+| --- | --- |
+| Console play reports | Switch observations relayed by the coordinator |
+
+- The operator's own reports from play on a Switch.
+- Most were relayed by the coordinator (inbox 2026-11-25 17:09:15Z, tr-primary-2; the report on install 5, inbox 23:33:51Z).
+- Two were recorded by the coordinator at the time, in its handoff (`artifacts/phase23/HANDOFF-PRIMARY-tr-primary-2.md`); their rows name the entry.
+- Each report is placed on the build that was on the card at its time, by the install records' times above.
+- They say what the operator saw; none is a pass or a fail of a build. "Changed in" names the first install whose history holds the change (`git merge-base --is-ancestor`), and what an Eden run showed of it.
+- Reports about other plugins are left out, except the first, which was made in Training and turned out to be another plugin's.
 
 | When (UTC) | Build on the card | The operator reported | Changed in |
 | --- | --- | --- | --- |
@@ -176,6 +179,10 @@ changed. Receipts: `artifacts/phase23/place-float/eden/out-03/` and `out-04/`; r
 
 ## Install 5 (`b7a382e4`)
 
+| Card readback | Recorded result |
+| --- | --- |
+| Install 5 | `99e00e92` → `0cb29525` |
+
 - **Card:** `artifacts/phase23/card-install/20261125-2306Z-card-b7a382e4/deployment.json`. Over DBI's USB file
   transfer, at 23:06. Before `99e00e92`, after `0cb29525`, read back. 21 plugins before and after; the other 20 are
   byte-identical. The old file is kept on the card as `ultimate/TrainingRooms/backups/pre-0cb29525506021e3.nro`, and
@@ -192,12 +199,10 @@ The changes in this build were merged one by one after `a945b0c1` and are listed
 `artifacts/phase23/next-build/` for the head that passed all six steps. Playback was gated together with the two
 documentation merges that followed it. These receipts are host tests and builds, not gameplay tests.
 
-On 2026-11-25, Eden run `tso-3fd708bc-ally-1` used the diagnostic build of `3fd708bc` to check the Training stage
-**before** the off-stage changes. Guard the Edge and Juggler did not start there, and the menu then read "Stop … Running"
-(`out/p05/ally-173401-786500-p05-open.png` for Guard the Edge and `out/p06/ally-173435-667300-p06-reopen.png`
-for Juggler in the run's folder). This was not a test of the fix,
-which merged later as `7e6ff810` (the smoke boot below opened both set-ups on that stage), or of capture Delete. Receipts: `artifacts/phase23/training-stage-tracing/ally-boot/tso-3fd708bc-ally-1/` and the
-17:39:04Z report from training-offstage.
+- On 2026-11-25, Eden run `tso-3fd708bc-ally-1` used the diagnostic build of `3fd708bc` to check the Training stage **before** the off-stage changes.
+- Guard the Edge and Juggler did not start there, and the menu then read "Stop … Running" (`out/p05/ally-173401-786500-p05-open.png` for Guard the Edge and `out/p06/ally-173435-667300-p06-reopen.png` for Juggler in the run's folder).
+- This was not a test of the fix, which merged later as `7e6ff810` (the smoke boot below opened both set-ups on that stage), or of capture Delete.
+- Receipts: `artifacts/phase23/training-stage-tracing/ally-boot/tso-3fd708bc-ally-1/` and the 17:39:04Z report from training-offstage.
 
 A later Eden probe (`sg-probe-yoga-01`, diagnostic `0f39ec04`) read the Training stage's long floor and Battlefield.
 The point below the long floor read Solid; the point beneath Battlefield read Under. This was not a run of the
@@ -212,11 +217,10 @@ is on record.
 
 ### The Eden smoke boot of the finished build
 
-On 2026-11-25, Eden run `nb-smoke-yoga-01` (22:21 to 22:57) ran the release build of `b7a382e4`, the head of merge 10,
-with the card's 20 other plugins. Its NRO, sha256 `0cb29525…215ca2f`, is the release file of that head's gate
-(`artifacts/phase23/next-build/gate-b7a382e4/status.json`). The game did not crash. Receipts:
-`artifacts/phase23/next-build-smoke/20261125-1745Z/RESULTS.md` and, in full, `smoke/RESULT.md` there; for each row its
-JSON and one frame under `smoke/evidence/out/<row>/`. Reported by dup-audit (inbox 22:57:42Z).
+- On 2026-11-25, Eden run `nb-smoke-yoga-01` (22:21 to 22:57) ran the release build of `b7a382e4`, the head of merge 10, with the card's 20 other plugins.
+- Its NRO, sha256 `0cb29525…215ca2f`, is the release file of that head's gate (`artifacts/phase23/next-build/gate-b7a382e4/status.json`).
+- The game did not crash.
+- Receipts: `artifacts/phase23/next-build-smoke/20261125-1745Z/RESULTS.md` and, in full, `smoke/RESULT.md` there; for each row its JSON and one frame under `smoke/evidence/out/<row>/`. Reported by dup-audit (inbox 22:57:42Z).
 
 Two rows, the eggs zone and placement, passed on a later try in the same boot, after the test's own steps were
 corrected (it looked for a row named Stop, and expected the placement card to open on Spot). The build did not change
@@ -284,6 +288,10 @@ frame was looked at.
 | A save's placement is changed with the crosshair; the Off stage switch | `6dcf5c40` | `gate-b7a382e4` (one gate for this merge and a docs merge) |
 
 ## Install 6 (`5df3d9dc`)
+
+| Card readback | Recorded result |
+| --- | --- |
+| Install 6 | `0cb29525` → `c1ced861` |
 
 - **Card:** `artifacts/phase23/card-install/20261126-1156Z-card-5df3d9dc/deployment.json`, state
   `installed_verified`. Over DBI's USB file transfer, finished at 12:22:55. Before `0cb29525`, after `c1ced861`,
@@ -359,11 +367,11 @@ bridge and the same three staged old macros on both builds):
 - **Limits of the counts:** one boot per build on one host; one sample each for the two long macros; whole frames
   only, so nothing under a frame is shown; the takes recorded in the two boots differ by a few frames in length.
   This is Eden, not the console.
-- **What carries over:** the Play-start comparison is not repeated on merge 17: the fix changed the scrub hold
-  and stage check, not the playback path (rv-preview-vis, inbox 11:07:22Z). The rename path is also unchanged.
-  SP-22 **passed with a note** (tr-primary-2, 11:15:37Z): the automated pad attempt failed. Typing into Eden's
-  own keyboard window changed "Macro 3" to "Macro 3q"; the list and Crop showed the new name, the ID and positions
-  file's hash stayed the same, and Crop still held. See `eden-session/packet-a/gate/handoff45-rename.json` under
+- **What carries over:** the Play-start comparison is not repeated on merge 17: the fix changed the scrub hold and stage check, not the playback path (rv-preview-vis, inbox 11:07:22Z).
+  - The rename path is also unchanged.
+  - SP-22 **passed with a note** (tr-primary-2, 11:15:37Z): the automated pad attempt failed.
+  - Typing into Eden's own keyboard window changed "Macro 3" to "Macro 3q"; the list and Crop showed the new name, the ID and positions file's hash stayed the same, and Crop still held.
+  - See `eden-session/packet-a/gate/handoff45-rename.json` under
   `artifacts/phase23/scrub-positions/`. This did not test typing on the console. The other rows above report
   what ran on merge 16, not a fresh merge-17 result.
 - **Logs:** dup-audit counted 0 lines with panic, abort, Unmapped, crash, Fatal or a break call in each run's Eden
@@ -397,8 +405,8 @@ files named below were read for this page.
 | SP-10, 13:01 flight | The requested CPU point (−81.72, −15.10) was beside the floor's end. It was not refused; two reads put the body **5.13 units left** of the point, against the wall. The row failed on that displacement, not the fighter-switch check. `eb39d6bc` showed a similar displacement. |
 | Wall verdict | **Defect accepted** (13:20:24Z). **What it is, read from the stage's lines and not run** (preview-vis-sol, 13:42:30Z; ruled 13:43:10Z): the point is not inside the wall. The Training floor's solid run is x −80 to 620, so the point is 1.72 left of its end and the stage rule rightly answers open (`src/model/stage_geometry.rs` lines 222 to 254 read one column through the point and meet no wall). The fighter's body has width: it rests at x −86.85 when asked to x −81.72 and is exact at x −86.96, which fits a body pushed until it clears a wall at x −80. The editor does not read back where the game left the body. Fixed in the next build. |
 | First X on a capture: two takes | In `tut-5df3d9dc-yoga-3`, Y snapped In but X refused with In selected; no input frame was fed (12:46:48Z). In the control take, L deselected In; after a one-second wait X previewed on the CPU (12:51:05Z). The earlier successful release snap on `eb39d6bc` previewed on Player 1. |
-| S1 on the diagnostic build (third flight, 13:24:09Z) | In stepped to frame 7 and X played nothing, as wanted. Y moved In to 6. X then gave one `playing=1` line, the notice "Let the CPU settle to idle and leave the ledge before previewing", and no input frame; the CPU's status changed one frame after the check. No Replay-window preview fed a frame in that whole boot, so S2 and S3 show their snap and not a working preview. The Crop preview of a recorded macro (SP-5) did feed. On `eb39d6bc`'s release build the same steps fed 101 frames. **Treated as a regression of install 6 until the release smoke says otherwise** (13:24:36Z, tr-primary-2); whether it comes from merge 17 or from the diagnostic flavour is not separated |
-| Why X can refuse (code reading, not a fix test) | A first temporary checkpoint requires a grounded, idle CPU (`states/preview.rs:128–137`). The request can reach it before the scrub hold releases the CPU. A macro loading its own start save bypasses that checkpoint. A fix is assigned, not tested here. |
+| S1 on the diagnostic build (third flight, 13:24:09Z) | In stepped to frame 7 and X played nothing, as wanted. Y moved In to 6. X then gave one `playing=1` line, the notice "Let the CPU settle to idle and leave the ledge before previewing", and no input frame; the CPU's status changed one frame after the check. No Replay-window preview fed a frame in that whole boot, so S2 and S3 show their snap and not a working preview. The Crop preview of a recorded macro (SP-5) did feed. On `eb39d6bc`'s release build the same steps fed 101 frames. **Classified at the time as an install 6 regression pending a release smoke test** (13:24:36Z, tr-primary-2); whether it comes from merge 17 or from the diagnostic flavour is not separated |
+| Why X can refuse (code reading, not a fix test) | A first temporary checkpoint requires a grounded, idle CPU (`states/preview.rs:128–137`). The request can reach it before the scrub hold releases the CPU. A macro loading its own start save bypasses that checkpoint. The team assigned a fix after this run. Snapped X later played in both preview release boots (see [smoke tests](#smoke-tests-on-the-release-file)). |
 
 - **Not covered by these runs:** a smoke boot of install 6's release NRO or a fresh waiting-room pair.
 - **Not shown in the two test boots:** release through a fighter swap or a scene change (SP-12, SP-13), or a
@@ -408,14 +416,15 @@ files named below were read for this page.
 
 ## Preview build (`cc71537c`)
 
-Staged on 2026-11-27, then removed when the install was cancelled. None of these preview runs used a console.
-
 | Fact | Value | Where |
 | --- | --- | --- |
 | Commit | `cc71537c`, the head of the next build's branch with every part in | — |
 | Release file | sha256 `78db86f5378635a8ce6820b6cdace6feb3d9d1c73ef126aa4475da1e4f03e77a`, 5,419,008 bytes | `artifacts/phase23/next-build/gate-cc71537c/nro/` |
 | After cancellation | The card still held install 6's `c1ced861…` | Card readback, 2026-11-27 04:04Z |
 | Host gate | Six steps exited 0. The six top-level suites reported 3,182 passed, 0 failed, 4 ignored. The summary also counted 15 nested passes and missed a sixteenth whose output was interleaved. | `artifacts/phase23/next-build/gate-cc71537c/`, `logs/test.log:359` |
+
+Staged on 2026-11-27, then removed when the install was cancelled. None of these preview runs used a console.
+
 
 ### Smoke tests on the release file
 
@@ -438,8 +447,7 @@ inbox 2026-11-26 23:11:03Z and 2026-11-27 00:38:37Z. For this page the two posts
 - The editor's input gate holds the roster request while the editor is visible. Its timeout counts worker passes,
   not game frames: once the count exceeds 600 it clears its own wait, not the accepted roster request. In the second
   boot Player 1 timed out twice; the roster applied the switch three game frames after close.
-- Four clips were made in the second boot (`artifacts/phase23/final-smoke-media/`). They are not placed in the pages:
-  three are to be filmed again after the fixes.
+- Four clips were made in the second boot (`artifacts/phase23/final-smoke-media/`). At the time, all four were withheld from the pages and three were marked for filming again after the fixes.
 
 ### Eden, on the diagnostic build of the same commit
 
@@ -463,6 +471,6 @@ Both Yoga traces used the staged release `78db86f5…`, not the diagnostic file.
 
 ### Not covered
 
-- No console run: the build is not installed.
+- The preview install was cancelled. No console run was recorded.
 - Captures keeping their animation has host tests only, including one where a second process reads the files back.
 - The CPU side of the fighter choice, the way back to the current fighter, and a second player in a waiting room.

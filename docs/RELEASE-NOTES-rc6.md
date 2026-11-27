@@ -1,11 +1,17 @@
 # 0.2.0-rc.6
 
-Notes for players. 0.2.0-rc.5 was withdrawn before it ran on players' consoles, so this is the build after
+Notes for players. 0.2.0-rc.5 was withdrawn before it ran on players' consoles, so rc.6 followed
 `0.2.0-rc.3.1`. Everything [RELEASE-NOTES-rc5.md](RELEASE-NOTES-rc5.md) lists is in it, with the changes below. How to
 use recording is [RECORDING.md](guide/recording.md), the Mii pages are [MII.md](MII.md), and the pictures are the list in
 [MEDIA.md](MEDIA.md).
 
+The switch and reset times below are the ranges reported for rc.6. The [feature ledger](FEATURE-LEDGER.md) names the candidate runs. Their original timing receipts were unavailable for the November 27 audit.
+
 ## New
+
+| Addition | Recorded result |
+| --- | --- |
+| Sequence drilling | Practise an ordered list of combos |
 
 ### Sequence drilling
 
@@ -38,11 +44,12 @@ than in rc.5, under either bar.
 
 ### Save last combo
 
-*+ Save last combo…* is the first row of COMBOS, on the Recording page and in the pop-up's Combos & Sequences tab. It
-saves the last combo the frame strip saw, with its input events, and makes it the drill. A opens the keyboard for its
-name. An empty name, or an online waiting room where the keyboard does not open, gives it the next Combo N name. A
-local-wireless waiting room opens the keyboard. With no link on the strip yet it says so and writes nothing. rc.5 had
-lost this row.
+- *+ Save last combo…* is the first row of COMBOS, on the Recording page and in the pop-up's Combos & Sequences tab.
+- It saves the last combo the frame strip saw, with its input events, and makes it the drill.
+- A opens the keyboard for its name.
+- An empty name, or an online waiting room where the keyboard does not open, gives it the next Combo N name.
+- A local-wireless waiting room opens the keyboard.
+- With no link on the strip yet it says so and writes nothing. rc.5 had lost this row.
 
 ### The recording pop-up as drawn
 
@@ -68,11 +75,9 @@ A drilled combo, like a bound save or an active macro, moves to the top of its l
 - **The rest in the background.** After Training loads, the other groups of your cycles are built in the background
   while you play. The fighters on screen stay. Once the notice reads Ready or All loaded, switching into a group took
   about 50–70 ms in Eden, for Player 1 and for the CPU.
-- **Mii groups.** A Mii group is built on the game's worker instead of the game thread. In Eden the game thread's
-  longest pause during such a build was 34 ms (183 ms for the first Mii build after boot); the old build paused it at
-  every Mii build, 141 ms on the console. Leaving a Mii for the fighters it replaced takes about 45–115 ms; in rc.5 it
-  was a full reload of 4–6 seconds, and the next visit to the Mii built it again. Going back to the Mii is a warm
-  switch too, about 50 ms.
+- **Mii groups.** A Mii group is built on the game's worker instead of the game thread. In Eden the game thread's longest pause during such a build was 34 ms (183 ms for the first Mii build after boot); the old build paused it at every Mii build, 141 ms on the console.
+  - Leaving a Mii for the fighters it replaced takes about 45–115 ms; in rc.5 it was a full reload of 4–6 seconds, and the next visit to the Mii built it again.
+  - Going back to the Mii is a warm switch too, about 50 ms.
   - Mii groups are built in the background too, so the first switch into a Mii is warm (47–72 ms in Eden, for Player 1
     and for the CPU), and leaving a Mii is warm to any built group (47–80 ms).
 - Ice Climbers, Pokémon Trainer and Pyra/Mythra groups are built in the background too, also while a Mii is on screen
@@ -85,19 +90,18 @@ A drilled combo, like a bound save or an active macro, moves to the top of its l
 
 ### A cycle change takes effect at once
 
-Changing Player 1's or the CPU's Character Cycles in Training takes effect when the menu closes. The new fighters are
-built in the background right away, the same way. The notice goes from Loading to Ready (in Eden, 14 s after a Player 1
-change and 4 s after a CPU change). After a change, the first switches into the new fighters took 47–70 ms in Eden,
-also after a second change made while the first was still loading.
+- Changing Player 1's or the CPU's Character Cycles in Training takes effect when the menu closes.
+- The new fighters are built in the background right away, the same way.
+- The notice goes from Loading to Ready (in Eden, 14 s after a Player 1 change and 4 s after a CPU change).
+- After a change, the first switches into the new fighters took 47–70 ms in Eden, also after a second change made while the first was still loading.
 
 - **Fighters that left the cycle** stay loaded until you next open Training's pause menu, which frees them. Until then,
   a fighter loaded with them that the new cycle still has stays warm to switch to.
-- **If the new fighters need their room,** the old ones are freed at once instead: only as many as needed, and first
-  those the new cycle no longer has. The game pauses for a moment while they go (0.04–0.27 s in Eden). Their memory is
-  handed back as soon as the game has unloaded them (about 0.04 s in Eden mid-play, unseen at a pause), so the new
-  fighters start loading right after (about 1 s after the free for the Ice Climbers in Eden). Fighters the new cycle
-  still uses are freed only if there still isn't room after that. You never need to open the pause menu for a change
-  to load.
+- **If the new fighters need their room,** the old ones are freed at once instead: only as many as needed, and first those the new cycle no longer has.
+  - The game pauses for a moment while they go (0.04–0.27 s in Eden).
+  - Their memory is handed back as soon as the game has unloaded them (about 0.04 s in Eden mid-play, unseen at a pause), so the new fighters start loading right after (about 1 s after the free for the Ice Climbers in Eden).
+  - Fighters the new cycle still uses are freed only if there still isn't room after that.
+  - You never need to open the pause menu for a change to load.
 - Changing the cycle many times in a row doesn't build up memory: ten changes in Eden ended where they started.
 - The CPU seats that No. of CPUs raises (below) follow the new CPU cycle too.
 - While the new fighters build in the background, the game keeps running: its longest pause was 4 frames (about
@@ -145,6 +149,10 @@ leaves the game's own level everywhere.
 
 ## Fixed
 
+| Fix | Recorded result |
+| --- | --- |
+| Save, Load and Auto-load | Follow the save bound in the pop-up |
+
 - **Save, Load and Auto-load use the bound save.** In rc.5 they used the old save-state slot file, whatever the pop-up
   showed as bound. Save writes the bound save, and Load and Auto-load on death warp to it. With nothing bound,
   Auto-load does nothing.
@@ -172,8 +180,7 @@ leaves the game's own level everywhere.
   its Fighter Mismatch question is shown, and Switch loads the exact Mii.
 - **Notice plates.** Each dark plate is drawn under the notice texts, so a body's plate no longer covers the lower
   half of the header.
-- **Crashes and hangs:**
-  - going back to the original fighter from a group of fighters could make the game call through a null pointer, and
+- **Crashes and hangs:** going back to the original fighter from a group of fighters could make the game call through a null pointer, and
     the game then hung on Quit Training;
   - a Mii in a No. of CPUs seat was loaded without its Mii and read null memory every frame;
   - after a scene change, a group switch could bring in the wrong fighter and leave the CPU cycle stuck on "Wait for
@@ -194,11 +201,15 @@ leaves the game's own level everywhere.
 
 ## Known issues
 
-- **The game can freeze when the menu closes (rare).** In Eden it happened four times: once in Training after a
-  diagnostic CPU-cycle reload with Cycle Preload Off, and three times in Quickplay's waiting area while paging through
-  the menu (in the two longest loops, after 36 and 38 clean closes in a row). Other loops of the same steps closed the
-  menu cleanly. While the game was frozen, none of this mod's code was running; the game's own code was busy. The
-  rc.6 investigation did not establish the cause. See the [later menu-close fix](RELEASE-NOTES-rc8.md#a-rare-freeze-as-the-menu-closes); the macro-naming freeze was separate.
+| Observed issue | Recorded result |
+| --- | --- |
+| Menu-close freeze | Four occurrences in Eden |
+
+- **The game can freeze when the menu closes (rare).** In Eden it happened four times: once in Training after a diagnostic CPU-cycle reload with Cycle Preload Off, and three times in Quickplay's waiting area while paging through the menu (in the two longest loops, after 36 and 38 clean closes in a row).
+  - Other loops of the same steps closed the menu cleanly.
+  - While the game was frozen, none of this mod's code was running; the game's own code was busy.
+  - The rc.6 investigation did not establish the cause.
+  - See the [later menu-close fix](RELEASE-NOTES-rc8.md#a-rare-freeze-as-the-menu-closes); the macro-naming freeze was separate.
 - **Waiting for memory.** When memory is short, a group or a CPU seat can stay "waiting for memory". The Fighters
   notice says so, for example "Loaded 9/10 (1 waiting for memory)". That fighter still loads when you switch to it,
   the normal (slower) way.
@@ -213,7 +224,11 @@ leaves the game's own level everywhere.
 
 ## Corrections to the rc.5 notes
 
+| Correction | Recorded result |
+| --- | --- |
+| Save last combo | The row was absent in rc.5 |
+
 - "Save last combo still saves the combo you landed": rc.5 had no row for it. rc.6 has it, above.
 - "A named macro can carry the exact Mii it was recorded on": rc.5 loaded the class default. rc.6 loads the exact Mii,
   above.
-- "Drilling a sequence comes in the next build": that is this build.
+- rc.6 added sequence drilling.
