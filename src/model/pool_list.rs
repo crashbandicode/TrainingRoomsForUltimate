@@ -36,8 +36,8 @@ impl<T: Copy> PoolList<T> {
         Self::make(capacity, (1 << 48) - 1)
     }
 
-    #[cfg(test)]
     /// A test pool that retires after `last` checkouts.
+    #[cfg(test)]
     fn with_last_generation(capacity: usize, last: u64) -> Option<Self> {
         Self::make(capacity, last)
     }
