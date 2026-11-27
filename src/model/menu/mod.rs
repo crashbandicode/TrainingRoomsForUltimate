@@ -2498,3 +2498,7 @@ mod bridge_ack_tests;
 #[cfg(test)]
 #[path = "loading_help_tests.rs"]
 mod loading_help_tests;
+
+#[cfg(test)]
+#[path = "edge_setup_help_tests.rs"]
+mod edge_setup_help_tests;
