@@ -402,14 +402,11 @@ such as "7 of 7".
 | Ice Climbers pair group | Keeps the pair ready as a group of its own. | Group Swap or the pair bank is Off |
 | Mii groups | Keeps one Mii group per role ready. | Group Swap is Off |
 
-PT / Aegis groups need **3 free Ready Fighters** (the total is shared with the other ready fighters). With fewer, the
-group loads on the swap instead, with no message on screen. The row's help line says "PT / Aegis groups need 3 free
-Ready Fighters."
+PT / Aegis groups need **free Ready Fighters: 3 for Pokémon Trainer, 2 for Pyra / Mythra** (the total is shared with
+the other ready fighters). With fewer, the group loads on the swap instead, with no message on screen. The row's help
+line says "PT / Aegis groups need free Ready Fighters: PT 3, Aegis 2."
 Every entry also needs Cycle Preload above Off, Preload on Fighters or Both and Ready Fighter Bodies above Off; the
 list doesn't grey them for that.
-
-![Fighters & Stages, Loading: the Swap groups row is focused and its help line reads: PT / Aegis groups need 3 free Ready Fighters](../media/rc13-swap-groups-help.png)<br>
-*The Swap groups row on the Loading section, with Ready Fighters at 2: the help line reads "PT / Aegis groups need 3 free Ready Fighters." Eden, rc.13 (untested on hardware).*
 
 ![Side by side, the same Player 1 swap from Pikachu back to Mario with Original fighter bank On (left) and Off (right): On has Mario there at once, Off leaves the spot empty a little longer](../media/rc14-swap-groups-orig-bank.gif)<br>
 *Original fighter bank On (left) and Off (right): the same cycle chord, lined up on the press, with the CPU Captain Falcon in both. Player 1 goes from Pikachu back to its starting fighter, Mario. On, Mario is there at once with "Original fighter restored"; Off, the spot stays empty a little longer while Mario loads. A timer runs bottom left. Eden, rc.14 (untested on hardware).*

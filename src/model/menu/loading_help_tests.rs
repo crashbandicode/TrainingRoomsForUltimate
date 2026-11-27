@@ -32,7 +32,8 @@ fn the_loading_help_lines_say_what_the_code_does() {
     // Off leaves no group at all, whatever Group Swap says.
     assert!(Settings::DEFAULT.groups_enabled());
     assert!(!Settings { bank_members: 0, ..Settings::DEFAULT }.groups_enabled());
-    // Pokémon Trainer's group is three bodies and Pyra / Mythra's two.
+    // A group is placed whole when that many bodies are free (`body_bank`'s planner): Pokémon Trainer's is three
+    // bodies and Pyra / Mythra's two (`Forms::starting`).
     assert_eq!((Members::native_group(0x24).map(Members::count), Members::native_group(0x5a).map(Members::count)), (Some(3), Some(2)));
 }
 }
