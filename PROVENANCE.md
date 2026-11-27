@@ -160,12 +160,11 @@ Whole-image numbers the campaign recorded (file bytes; resident = file + bss):
 | revision 32 (r31 sources) | 2,174,976 | 2,203,648 | opt-level "z", codegen-units 1 | same |
 | revision 33 (analytics, updater, dialog removed) | 1,769,472 | 1,798,144 | "z" + cgu1; the smallest fork image in the record | `footprint-experiments/results.json` key `default` (a fork r33 build, not upstream) |
 | 7.1.2 (input display renderer cache) | 1,785,856 | 1,814,528 | "z" + cgu1 | `artifacts/switch-input-display-7.1.2/` |
-| C116.1 (M5i) | 4,804,608 | 4,878,336 | +9.1 % vs B123-rc; `.rodata` 2,510,848 B of it is the fork's embedded roster/stage/item images; hot-swap, Mii and preload work since r33 | `SWITCH-INSTALL-C116.1.json`; `docs/resource-costs.md` Table A (full trail, 30 builds) |
+| C116.1 (M5i) | 4,804,608 | 4,878,336 | +9.1 % vs B123-rc; `.rodata` 2,510,848 B of it is the fork's embedded roster/stage/item images; hot-swap, Mii and preload work since r33 | `SWITCH-INSTALL-C116.1.json`; [Table A](docs/BUDGETS.md#resource-costs--table-a-whole-plugin-image-over-time) (full trail, 30 builds) |
 
 An upstream-only image was never built in this workspace (the file named
 `libtraining_upstream33w.nro` has the fork's 32w header), so the share of the
-image that the upstream-origin features cost is not known; `docs/resource-costs.md`
-§Gaps proposed these measurements.
+image that the upstream-origin features cost is not known; [Gaps and how to measure](docs/BUDGETS.md#resource-costs--gaps-and-how-to-measure) proposed these measurements.
 
 - One cargo feature per upstream-origin feature and an
 "all on minus X" build matrix measured with the playbook's `nro_size.py`, and a
