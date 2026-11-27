@@ -457,7 +457,7 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 | --- | --- |
 | Guide and specification | [Combo files](guide/combos.md) · [SPEC-input-07](../specs/SPEC-input-07-combo-helper.md). |
 | Drill selection | `src/model/library/hot.rs` persists it in `recording-index.json`. |
-| Import | `src/model/recording_menu.rs` rereads the combo folder on opening, including files copied in. |
+| Import | On reopening, `rr_runtime.rs` checks the combo folder for changes and passes the refreshed catalog to the menu. |
 | Fighter Mismatch | `ask_drill` in `src/model/rr_host.rs` handles the prompt. |
 
 | Combo file | Format | Rules |

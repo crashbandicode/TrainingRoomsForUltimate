@@ -36,7 +36,7 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 
 **Log a panic**
 
-- A panic is written to the diagnostics file and the Skyline log; there is no pop-up.
+- The panic hook flushes the diagnostics buffer to the diagnostics file and kernel debug output. Eden records the latter as `OutputDebugString`.
 
 
 
