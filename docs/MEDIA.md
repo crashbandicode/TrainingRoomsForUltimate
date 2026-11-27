@@ -635,10 +635,10 @@ screen draws the same):
   `688c478`), booted on cov-rec's pre-library card. The row first checked the card the way cov-rec's #37 row does:
   two dated saves, Slot 2 bound, `oldjab` active, one migrate line. The take's first 0.9 s (a leftover notice) are
   trimmed. It was re-encoded with ffmpeg, one shared palette and no dither: 3.9 MB, 8.1 s.
-  - guide/recording.md now embeds `rc5-migration-crop.gif` (2026-11-11): the same frames and times, cropped to the top 436
+  - The recording guide used `rc5-migration-crop.gif` on 2026-11-11: the same frames and times, cropped to the top 436
     rows to leave out the gamepad overlay plugin's input bar. The two lists and the notices are whole; the fighters
     are cut at the waist.
-- `rc5-save-warp.gif` (Surface `out-confirm-2116Z`, above): guide/recording.md now embeds `rc5-save-warp-crop.gif`
+- `rc5-save-warp.gif` (Surface `out-confirm-2116Z`, above): the recording guide used `rc5-save-warp-crop.gif`
   (2026-11-11), cropped the same way; the fighters are cut at the knees.
 - `rc5-make-combo.gif`: run `rc6-docs-gifs-xps7` on the XPS, 2026-11-08 17:46Z, the same diag NRO, fixture `mk6` (the
   rc.5 `mk` fixture with its start save moved into reach, `make_mk6.py`). After the clip the row checked the card:
@@ -649,7 +649,7 @@ screen draws the same):
   `TRUE 0` (input +4), attempt 1 `+1 DROP` (input +5), attempt 2 up tilt into up smash (input +4). The take is trimmed
   at 0.8 s. It was re-encoded with one shared palette of 96 colours and no dither, keeping every second frame with the
   time of both: 9.9 MB, 7.1 s.
-  - guide/recording.md now embeds `rc5-grade-not-true-crop.gif` (2026-11-11): the same frames and times, cropped to the top
+  - The recording guide used `rc5-grade-not-true-crop.gif` on 2026-11-11: the same frames and times, cropped to the top
     436 rows to leave out the gamepad overlay plugin's input bar (y 443–452). The frame strip and helper bar are
     whole; the fighters are cut at the knees in the last 2 s.
 
@@ -934,4 +934,4 @@ their own claim: each half is read on the diag log, and both halves run against 
 
 `rc15-input-drill.gif` is the byte-identical media restored from `3d36ca7d`, shot on rc.15 feature source `2eb3903e`, not the final integrated build. Full frame1280×720,3.78s, nine encoded frames from19 native frames at a5fps request; SHA256 `a7f8a550de084758ed076c81b4dff39bc4503b2eacc80a8b7c9bb317b4fa9ccc`. It shows Drill1's Crop range4→3→4→3. It does not show Record drill, Make combo, grading or save-as-new. The early build's helper overlaps the editor; the integrated build corrected that issue. The [dated evidence](EVIDENCE-rc15-input-drill.md) keeps the original limitations and separate runtime checks. Embedded in README, Recording guide and Recording menu.
 
-Remaining media gaps: no dedicated GIF for combo link Crop, Record drill, no-hit Make combo, drill grading or the colour legend. Macro and drill GIFs show range selection rather than the full preview/save flow; the article hurtbox GIF shows Pikmin, not every supported item. Colour legend has both native scheme stills. These are capture gaps, not claims of missing runtime functionality.
+At the time, the macro and drill GIFs showed range selection, not the full preview/save flow. The [article hurtbox take](media/rc15-article-hurtboxes.gif) showed Pikmin, not every supported item. For later Record drill and colour legend footage, see [Tutorial clips](#tutorial-clips-2026-11-25-through-2026-11-27).

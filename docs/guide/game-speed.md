@@ -22,5 +22,5 @@
 | To | Do this |
 |---|---|
 | <a id='1-frame'></a>Stop on a frame | Move left to **1 Frame**, then release the speed chord. |
-| Advance | Tap ZL once, or hold it to keep stepping after the initial delay. |
+| Advance | Tap ZL (GameCube: L), or hold to keep stepping after the initial delay. |
 | Resume | Hold the speed chord again; tap Right until the display reads x1. |

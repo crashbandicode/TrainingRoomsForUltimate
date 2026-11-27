@@ -174,9 +174,8 @@ The docs steps of a release. The build, the tag, the Forgejo release and the car
 `docs/CHECKLIST.md` and the operator's order.
 
 1. Edit `docs/CURRENT-RELEASE.md`: the `Current release:` line, the status, what's new, the known issues.
-2. Make the README's top and the Status section of `docs/TECHNICAL.md` name that release. `cargo test` fails until they
-   do (`tools/docs_check.py`, rule `version-name`), and also on any "newest" or "latest" sentence that still names the
-   old one (`version-stale`).
+2. Name the release in the README and Getting started status links and in `docs/TECHNICAL.md` under Status.
+   `version-name` checks all three; `version-stale` rejects "newest" or "latest" claims about an older release.
 3. Put the release in the crate version in the release's name commit (`Cargo.toml` `version = "0.2.0-rc.N"` and
    `Cargo.lock`'s `training_rooms` entry, with `build.rs` `BUILD_NAME`, `tests/build_tag.rs` and the frame.rs build-tag
    test): the footer reads `0.2.0-rc.N · rcN <commit>`. Not before: `cargo test` fails (`version-cargo`) while the crate

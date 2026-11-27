@@ -633,13 +633,7 @@ See [Current release](CURRENT-RELEASE.md) for the installed build, changes and k
 
 ## Build
 
-```powershell
-cargo test --all-targets
-cargo skyline build --release
-```
-
-The NRO is `target/aarch64-skyline-switch/release/libtraining_rooms.nro`. Toolchains, the diagnostic build and the
-layout recipe: [BUILD.md](BUILD.md). Current acceptance state: [HANDOFF.md](../HANDOFF.md).
+See [Building TrainingRooms](BUILD.md) for the host checks, toolchains and Switch builds, or the [handoff](../HANDOFF.md) for acceptance results.
 
 ## License and provenance
 
