@@ -2510,7 +2510,8 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f78ea125d955343759eb6e721ae3b74e5cb03358" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-di.mp4) ([DI Direction](menu/cpu.md#di-direction)): DI Down, the grid with Down at full tint, Y clears it, Up picked, DI Up; the same smash launches Donkey Kong low, then high; <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/070bd785610ec2f84383985757f699021f9ba217" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-di-sdi-chips.mp4): the DI and SDI grids from nothing picked to Up x1 (`gna-r13b-yoga-1`, `7d7b74c9`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f78ea125d955343759eb6e721ae3b74e5cb03358" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-di.mp4) ([DI Direction](menu/cpu.md#di-direction)): DI Down, the grid with Down at full tint, Y clears it, Up picked, DI Up; the same smash launches Donkey Kong low, then high.
+- <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/070bd785610ec2f84383985757f699021f9ba217" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-di-sdi-chips.mp4): the DI and SDI grids from nothing picked to Up x1 (`gna-r13b-yoga-1`, `7d7b74c9`)
 
 ### 99. Left / Right flip an On/Off row, as the footer says, not only A (Menu)
 
@@ -2707,7 +2708,8 @@ what those reports (and, for a clip, [MEDIA.md](MEDIA.md)) say, and "not covered
 
 **Clip observations**
 
-- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/8972634edc5cc82df2002fc535df43b0652b0cd4" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-taunts-off.mp4) ([Taunts](menu/display-and-controls.md#taunts)): the same D-pad Up, Side and Down from the same reset, Off (left) Mario stands, On (right) three taunts; <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e904804037ffeba739d85fe6c2674665501c604c" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-taunts-kirby-hat.mp4): Taunts Off, Kirby, no hat Up does nothing, Falco's hat, Side and Down nothing, Up drops the hat (`gna-g10-1`, `f4f058e2`)
+- **ok** <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/8972634edc5cc82df2002fc535df43b0652b0cd4" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-taunts-off.mp4) ([Taunts](menu/display-and-controls.md#taunts)): the same D-pad Up, Side and Down from the same reset, Off (left) Mario stands, On (right) three taunts.
+- <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e904804037ffeba739d85fe6c2674665501c604c" autoplay muted loop playsinline controls></video> [Open the clip](media/rc13-taunts-kirby-hat.mp4): Taunts Off, Kirby, no hat Up does nothing, Falco's hat, Side and Down nothing, Up drops the hat (`gna-g10-1`, `f4f058e2`)
 
 ### 109. Swap group hints for Pokémon Trainer and Aegis
 
