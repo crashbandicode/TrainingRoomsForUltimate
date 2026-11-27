@@ -2,7 +2,7 @@
 //! without a start does not end the session (the docs pass, 2026-11-27: with factory settings the drill stopped after
 //! three launches with "Approximate aim has no solution for these values").
 use super::*;
-use crate::model::tech_launch::FlightParams;
+use crate::model::tech_launch::{self as flight, FlightParams};
 use crate::model::tech_settings::{Mode, Numeric};
 use surface::{Kind, Line, Source, Surfaces, END_MARGIN};
 
@@ -321,4 +321,282 @@ fn an_unsolvable_draw_is_drawn_again_and_the_stop_is_a_listed_restriction() {
     assert_eq!(feature.matches("// restriction: tech-no-launch-fits").count(), 2, "both places that show it");
     let row = format!("| `tech-no-launch-fits` | \"{stop}\" |");
     assert!(include_str!("../../../docs/RESTRICTIONS.md").contains(&row));
+}
+
+/// rc15 `ceiling-92ac06d0`: 50 units under a ceiling, straight up at KB 100, rose 34.18 and never touched; 30 did.
+#[test]
+fn a_manual_start_that_touches_no_surface_is_refused_and_no_longer_replays() {
+    let surfaces = block(v(85., 0.), v(-85., 0.));
+    let ceiling = surfaces.lines().find(|l| l.kind() == Some(Kind::Ceiling)).expect("the block's underside");
+    let spot = picker::Spot::at(ceiling, 0.5);
+    let plan = |distance: f32, angle: Option<f32>| {
+        let mut config = factory_floor();
+        config.surface = 4;
+        config.start = Numeric { mode: Mode::Set, lo: distance, hi: distance };
+        if let Some(degrees) = angle {
+            config.angle = Numeric { mode: Mode::Set, lo: degrees, hi: degrees };
+        }
+        planner::plan(config, context(&surfaces, spot), &mut |_| 0)
+    };
+    let near = plan(30., Some(90.)).expect("a start 30 under the ceiling touches it");
+    assert_eq!(near.setup.launch.start, v(spot.point().x, -90.));
+    // Why it matters: a launch without a contact is abandoned, and the session asks for the same setup again.
+    let mut session = session::Session::IDLE;
+    session.start(session::Length::Free);
+    session.placed(1);
+    assert_eq!(session.tick(false, None), session::Action::Launch);
+    assert_eq!(session.abandon(), session::Action::Place { reroll: false });
+    for angle in [Some(90.), None] {
+        assert_eq!(plan(50., angle).err(), Some(planner::Refused::Aim), "50 under the ceiling, angle {angle:?}");
+    }
+}
+
+#[test]
+fn a_floor_reached_after_hitstun_still_plans_until_the_session_would_abandon_the_attempt() {
+    let surfaces = block(v(85., 0.), v(-85., 0.));
+    let spot = picker::Spot::at(surfaces.lines().next().unwrap(), 0.5);
+    let mut config = factory_floor();
+    config.surface = 4;
+    config.speed = Numeric { mode: Mode::Set, lo: 80., hi: 80. };
+    config.angle = Numeric { mode: Mode::Set, lo: 90., hi: 90. };
+    config.start = Numeric { mode: Mode::Set, lo: 100., hi: 100. };
+    let plan = planner::plan(config, context(&surfaces, spot), &mut |_| 0).expect("a late floor contact");
+    assert_eq!(plan.setup.launch.start, v(0., 100.));
+    let velocity = flight::launch_velocity(80., flight::direction_degrees(90.).unwrap()).unwrap();
+    let planned_frame = (1..=flight::MAX_FRAMES)
+        .find(|&f| plan.setup.launch.start.y + flight::flight(velocity, PARAMS, f).unwrap().displacement.y <= 0.)
+        .unwrap();
+    assert!(planned_frame >= 32);
+
+    let wide = block(v(10000., 0.), v(-10000., 0.));
+    let floor = picker::Spot::at(wide.lines().next().unwrap(), 0.5);
+    let blast = solver::editor_bounds([-20000., 20000., 20000., -20000.]);
+    let aim = solver::Aim { surfaces: &wide, spot: floor, knockback: 80., params: PARAMS, blast, view: None };
+    let mut before = false;
+    let mut after = false;
+    for half_height in 2..=500 {
+        let height = half_height as f32 / 2.;
+        let first = (1..=flight::MAX_FRAMES)
+            .find(|&f| height + flight::flight(velocity, PARAMS, f).unwrap().displacement.y <= 0.)
+            .unwrap();
+        let expected = (f32::from(first) < 80. * flight::DAMAGE_FRAME_MUL + f32::from(session::ABANDON))
+            .then_some(first);
+        before |= expected.is_some() && f32::from(first) >= 80. * flight::DAMAGE_FRAME_MUL;
+        after |= expected.is_none();
+        assert_eq!(aim.contact(v(0., height), 90.).0, expected, "height {height}, frame {first}");
+    }
+    assert!(before && after);
+
+    for (kind, kb, angle, early, late) in [(Kind::Wall, 80., 180., 20u16, 35u16),
+                                          (Kind::Ceiling, 250., 90., 20u16, 110u16)] {
+        let line = match kind {
+            Kind::Wall => Line { id: 1, ends: [v(0., -1000.), v(0., 1000.)], normal: v(1., 0.),
+                floor: false, wall: true, passable: false },
+            Kind::Ceiling => Line { id: 1, ends: [v(-1000., 0.), v(1000., 0.)], normal: v(0., -1.),
+                floor: false, wall: false, passable: false },
+            Kind::Floor => unreachable!(),
+        };
+        let mut faces = Surfaces::EMPTY;
+        assert!(faces.push(line));
+        let aim = solver::Aim { surfaces: &faces, spot: picker::Spot::at(line, 0.5),
+            knockback: kb, params: PARAMS, blast, view: None };
+        let velocity = flight::launch_velocity(kb, flight::direction_degrees(angle).unwrap()).unwrap();
+        for target_frame in [early, late] {
+            let previous = flight::flight(velocity, PARAMS, target_frame - 1).unwrap().displacement;
+            let current = flight::flight(velocity, PARAMS, target_frame).unwrap().displacement;
+            let start = if kind == Kind::Wall {
+                v(-(previous.x + current.x) / 2., 0.)
+            } else {
+                v(0., -(previous.y + current.y) / 2.)
+            };
+            let first = (1..=flight::MAX_FRAMES).find(|&f| {
+                let p = add(start, flight::flight(velocity, PARAMS, f).unwrap().displacement);
+                if kind == Kind::Wall { p.x <= 0. } else { p.y >= 0. }
+            }).unwrap();
+            assert_eq!(first, target_frame);
+            let expected = (f32::from(first) < kb * flight::DAMAGE_FRAME_MUL).then_some(first);
+            assert_eq!(aim.contact(start, angle).0, expected, "{kind:?} frame {first}");
+        }
+    }
+}
+
+#[test]
+fn auto_starts_pass_the_manual_contact_test_and_the_traced_fly_by_fails_both() {
+    let flat = block(v(85., 0.), v(-85., 0.));
+    let sloped = block(v(0., 0.), v(100., 20.));
+    let a = v(41.416_157, -40.118_07);
+    let b = v(64.387_29, -25.103_106);
+    let c = v(a.x, b.y);
+    let wall = Line { id: 1, ends: [a, b], normal: v(0.547_131_3, -0.837_046_74),
+        floor: false, wall: true, passable: false };
+    let mut traced = Surfaces::EMPTY;
+    for line in [wall, Line { id: 2, ends: [b, c], normal: v(0., 1.), floor: true, wall: false, ..wall },
+                 Line { id: 3, ends: [c, a], normal: v(-1., 0.), ..wall }] {
+        assert!(traced.push(line));
+    }
+    traced.state = surface::Walk::Closed;
+    let rows = [
+        ("flat-20", &flat, drawn(&flat, 18296), 20u16, None, true),
+        ("flat-38", &flat, drawn(&flat, 45000), 38, None, true),
+        ("slope-20", &sloped, drawn(&sloped, 3), 20, None, true),
+        ("slope-30", &sloped, drawn(&sloped, 45000), 30, None, true),
+        ("wall-control", &traced, picker::Spot::at(wall, 0.654_409_35), 26, Some(123.170_44), true),
+        ("wall-fly-by", &traced, picker::Spot::at(wall, 0.699_877_26), 25, Some(80.), false),
+    ];
+    for (name, surfaces, spot, frames, angle, expected) in rows {
+        let ctx = planner::Context { damage_multiplier: Some(1.2), ..context(surfaces, spot) };
+        let aim = solver::Aim { surfaces, spot, knockback: 100., params: ctx.params, blast: ctx.blast, view: ctx.view };
+        let angle = angle.unwrap_or_else(|| aim.solve(None, frames).expect("factory floor solution").angle);
+        let auto = aim.at(angle, frames);
+        let velocity = flight::launch_velocity(100., flight::direction_degrees(angle).unwrap()).unwrap();
+        let start = sub(spot.point(), flight::flight(velocity, PARAMS, frames).unwrap().displacement);
+        let manual = aim.contact(start, angle).0;
+        assert_eq!((auto.is_some(), manual.is_some()), (expected, expected),
+            "{name}: start {start:?}, angle {angle}, frames {frames}, manual {manual:?}");
+        if let Some(touch) = manual {
+            assert!(touch == frames || touch == frames + 1, "{name}: touch {touch}, frames {frames}");
+        }
+    }
+}
+
+#[test]
+fn a_random_start_with_unreachable_bearings_draws_only_from_the_bearings_that_touch() {
+    let surfaces = block(v(85., 0.), v(-85., 0.));
+    let wall = surfaces.lines().find(|line| line.kind() == Some(Kind::Wall) && line.normal.x > 0.).unwrap();
+    let spot = picker::Spot::at(wall, 0.5);
+    let ctx = context(&surfaces, spot);
+    let aim = solver::Aim { surfaces: &surfaces, spot, knockback: 100., params: PARAMS, blast: ctx.blast, view: ctx.view };
+    let mut config = factory_floor();
+    config.surface = 4;
+    config.speed = Numeric { mode: Mode::Set, lo: 100., hi: 100. };
+    config.angle = Numeric { mode: Mode::Set, lo: 180., hi: 180. };
+    config.start = Numeric { mode: Mode::Random, lo: 50., hi: 50. };
+    let starts: Vec<_> = (0..360).map(|bearing| {
+        add(spot.point(), scale(flight::direction_degrees(bearing as f32).unwrap(), 50.))
+    }).collect();
+    let touching: Vec<_> = starts.iter().map(|&start| {
+        finite(start) && ctx.blast.contains(start) && ctx.view.is_none_or(|view| view.contains(start))
+            && !solver::inside(&surfaces, start) && aim.contact(start, 180.).0.is_some()
+    }).collect();
+    assert!(touching.iter().any(|&value| value) && touching.iter().any(|&value| !value));
+    let bad = touching.iter().position(|&value| !value).unwrap() as u32;
+    let bearing_of = |start| starts.iter().position(|&candidate| bits(candidate) == bits(start)).unwrap();
+    let mut seed = 0x2545_f491u32;
+    let mut draw = |n: u32| {
+        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        ((u64::from(seed >> 8) * u64::from(n)) >> 24) as u32
+    };
+    let mut seen = [false; 360];
+    for _ in 0..1000 {
+        let plan = planner::plan(config, context(&surfaces, spot), &mut draw).expect("a touching bearing");
+        let bearing = bearing_of(plan.setup.launch.start);
+        assert!(touching[bearing], "bearing {bearing}");
+        seen[bearing] = true;
+    }
+    assert!(seen.iter().filter(|&&value| value).count() > 1);
+    let plan = planner::plan(config, context(&surfaces, spot), &mut |n| if n == 360 { bad } else { 0 })
+        .expect("ordered search finds a touching bearing");
+    assert!(touching[bearing_of(plan.setup.launch.start)]);
+
+    let mut search = planner::Search::default();
+    loop {
+        match planner::plan_frame(config, &ctx, &mut |n| if n == 360 { bad } else { 0 }, &mut search) {
+            Ok(plan) => {
+                assert!(touching[bearing_of(plan.setup.launch.start)]);
+                break;
+            }
+            Err(planner::Refused::Checking) => {}
+            Err(other) => panic!("unexpected refusal {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn ranges_without_a_touching_value_stop_once_every_value_was_flown() {
+    let surfaces = block(v(85., 0.), v(-85., 0.));
+    let ceiling = surfaces.lines().find(|line| line.kind() == Some(Kind::Ceiling)).unwrap();
+    let spot = picker::Spot::at(ceiling, 0.5);
+    let ctx = context(&surfaces, spot);
+    let fixed = |value| Numeric { mode: Mode::Set, lo: value, hi: value };
+    let mut config = factory_floor();
+    config.surface = 4;
+    config.speed = fixed(100.);
+    config.damage = fixed(0.);
+    config.hit_damage = fixed(12.);
+    config.time = fixed(30.);
+    config.delay = fixed(30.);
+    config.angle = fixed(270.);
+    config.start = Numeric { mode: Mode::Random, lo: 10., hi: 10. };
+    for (speed, turns) in [(fixed(100.), 360u32),
+                           (Numeric { mode: Mode::Random, lo: 80., hi: 100. }, 1080)] {
+        config.speed = speed;
+        let mut search = planner::Search::default();
+        let mut total = 0u32;
+        let mut calls = 0u32;
+        loop {
+            let mut bearings = 0u32;
+            let result = planner::plan_frame(config, &ctx, &mut |n| {
+                if n == 360 { bearings += 1; }
+                0
+            }, &mut search);
+            calls += 1;
+            let first = u32::from(calls == 1);
+            assert!(bearings >= first && bearings - first <= 36);
+            total += bearings - first;
+            match result {
+                Err(planner::Refused::Checking) => {}
+                Err(planner::Refused::Aim) => break,
+                Err(other) => panic!("unexpected refusal {other:?}"),
+                Ok(_) => panic!("an unreachable range was planned"),
+            }
+        }
+        assert_eq!(total, turns);
+        assert!(calls > 1);
+    }
+    config.speed = fixed(100.);
+    config.start = fixed(10.);
+    assert_eq!(planner::plan_frame(config, &ctx, &mut |_| panic!("an all-Set draw"), &mut planner::Search::default()).err(),
+        Some(planner::Refused::Aim));
+}
+
+#[test]
+fn a_refused_five_angle_ceiling_spot_consumes_more_than_half_a_frame_budget() {
+    let surfaces = block(v(85., 0.), v(-85., 0.));
+    let ceiling = surfaces.lines().find(|l| l.kind() == Some(Kind::Ceiling)).unwrap();
+    let fixed = |x| Numeric { mode: Mode::Set, lo: x, hi: x };
+    let mut config = factory_floor();
+    config.surface = 3;
+    config.speed = fixed(250.);
+    config.start = fixed(50.);
+    config.angle = Numeric { mode: Mode::Random, lo: 265., hi: 285. };
+    config.damage = fixed(0.);
+    config.hit_damage = fixed(12.);
+    config.time = fixed(30.);
+    config.delay = fixed(30.);
+    for t in [0.25, 0.75] {
+        let spot = picker::Spot::at(ceiling, t);
+        let ctx = planner::Context { blast: solver::editor_bounds([-500., 500., 500., -1000.]), ..context(&surfaces, spot) };
+        let aim = solver::Aim { surfaces: &surfaces, spot, knockback: 250., params: ctx.params, blast: ctx.blast, view: None };
+        let start = add(spot.point(), scale(ceiling.normal, 50.));
+        for angle in (265..=285).step_by(5) {
+            assert_eq!(aim.contact(start, angle as f32), (None, 219));
+        }
+        let mut chance = 0;
+        let result = planner::plan_frame(config, &ctx, &mut |n| {
+            assert_eq!(n, 5);
+            chance += 1;
+            0
+        }, &mut planner::Search::default());
+        assert_eq!(result.err(), Some(planner::Refused::Aim));
+        assert_eq!(chance, 6, "one ordinary draw plus one per enumerated angle");
+    }
+}
+
+#[test]
+fn the_session_and_the_solver_share_the_abandon_point_and_the_runtime_asks_frame_by_frame() {
+    let feature = include_str!("../../runtime/features/tech.rs");
+    assert!(feature.contains("planner::plan_frame("));
+    assert!(feature.contains("session::ABANDON"));
+    assert!(!feature.contains("after_reaction > 120"));
+    assert_eq!(feature.matches("No launch fits these Tech practice values").count(), 1);
 }
