@@ -1,6 +1,6 @@
 # rc.14 preview: targets (Eggs-ercise and Break the Targets)
 
-These 2026-11-14 Eden recordings document preview builds. The test did not include hardware.
+- These 2026-11-14 Eden recordings document preview builds. The test did not include hardware.
 
 ## Newest takes (the rc.14 build, footer "rc14 8199c696", shot about 23:50Z)
 

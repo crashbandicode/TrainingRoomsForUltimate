@@ -1,6 +1,6 @@
 # How the Training stage's off-stage rule was chosen
 
-This 2026-11-25 review used stage-file diagrams and plugin code. See [Technical notes](../../TECHNICAL.md#stages) for the implementation.
+- This 2026-11-25 review used stage-file diagrams and plugin code. See [Technical notes](../../TECHNICAL.md#stages) for the implementation.
 
 ## 1. The stage
 
@@ -35,7 +35,7 @@ This 2026-11-25 review used stage-file diagrams and plugin code. See [Technical 
 
 ![The proposed rule on the Training stage](training-04-off-stage-proposed.png)
 
-The proposal used geometry on every stage:
+- The proposal used geometry on every stage:
 
 - A point is **off stage** when it is inside the blast lines, not inside a solid, and there is nothing to stand on
   beneath it down to the bottom blast line.
@@ -43,7 +43,7 @@ The proposal used geometry on every stage:
 - A **ledge** is the end of a solid floor that has such open air beside it.
 - A **default spot** (the white crosses) is the middle of the open air beside a ledge.
 
-On Training this marks the two gaps and the same four ledges the stage file lists. It excludes the block top, wall step and far floor end.
+- On Training this marks the two gaps and the same four ledges the stage file lists. It excludes the block top, wall step and far floor end.
 
 ![Battlefield under the old and proposed rules](battlefield-05-today-and-proposed.png)
 

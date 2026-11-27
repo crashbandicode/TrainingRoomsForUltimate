@@ -11,7 +11,7 @@ The 2026-11-25 proposal used the Break the Targets crosshair to edit a save dire
 | 3 · Spot | Move the fighter with the crosshair. |
 | 4 | Press A to save, then load once. |
 
-**Decided 2026-11-25, about 15:50Z.** Each section gives the outcome first. Green outlines mark the original recommendations. See [the decision record](../../DECISIONS.md) and [the Recording guide](../../guide/recording.md#change-placement-and-the-replay-window).
+- **Decided 2026-11-25, about 15:50Z.** Each section gives the outcome first. Green outlines mark the original recommendations. See [the decision record](../../DECISIONS.md) and [the Recording guide](../../guide/recording.md#change-placement-and-the-replay-window).
 
 ## PC1 · On stage: how the floor is chosen
 
@@ -36,7 +36,7 @@ The 2026-11-25 proposal used the Break the Targets crosshair to edit a save dire
 
 ![PC3](place-next-PC3-pages.png)
 
-**Five pages were chosen.** + saves from any page.
+- **Five pages were chosen.** + saves from any page.
 
 - **A (recommended then).** Where and Spot only. Keep damage and facing. Change an impossible start state, such as a missed tech moved into the air, to Standard.
 - **B.** Add three pages per visit to edit state and damage and preview the result, as in Record placement.
@@ -54,7 +54,7 @@ The 2026-11-25 proposal used the Break the Targets crosshair to edit a save dire
 
 ![PC5](place-next-PC5-shared-start.png)
 
-**Users choose each time by default.** Advanced offers Prompt, Always change and Always copy.
+- **Users choose each time by default.** Advanced offers Prompt, Always change and Always copy.
 
 - **A (recommended then).** Edit the shared save for every linked macro. The Saved notice names the count, for example “2 macros start here”.
 - **B.** Create a new save each time and relink this macro alone. Estimated cost was 40 extra lines.
