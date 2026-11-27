@@ -12,6 +12,7 @@
 | 2. Set the start | Choose **Set up…**, place the CPU, then choose its percent. |
 | 3. Adjust percent | Left/Right changes one point; Up/Down changes ten. |
 | 4. Start | Place Player 1 above a floor or platform; press A or Plus on Preview. |
-| 5. Juggle | The clock starts at release; landing, a ledge catch or KO ends the attempt. |
+| 5. Juggle | Outside Hero's Zoom, airtime runs from release to landing, ledge catch or KO. |
+| Against Hero's Zoom | Aim for a hit or grab in the [Zoom landing window](../menu/practice-games.md#zoom-landing-window). |
 | Retry | Start reuses the same floor setup; moving to a disconnected floor can reopen placement. |
 | Change the challenge | Use [game settings](../menu/practice-games.md); Reaction is available in Perfect mode. |

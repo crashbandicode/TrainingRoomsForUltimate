@@ -71,7 +71,7 @@ Keep a [named setup](../guide/save-states.md#making-a-setup) from the fighters' 
 | Action | Result |
 | --- | --- |
 | Restore here | Moves both fighters on close; later Load still uses the bound save. |
-| Make Load use it | Changes Load and Auto-load's target until you Save or bind another save. |
+| Make Load use it | Sets this setup as the Load and Auto-load target without moving either fighter. |
 | Rename | Changes the setup's name, not its identity. |
 | Delete | Asks before removing the setup; your saves stay intact. |
 
