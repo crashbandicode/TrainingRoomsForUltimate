@@ -76,7 +76,7 @@ Use [delay rows](../guide/cpu-behaviour.md#delay-rows) to select individual valu
 | <a id="throw-delay"></a>Throw Delay | 0-150 frames, step 5; **no wait** | Waits before throwing. |
 | <a id="pummel-delay"></a>Pummel Delay | 0-150 frames, step 5; **no pummels** | Waits before each pummel, including the first. |
 | <a id="falling-aerials"></a>Falling Aerials | Yes, **No**, Random | Waits until falling before starting an aerial. |
-| <a id="aerial-drift"></a>Aerial Drift | None, In, Out, Forward, Back; **none ticked** | Drifts during a mashed aerial until landing. |
+| <a id="aerial-drift"></a>Aerial Drift | None, In, Out, Forward, Back; **none ticked** | Holds the chosen drift while the mashed aerial is active and the CPU is airborne. |
 | <a id="aerial-delay"></a>Aerial Delay | 0-30 frames; **no wait** | Waits before starting an aerial. |
 | <a id="full-hop"></a>Full Hop | **Yes**, No, Random | Chooses full or short hops, including jumps before aerials. |
 | <a id="fast-fall"></a>Fast Fall | Yes, **No**, Random | Fast falls after reaching the jump's peak. |
