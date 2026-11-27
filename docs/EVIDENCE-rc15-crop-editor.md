@@ -1,17 +1,19 @@
 # Crop editor acceptance — 2026-11-15
 
-Tested source: **d520d325aa2fe82de61e690fa01cb88f77de8c35**, base400e2c69. The following docs/evidence commit changes no Rust source. Release NRO SHA256 `d35f0f7497a679cc8a7de69b69062c44a93a39ae8560c4925f51f8f4c2bc128d`; tested diagnostic NRO SHA256 `aea5f904b0bb7ab6db40b23268053846776bb84cca3cb229cc8e23c7bb44f973`. All six XPS gates passed: release, diag, test, clippy, no-default-features and size. Tests:2193 passed, zero failed, four ignored across102 binaries. Size147731/147921,190 spare. Artifacts: `/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gate-d520d325/status.json`.
+Tested source: **d520d325aa2fe82de61e690fa01cb88f77de8c35**, base `400e2c69`. The following docs/evidence commit changes no Rust source. Release NRO SHA256 `d35f0f7497a679cc8a7de69b69062c44a93a39ae8560c4925f51f8f4c2bc128d`; tested diagnostic NRO SHA256 `aea5f904b0bb7ab6db40b23268053846776bb84cca3cb229cc8e23c7bb44f973`. All six XPS gates passed: release, diag, test, clippy, no-default-features and size. Tests: 2,193 passed, zero failed, four ignored across 102 binaries. Size 147,731/147,921, 190 spare. Artifacts: `/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gate-d520d325/status.json`.
 
-- Yoga ran the current released Eden AppImage SHA256 `2f315fc4b7d9658afef84f4ba3cb80a3d0b33292eaef66a802ef837222a247b9`, with the diagnostic NRO above and the pinned21-plugin set recorded in each run config.
-- Both runs used one owned profile copy, display72, GDB6572 enabled before game.load, persisted volume0 and memory_layout_mode0.
+- Yoga ran the November 15 Eden AppImage SHA256 `2f315fc4b7d9658afef84f4ba3cb80a3d0b33292eaef66a802ef837222a247b9`, with the diagnostic NRO above and the pinned 21-plugin set recorded in each run config.
+- Both runs used one owned profile copy, display 72, GDB 6572 enabled before game.load, persisted volume 0 and memory_layout_mode 0.
 - Start/main-menu stills were visually checked out of attract mode.
 - No Surface or card used.
-- Existing setup helper receipts call the CPU Mario; the actual readable CPU was Bayonetta in boot1 and Ridley in boot2.
+- Existing setup helper receipts call the CPU Mario; the actual readable CPU was Bayonetta in boot 1 and Ridley in boot 2.
 - The existing Fighter Mismatch choice kept that current CPU.
+
+The table records the November 15 observations. Its paths name the original captures. The shared workspace retains the build gate and the completion report in the integration inbox (entry for final head `3549ee3f`), but the raw row files were unavailable for the November 27 audit.
 
 | Check | Observed result | Raw evidence under the artifact directory |
 | --- | --- | --- |
-| Macro Crop opens shared editor; handle redraw | P1 Macro1,314 frames. Start moved0→180 with explicit L and40ms taps; screen shows134 frames kept. | `runtime1/crop-macro/*macro-resume-full-range.png`, `*macro-resume-kept-range.png`, `macro-frame-publish.log` |
+| Macro Crop opens shared editor; handle redraw | P1 Macro1,314 frames. Start moved0→180 with explicit L and 40 ms taps; screen shows134 frames kept. | `runtime1/crop-macro/*macro-resume-full-range.png`, `*macro-resume-kept-range.png`, `macro-frame-publish.log` |
 | Macro X CPU preview and B exit | Preview inputs complete; HideClip seq272. Editor-closed still shows gameplay. | `runtime1/crop-macro/*preview-started.png`, `*preview-complete.png`, `*editor-closed.png`; frame log |
 | Macro save-as-new and playback | Native keyboard named kept-jab-2;134 frames equal source[180:]; original bytes unchanged. New macro set active on CPU and played with existing chord after existing mismatch choice. | `runtime1/crop-macro/{source-macro.json,kept-macro.json,macro-crop.json}` and new-macro-played still |
 | Combo units, no X, empty name | Two-link fixture cropped to first link. No X help; after-X frame pixel-identical to selected frame. Native keyboard true-empty confirmation produced Combo2; original unchanged. | `runtime1/crop-combo/` source/kept JSON, before/selected/after-X/saved stills and combo receipt |
@@ -19,21 +21,21 @@ Tested source: **d520d325aa2fe82de61e690fa01cb88f77de8c35**, base400e2c69. The f
 | Replay X CPU preview and B exit | Publish seq72 playing; inputs_complete revision7 frames179; hidden seq251, editor visibly gone. | Same directory preview-started/preview-complete/editor-closed stills; `runtime2-continuation/crop-replay-continuation.json` PASS4.5s |
 | Drill integration | Shared Step units, labels, default Drill N and save-same-kind adapter covered by host tests. | `drill_units_share_clip_editor_and_save_same_kind` in the green gate. Full drill recording/runtime belongs to the input-drill lane. |
 
-- The first boot label was `rc15-crop-editor-d520d325`: final6PASS/1FAILED (Replay stopped before entry).
-- The explicitly authorized fresh boot was `rc15-crop-replay-d520d325`: setup4PASS, first Replay probe FAILED at the visible existing mismatch choice because its log assertion did not recognize that screen.
+- The first boot label was `rc15-crop-editor-d520d325`: final tally 6 PASS / 1 FAILED (Replay stopped before entry).
+- The explicitly authorized fresh boot was `rc15-crop-replay-d520d325`: setup 4 PASS, first Replay probe FAILED at the visible existing mismatch choice because its log assertion did not recognize that screen.
 - The same boot continued from the visually observed Keep current fighter choice in a separate row/output directory and passed.
 - No third boot.
 - Both original failed Replay receipts/stills remain; failed macro probes remain as raw STOP timestamp receipts, FAIL stills and logs.
 - The shared runner overwrites the prior per-row JSON on retry; its generated RESULTS summary counts zero archived JSON failures.
 - Earlier JSON receipts are therefore not all retained, and this report does not claim they are.
 
-- Initial macro probes used150ms taps, which triggered documented held acceleration and saved an unintended14-frame copy.
+- Initial macro probes used 150 ms taps, which triggered documented held acceleration and saved an unintended14-frame copy.
 - Another probe omitted handle reselection after preview/save and did not move the handle.
-- Successful continuation used explicit L/R selection and40ms taps, asserting each range.
+- Successful continuation used explicit L/R selection and 40 ms taps, asserting each range.
 - A later probe assumed a nonexistent Play on CPU file row; the successful continuation used Set active and the existing CPU playback chord.
 - These were probe/setup failures; no product failure is established by them.
 - Failed receipts and outputs were kept.
-- Existing handle deselection after preview/save is now stated in the docs table.
+- Existing handle deselection after preview/save was stated in the docs table.
 
 - Both runs completed Down with cleanup_failures=[], full profile restored and separately verified, owned processes stopped, and copies pruned (2.6GB unique per run; no leftovers).
 - The ledger records RELEASED, including second run16:00:31.941Z. game.stop reached its shutdown deadline and lifecycle used owned SIGKILL, explicitly recorded as a forced stop, not a crash.

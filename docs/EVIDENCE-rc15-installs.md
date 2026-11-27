@@ -393,8 +393,8 @@ files named below were read for this page.
 | SP-10, 13:01 flight | The requested CPU point (−81.72, −15.10) was beside the floor's end. It was not refused; two reads put the body **5.13 units left** of the point, against the wall. The row failed on that displacement, not the fighter-switch check. `eb39d6bc` showed a similar displacement. |
 | Wall verdict | **Defect accepted** (13:20:24Z). **What it is, read from the stage's lines and not run** (preview-vis-sol, 13:42:30Z; ruled 13:43:10Z): the point is not inside the wall. The Training floor's solid run is x −80 to 620, so the point is 1.72 left of its end and the stage rule rightly answers open (`src/model/stage_geometry.rs` lines 222 to 254 read one column through the point and meet no wall). The fighter's body has width: it rests at x −86.85 when asked to x −81.72 and is exact at x −86.96, which fits a body pushed until it clears a wall at x −80. The editor does not read back where the game left the body. Fixed in the next build. |
 | First X on a capture: two takes | In `tut-5df3d9dc-yoga-3`, Y snapped In but X refused with In selected; no input frame was fed (12:46:48Z). In the control take, L deselected In; after a one-second wait X previewed on the CPU (12:51:05Z). The earlier successful release snap on `eb39d6bc` previewed on Player 1. |
-| S1 on the diagnostic build (third flight, 13:24:09Z) | In stepped to frame 7 and X played nothing, as wanted. Y moved In to 6. X then gave one `playing=1` line, the notice "Let the CPU settle to idle and leave the ledge before previewing", and no input frame; the CPU's status changed one frame after the check. No Replay-window preview fed a frame in that whole boot, so S2 and S3 show their snap and not a working preview. The Crop preview of a recorded macro (SP-5) did feed. On `eb39d6bc`'s release build the same steps fed 101 frames. **Treated as a regression of install 6 until the release smoke says otherwise** (13:24:36Z, tr-primary-2); whether it comes from merge 17 or from the diagnostic flavour is not separated |
-| Why X can refuse (code reading, not a fix test) | A first temporary checkpoint requires a grounded, idle CPU (`states/preview.rs:128–137`). The request can reach it before the scrub hold releases the CPU. A macro loading its own start save bypasses that checkpoint. A fix is assigned, not tested here. |
+| S1 on the diagnostic build (third flight, 13:24:09Z) | In stepped to frame 7 and X played nothing, as wanted. Y moved In to 6. X then gave one `playing=1` line, the notice "Let the CPU settle to idle and leave the ledge before previewing", and no input frame; the CPU's status changed one frame after the check. No Replay-window preview fed a frame in that whole boot, so S2 and S3 show their snap and not a working preview. The Crop preview of a recorded macro (SP-5) did feed. On `eb39d6bc`'s release build the same steps fed 101 frames. **Classified at the time as an install 6 regression pending a release smoke test** (13:24:36Z, tr-primary-2); whether it comes from merge 17 or from the diagnostic flavour is not separated |
+| Why X can refuse (code reading, not a fix test) | A first temporary checkpoint requires a grounded, idle CPU (`states/preview.rs:128–137`). The request can reach it before the scrub hold releases the CPU. A macro loading its own start save bypasses that checkpoint. The team assigned a fix after this run. Snapped X later played in both preview release boots (see [smoke tests](#smoke-tests-on-the-release-file)). |
 
 - **Not covered by these runs:** a smoke boot of install 6's release NRO or a fresh waiting-room pair.
 - **Not shown in the two test boots:** release through a fighter swap or a scene change (SP-12, SP-13), or a
@@ -434,8 +434,7 @@ inbox 2026-11-26 23:11:03Z and 2026-11-27 00:38:37Z. For this page the two posts
 - The editor's input gate holds the roster request while the editor is visible. Its timeout counts worker passes,
   not game frames: once the count exceeds 600 it clears its own wait, not the accepted roster request. In the second
   boot Player 1 timed out twice; the roster applied the switch three game frames after close.
-- Four clips were made in the second boot (`artifacts/phase23/final-smoke-media/`). They are not placed in the pages:
-  three are to be filmed again after the fixes.
+- Four clips were made in the second boot (`artifacts/phase23/final-smoke-media/`). At the time, all four were withheld from the pages and three were marked for filming again after the fixes.
 
 ### Eden, on the diagnostic build of the same commit
 
@@ -459,6 +458,6 @@ Both Yoga traces used the staged release `78db86f5…`, not the diagnostic file.
 
 ### Not covered
 
-- No console run: the build is not installed.
+- The preview install was cancelled. No console run was recorded.
 - Captures keeping their animation has host tests only, including one where a second process reads the files back.
 - The CPU side of the fighter choice, the way back to the current fighter, and a second player in a waiting room.

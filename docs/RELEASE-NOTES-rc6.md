@@ -1,6 +1,6 @@
 # 0.2.0-rc.6
 
-Notes for players. 0.2.0-rc.5 was withdrawn before it ran on players' consoles, so this is the build after
+Notes for players. 0.2.0-rc.5 was withdrawn before it ran on players' consoles, so rc.6 followed
 `0.2.0-rc.3.1`. Everything [RELEASE-NOTES-rc5.md](RELEASE-NOTES-rc5.md) lists is in it, with the changes below. How to
 use recording is [RECORDING.md](guide/recording.md), the Mii pages are [MII.md](MII.md), and the pictures are the list in
 [MEDIA.md](MEDIA.md).
@@ -213,4 +213,4 @@ leaves the game's own level everywhere.
 - "Save last combo still saves the combo you landed": rc.5 had no row for it. rc.6 has it, above.
 - "A named macro can carry the exact Mii it was recorded on": rc.5 loaded the class default. rc.6 loads the exact Mii,
   above.
-- "Drilling a sequence comes in the next build": that is this build.
+- rc.6 added sequence drilling.

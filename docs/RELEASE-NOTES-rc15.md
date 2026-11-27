@@ -1,6 +1,6 @@
 # rc.15: the builds of November 2026
 
-Notes for players. rc.15 is one release name for a line of builds. Each build's menu footer reads
+These notes cover the November builds of the untagged rc.15 candidate. Each build's menu footer reads
 `0.2.0-rc.15 · rc15` and then the commit it was made from, so the commit tells the builds apart
 ([Which build you have](guide/getting-started.md#which-build-you-have)).
 
