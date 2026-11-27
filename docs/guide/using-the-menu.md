@@ -17,7 +17,7 @@
 | Adjust a range | Pick Min or Max; A lifts the handle, directions move it, A sets it down. |
 | Leave | B backs out one level; close the menu normally to apply changes. |
 | Reopen | You'll return to the page and row you left. |
-| <a id='your-defaults'></a>Set your defaults | X saves current settings; Y restores the focused row. File lists have their own keys. |
+| <a id='your-defaults'></a>Set your defaults | Outside Recording, X saves defaults on main pages; Y restores the focused setting. |
 | Reset one page | Choose **Reset page to defaults**, then confirm with A. |
 
 | Running a [practice game](../menu/practice-games.md) | What happens |

@@ -4,7 +4,7 @@
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d0eca9a146fb35a73838b8f5fa51330d6455a5c5" autoplay muted loop playsinline controls></video>
 
-*A missed tech at 3/20, before the aim fix.* [Open the clip](../media/tut-tech-practice.mp4)
+*The third attempt is a missed tech.* [Open the clip](../media/tut-tech-practice.mp4)
 
 | Step | What to do |
 |---|---|

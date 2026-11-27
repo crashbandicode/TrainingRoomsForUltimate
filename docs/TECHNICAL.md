@@ -68,11 +68,7 @@ right panel is the same capsules as one pill each. [Decisions](DECISIONS.md)*
 
 ### Frame strip
 
-The input display (Display & Controls › Input Display) is a strip at the top of the screen: the last second of
-Player 1 and the CPU, a chip for each new button, and ADVANTAGE, LINK, and INPUT for the last exchange. ADVANTAGE is
-the CPU's first actionable frame minus yours. Plus means you act first. [FRAME-STRIP.md](guide/frame-strip.md)
-is how to read the lanes, the stick row, and the readouts. The rc.5 clips are listed in
-[MEDIA.md](MEDIA.md).
+See the [frame strip guide](guide/frame-strip.md) for the lanes and readouts, and [Media](MEDIA.md) for the rc.5 clips.
 
 **Clip** [`rc8-input-display-chord.gif`](media/rc8-input-display-chord.gif): R + D-pad Down hides the frame strip, then shows it again
 
@@ -331,10 +327,8 @@ on Player 1 is off", "… Quick Reset is off"), and Player 1's input is left to 
 (jab → jab) drilled; the jabs; the bar under the frame strip grades the attempt: TRUE −5, on time. Cuts inside are
 listed in [MEDIA.md](MEDIA.md).*
 
-*+ Save last combo…*, the first row of COMBOS on the Recording page and in the recording pop-up, keeps your last combo
-as a file and makes it the drill. With *Combo helper* On, a bar under the frame strip grades each attempt link by link:
-whether the recorded inputs came, in order and on time, and whether the same move came out. A true combo is shown,
-not required. Drilling a sequence adds a header and a row of its combos to that bar.
+The [Recording guide](guide/recording.md#combos) covers saving and drilling a combo. In a sequence, the
+[corner card](design/compact-strip-layout.md) stacks up to three combos; the cells beneath the strip show individual links.
 
 Where the combo code is (moved here from the [Combo files](guide/combos.md) guide): the spec is
 [SPEC-input-07](../specs/SPEC-input-07-combo-helper.md). The drill is kept in `recording-index.json`, the recording
@@ -583,7 +577,7 @@ else keeps it hidden, decision N1). While it's hidden its rows do nothing. All t
 | Row | What it does |
 | --- | --- |
 | Preload Samples | Writes sparse timing and memory samples of preloads to the diagnostics file. |
-| Reload developer config | While On, holding L + R + A on Player 1 re-reads the developer config file every frame. |
+| Reload developer config | In Training, each P1 poll holding L + R + A queues a worker read of `dev.json`. |
 | Debug hooks | Turns on the debug watch on the Kirby backshield work float. |
 
 ### Menu shortcuts and replay capture
