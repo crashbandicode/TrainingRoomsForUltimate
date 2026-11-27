@@ -137,6 +137,7 @@ pub const fn game_name(game: Game) -> &'static str {
         Game::Parry => "parry",
         Game::GuardEdge => "guard_edge",
         Game::Juggler => "juggler",
+        Game::LedgeTrap => "ledge_trap",
     }
 }
 

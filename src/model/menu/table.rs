@@ -72,7 +72,7 @@ const fn sub(page: Page, title: &'static str) -> Group {
     Group { sub: true, ..g(page, title) }
 }
 
-pub static GROUPS: [Group; 28] = [
+pub static GROUPS: [Group; 29] = [
     g(Page::Cpu, "Reactions"),
     g(Page::Cpu, "Defence"),
     g(Page::Cpu, "Ledge & Tech"),
@@ -107,6 +107,7 @@ pub static GROUPS: [Group; 28] = [
     sub(Page::FightersStages, "Parry practice"),
     sub(Page::FightersStages, "Guard the Edge"),
     sub(Page::FightersStages, "Juggler"),
+    sub(Page::FightersStages, "Ledge Trap"),
 ];
 
 // Group indices, for the rows below.
@@ -141,6 +142,7 @@ const MASHOUT: u8 = 24;
 const PARRY: u8 = 25;
 pub(super) const EDGE: u8 = 26;
 pub(super) const JUGGLE: u8 = 27;
+pub(super) const TRAP: u8 = 28;
 
 /// The sub-screen group of a practice game (rc.15 practice menu).
 pub const fn game_group(game: Game) -> u8 {
@@ -152,6 +154,7 @@ pub const fn game_group(game: Game) -> u8 {
         Game::Parry => PARRY,
         Game::GuardEdge => EDGE,
         Game::Juggler => JUGGLE,
+        Game::LedgeTrap => TRAP,
     }
 }
 
@@ -285,7 +288,7 @@ const fn delay(group: u8, title: &'static str, id: &'static str, step: u16, rang
 const TOGGLE: Control = Control::Toggle;
 
 /// The rows in page order, then group order, then the order they appear in (MENU-DRAFT §2).
-pub static ROWS: [Row; 175] = [
+pub static ROWS: [Row; 185] = [
     // CPU > Reactions
     r(REACT, "Mash", "mash_state", Control::MultiSelect(&o::ACTIONS),
       "Actions the CPU performs as soon as it can.\nWith several ticked it picks one at random."),
@@ -528,6 +531,8 @@ pub static ROWS: [Row; 175] = [
       "Keep the CPU offstage and secure the stock.\nA opens its settings and Start."),
     r(GAMES, "Juggler", "", Control::Game(Game::Juggler),
       "Keep the CPU airborne for as long as possible.\nA opens its settings and Start."),
+    r(GAMES, "Ledge Trap", "", Control::Game(Game::LedgeTrap),
+      "Keep the CPU from getting back on the stage from the ledge.\nA opens its settings and Start."),
     // Practice games > Eggs-ercise
     r(EGGS, "Start", "", Control::Start(Game::Eggs),
       "Closes the menu and starts Eggs-ercise with the settings below.\nWhile it runs, this row reads Stop."),
@@ -661,6 +666,25 @@ pub static ROWS: [Row; 175] = [
       "Finish a set of 10 or 20 attempts, or practise freely.\nThe clock starts at release."),
     r(JUGGLE, "Zoom landing window", "juggle_zoom_window", Control::Number { first: 1, step: 1 },
       "Frames after touchdown that still count as a Zoom win. Hero starts each Zoom with enough MP."),
+    r(TRAP, "Start", "", Control::Start(Game::LedgeTrap),
+      "Starts with the last setup for this stage or opens the wizard.\nWhile it runs, this row reads Stop."),
+    r(TRAP, "CPU fighter and level", "trap_difficulty",
+      Control::Editor(Editor::PracticeCpu(crate::model::edge_juggle::Drill::LedgeTrap)),
+      "Pick the CPU fighter. X changes the CPU level in the fighter popup."),
+    r(TRAP, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::LedgeTrap)),
+      "Pick the CPU's ledge, then your own start, then preview both.\nOn the ledge page, Y takes the other ledge."),
+    r(TRAP, "Ledge options", "trap_options", Control::MultiSelect(&o::TRAP_OPTIONS),
+      "What the CPU does from the ledge.\nWith several ticked it picks one at random."),
+    delay(TRAP, "Ledge Delay", "ledge_delay", 10, "ledge_delay_range",
+          "Frames the CPU waits before its ledge option.\nThe same setting as CPU > Ledge & Tech > Ledge Delay."),
+    r(TRAP, "Fail after", "trap_fail", Control::Dropdown(&["2.0 s", "2.5 s", "3.0 s"]),
+      "How long the CPU may stand on the stage.\nA grab resets the count; time in the air doesn't count."),
+    r(TRAP, "Round time", "trap_time", Control::Dropdown(&["20 s", "30 s", "60 s", "Until KO"]),
+      "A round the CPU hasn't won by then counts as kept off.\nUntil KO: only a KO ends the round."),
+    r(TRAP, "CPU percent", "trap_cpu_percent", Control::Number { first: 0, step: 1 },
+      "CPU damage at the start of each attempt."),
+    r(TRAP, "Attempts", "trap_attempts", Control::Dropdown(&["10", "20", "Free"]),
+      "Stop scoring after 10 or 20 attempts, or practise freely.\nUnresolved attempts do not count."),
     r(OPTIONS, "Show playback indicator", "playback_indicator", TOGGLE,
       "On: show which role is playing a recording.\nOff: hide the playback indicator."),
     r(OPTIONS, "Playback delay", "playback_delay", Control::Dropdown(&o::PLAYBACK_DELAY),

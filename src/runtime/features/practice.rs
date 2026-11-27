@@ -54,7 +54,7 @@ pub fn start(game: Game, how: How) {
         Game::Btt => super::btt::start(how.place_targets),
         Game::Mashout => super::mashout::start(),
         Game::Parry => super::parry::start(how.resume_parry),
-        Game::GuardEdge | Game::Juggler => super::edge_juggle::start(how.edge_juggle_setup),
+        Game::GuardEdge | Game::Juggler | Game::LedgeTrap => super::edge_juggle::start(how.edge_juggle_setup),
         Game::Tech => {
             super::tech::start(how.tech_point);
             if how.tech_wizard {
@@ -92,7 +92,7 @@ pub fn running() -> Option<Game> {
         // Mash out has no end of its own: each result re-arms the next attempt until Stop.
         Game::Mashout => true,
         Game::Parry => super::parry::on(),
-        Game::GuardEdge | Game::Juggler => true,
+        Game::GuardEdge | Game::Juggler | Game::LedgeTrap => true,
     };
     live.then_some(game)
 }

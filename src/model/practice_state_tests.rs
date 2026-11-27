@@ -20,6 +20,7 @@ fn practice_game_wire_fields() {
         (Game::Parry, "parry", "armed"),
         (Game::GuardEdge, "guard_edge", "ready"),
         (Game::Juggler, "juggler", "result"),
+        (Game::LedgeTrap, "ledge_trap", "result"),
     ] {
         let mut wire = String::new();
         let fields = Fields {

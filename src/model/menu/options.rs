@@ -21,6 +21,7 @@ pub static LEDGE_OPTIONS: [&str; 10] = [
     "Neutral Getup", "Roll", "Jump", "Getup Attack", "Wait", "Playback Slot 1", "Playback Slot 2", "Playback Slot 3",
     "Playback Slot 4", "Playback Slot 5",
 ];
+pub static TRAP_OPTIONS: [&str; 4] = ["Neutral Getup", "Roll", "Jump", "Getup Attack"];
 pub static TECH: [&str; 4] = ["No Tech", "Roll Forwards", "Roll Backwards", "Tech In Place"];
 pub static MISTECH: [&str; 4] = ["Neutral Getup", "Getup Attack", "Roll Forwards", "Roll Backwards"];
 pub static SHIELD: [&str; 4] = ["None", "Infinite", "Hold", "Constant"];

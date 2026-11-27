@@ -181,7 +181,7 @@ fn games_list_is_one_row_per_game() {
     for (control, game) in list.iter().zip(Game::ALL) {
         assert!(matches!(control, Control::Game(g) if *g == game), "{control:?}");
     }
-    assert_eq!(titles(table::GAMES), ["Eggs-ercise", "Break the Targets", "Tech practice", "Mash out", "Parry practice", "Guard the Edge", "Juggler"]);
+    assert_eq!(titles(table::GAMES), ["Eggs-ercise", "Break the Targets", "Tech practice", "Mash out", "Parry practice", "Guard the Edge", "Juggler", "Ledge Trap"]);
     // The games' sub groups are not sections of the page: the left column ends with Practice games.
     let m = menu();
     let groups: Vec<&str> = (0..m.entry_count(Page::FightersStages))
@@ -209,7 +209,7 @@ fn guard_the_edge_and_juggler_show_in_a_waiting_room() {
                 _ => None,
             })
             .collect();
-        assert_eq!(games, ["Eggs-ercise", "Break the Targets", "Tech practice", "Mash out", "Parry practice", "Guard the Edge", "Juggler"]);
+        assert_eq!(games, ["Eggs-ercise", "Break the Targets", "Tech practice", "Mash out", "Parry practice", "Guard the Edge", "Juggler", "Ledge Trap"]);
         let mut visible = Vec::new();
         for game in [Game::GuardEdge, Game::Juggler] {
             let mut m = Menu::new(Settings::factory(), env);
@@ -225,6 +225,70 @@ fn guard_the_edge_and_juggler_show_in_a_waiting_room() {
         screens.push(visible);
     }
     assert_eq!(screens[0], screens[1]);
+}
+
+#[test]
+fn trap_options_list_normal_first() {
+    assert_eq!(titles(table::TRAP), [
+        "Start", "CPU fighter and level", "Set up…", "Ledge options", "Ledge Delay",
+        "Fail after", "Round time", "CPU percent", "Attempts",
+    ]);
+    let mut m = opened(Game::LedgeTrap);
+    let options = row("Ledge options", table::TRAP);
+    let Control::MultiSelect(labels) = ROWS[options].control else { panic!("not a checklist") };
+    assert_eq!(labels, ["Neutral Getup", "Roll", "Jump", "Getup Attack"]);
+    assert_eq!(m.get("trap_options"), &[1, 1, 1, 1]);
+    let delay = row("Ledge Delay", table::TRAP);
+    assert_eq!(ROWS[delay].id, "ledge_delay");
+    m.activate(delay);
+    assert!(matches!(m.screen(), Some(Screen::Delay { .. })));
+    m.press(Button::A);
+    assert_eq!(m.get("ledge_delay")[0], 1);
+    assert_eq!(m.settings().menu.get("ledge_delay").unwrap()[0], 1);
+}
+
+#[test]
+fn trap_runs_the_same_in_training_and_waiting() {
+    use crate::model::bridge_state::list_view;
+    use crate::model::cpu::{facts::FrameFacts, ids::{C, Table}, role::{FighterKey, Scene}, settings::Weights, state::Cpu, status::Situation};
+    let mut views = Vec::new();
+    for env in [Env::default(), Env { waiting_room: true, ..Env::default() }] {
+        let mut m = Menu::new(Settings::factory(), env);
+        let games: Vec<_> = (0..m.entry_count(Page::FightersStages)).filter_map(|index| match m.entry(Page::FightersStages, index) {
+            Some(Entry::Row(row)) if ROWS[row].group == table::GAMES => Some(ROWS[row].title),
+            _ => None,
+        }).collect();
+        assert_eq!(games.last(), Some(&"Ledge Trap"));
+        on_list(&mut m, Game::LedgeTrap);
+        m.press(Button::A);
+        let mut rows = Vec::new();
+        for _ in 0..m.sub_rows(table::TRAP).count() {
+            rows.push(list_view(&m));
+            m.press(Button::Down);
+        }
+        views.push(rows);
+    }
+    assert_eq!(views[0], views[1]);
+    let mut training = Cpu::factory(77);
+    let mut waiting = Cpu::factory(77);
+    waiting.scene = Scene::Lobby;
+    let ids = Table::with(&[
+        (C::StatusCliffCatch, 40), (C::StatusCliffWait, 41), (C::StatusCliffEscape, 43),
+        (C::TermContCliffClimb, 7), (C::TermContCliffAttack, 8),
+    ]);
+    training.ids = ids.clone();
+    waiting.ids = ids;
+    let keys = [FighterKey::new(1, false).unwrap(), FighterKey::new(4, false).unwrap()];
+    let options = Weights([0, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
+    for frame in 0..25 {
+        let facts = FrameFacts {
+            status: 41, prev_status: 40, situation: Situation::Cliff, motion_frame: frame,
+            cont_cliff_attack: true, ..FrameFacts::default()
+        };
+        assert_eq!(training.trap_frame(keys[0], &facts, options), waiting.trap_frame(keys[1], &facts, options));
+        training.tick_clock();
+        waiting.tick_clock();
+    }
 }
 
 #[test]

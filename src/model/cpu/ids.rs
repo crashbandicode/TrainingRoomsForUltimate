@@ -259,6 +259,7 @@ game_constants! {
     StatusCatchWait = "FIGHTER_STATUS_KIND_CATCH_WAIT",
     StatusCatchPull = "FIGHTER_STATUS_KIND_CATCH_PULL",
     StatusCatchAttack = "FIGHTER_STATUS_KIND_CATCH_ATTACK",
+    StatusThrown = "FIGHTER_STATUS_KIND_THROWN",
     StatusSquat = "FIGHTER_STATUS_KIND_SQUAT",
     StatusSquatB = "FIGHTER_STATUS_KIND_SQUAT_B",
     StatusSquatF = "FIGHTER_STATUS_KIND_SQUAT_F",
