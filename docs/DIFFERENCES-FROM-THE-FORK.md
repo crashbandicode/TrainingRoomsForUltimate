@@ -12,7 +12,7 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 | First boot on a card with the fork's folder imports its settings (`training_modpack_menu.conf` → `settings.json`), `button_config.ini`, `replay_capture.ini`, `replay_captures/`, `save_states.json`, `mii-presets.json`, `setups/` and `macros/` by copying. `migration.json` marks it done; delete it to import again. | `src/model/migration.rs:42-62` |
 | A settings file that does not parse is kept as `settings.invalid-N.json`, and each bad field falls back to its default; the other fields load. | `src/model/settings_file.rs:5-13` |
 | A panic is written to the diagnostics file and the Skyline log; there is no pop-up. | `src/runtime/boot.rs:100-104` |
-| If another mod replaces the Training HUD layout, the plugin still injects its own. | `src/runtime/ui/archive.rs:183-189` |
+| If another mod replaces the Training HUD layout, the plugin still injects its own. | `src/runtime/ui/archive.rs` (`build_on_vanilla`) |
 
 ## Menu
 
@@ -22,15 +22,15 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 | Change | Where in the code |
 | --- | --- |
 | Five pages (CPU, Saves, Recording, Fighters & Stages, Display & Controls), switched with L/R. A sixth Developer page appears only with `developer_page=on` in `developer.ini`; developer-only rows live there. | `src/model/menu/table.rs:10-22`, `src/model/developer_ini.rs:24` |
-| The menu opens on the last page used (CPU the first time). | `src/model/menu/mod.rs:323` (`Menu::new`) |
-| Dropdown rows change in place with Left/Right; A opens the list. | `src/model/menu/mod.rs:1060` (`cycle`) |
-| The seven delay rows offer a checklist and a min–max range; using one greys the other, Y clears. | `src/model/menu/table.rs:203-204` |
-| Direction grids carry a weight per chip: each A adds one. | `src/model/menu/mod.rs:1357-1358` |
+| The menu opens on the last page used (CPU the first time). | `src/model/menu/mod.rs:529` (`Menu::new`) |
+| Dropdown rows change in place with Left/Right; A opens the list. | `src/model/menu/mod.rs:1626` (`cycle`) |
+| The seven delay rows offer a checklist and a min–max range; using one greys the other, Y clears. | `src/model/menu/table.rs:281` (`delay`) |
+| A adds weight on multi-direction grids, wrapping to zero. Single-choice grids toggle one direction. | `src/model/menu/mod.rs:2039-2051` |
 | Stage and item grids show 5×8 tiles docked or 4×4 handheld. Fighter grids show 13×7 in either mode. | `src/model/menu/grid.rs:76-77` |
-| Fighter grids show the game's own stock icons, loaded at run time through the game's mod-aware loader, so modded icons show. | `src/runtime/roster/character_roster.rs:2168-2174` |
+| Fighter grids show the game's own stock icons, loaded at run time through the game's mod-aware loader, so modded icons show. | `src/runtime/roster/character_roster.rs:2376-2382` |
 | The DI and SDI chips show the game's own DI line and SDI streak (the streak drawn ×2.0). | `src/model/effect_chips.rs:7-16` |
-| Menu shortcuts 1 and 2 are edited in the menu with a chord editor, apply at once and are saved to `button_config.ini`. B + D-pad Up always opens the menu. | `src/model/menu/table.rs:430-433` |
-| A *Replay capture* row writes `replay_capture.ini`; the Online Deluxe overlay's row shows the same value. | `src/model/menu/table.rs:353`, `src/runtime/deluxe_row.rs:31` |
+| Menu shortcuts 1 and 2 are edited in the menu with a chord editor, apply at once and are saved to `button_config.ini`. B + D-pad Up always opens the menu. | `src/model/menu/table.rs:496`, `src/model/ini_files.rs:85` |
+| A *Replay capture* row writes `replay_capture.ini`; the Online Deluxe overlay's row shows the same value. | `src/model/menu/table.rs:391`, `src/runtime/deluxe_row.rs:31` |
 
 ![Fighter grid with cycle badges, then the cycle chord switching Player 1 in that order](media/rc11-cycle-switch.gif)
 
@@ -43,8 +43,8 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 | Change | Where in the code |
 | --- | --- |
 | Air dodge and shield tilt *In*/*Out* are relative to the opponent on both sides. | `src/model/cpu/defence.rs:64-71` |
-| The fork's instant respawn is the default; [Respawn on platform](menu/fighters-and-stages.md#respawn-on-platform) offers the alternative and lists when it is greyed out. | `src/model/menu/mod.rs` (`respawn_invincibility`) |
-| Changing ledge or throw options in the menu re-rolls them at once, even for a CPU already on the ledge. | `src/model/cpu/state.rs:178-183` |
+| The fork's instant respawn is the default; [Respawn on platform](menu/fighters-and-stages.md#respawn-on-platform) offers the alternative and lists when it is greyed out. | `src/model/menu/table.rs:456` |
+| Changing ledge or throw options in the menu re-rolls them at once, even for a CPU already on the ledge. | `src/model/cpu/state.rs:165` (`publish`) |
 | During input playback the recording wins over DI, SDI, air dodge, tech and throw. *Settings override playback* (default Off) restores the fork's rule. | `src/model/cpu/playback.rs:29-31` |
 | Ice Climbers keep one CPU state each for Popo and Nana. | `src/model/cpu/role.rs:32-52` |
 | When the CPU pilot plugin drives Player 1, CPU settings apply to the CPU only. Record works and holds the AI's inputs (2026-11-25; it was refused before). | `src/model/cpu/role.rs:3-6`, `src/model/recording.rs` (`record_refusal`, `fallback_waits`), `src/runtime/features/recorder.rs` (`record_refusal`) |
