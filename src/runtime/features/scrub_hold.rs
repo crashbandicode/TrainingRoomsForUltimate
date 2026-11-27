@@ -10,7 +10,7 @@
 //! NOT YET SWITCH-RUN.
 use super::placement;
 use super::stage_geometry::RayProbe;
-use crate::engine::macro_ui::scrub_pose::{asked_of, decide, drawn, Act, FALL, WAIT};
+use crate::engine::macro_ui::scrub_pose::{asked_of, decide, drawn, lets_partner_go, Act, FALL, WAIT};
 use crate::engine::macro_ui::scrub_track::{can_stand, in_bounds, Block, Spot, POSE_NONE, POSE_SHOWN, SEEN_HELD, SEEN_IDLE, SEEN_OFF, SLOT};
 use crate::engine::macros::{PackedPose, Pose};
 use crate::model::crosshair::CpuPreview;
@@ -37,6 +37,16 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
             block.forget();
             block.set_pose(slot ^ 1, partner.0, partner.1);
         }
+        // Nobody is asked any more: the other role's body is let go here too, on this callback, so the game never
+        // tests the two fighters against each other with one home and one still held (`lets_partner_go`). Its own
+        // frame then finds no hold and only reports.
+        if holds[slot ^ 1].is_some() && lets_partner_go(block) {
+            let partner = other_body(slot).filter(|&body| holds[slot ^ 1].is_some_and(|hold| hold.body() == natives::battle_object_id(body)));
+            if let Some(partner) = partner {
+                let seen = release(block, slot ^ 1, &mut holds[slot ^ 1], partner);
+                block.set_seen(slot ^ 1, seen);
+            }
+        }
         let seen = match point(block, &holds, slot, accessor) {
             Some(spot) => hold(block, generation, slot, &mut holds[slot], accessor, spot),
             None => release(block, slot, &mut holds[slot], accessor),
@@ -44,6 +54,16 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
         block.set_seen(slot, seen);
         block.ack(slot, generation);
     });
+}
+
+/// The other role's body, found as the placement picker finds the two: the CPU's for Player 1, Player 1's for the
+/// CPU.
+unsafe fn other_body(slot: usize) -> Option<usize> {
+    if slot == 0 {
+        super::recorder::cpu_body().map(|body| body.accessor)
+    } else {
+        natives::module_accessor(0)
+    }
 }
 
 /// Where this role's body is asked to be. The group's home is where the hold found the target role's body: its

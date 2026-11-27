@@ -40,8 +40,7 @@ pub fn asked_of(recorded: PackedPose, has: impl FnOnce(u64) -> bool) -> PackedPo
 /// release at any moment; each role reads it on its own callback, and the game tests the two fighters against
 /// each other after both. Read by one role alone, one body would be home and the other still held for that test.
 pub fn lets_partner_go(block: &Block) -> bool {
-    let _ = block;
-    false
+    block.target_slot().is_none()
 }
 
 /// One fighter frame of a held role. `asked_kind`, `asked`: the recorded fighter and its animation on the shown
