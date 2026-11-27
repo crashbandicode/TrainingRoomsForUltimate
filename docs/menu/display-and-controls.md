@@ -62,8 +62,9 @@ moved but can still act. Most deal no damage, such as F.L.U.D.D.'s water, and so
 of Bowser's Fire Breath. The game marks them itself, and the plugin uses that mark. A windbox is a hitbox, so Hitboxes
 draws it too; with both ticked it is drawn once, in sky blue, and with Windboxes alone only the windboxes are drawn.
 
-<!-- CLIP: tut-hitbox-windboxes.mp4 | Windboxes ticked → F.L.U.D.D.'s push in sky blue -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/09674dc06dfdad0a59ade47c9e7a2a68f8aa118f" autoplay muted loop playsinline controls></video>
+
+*Hitbox Visualization with only Windboxes ticked; its legend names sky blue for a windbox. At 1/4 speed Mario's F.L.U.D.D. pushes the CPU off the stage, and the damage stays at 0.0. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-hitbox-windboxes.mp4)
 
 Some moves push through a wind area instead of a hitbox. Windboxes draws those too: a see-through olive box or
 circle with a white line pointing the way it pushes. A dot means the wind has no one direction.
@@ -198,8 +199,9 @@ part of the same move. An unranked hitbox stays red. There is no separate colour
 
 ### Spacing grader
 
-<!-- CLIP: tut-spacing-grader.mp4 | Spacing grader On → a spaced and an unspaced hit read differently -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3479d45d985316dd85642f5e8912aa414544831b" autoplay muted loop playsinline controls></video>
+
+*Spacing grader On: one jab at close range hits the CPU, and Player 1's lane on the strip starts with the tag “Good”. Only one hit is shown, and both fighters are drawn translucent in this take. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-spacing-grader.mp4)
 
 On grades Player 1 hits, and Player 2 hits when the second fighter is player-controlled, by how deeply they reach the
 hurtbox. With the frame strip visible, the grade appears on the attacker's lane: **Excellent** near the hurtbox edge,
@@ -268,8 +270,9 @@ More: [Frame strip](../guide/frame-strip.md#spot-labels)
 
 ### Input Delay
 
-<!-- CLIP: tut-input-delay.mp4 | Input Delay 0, then raised → the same press lands later on the strip -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/1275892b7d895b7e839248090d7861d88f01c3b2" autoplay muted loop playsinline controls></video>
+
+*A jab with Input Delay 0. Display & Controls › Input Delay is moved from 0 to 10, and the same jab is pressed again. The clip shows the setting being changed; it does not make the ten frames of delay visible. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-input-delay.mp4)
 
 Holds Player 1's inputs back by a number of frames, for example to practise as if playing online. Chords are not
 delayed. The frame strip and recordings see the inputs as delayed. The frames are game frames at every

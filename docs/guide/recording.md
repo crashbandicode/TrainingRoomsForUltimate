@@ -207,8 +207,9 @@ recorded one.
 
 ### Input drills
 
-<!-- CLIP: tut-input-drill-record.mp4 | DRILLS › + Record drill… → Record chord, the moves, stop → the drill's steps listed → one graded try -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b635893c4df02daaae5535f19b5b3f5c2346245b" autoplay muted loop playsinline controls></video>
+
+*Kirby turns red while an input drill is recorded. Recording › Combos & Sequences › DRILLS then lists “Drill 1” with the recorded inputs, and Kirby tries it. The grades are too small to read in this clip. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-input-drill-record.mp4)
 
 **DRILLS >** under COMBOS opens the input-drill list in Training and waiting rooms. A drill needs no contact with the opponent: use it for dash-back, short hops, fast-falls or a movement sequence. Its default name is Drill N. Its file screen has Drill, Rename, Trim, Crop and Delete, plus Made from when a macro or chain made it. Macro and drill Trim skips neutral frames during playback without removing them; hit combos have no Trim row because they have no idle input frames.
 

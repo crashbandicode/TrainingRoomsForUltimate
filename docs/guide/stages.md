@@ -3,8 +3,9 @@
 Change stages from the menu, or choose a list for Training and waiting-room practice. The rows are on
 Fighters & Stages.
 
-<!-- CLIP: tut-stage-change.mp4 | Fighters & Stages › Change Stage → the grid → Battlefield in its Ω form loads with both fighters -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e0de6dbeba09dd60aa5dc2ec3c5fbde73470d79a" autoplay muted loop playsinline controls></video>
+
+*Fighters & Stages › Change Stage: the grid, Y for the Ω form, A on Battlefield. The stage is swapped and both fighters stand on Battlefield's Ω form. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-stage-change.mp4)
 
 ## Change Stage
 

@@ -17,8 +17,9 @@ that class. A replay Mii can appear here even if Smash has no saved Mii of that 
 
 ## Picking a saved Mii
 
-<!-- CLIP: tut-mii-pick.mp4 | Fighters & Stages › Mii Brawler → the list of saved Miis → A on one → Player 1 is that Mii -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/cc2afdd8e4395fc04dd9a9d05b72a78b3f3462d8" autoplay muted loop playsinline controls></video>
+
+*Fighters & Stages › Mii Brawler opens the Player list; A picks a saved Mii. Back in Training, Mario attacks once, then Cycle Player (ZL + D-pad Right) brings that Mii Brawler in as Player 1, with the notice “Player Mii configuration applied”. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-mii-pick.mp4)
 
 1. Open the class's list. Press ZR if you want the CPU rather than Player.
 2. Move to a saved Mii and press A. The `>` moves to your choice.

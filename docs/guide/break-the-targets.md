@@ -1,8 +1,8 @@
 # Break the Targets
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a50f86431c64bcc23b59723fe8305c454ffff99b" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d8dc78d3f34bd83e7c687ed7ce791010bd1556e8" autoplay muted loop playsinline controls></video>
 
-*Practice games › Break the Targets › Place targets: the view pulls back, the crosshair picks a spot and a target is placed beside Mario. No target is broken in this clip. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-break-the-targets.mp4)
+*Practice games › Break the Targets, with one target placed beside Mario: a jab, a forward tilt, then a short-hop back air breaks the target and it is gone. Eden, the diagnostic file of preview build `cc71537c`, 2026-11-27.* [Open the clip](../media/tut-break-the-targets.mp4)
 
 Works in Training and in the [waiting room](waiting-rooms.md). Place up to ten targets, then break them as fast as you can. Choose **Start** in [Practice games](../menu/practice-games.md#break-the-targets): if this stage has no targets, the placement view opens first. The clock starts on your first gameplay input and stops when the last target breaks.
 
