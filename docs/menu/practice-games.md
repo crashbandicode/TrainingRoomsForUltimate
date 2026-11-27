@@ -44,7 +44,7 @@ Place up to ten targets, then break them all against the clock ([guide](../guide
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d0eca9a146fb35a73838b8f5fa51330d6455a5c5" autoplay muted loop playsinline controls></video>
 
-*The fighter launches at 72% and misses the tech.* [Open the clip](../media/tut-tech-practice.mp4)
+*This run stopped after a missed tech at 3/20.* [Open the clip](../media/tut-tech-practice.mp4)
 
 Tech a launch at a chosen or random surface; Set uses a range's low end, Random both ends ([guide](../guide/tech-practice.md)).
 
