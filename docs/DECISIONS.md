@@ -259,7 +259,7 @@ the clean room's arrows?
 
 ### S1 · Five import details (`SPEC-core-08` §10)
 
-The picture numbers five questions from the original import proposal. On November 1, four recommendations were accepted; the capture recommendation was reversed.
+Of the five original import recommendations numbered in the picture, four were accepted on November 1 and the capture recommendation was reversed.
 
 - **1 · settings file name:** rename to `settings.json`, or keep the fork's name `training_modpack_menu.conf`?
   *Rename*; the loader also accepts the old name once.
