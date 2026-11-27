@@ -1273,14 +1273,12 @@ def main():
              "fork's own grid pickers. The item grid uses the fork's own 38 item icons, copied unchanged. The stage grid shows "
              "captures of the stock thumbnails; the clean room does not bake them but reads each stage's own game UI texture at run "
              "time, so a stage mod's picture shows (SPEC-core-07 §4.5). Sources are in the tables below. The Kirby Hats, Solo Popo and "
-             "character-item chips are a neutral placeholder: their final icons are open and will be designed once the functionality "
-             "is settled. The DI and SDI Direction chips show the game's own DI streak and SDI spark as renders made from the "
+             "character-item chips were placeholders in this proposal. The DI and SDI Direction chips show the game's own DI streak and SDI spark as renders made from the "
              "game's effect file (one still per effect, turned to each direction as the game turns that effect to the launch "
              "angle / SDI vector; SPEC-core-07 §4.6); the chip sheet shows crops of real captures beside them as the visual "
              "check. The Airdodge Direction and Shield Tilt "
-             "arrows are the clean room's own vector art. The screens carry no origin tags "
-             "(upstream / ours, proposal v6): origin is internal, recorded in `PROVENANCE.md` and the provenance table "
-             "in `docs/MENU-PROPOSAL.md`.", "",
+             "arrows are the clean room's own vector art. The screens carry no origin tags; see the Origin column in the "
+             "[menu draft](../../MENU-DRAFT.md) and the [provenance record](../../PROVENANCE.md).", "",
              "Version 10 (2026-11-01): the SDI chips draw the spark's burst x2.0 longer along the SDI vector (screens 01, 16, 17; the stretches are compared on 21; method "
              "and measurements below, `DECISIONS.md` N10); the decided items are drawn (`DECISIONS.md` N1-N7): 02 Respawn "
              "invincibility added and Item on load gone, 03 the advanced row Settings override playback, 05 editable menu shortcuts, "
