@@ -606,7 +606,7 @@ mod tests {
     }
 
     fn the_carried_fork_hunks_are_listed_with_commit_file_and_lines() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/docs/provenance/replay-editor.md");
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/docs/PROVENANCE.md");
         let text = std::fs::read_to_string(path).unwrap_or_default();
         for part in ["eb4eec2", "training_mod_tui/src/clip_panel.rs", "+16-124", "src/replay_capture.rs",
                      "15ada37", "training_mod_macros/src/move_start.rs", "+1-256",
