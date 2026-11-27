@@ -28,6 +28,10 @@ The menu tour, menu option and button-chord films come from `tut-c51f4d81-yoga-1
 They crop a 1842×1036 region at (39, 44) from the 1080p capture and scale it to 720p, removing the capture tool's
 yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows name their own source runs.
 
+Every clip of this table is cut with that same crop, except `tut-save-load.mp4`, which is the whole frame. Where the
+frame strip is on screen, the crop also cuts the strip's top rows: `tut-input-delay`, `tut-input-display`,
+`tut-input-drill-record`, `tut-input-special-direction` and `tut-spacing-grader`.
+
 | Clip | Shows | Film, cut | Bytes | SHA256 (first 16) | Embedded in |
 | --- | --- | --- | ---: | --- | --- |
 | `tut-menu-tour.mp4` | B + D-pad Up opens the menu, R turns through the five pages, B closes it, Mario walks | `t01-menu-tour`, 0.3–9.8 s | 1,301,566 | `866d3984b6c2c2cc` | [Getting started](guide/getting-started.md) |
