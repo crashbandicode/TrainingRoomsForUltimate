@@ -1,4 +1,6 @@
-# F9 promotion contract — proposed, native implementation not yet qualified
+# F9 promotion proposal (2026-11-02)
+
+This records the proposal and gaps before implementation. The later [hat/item cutover decision](../DECISIONS.md#f9-live-hat-item-source-immediate-cutover-2026-11-03) superseded lossless transfer for those two cases; the [roadmap](../ROADMAP.md#deferred-operator-decision-2026-11-03) records what shipped.
 
 Operator/lead direction in TRAININGROOMS-LEAD-INBOX.md, 2026-11-02 20:5x/21:0xZ,
 supersedes delayed-count/setter replay. Preserve the requested count and retain

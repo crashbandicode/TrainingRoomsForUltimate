@@ -43,9 +43,8 @@ Four additions on top of rc.2 (candidate `p23/rc3-candidate` `3c8f5bc`; see
   Training and in waiting-room practice. rc.2's Direct stage pick, which did nothing, works again.
 - **Menu navigation**: ZL + Up/Down jumps sections; the menu reopens where it was closed; ZR no longer resets a page
   (decision SETTINGS-PERSIST), and each page ends with a confirmed *Reset page to defaults*.
-- **Own hitbox discs** (decision HB-OWN-ORBS, option 1): every fighter sphere is drawn as the plugin's own disc and
-  is never refused. Projectiles keep the game's effect spheres. Known limit: the discs trail the camera by one to two
-  frames while it pans.
+- **Own hitbox discs** (decision HB-OWN-ORBS, option 1): rc.3 drew fighter spheres as discs but left projectiles to
+  the game's effect spheres. The discs trailed the camera by one to two frames during pans in that build.
 
 ## Done: 0.2.0-rc.2 (2026-11-05)
 
@@ -63,7 +62,7 @@ The three operator decisions of 2026-11-05 that rc.1 did not carry (code at `p23
 
 The RC is M5q parity plus the new UI and clean MIT provenance; this list is not an RC gate.
 
-| Deferred work | State at rc.1 |
+| Work deferred at rc.1 | Later outcome |
 | --- | --- |
 | F9 helper promotion, fixed-seat ownership, hat/item cutover | Done in rc.5 (`p23/f9`): fixed CPU seats, slow mode on live entries, hat and item cutover, and the option-1 same-close raise from 1 to 3. |
 | Hurtboxes (HB1) | Deferred at rc.1; see [Hitbox Visualization](menu/display-and-controls.md#on-screen) for the supported layers. |
@@ -71,7 +70,7 @@ The RC is M5q parity plus the new UI and clean MIT provenance; this list is not 
 | Saved/replay Mii bust provider (Q15) | No new provider or hook; the native saved-Mii selection stays. |
 | Frame/status text backgrounds (UI22) | Done in rc.5: a dark plate behind each notice text (header, short body, long body). The input-log plates stay reverted. The frame strip keeps its own backdrop. |
 | Further latency work (F6) | rc.6, console test of 2026-11-08 (release `1e6c6a0e`): Player 1's first switch 53 ms and hats 7–23 ms, the first included, with no hitch. The slow group switches it found became the rc.6 group-speed work (decision GROUP-SPEED). |
-| Hitbox sphere replacement | Done for fighter spheres in rc.3 (own discs, never refused). Projectiles keep the game's effect spheres. |
+| Hitbox sphere replacement | Fighter discs in rc.3; [projectile hitboxes](TECHNICAL.md#hitboxes-and-grab-boxes) followed in rc.13. |
 | Remaining feature/edge-case inventory | Kept for later planning. |
 
 **Timer-recording truncation: fixed 2026-11-05** (`p23/timer-recording`; `docs/DECISIONS.md` DEFERRED-LIST item 7).
