@@ -503,7 +503,7 @@ pub static ROWS: [Row; 175] = [
     r(DEV, "Preload Samples", "cycle_preload_measurements", TOGGLE,
       "Writes sparse timing and memory samples of preloads\nto the diagnostics file."),
     r(DEV, "Reload developer config", "dev_reload_config", TOGGLE,
-      "While on, holding L+R+A on Player 1 re-reads the\ndeveloper config file every frame."),
+      "On: hold L+R+A on Player 1 in Training to reload dev.json.\nThe reads are queued and done off the game's thread."),
     r(DEV, "Debug hooks", "dev_debug_hooks", TOGGLE,
       "Turns on the debug watch on the Kirby backshield\nwork float."),
     // CPU > Level (rc.6; its group was appended to `GROUPS`, so its row follows the others here)
