@@ -375,40 +375,38 @@ impl Handoff {
         self.pool.heap_bytes() + std::mem::size_of_val(&*self.lanes)
     }
 
-    /// A value and its version.
-    fn value<M>(&self, current: &AtomicU64, read: fn(&[u64; WORDS]) -> M) -> (u64, M) {
+    /// A value's words and its version.
+    fn words_of(&self, current: &AtomicU64) -> (u64, [u64; WORDS]) {
         loop {
             let word = current.load(Acquire);
-            let value = read(&self.pool.read((word & INDEX) as u32));
+            let words = self.pool.read((word & INDEX) as u32);
             // The buffer was the current one throughout, so nobody wrote to it.
-            if current.load(Acquire) == word { return (word >> INDEX_BITS, value); }
+            if current.load(Acquire) == word { return (word >> INDEX_BITS, words); }
         }
     }
 
-    /// Apply `op` to a value and publish the result as the next version, which `op` is given: the version, the value and `op`'s
-    /// result. `op` runs again when another change came first. `None` when no buffer was free.
-    fn change_value<M: Copy + PartialEq, R>(
-        &self, current: &AtomicU64, read: fn(&[u64; WORDS]) -> M, words: fn(&M) -> [u64; WORDS], mut op: impl FnMut(&mut M, u64) -> R,
-    ) -> Option<(u64, M, R)> {
+    /// Apply `op` to a value's words and publish the result as the next version, which `op` is given: that version. `op` runs
+    /// again when another change came first. `None` when no buffer was free.
+    fn change_words(&self, current: &AtomicU64, op: &mut dyn FnMut(&mut [u64; WORDS], u64)) -> Option<u64> {
         loop {
             let word = current.load(Acquire);
             let old = (word & INDEX) as u32;
-            let before = read(&self.pool.read(old));
+            let before = self.pool.read(old);
             if current.load(Acquire) != word { continue; }
             let version = (word >> INDEX_BITS) + 1;
             let mut after = before;
-            let result = op(&mut after, version);
+            op(&mut after, version);
             // A changed value goes into a buffer of its own; an unchanged one keeps the buffer and only takes the next version.
             let fresh = if after == before {
                 None
             } else {
                 let buffer = self.pool.take()?;
-                self.pool.write(buffer, &words(&after));
+                self.pool.write(buffer, &after);
                 Some(buffer)
             };
             if current.compare_exchange(word, u64::from(fresh.unwrap_or(old)) | (version << INDEX_BITS), AcqRel, Acquire).is_ok() {
                 if fresh.is_some() { self.pool.give(old); }
-                return Some((version, after, result));
+                return Some(version);
             }
             // Another change came first. The checkout goes back even when it is the very buffer that was current before.
             if let Some(buffer) = fresh { self.pool.give(buffer); }
@@ -417,22 +415,38 @@ impl Handoff {
 
     /// The fighters' bindings and their version.
     pub fn sets(&self) -> (u64, SetMembers) {
-        self.value(&self.sets, sets_read)
+        let (version, words) = self.words_of(&self.sets);
+        (version, sets_read(&words))
     }
 
-    /// Change the fighters' bindings (`change_value`).
-    pub fn change_sets<R>(&self, op: impl FnMut(&mut SetMembers, u64) -> R) -> Option<(u64, SetMembers, R)> {
-        self.change_value(&self.sets, sets_read, sets_words, op)
+    /// Change the fighters' bindings (`change_words`).
+    pub fn change_sets<R>(&self, mut op: impl FnMut(&mut SetMembers, u64) -> R) -> Option<(u64, SetMembers, R)> {
+        let mut out = None;
+        let version = self.change_words(&self.sets, &mut |words, version| {
+            let mut members = sets_read(words);
+            let result = op(&mut members, version);
+            *words = sets_words(&members);
+            out = Some((members, result));
+        })?;
+        out.map(|(members, result)| (version, members, result))
     }
 
     /// The article slots and their version.
     pub fn articles(&self) -> (u64, Members) {
-        self.value(&self.articles, members_read)
+        let (version, words) = self.words_of(&self.articles);
+        (version, members_read(&words))
     }
 
-    /// Change the article slots (`change_value`).
-    pub fn change_articles<R>(&self, op: impl FnMut(&mut Members, u64) -> R) -> Option<(u64, Members, R)> {
-        self.change_value(&self.articles, members_read, members_words, op)
+    /// Change the article slots (`change_words`).
+    pub fn change_articles<R>(&self, mut op: impl FnMut(&mut Members, u64) -> R) -> Option<(u64, Members, R)> {
+        let mut out = None;
+        let version = self.change_words(&self.articles, &mut |words, version| {
+            let mut members = members_read(words);
+            let result = op(&mut members, version);
+            *words = members_words(&members);
+            out = Some((members, result));
+        })?;
+        out.map(|(members, result)| (version, members, result))
     }
 
     /// A fighter's CATCH: its set is found or taken over now, as under the lock, and the grab waits in the set's lane.
@@ -551,12 +565,16 @@ mod tests {
         let members = Members { ids: [(1, 16), (2, 32), (0, 0), (4, 64)],
             ages: [3, 7, 0, 10], attacking: [true, false, false, true] };
         assert_eq!(members_read(&members_words(&members)), members);
+        let words = members_words(&members);
+        assert_eq!(members_words(&members_read(&words)), words);
         let mut sets = SetMembers::NONE;
         sets.keys = [16, 32, 0, 64, 0, 96, 0, 0];
         sets.lives = [Some(life), None, None, Some(life), None, None, None, None];
         sets.bound = [9, 10, 0, 11, 0, 12, 0, 0];
         sets.used = [2, 2, 0, 5, 0, 1, 0, 0];
         let copy = sets_read(&sets_words(&sets));
+        let words = sets_words(&sets);
+        assert_eq!(sets_words(&sets_read(&words)), words);
         assert_eq!((copy.keys, copy.lives, copy.bound), (sets.keys, sets.lives, sets.bound));
         let mut a: Vec<_> = (0..FIGHTER_SETS).collect();
         let mut b = a.clone();
