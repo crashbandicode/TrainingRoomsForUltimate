@@ -140,7 +140,6 @@ CLAIM_OK = [
 # (path, the quoted text, reason). An entry whose text is gone from the page fails as `allowlist-stale`.
 NOTICE_OK = [
     ("docs/TECHNICAL.md", "Same as 格斗, nothing new saved", "the notice with a Mii's name filled in: src/model/notify.rs joins 'Same as ', the name and ', nothing new saved'"),
-    ("docs/guide/cpu-behaviour.md", "Selected: Up x3, In x1", "a help line built per chip: src/model/ui/screens.rs writes 'Selected: ' then '<direction> x<weight>' for each"),
     ("docs/RESTRICTIONS.md", "Combos work in Training", "a retired restriction: the row says the string is gone from src/"),
 ]
 
@@ -177,31 +176,7 @@ WALL_BULLETS = re.compile(r"^\*\*(?:Values|Default|How):\*\*")
 # page -> the number of `wall` problems it may still have while the pages are rewritten one by one. A page with more
 # fails with every one of them listed; a page with fewer fails as `allowlist-stale`, so a number only falls and a
 # finished page leaves the list. An empty list means every page is held to the rule.
-WALL_PENDING = {
-    # Counted on 2026-11-27 at the commit that added the rule (739 on 27 pages). Rewritten in this order: the menu pages
-    # (Fighters & Stages first), then the guide.
-    "docs/guide/break-the-targets.md": 3,
-    "docs/guide/combos.md": 13,
-    "docs/guide/controls.md": 9,
-    "docs/guide/cpu-behaviour.md": 13,
-    "docs/guide/eggs-ercise.md": 3,
-    "docs/guide/fighter-cycles.md": 8,
-    "docs/guide/frame-strip.md": 9,
-    "docs/guide/game-speed.md": 6,
-    "docs/guide/getting-started.md": 4,
-    "docs/guide/guard-the-edge.md": 4,
-    "docs/guide/juggler.md": 4,
-    "docs/guide/mash-out.md": 3,
-    "docs/guide/mii.md": 8,
-    "docs/guide/parry-practice.md": 1,
-    "docs/guide/recording.md": 76,
-    "docs/guide/save-states.md": 9,
-    "docs/guide/stages.md": 7,
-    "docs/guide/tech-practice.md": 3,
-    "docs/guide/troubleshooting.md": 2,
-    "docs/guide/using-the-menu.md": 8,
-    "docs/guide/waiting-rooms.md": 4,
-}
+WALL_PENDING = {}  # empty since 2026-11-27: every menu and guide page is held to the rule
 
 
 # Word budgets (`budget`). Ordered 2026-11-27 (operator, through tr-primary-2 03:16:29Z): the pages were too long.
@@ -216,29 +191,7 @@ BUDGET_GOOD_ROWS = 5
 BUDGET_VISUALS = {"docs/menu/*.md": "sections", "docs/guide/*.md": "page"}
 # page -> its word count, for the pages not yet cut to the budget. Such a page is not held to the rule, but it may not
 # grow, a shorter page lowers its number, and a page that meets the budget leaves the list. Empty before a release.
-BUDGET_PENDING = {
-    "docs/guide/break-the-targets.md": 215,
-    "docs/guide/combos.md": 2192,
-    "docs/guide/controls.md": 841,
-    "docs/guide/cpu-behaviour.md": 1060,
-    "docs/guide/eggs-ercise.md": 307,
-    "docs/guide/fighter-cycles.md": 733,
-    "docs/guide/frame-strip.md": 983,
-    "docs/guide/game-speed.md": 367,
-    "docs/guide/getting-started.md": 518,
-    "docs/guide/guard-the-edge.md": 263,
-    "docs/guide/juggler.md": 246,
-    "docs/guide/mash-out.md": 133,
-    "docs/guide/mii.md": 582,
-    "docs/guide/parry-practice.md": 157,
-    "docs/guide/recording.md": 6118,
-    "docs/guide/save-states.md": 848,
-    "docs/guide/stages.md": 584,
-    "docs/guide/tech-practice.md": 230,
-    "docs/guide/troubleshooting.md": 1408,
-    "docs/guide/using-the-menu.md": 647,
-    "docs/guide/waiting-rooms.md": 605,
-}
+BUDGET_PENDING = {}  # empty since 2026-11-27: every menu and guide page meets its budget
 
 
 class Problem(NamedTuple):
