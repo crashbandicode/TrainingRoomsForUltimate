@@ -30,10 +30,10 @@ The menu tour, menu option and button-chord films come from `tut-c51f4d81-yoga-1
 They crop a 1842×1036 region at (39, 44) from the 1080p capture and scale it to 720p, removing the capture tool's
 yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows name their own source runs.
 
-Every clip of this table is cut with that same crop, except `tut-save-load.mp4` and the six files of run `tut-61bedffb-xps-5`, which are whole frames. The first,
-middle and last frame of all 34 files then published were read on 2026-11-27: none shows the mark. Ten lost content
-of the game's own at the top edge. Two of those, `tut-input-special-direction` and `tut-spacing-grader`, were retired
-the same day with two other clips; the eight below are still published and are listed for a whole-frame take:
+- Every clip of this table is cut with that same crop, except `tut-save-load.mp4` and the six files of run `tut-61bedffb-xps-5`, which are whole frames.
+- The first, middle and last frame of all 34 files then published were read on 2026-11-27: none shows the mark.
+- Ten lost content of the game's own at the top edge.
+- Two of those, `tut-input-special-direction` and `tut-spacing-grader`, were retired the same day with two other clips; the eight below are still published and are listed for a whole-frame take:
 
 | Cut by the crop | Clips |
 | --- | --- |
@@ -166,20 +166,15 @@ The rc.13 options and drawing changes, shot by gif-nav-author-2. rc.13 is Eden-t
 - **The earlier rc.13 final:** DI, the DI and SDI chips, Dodge Staling, Mash a dodge on Always, Fast Fall Delay, Input
   Delay and the stage pick were shot on `7d7b74c9` (diag `134636ef…`), the rc.13 final before the re-roll. The rc.13
   commits after it add Taunts, Aerial Drift, the hitbox drawing changes, Wario's bike and Left / Right on toggles.
-- **Runs:** the Yoga, one instance, Training only, muted, Eden `2f315fc4b7d9` with its GDB stub on; recorded at 15 fps,
-  1280 wide. Hitbox clips and Aerial Drift run at Eden speed 25 % (the game's frames, four times as long); the Input
-  Delay and Fast Fall Delay clips at the game's own speed 1/4. Every frame is a captured frame; holds are on real
-  frames. Side-by-side clips line two takes up on the same input.
-- **Replaced:** `rc13-di.gif` and `rc13-di-sdi-chips.gif` replace `rc11-di.gif` and `rc11-di-sdi-chips.gif` in the
-  README, TECHNICAL, menu/cpu and guide/cpu-behaviour; `rc13-fast-fall-delay-quarter.gif` replaces
-  `rc12-fast-fall-delay.gif` in menu/cpu (rc.12 counted the delay in 60 Hz reads, not game frames, so its 1/4 clip is
-  out of date); `rc13-clatter-strength.gif` replaces `rc11-cpu-clatter-strength.gif` in menu/cpu (the rc.11 clip's menu
-  set Normal, not High, and never showed the break-out). The rows below preserve those earlier takes' provenance.
-- **SDI Direction and Clatter Strength:** the last two clips were added later, on rc.13 `ed0d7a35` (diag `2a667381…`),
-  on the XPS, one instance, Training only, muted, GDB stub on, with the gamepad overlay; Clatter Strength at Eden
-  speed 50 %. `rc13-sdi-direction.gif` is Kirby's rapid jab, not a neutral air: six neutral airs probed (Samus, Kirby,
-  Pikachu, Link, Palutena, Diddy) each gave only 2 to 4 SDI inputs, and Out and In flipped sign as the fighters swapped
-  sides mid-move. `rc13-clatter-strength.gif` was cut to 3.9 s and 160 colours to stay under 10 MB.
+- **Runs:** the Yoga, one instance, Training only, muted, Eden `2f315fc4b7d9` with its GDB stub on; recorded at 15 fps,   1280 wide.
+- Hitbox clips and Aerial Drift run at Eden speed 25 % (the game's frames, four times as long); the Input   Delay and Fast Fall Delay clips at the game's own speed 1/4.
+- Every frame is a captured frame; holds are on real   frames.
+- Side-by-side clips line two takes up on the same input.
+- **Replaced:** `rc13-di.gif` and `rc13-di-sdi-chips.gif` replace `rc11-di.gif` and `rc11-di-sdi-chips.gif` in the   README, TECHNICAL, menu/cpu and guide/cpu-behaviour; `rc13-fast-fall-delay-quarter.gif` replaces   `rc12-fast-fall-delay.gif` in menu/cpu (rc.12 counted the delay in 60 Hz reads, not game frames, so its 1/4 clip is   out of date); `rc13-clatter-strength.gif` replaces `rc11-cpu-clatter-strength.gif` in menu/cpu (the rc.11 clip's menu   set Normal, not High, and never showed the break-out).
+- The rows below preserve those earlier takes' provenance.
+- **SDI Direction and Clatter Strength:** the last two clips were added later, on rc.13 `ed0d7a35` (diag `2a667381…`),   on the XPS, one instance, Training only, muted, GDB stub on, with the gamepad overlay; Clatter Strength at Eden   speed 50 %.
+- `rc13-sdi-direction.gif` is Kirby's rapid jab, not a neutral air: six neutral airs probed (Samus, Kirby,   Pikachu, Link, Palutena, Diddy) each gave only 2 to 4 SDI inputs, and Out and In flipped sign as the fighters swapped   sides mid-move.
+- `rc13-clatter-strength.gif` was cut to 3.9 s and 160 colours to stay under 10 MB.
 
 | File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
 | --- | --- | --- | --- | --- | --- |
@@ -235,35 +230,36 @@ One clip per CPU option of [menu/cpu](menu/cpu.md): the option at its starting v
 
 ## rc.11 reshoots (2026-11-13)
 
-The GIF audit of 2026-11-13 (the operator's bar: the input visible, the same setup before and after, the effect held
-≥ 1 s with nothing covering it, readable text) marked 17 README GIFs for a reshoot. Each one retaken replaces its old
-file in the README and the docs; the old file stays in `media/` with a note in its row below.
+- The GIF audit of 2026-11-13 (the operator's bar: the input visible, the same setup before and after, the effect held ≥ 1 s with nothing covering it, readable text) marked 17 README GIFs for a reshoot.
+- Each one retaken replaces its old file in the README and the docs; the old file stays in `media/` with a note in its row below.
 
 - **Build:** rc.11 `0c628724`, its diag NRO `bd0bc61b…`.
-- **Runs:** the Surface, one instance, Training only, muted, Eden `2f315fc4b7d9` with its GDB stub on, no gamepad
-  overlay; the menu closed with its close chord only. `docs-rs1-0c628724` (03:21–03:32Z), `docs-rs1b-0c628724`
-  (03:44–03:53Z) and `docs-rs1e-0c628724` (04:17–04:28Z), slot 1; `docs-rs2-0c628724` (04:05–04:25Z), slot 2, with the
-  CPU's character-select coin pinned to Donkey Kong first (`rs2-pin-dk`), so re-entries keep the same CPU;
-  `docs-rs2b-0c628724` (04:33–04:46Z), slot 2, the DI take again with its smash on the C-stick; `docs-rs3-0c628724`
-  (04:30–04:46Z), slot 1; `docs-rs5-0c628724` (06:08–06:20Z) and `docs-rs5b-0c628724` (06:54–07:03Z), slot 2; `docs-ldn2-0c628724` (07:20–07:38Z), the
-  local-wireless pair on both slots.
-- **Evidence clips** (640 wide, outside git with the runs, `feature-gifs-rc11/cuts/`; the feature ledger lists each
-  one's frames): `rs11-f63-respawn.gif` (#63, `docs-rs2` `rs-respawn`: the same walk-off KO with Respawn on platform
-  Off, back at once, then On, back on the revival platform, with a zoomed inset of the platform) and
-  `rs11-f74-cpu-level.gif` (#74, `docs-rs2` `rs-cpu-level`, the README clip's take at 640),
-  `rs11-f56-cycle-switch.gif` (#56, `docs-rs3` `rs-cycle-switch` at 640, with a zoomed inset of the grid's badges)
-  and `rs11-f79-cycle-change.gif` (#79, `docs-rs3` `rs-cycle-change`: A on Donkey Kong adds "2" (inset), "Fighters ·
-  Loading 8/9" at once after the close, the chord to Link, "Ready 9/9", the chord to Donkey Kong).
-- **Recording and playback evidence** (`docs-rs4-0c628724`, slot 2, 04:56–05:12Z; the CPU made Mario so the lanes
-  match; rc.11 posts no notice for Record, Play or Load, so those presses are named in the ledger, with their log
-  lines in the receipts): `rs11-f10-record.gif` (#10), `rs11-f12-active-after-record.gif` (#12),
-  `rs11-f13-play-cpu.gif` (#13), `rs11-f15-playback.gif` (#15, the strip zoomed), `rs11-f17-both-play.gif` (#17),
-  `rs11-f22-mash-interrupt.gif` (#22) and `rs11-f29-bind-load.gif` (#29); from `docs-rs4c-0c628724` (slot 1,
-  06:12–06:28Z; the pop-up closed with a one-frame B tap) `rs11-f14-play-stop.gif` (#14), `rs11-f18-loop.gif` (#18),
-  `rs11-f20-chain.gif` (#20), `rs11-f26-popup.gif` (#26: its B close throws Mario's fireball, a product defect),
-  `rs11-f30-hot-five.gif` (#30), `rs11-f35-no-start-save.gif` (#35) and `rs11-f36-chord-once.gif` (#36), the
-  pop-up's list or the notice zoomed; `rs11-f68-replay-window.gif` (#68, `docs-rs5b`, the README take at 640). The
-  ledger lists each one's frames.
+- **Runs:** the Surface, one instance, Training only, muted, Eden `2f315fc4b7d9` with its GDB stub on, no gamepad overlay; the menu closed with its close chord only.
+  - `docs-rs1-0c628724` (03:21–03:32Z), `docs-rs1b-0c628724` (03:44–03:53Z) and `docs-rs1e-0c628724` (04:17–04:28Z), slot 1.
+  - `docs-rs2-0c628724` (04:05–04:25Z), slot 2, with the CPU's character-select coin pinned to Donkey Kong first (`rs2-pin-dk`), so re-entries keep the same CPU.
+  - `docs-rs2b-0c628724` (04:33–04:46Z), slot 2, the DI take again with its smash on the C-stick.
+  - `docs-rs3-0c628724` (04:30–04:46Z), slot 1.
+  - `docs-rs5-0c628724` (06:08–06:20Z) and `docs-rs5b-0c628724` (06:54–07:03Z), slot 2.
+  - `docs-ldn2-0c628724` (07:20–07:38Z), the local-wireless pair on both slots.
+- **Evidence clips** (640 wide, outside git with the runs, `feature-gifs-rc11/cuts/`; the feature ledger lists each one's frames)
+  - `rs11-f63-respawn.gif` (#63, `docs-rs2` `rs-respawn`: the same walk-off KO with Respawn on platform Off, back at once, then On, back on the revival platform, with a zoomed inset of the platform)
+  - `rs11-f74-cpu-level.gif` (#74, `docs-rs2` `rs-cpu-level`, the README clip's take at 640)
+  - `rs11-f56-cycle-switch.gif` (#56, `docs-rs3` `rs-cycle-switch` at 640, with a zoomed inset of the grid's badges)
+  - `rs11-f79-cycle-change.gif` (#79, `docs-rs3` `rs-cycle-change`: A on Donkey Kong adds "2" (inset), "Fighters · Loading 8/9" at once after the close, the chord to Link, "Ready 9/9", the chord to Donkey Kong).
+- **Recording and playback evidence** (`docs-rs4-0c628724`, slot 2, 04:56–05:12Z; the CPU made Mario so the lanes match; rc.11 posts no notice for Record, Play or Load, so those presses are named in the ledger, with their log lines in the receipts)
+  - `rs11-f10-record.gif` (#10)
+  - `rs11-f12-active-after-record.gif` (#12)
+  - `rs11-f13-play-cpu.gif` (#13)
+  - `rs11-f15-playback.gif` (#15, the strip zoomed)
+  - `rs11-f17-both-play.gif` (#17)
+  - `rs11-f22-mash-interrupt.gif` (#22)
+  - `rs11-f29-bind-load.gif` (#29); from `docs-rs4c-0c628724` (slot 1, 06:12–06:28Z; the pop-up closed with a one-frame B tap) `rs11-f14-play-stop.gif` (#14)
+  - `rs11-f18-loop.gif` (#18)
+  - `rs11-f20-chain.gif` (#20)
+  - `rs11-f26-popup.gif` (#26: its B close throws Mario's fireball, a product defect)
+  - `rs11-f30-hot-five.gif` (#30)
+  - `rs11-f35-no-start-save.gif` (#35)
+  - `rs11-f36-chord-once.gif` (#36), the pop-up's list or the notice zoomed; `rs11-f68-replay-window.gif` (#68, `docs-rs5b`, the README take at 640). The ledger lists each one's frames.
 - **Frame strip and Fighter Mismatch evidence** (`docs-rs6-0c628724`, slot 2, 07:46–07:57Z; Mario vs Mario from a
   bound save; the strip zoomed along the bottom of each clip, the colours kept with a 255-colour palette):
   `rs11-f02-lanes.gif` (#2), `rs11-f03-stick-row.gif` (#3), `rs11-f04-cstick.gif` (#4), `rs11-f07-adv-frames.gif`
@@ -272,17 +268,14 @@ file in the README and the docs; the old file stays in `media/` with a note in i
 - **Combos and Mii evidence** (`docs-rs7-0c628724`, slot 1, 08:47–09:05Z; everything through the Recording page):
   `rs11-f38-sequence.gif` (#38), `rs11-f45-shared-combo.gif` (#45), `rs11-f46-other-fighter.gif` (#46, #47),
   `rs11-f51-mii-identical.gif` (#51) and `rs11-f54-named-mii.gif` (#54).
-- **Migration, placement and the CPU pilot** (`docs-rs8-0c628724`, slot 2, 08:43–09:00Z): `rs11-f37-migration.gif`
-  (#37; its first 3.5 s is a receipt card listing the card's pre-rc.5 files, since no screen in the game shows them,
-  then the Recording page after the first Training entry), `rs11-f70-edit-placement.gif` (#70: Offset X −40, the
-  same jab whiffs) and `rs11-f84-pilot-refusals.gif` (#84, #87 and #89's Play half: Record and Play on Player 1
-  refused, R + D-pad Down inert while Online Deluxe shows a page with rows, B + D-pad Up still opening the menu).
-- **Player 2 and the setup library** (`docs-rs9-0c628724`, slot 1, 09:54–10:12Z, Player 2's controller connected;
-  `docs-rs8c-0c628724`, slot 2, 09:58–10:11Z): `rs11-f60-p2-control.gif` (#60: under Control, Player 2 walks and
-  taunts the CPU, cycles it to Kirby and gives it Mario's hat; Player 1 saves and loads),
-  `rs11-f61-p2-lra-mii.gif` (#61: Player 2's L + R + A resets, then a Mii Brawler) and
-  `rs11-f69-setup-restore.gif` (#69: a setup saved, both fighters moved, the library puts them back). Player 2's
-  presses have no on-screen mark; the ledger names them.
+- **Migration, placement and the CPU pilot** (`docs-rs8-0c628724`, slot 2, 08:43–09:00Z)
+  - `rs11-f37-migration.gif` (#37; its first 3.5 s is a receipt card listing the card's pre-rc.5 files, since no screen in the game shows them, then the Recording page after the first Training entry)
+  - `rs11-f70-edit-placement.gif` (#70: Offset X −40, the same jab whiffs)
+  - `rs11-f84-pilot-refusals.gif` (#84, #87 and #89's Play half: Record and Play on Player 1 refused, R + D-pad Down inert while Online Deluxe shows a page with rows, B + D-pad Up still opening the menu).
+- **Player 2 and the setup library** (`docs-rs9-0c628724`, slot 1, 09:54–10:12Z, Player 2's controller connected; `docs-rs8c-0c628724`, slot 2, 09:58–10:11Z)
+  - `rs11-f60-p2-control.gif` (#60: under Control, Player 2 walks and taunts the CPU, cycles it to Kirby and gives it Mario's hat; Player 1 saves and loads)
+  - `rs11-f61-p2-lra-mii.gif` (#61: Player 2's L + R + A resets, then a Mii Brawler)
+  - `rs11-f69-setup-restore.gif` (#69: a setup saved, both fighters moved, the library puts them back). Player 2's presses have no on-screen mark; the ledger names them.
 - **VS through sudden death** (`docs-rs9d-0c628724`, slot 2, 11:26–11:38Z, Player 2's controller connected):
   `rs11-f71-vs-capture.gif` (#71: TIME!, sudden death, GAME!; then in Training the Replay window lists the capture
   at 5325 frames, past the timer's 3600, zoomed; then the Vault's Replay Data with the new replay first). Three takes
@@ -434,9 +427,9 @@ file in the README and the docs; the old file stays in `media/` with a note in i
 
 ## Post-ship refresh: rc.7 as shipped (2026-11-11)
 
-- **Why:** many earlier clips carry a line of text across the frame, "Key BTN - LS +0000,+0000 RS +0000,+0000 GC LT ---
-  RT ---". It comes from another plugin, `libsmash_gamepad_overlay.nro`, which was in the capture sessions' plugin set.
-  The rc.1–rc.4 clips also show the fork's old 15-row input log at the left edge.
+- **Why:** many earlier clips carry a line of text across the frame, "Key BTN - LS +0000,+0000 RS +0000,+0000 GC LT ---   RT ---".
+- It comes from another plugin, `libsmash_gamepad_overlay.nro`, which was in the capture sessions' plugin set.
+- The rc.1–rc.4 clips also show the fork's old 15-row input log at the left edge.
   - The audit is `artifacts/phase23/feature-gifs/POSTSHIP-RETAKES.md`: 43 of the 68 GIFs carry the bar.
   - Every docs capture now leaves that plugin out.
 - **Build:** rc.7 `722525a5` as shipped (release NRO `b6e60bb9…`). The clips use the same commit's diag NRO
@@ -567,12 +560,10 @@ Retired from the README (each carried the bar):
 
 ## rc.6 clips
 
-`rc6-sequence-drill.gif` comes from run `rc6-seq-diag1` on the Yoga, 2026-11-08, row `seq-gif`, 13:40:04–13:40:27Z,
-with the diag NRO `50c8a5df` of `p23/rc6-seq-drill` `e6ac460`. The diag build adds log lines only; the screen draws the
-same. The take is Eden's own recorder at 1280×720 and 15 fps, 6 s, 91 frames, 13.3 MB (raw take SHA-256
-`71d818e4…372d`, kept in `artifacts/phase23/rc6-eden/seq-diag1/out/seq-gif/`). It was re-encoded with the playbook's
-`tools/eden-solo/encode.py`: one shared palette of 96 colours, no dither, every second frame kept with the time of both,
-so it still plays at game speed (46 frames, 6.9 MB).
+- `rc6-sequence-drill.gif` comes from run `rc6-seq-diag1` on the Yoga, 2026-11-08, row `seq-gif`, 13:40:04–13:40:27Z, with the diag NRO `50c8a5df` of `p23/rc6-seq-drill` `e6ac460`.
+- The diag build adds log lines only; the screen draws the same.
+- The take is Eden's own recorder at 1280×720 and 15 fps, 6 s, 91 frames, 13.3 MB (raw take SHA-256 `71d818e4…372d`, kept in `artifacts/phase23/rc6-eden/seq-diag1/out/seq-gif/`).
+- It was re-encoded with the playbook's `tools/eden-solo/encode.py`: one shared palette of 96 colours, no dither, every second frame kept with the time of both, so it still plays at game speed (46 frames, 6.9 MB).
 
 | File | Re-run row | Host | Embedded in | Build | Length | Start, then the inputs | Must be visible | In `media/` |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -593,10 +584,9 @@ game or in a file, not only a menu. These clips replace or join the GIFs that sh
     vanilla, in a Quickplay room hosted in Eden.
 - **Review and cuts:**
   - Each take was reviewed at the times in its row below (`clips.py times`).
-  - Each was cut to the before, the action and the result (`clips.py cutw`, 10 fps): one palette of 128 colours from
-    three frames, no dither, the game's frame times.
-  - The windows kept from the raw take are listed with each clip. The raw takes stay with the runs in
-    `artifacts/phase23/feature-gifs/runs/`.
+  - Each was cut to the before, the action and the result (`clips.py cutw`, 10 fps): one palette of 128 colours from     three frames, no dither, the game's frame times.
+  - The windows kept from the raw take are listed with each clip.
+- The raw takes stay with the runs in     `artifacts/phase23/feature-gifs/runs/`.
 
 | File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
 | --- | --- | --- | --- | --- | --- |
@@ -620,11 +610,9 @@ evidence clips stay outside git, in `artifacts/phase23/feature-gifs/evidence/`.
 
 ## rc.5 clips
 
-The rc.5 player docs embedded 23 takes from [`media/`](media). Three more were there until
-2026-11-10, when clips that show the result replaced them (rc.6 docs clips above); they remain in the history up to
-`da26d632`. They are Eden footage of
-`p23/rc5-wire-fix` diag builds, and for the last three of `p23/rc6-hot-slots` diag builds, which add log lines only (the
-screen draws the same):
+- The rc.5 player docs embedded 23 takes from [`media/`](media).
+- Three more were there until 2026-11-10, when clips that show the result replaced them (rc.6 docs clips above); they remain in the history up to `da26d632`.
+- They are Eden footage of `p23/rc5-wire-fix` diag builds, and for the last three of `p23/rc6-hot-slots` diag builds, which add log lines only (the screen draws the same):
 
 - The frame-strip clips other than the C-stick one: run `rc5-docs-gifs-xps2` on the XPS, 2026-11-08 00:30–00:56Z, diag NRO `6bbf2ecd`. The drop
   clip and the input clip are the same take.
@@ -637,27 +625,24 @@ screen draws the same):
   CPU's jab, so each clip shows the CPU's jabs landing.
 - `rc5-popup.gif`, `rc5-record-start-save.gif`, `rc5-recording-page.gif` and `rc5-save-warp.gif`: Surface run
   `out-confirm-2116Z`, 2026-11-07.
-- `rc5-migration.gif`: run `rc6-docs-gifs-xps2` on the XPS, 2026-11-08 16:45Z, diag NRO `d20ead7b` (`p23/rc6-hot-slots`
-  `688c478`), booted on cov-rec's pre-library card. The row first checked the card the way cov-rec's #37 row does:
-  two dated saves, Slot 2 bound, `oldjab` active, one migrate line. The take's first 0.9 s (a leftover notice) are
-  trimmed. It was re-encoded with ffmpeg, one shared palette and no dither: 3.9 MB, 8.1 s.
-  - The recording guide used `rc5-migration-crop.gif` on 2026-11-11: the same frames and times, cropped to the top 436
-    rows to leave out the gamepad overlay plugin's input bar. The two lists and the notices are whole; the fighters
-    are cut at the waist.
+- `rc5-migration.gif`: run `rc6-docs-gifs-xps2` on the XPS, 2026-11-08 16:45Z, diag NRO `d20ead7b` (`p23/rc6-hot-slots`   `688c478`), booted on cov-rec's pre-library card.
+- The row first checked the card the way cov-rec's #37 row does:   two dated saves, Slot 2 bound, `oldjab` active, one migrate line.
+- The take's first 0.9 s (a leftover notice) are   trimmed.
+- It was re-encoded with ffmpeg, one shared palette and no dither: 3.9 MB, 8.1 s.
+  - The recording guide used `rc5-migration-crop.gif` on 2026-11-11: the same frames and times, cropped to the top 436     rows to leave out the gamepad overlay plugin's input bar.
+- The two lists and the notices are whole; the fighters     are cut at the waist.
 - `rc5-save-warp.gif` (Surface `out-confirm-2116Z`, above): the recording guide used `rc5-save-warp-crop.gif`
   (2026-11-11), cropped the same way; the fighters are cut at the knees.
 - `rc5-make-combo.gif`: run `rc6-docs-gifs-xps7` on the XPS, 2026-11-08 17:46Z, the same diag NRO, fixture `mk6` (the
   rc.5 `mk` fixture with its start save moved into reach, `make_mk6.py`). After the clip the row checked the card:
   `combo-2` written and hot, `combo-1` still the drill. The take is trimmed to 0.7–10.4 s and re-encoded the same way:
   6.1 MB, 9.7 s.
-- `rc5-grade-not-true.gif`: run `rc6-docs-gifs-xps9` on the XPS, 2026-11-08 18:58Z, the same diag NRO, row
-  `gif-gnt-f` (the plan's `gif-gnt-b`, renamed for the rerun). The strip logged the three links the row needs: Make combo
-  `TRUE 0` (input +4), attempt 1 `+1 DROP` (input +5), attempt 2 up tilt into up smash (input +4). The take is trimmed
-  at 0.8 s. It was re-encoded with one shared palette of 96 colours and no dither, keeping every second frame with the
-  time of both: 9.9 MB, 7.1 s.
-  - The recording guide used `rc5-grade-not-true-crop.gif` on 2026-11-11: the same frames and times, cropped to the top
-    436 rows to leave out the gamepad overlay plugin's input bar (y 443–452). The frame strip and helper bar are
-    whole; the fighters are cut at the knees in the last 2 s.
+- `rc5-grade-not-true.gif`: run `rc6-docs-gifs-xps9` on the XPS, 2026-11-08 18:58Z, the same diag NRO, row   `gif-gnt-f` (the plan's `gif-gnt-b`, renamed for the rerun).
+- The strip logged the three links the row needs: Make combo   `TRUE 0` (input +4), attempt 1 `+1 DROP` (input +5), attempt 2 up tilt into up smash (input +4).
+- The take is trimmed   at 0.8 s.
+- It was re-encoded with one shared palette of 96 colours and no dither, keeping every second frame with the   time of both: 9.9 MB, 7.1 s.
+  - The recording guide used `rc5-grade-not-true-crop.gif` on 2026-11-11: the same frames and times, cropped to the top     436 rows to leave out the gamepad overlay plugin's input bar (y 443–452).
+- The frame strip and helper bar are     whole; the fighters are cut at the knees in the last 2 s.
 
 Each was taken at 1280×720 and 15 fps by the runner's `gif` step. Seven takes over 10 MB were re-encoded with one shared
 palette of 96 colours and no dither: `rc5-popup.gif` and `rc5-save-warp.gif` keep every frame, and
@@ -710,28 +695,22 @@ Recording page. A row that says `rr-6` is not a capture of the old slot page. Re
 | `media/rc5-fighter-mismatch.gif` | `media-rc5-fighter-mismatch` | yoga | guide/recording.md, Fighter Mismatch | rr-6 | 7 s | CPU is Mario. Active chain whose first macro was recorded on a different fighter (change P1 to Pikachu, record a jab, change P1 back to Mario, put that recording first in a chain, set the chain active for the CPU). ZR+Up. | The Fighter Mismatch rows open, cursor on Keep. Keep plays the chain on Mario. There is no second prompt when a later macro plays. | yes |
 | `media/rc5-migration.gif` | `gif-migration` (`artifacts/phase23/rc6-combined/rows-docs-gifs`) | xps | guide/recording.md, Migration | first boot of a card from before the library | 8 s | Before boot, the card holds the old `save_states.json` with saves in indexes 1 and 2, the Save and Load chords on index 2, and `macros/selected.txt` naming `oldjab` (cov-rec's `boot/` card). Boot into Training. ZR+Right for the pop-up, Right to MACROS, B. ZR+Left. | SAVE STATES lists `Slot 2 (YYYY-MM-DD)` and `Slot 1 (YYYY-MM-DD)`, and Slot 2 is the bound save. MACROS lists `Old jab` as Player 1's active macro. Play runs it from where Player 1 stands; there is no warp. | yes |
 
-rc.5 has no sequence-drill row because rc.5 did not drill sequences. rc.6 drills them, and the clip is under rc.6
-clips above ([the Recording guide](guide/recording.md), Sequences and the one drill). The migration clip shows what a card updated
-from an earlier build carries over: its save indexes and its selected macro. Recording slots were never kept between
-boots (`src/model/library/migrate.rs`), so no card reaches the library with a recording slot that becomes
-`Slot N (date)`.
+- rc.5 has no sequence-drill row because rc.5 did not drill sequences.
+- rc.6 drills them, and the clip is under rc.6 clips above ([the Recording guide](guide/recording.md), Sequences and the one drill).
+- The migration clip shows what a card updated from an earlier build carries over: its save indexes and its selected macro.
+- Recording slots were never kept between boots (`src/model/library/migrate.rs`), so no card reaches the library with a recording slot that becomes `Slot N (date)`.
 
-The grade-not-true row was measured before the take (runs `rc6-docs-gifs-xps8` and `-xps9`). Plugin macros played by
-Player 1's Play chord put the follow-up an exact number of frames after the first press, from the save; Eden's own
-inputs drifted by up to 6 frames between two presses. From the shared start (CPU at 0%), jab into jab reads `TRUE 0`
-with the second press 21 frames after the first, but any A in jab 1's window is jab 2, so no different move can follow at
-that timing. At 0%, up tilt into up tilt first links at a gap of 45 frames, `+15 DROP`, and down tilt into up tilt did
-not link at gaps of 19–37 frames. At the CPU's 42%, up tilt into up tilt
-reads `TRUE 0` at a gap of 41 frames (three plays) and `+1 DROP` at 42 (two plays), and up smash hits at those gaps.
+- The grade-not-true row was measured before the take (runs `rc6-docs-gifs-xps8` and `-xps9`).
+- Plugin macros played by Player 1's Play chord put the follow-up an exact number of frames after the first press, from the save; Eden's own inputs drifted by up to 6 frames between two presses.
+- From the shared start (CPU at 0%), jab into jab reads `TRUE 0` with the second press 21 frames after the first, but any A in jab 1's window is jab 2, so no different move can follow at that timing.
+- At 0%, up tilt into up tilt first links at a gap of 45 frames, `+15 DROP`, and down tilt into up tilt did not link at gaps of 19–37 frames.
+- At the CPU's 42%, up tilt into up tilt reads `TRUE 0` at a gap of 41 frames (three plays) and `+1 DROP` at 42 (two plays), and up smash hits at those gaps.
 
-The take ran on `688c478`, before rc.6's recording fixes, and two things in it differ from rc.6. On that build
-*Save last combo* had no row on the Recording page (`Editor::ComboSave` was in no menu table), so the drill was made
-with Make combo. A combo made from a macro there had links but no input events (`"events": []`): the strip read Player
-1's poll before the macro's playback was written into it, so it never saw the macro's presses. Attempt 1 in the clip
-therefore counts because its move matches; the on-time tolerance had no event to test. rc.6 has the
-*+ Save last combo…* row (`src/model/recording_menu.rs:1584`), and the strip reads the played frame, so Make combo
-stores the macro's events (`Sticks::after_recorder`, `src/model/input_delay.rs:76`; cov-rec row `cov-make-combo`,
-every link has events).
+- The take ran on `688c478`, before rc.6's recording fixes, and two things in it differ from rc.6.
+- On that build *Save last combo* had no row on the Recording page (`Editor::ComboSave` was in no menu table), so the drill was made with Make combo.
+- A combo made from a macro there had links but no input events (`"events": []`): the strip read Player 1's poll before the macro's playback was written into it, so it never saw the macro's presses.
+- Attempt 1 in the clip therefore counts because its move matches; the on-time tolerance had no event to test.
+- rc.6 has the *+ Save last combo…* row (`src/model/recording_menu.rs:1584`), and the strip reads the played frame, so Make combo stores the macro's events (`Sticks::after_recorder`, `src/model/input_delay.rs:76`; cov-rec row `cov-make-combo`, every link has events).
 
 The redesign mockups named `docs/decisions/RECORDING-REDESIGN-*.png` are not in this tree. They are not a substitute
 for the rows above. The rc.3 clip `media/frame-strip.gif` remains the earlier take of the strip. The RC10 clip
@@ -741,12 +720,10 @@ Clips in the sections below are already in the tree. They have no row in `eden/r
 
 ## 0.2.0-rc.4 clips (2026-11-05)
 
-Run `tr-p23-rc4-docs-2` on the Yoga, 2026-11-05 19:32–20:05Z: the RELEASE NRO of `p23/rc4-candidate` `ff69e53`
-(`031f1eaecbd3d0d0284616baf10b8e8c955623b8821ce42976266c1dd10b2d9d`), with the CPU pilot, Online Deluxe and tile-cursor
-plugins installed; Eden muted. P1 Mario and CPU Mario, Hitbox Visualization Off, Input Display Frame strip. Each clip is
-one continuous take from Eden's own recorder at 1280, re-encoded with the playbook's `tools/eden-solo/encode.py` (one
-shared palette, no dither, fps 0: Eden's own frame times). Facts in the captions come from guest tracepoints and the
-profile's files, not from a diag build.
+- Run `tr-p23-rc4-docs-2` on the Yoga, 2026-11-05 19:32–20:05Z: the RELEASE NRO of `p23/rc4-candidate` `ff69e53` (`031f1eaecbd3d0d0284616baf10b8e8c955623b8821ce42976266c1dd10b2d9d`), with the CPU pilot, Online Deluxe and tile-cursor plugins installed; Eden muted.
+- P1 Mario and CPU Mario, Hitbox Visualization Off, Input Display Frame strip.
+- Each clip is one continuous take from Eden's own recorder at 1280, re-encoded with the playbook's `tools/eden-solo/encode.py` (one shared palette, no dither, fps 0: Eden's own frame times).
+- Facts in the captions come from guest tracepoints and the profile's files, not from a diag build.
 
 | File | What it shows |
 | --- | --- |
@@ -766,11 +743,9 @@ Not in these clips:
 
 ### Frame strip and own hitbox discs
 
-Run `tr-p23-rc3-1` on the Surface, 2026-11-05 15:10–16:01Z: the RELEASE NRO of `p23/rc3-candidate` `3c8f5bc`
-(`bf01353ea59e8e06d38975ed13aa686fd25e0c0617d5a66517152fcc292b8527`), with the CPU pilot, Online Deluxe and tile-cursor
-plugins installed. P1 Ridley and CPU Ridley (picked in Fighters & Stages), Hitbox Visualization On, Input Display Frame
-strip. Eden's raw takes (17–22 MB) were re-encoded with the playbook's `tools/eden-solo/encode.py` (one shared palette,
-96 colours, no dither); *step 2* keeps every second frame, so the clip plays about 10–20% slower than the game.
+- Run `tr-p23-rc3-1` on the Surface, 2026-11-05 15:10–16:01Z: the RELEASE NRO of `p23/rc3-candidate` `3c8f5bc` (`bf01353ea59e8e06d38975ed13aa686fd25e0c0617d5a66517152fcc292b8527`), with the CPU pilot, Online Deluxe and tile-cursor plugins installed.
+- P1 Ridley and CPU Ridley (picked in Fighters & Stages), Hitbox Visualization On, Input Display Frame strip.
+- Eden's raw takes (17–22 MB) were re-encoded with the playbook's `tools/eden-solo/encode.py` (one shared palette, 96 colours, no dither); *step 2* keeps every second frame, so the clip plays about 10–20% slower than the game.
 
 | File | What it shows |
 | --- | --- |
@@ -805,12 +780,10 @@ as above. Re-encoded the same way (step 2, 96 colours), each frame then given 16
 
 ## 0.2.0-rc.1 clips (2026-11-05)
 
-Run `tr-p23-docs-capture-03` on the Surface, 2026-11-05Z: one boot of the released 0.2.0-rc.1 NRO
-(`706c993ff885273206eee656cce1313ec8690b29176b3ebf66ae38ec28c64a46`), with the CPU pilot, Online Deluxe and tile-cursor
-plugins installed. A boot settings file set Hitbox Visualization On, Respawn on platform On, DI Up, SDI Up/High, and
-Kirby first in both cycle orders; the rest was changed in the menu on camera. P1 is Steve and the CPU Richter until
-the cycle chords switch both to Kirby. Clips marked *step 2* keep every second frame (each shown twice as long) to
-stay under 10 MB.
+- Run `tr-p23-docs-capture-03` on the Surface, 2026-11-05Z: one boot of the released 0.2.0-rc.1 NRO (`706c993ff885273206eee656cce1313ec8690b29176b3ebf66ae38ec28c64a46`), with the CPU pilot, Online Deluxe and tile-cursor plugins installed.
+- A boot settings file set Hitbox Visualization On, Respawn on platform On, DI Up, SDI Up/High, and Kirby first in both cycle orders; the rest was changed in the menu on camera.
+- P1 is Steve and the CPU Richter until the cycle chords switch both to Kirby.
+- Clips marked *step 2* keep every second frame (each shown twice as long) to stay under 10 MB.
 
 | File | What it shows |
 | --- | --- |
@@ -855,7 +828,10 @@ rc.1 clip above; it and its provenance note remain in the history up to v0.2.0-r
 
 ## rc.13 clips, effect clips (2026-11-14, untested on hardware)
 
-Clips for options whose earlier GIF showed the menu and not the effect (the docs GIF audit), shot by gif-lane-4 on rc.13 `ed0d7a35` (diag `2a667381…`), Eden `2f315fc4b7d9` with its GDB stub on, muted, 1x, one instance, Training only, recorded at 15 fps and cut at 1280 wide. rc.13 is Eden-tested and **untested on hardware**. The Surface (`gl4-a-1`) and the Ally (`gl4-ally-3`, `-5` and `-7`, a Windows Eden) were used; the Ally has no gamepad overlay, so a chord in the game is named in a box above the picture and a press made in the menu is named in the menu. The `gl4-ally-3` and `gl4-ally-5` runs used a copy of `gdb_rc11.py` without its Linux-only CPU-time measurement; `gl4-ally-7` used the harness copy that measures it on Windows.
+- Clips for options whose earlier GIF showed the menu and not the effect (the docs GIF audit), shot by gif-lane-4 on rc.13 `ed0d7a35` (diag `2a667381…`), Eden `2f315fc4b7d9` with its GDB stub on, muted, 1x, one instance, Training only, recorded at 15 fps and cut at 1280 wide.
+- rc.13 is Eden-tested and **untested on hardware**.
+- The Surface (`gl4-a-1`) and the Ally (`gl4-ally-3`, `-5` and `-7`, a Windows Eden) were used; the Ally has no gamepad overlay, so a chord in the game is named in a box above the picture and a press made in the menu is named in the menu.
+- The `gl4-ally-3` and `gl4-ally-5` runs used a copy of `gdb_rc11.py` without its Linux-only CPU-time measurement; `gl4-ally-7` used the harness copy that measures it on Windows.
 
 | File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
 | --- | --- | --- | --- | --- | --- |
@@ -875,7 +851,9 @@ Clips for options whose earlier GIF showed the menu and not the effect (the docs
 
 ## rc.13 stills, frame strip, CPU pilot refusals, menu controls and the sequence bar (2026-11-14, untested on hardware)
 
-Docs stills shot by gif-lane-5 on rc.13 `ed0d7a35` (diag `2a667381…`), Eden `2f315fc4b7d9` with its GDB stub on, muted, 1x, one instance on the XPS, Training only. A still is a frame cut out of the take's own 1280x720 recording (15 fps, 256-colour palette): Eden's screenshots on the XPS are the render window, 1280x674 with pillarbox bars. rc.13 is Eden-tested and **untested on hardware**.
+- Docs stills shot by gif-lane-5 on rc.13 `ed0d7a35` (diag `2a667381…`), Eden `2f315fc4b7d9` with its GDB stub on, muted, 1x, one instance on the XPS, Training only.
+- A still is a frame cut out of the take's own 1280x720 recording (15 fps, 256-colour palette): Eden's screenshots on the XPS are the render window, 1280x674 with pillarbox bars.
+- rc.13 is Eden-tested and **untested on hardware**.
 
 | File | Run, row | Embedded in | Size | Frame kept | What the picture shows |
 | --- | --- | --- | --- | --- | --- |
@@ -901,9 +879,9 @@ Docs stills shot by gif-lane-5 on rc.13 `ed0d7a35` (diag `2a667381…`), Eden `2
 
 ## rc.14 clips (2026-11-14, diag `aa336fc7`, untested on hardware)
 
-Shot by gif-lane-5 on integration-3's green diag `aa336fc7` (`libtraining_rooms-aa336fc7-diag.nro`, sha256 `4fd3a5df00bbef5db0699e8e2ce9c4f7d7955f0e68a4ad2cd5b7f4772f7937ae`), Eden 2f315fc4, muted, GDB stub on, 1x. These show rc.14 behaviour (the
-PT / Aegis group in a Mario + one-group cycle needs the rc.14 pt-groups fix), so they belong to rc.14's docs, not to rc.13's. The takes check
-their own claim: each half is read on the diag log, and both halves run against the same CPU.
+- Shot by gif-lane-5 on integration-3's green diag `aa336fc7` (`libtraining_rooms-aa336fc7-diag.nro`, sha256 `4fd3a5df00bbef5db0699e8e2ce9c4f7d7955f0e68a4ad2cd5b7f4772f7937ae`), Eden 2f315fc4, muted, GDB stub on, 1x.
+- These show rc.14 behaviour (the PT / Aegis group in a Mario + one-group cycle needs the rc.14 pt-groups fix), so they belong to rc.14's docs, not to rc.13's.
+- The takes check their own claim: each half is read on the diag log, and both halves run against the same CPU.
 
 | File | Run, row | Embedded in | Length, size | Raw windows kept | What the frames show |
 | --- | --- | --- | --- | --- | --- |
@@ -937,6 +915,11 @@ their own claim: each half is read on the diag log, and both halves run against 
 
 ## rc.15 input drill (2026-11-15)
 
-`rc15-input-drill.gif` is the byte-identical media restored from `3d36ca7d`, shot on rc.15 feature source `2eb3903e`, not the final integrated build. Full frame1280×720,3.78s, nine encoded frames from19 native frames at a5fps request; SHA256 `a7f8a550de084758ed076c81b4dff39bc4503b2eacc80a8b7c9bb317b4fa9ccc`. It shows Drill1's Crop range4→3→4→3. It does not show Record drill, Make combo, grading or save-as-new. The early build's helper overlaps the editor; the integrated build corrected that issue. The [dated evidence](EVIDENCE-rc15-input-drill.md) keeps the original limitations and separate runtime checks.
+- `rc15-input-drill.gif` is the byte-identical media restored from `3d36ca7d`, shot on rc.15 feature source `2eb3903e`, not the final integrated build.
+- Full frame1280×720,3.78s, nine encoded frames from19 native frames at a5fps request; SHA256 `a7f8a550de084758ed076c81b4dff39bc4503b2eacc80a8b7c9bb317b4fa9ccc`.
+- It shows Drill1's Crop range4→3→4→3.
+- It does not show Record drill, Make combo, grading or save-as-new.
+- The early build's helper overlaps the editor; the integrated build corrected that issue.
+- The [dated evidence](EVIDENCE-rc15-input-drill.md) keeps the original limitations and separate runtime checks.
 
 At the time, the macro and drill GIFs showed range selection, not the full preview/save flow. The `rc15-article-hurtboxes` take showed Pikmin, not every supported item. For later Record drill and colour legend footage, see [Tutorial clips](#tutorial-clips-2026-11-25-through-2026-11-27).
