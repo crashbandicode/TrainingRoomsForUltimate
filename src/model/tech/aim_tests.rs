@@ -560,6 +560,39 @@ fn ranges_without_a_touching_value_stop_once_every_value_was_flown() {
 }
 
 #[test]
+fn a_refused_five_angle_ceiling_spot_consumes_more_than_half_a_frame_budget() {
+    let surfaces = block(v(85., 0.), v(-85., 0.));
+    let ceiling = surfaces.lines().find(|l| l.kind() == Some(Kind::Ceiling)).unwrap();
+    let fixed = |x| Numeric { mode: Mode::Set, lo: x, hi: x };
+    let mut config = factory_floor();
+    config.surface = 3;
+    config.speed = fixed(250.);
+    config.start = fixed(50.);
+    config.angle = Numeric { mode: Mode::Random, lo: 265., hi: 285. };
+    config.damage = fixed(0.);
+    config.hit_damage = fixed(12.);
+    config.time = fixed(30.);
+    config.delay = fixed(30.);
+    for t in [0.25, 0.75] {
+        let spot = picker::Spot::at(ceiling, t);
+        let ctx = planner::Context { blast: solver::editor_bounds([-500., 500., 500., -1000.]), ..context(&surfaces, spot) };
+        let aim = solver::Aim { surfaces: &surfaces, spot, knockback: 250., params: ctx.params, blast: ctx.blast, view: None };
+        let start = add(spot.point(), scale(ceiling.normal, 50.));
+        for angle in (265..=285).step_by(5) {
+            assert_eq!(aim.contact(start, angle as f32), (None, 219));
+        }
+        let mut chance = 0;
+        let result = planner::plan_frame(config, &ctx, &mut |n| {
+            assert_eq!(n, 5);
+            chance += 1;
+            0
+        }, &mut planner::Search::default());
+        assert_eq!(result.err(), Some(planner::Refused::Aim));
+        assert_eq!(chance, 6, "one ordinary draw plus one per enumerated angle");
+    }
+}
+
+#[test]
 fn the_session_and_the_solver_share_the_abandon_point_and_the_runtime_asks_frame_by_frame() {
     let feature = include_str!("../../runtime/features/tech.rs");
     assert!(feature.contains("planner::plan_frame("));

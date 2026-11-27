@@ -531,6 +531,7 @@ fn notice(run: &Practice, text: Option<&str>) {
 /// Discard borrowed identities once, then resolve the same geometry after the
 /// bounded walk. A second invalid result is a specific failure, never a retry loop.
 fn rebuild(run: &mut Practice, view: &mut ViewState) {
+    run.search = planner::Search::default();
     if run.recovering {
         // restriction: tech-surface-unavailable-after-rebuild
         let message = "Selected surface unavailable after rebuild";
@@ -712,7 +713,6 @@ pub unsafe fn frame(fighter: usize) {
             });
         }
         let run = slot.as_mut().unwrap();
-        let mut search = core::mem::take(&mut run.search);
         camera = run.config.camera;
         RUNNING.store(true, Ordering::Release);
         // rc.15 practice menu (Q1, tr-review-astra-3 16:37Z): a menu visit suspends the session, it never stops it. The
@@ -889,7 +889,7 @@ pub unsafe fn frame(fighter: usize) {
             run.reroll = true;
             run.sampled = None;
             run.planning_failed = false;
-            search = planner::Search::default();
+            run.search = planner::Search::default();
             let placing = EDIT.swap(false, Ordering::AcqRel)
                 || wizard_active()
                 || config.surface == 4 && view.picker.selected.is_none();
@@ -1039,7 +1039,7 @@ pub unsafe fn frame(fighter: usize) {
                             return Err(Ended::Rebuild);
                         }
                         view.picker.selected.ok_or(Ended::Choose)?
-                    } else if search.under_way() {
+                    } else if run.search.under_way() {
                         view.picker.selected.filter(|s| s.current(&mut source)).ok_or(Ended::Rebuild)?
                     } else {
                         picker::random_spot(
@@ -1058,19 +1058,17 @@ pub unsafe fn frame(fighter: usize) {
                     };
                     view.picker.selected = Some(spot);
                     let context = plan_context(view, spot, run.config, at, multiplier).ok_or(Ended::Wait)?;
-                    Ok(match planner::plan_frame(run.config, &context, &mut |n| draw(&mut run.rng, n), &mut search) {
+                    Ok(match planner::plan_frame(run.config, &context, &mut |n| draw(&mut run.rng, n), &mut run.search) {
                         Ok(plan) => Some((plan, spot)),
-                        Err(planner::Refused::Checking) => {
-                            run.search = search;
-                            return Err(Ended::Wait);
-                        }
+                        Err(planner::Refused::Checking) => return Err(Ended::Wait),
                         Err(refused) => {
                             why = refused;
-                            search.refused += 1;
-                            if search.refused >= planner::CANDIDATES
-                                || run.config.surface == 4 && run.config.start.mode != tech_settings::Mode::Auto
-                            {
-                                return Err(Ended::Stop);
+                            if run.config.start.mode != tech_settings::Mode::Auto {
+                                run.search.refused += 1;
+                                // A new manual spot gets a new frame's flight budget, not the rest of this callback.
+                                return Err(if run.config.surface == 4 || run.search.refused == planner::CANDIDATES {
+                                    Ended::Stop
+                                } else { Ended::Wait });
                             }
                             None
                         }
@@ -1099,6 +1097,7 @@ pub unsafe fn frame(fighter: usize) {
                     }
                 };
                 run.sampled = Some((plan.setup, spot, plan.sampled_percent));
+                run.search = planner::Search::default();
                 run.approximate = plan.approximate;
             }
             if let Some((mut setup, spot, [percent, visible_hit_damage])) = run.sampled {
