@@ -22,7 +22,7 @@ Nothing under the stage is ever written.
 """
 import argparse, hashlib, json, os, posixpath, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import test_cut  # rc.9: the manifest edits `cut_tests`, `wrap_tests` and `wrap_file` (docs/TEST-CUT-LEDGER-rc9.md)
+import test_cut  # rc.9: the manifest edits `cut_tests`, `wrap_tests` and `wrap_file` (docs/TEST-PROVENANCE.md#test-cut-ledger-rc9)
 
 STAGES = os.environ.get("TR_CARRY_STAGES") or "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
 DEFAULT_MANIFEST = "docs/provenance/pkg6-carry-manifest.json"
@@ -357,7 +357,7 @@ The named-macro change was on `stream/pkg4` at `d124246`, not yet merged at the 
 
 def write_ledger(root, manifest):
     """The carried-file table of CARRY-OVER.md (stage, path, sha256, clean-room changes), generated from the manifest."""
-    path = os.path.join(root, "docs/provenance/pkg6-carry-ledger.md")
+    path = os.path.join(root, "tools/provenance-data/pkg6-carry-ledger.txt")
     with open(path, "w") as f:
         f.write(f"# Package 6 carried files (stage {manifest['stage']})\n\n")
         f.write("| Ledger key | Meaning |\n")

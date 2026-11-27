@@ -110,9 +110,9 @@ on 2026-11-05; no item was dropped.
 
 
 
-The [feature ledger](FEATURE-LEDGER.md) records the candidate's tests, and the [rc.6 notes](RELEASE-NOTES-rc6.md) describe the changes.
+The [feature ledger](FEATURE-LEDGER.md) records the candidate's tests, and the [rc.6 notes](RELEASE-NOTES.md#release-notes-rc6) describe the changes.
 
-The rc.6 investigation saw freezes in `covrest-yoga-05`, `rc6-bg-qp3`, `rc6-qpf1` and `rc6-qpf2`; the [later menu-close fix](RELEASE-NOTES-rc8.md#a-rare-freeze-as-the-menu-closes) removed a wait on the menu thread.
+The rc.6 investigation saw freezes in `covrest-yoga-05`, `rc6-bg-qp3`, `rc6-qpf1` and `rc6-qpf2`; the [later menu-close fix](RELEASE-NOTES.md#release-notes-rc8--a-rare-freeze-as-the-menu-closes) removed a wait on the menu thread.
 
 ## Done: 0.2.0-rc.3 (2026-11-05)
 

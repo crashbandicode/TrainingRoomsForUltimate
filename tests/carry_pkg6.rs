@@ -17,7 +17,7 @@ fn carried_files_match_the_manifest() {
 #[test]
 fn the_ledger_is_generated_from_the_manifest() {
     let root = env!("CARGO_MANIFEST_DIR");
-    let path = format!("{root}/docs/provenance/pkg6-carry-ledger.md");
+    let path = format!("{root}/tools/provenance-data/pkg6-carry-ledger.txt");
     let before = std::fs::read_to_string(&path).expect("ledger present");
     let out = match Command::new("python3").current_dir(root).args(["-I", "tools/carry_pkg6.py", "ledger"]).output() {
         Ok(out) => out,

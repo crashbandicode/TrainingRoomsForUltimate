@@ -10,7 +10,7 @@ import sys
 import tempfile
 
 STAGES = os.environ.get("TR_CARRY_STAGES") or "/home/intpa/smash-training-lobby/artifacts/enhancements/console-practice91/lobby-parity167/parked-reuse175/refactor/stages"
-FILES = ("provenance-files.json", "provenance-files.md", "feature-groups.md", "feature-groups.json")
+FILES = ("provenance-files.json", "provenance-files.txt", "feature-groups.txt", "feature-groups.json")
 
 
 def first_differing_line(a, b):
@@ -55,20 +55,23 @@ def main():
                 if args.write:
                     print(result.stdout, end="")
             outputs = {name: (generated / name).read_bytes() for name in FILES}
+            records = args.root / "tools" / "provenance-data"
+            targets = {name: (records if name.endswith(".txt") else provenance) / name for name in FILES}
             if args.write:
+                records.mkdir(parents=True, exist_ok=True)
                 for name, data in outputs.items():
-                    (provenance / name).write_bytes(data)
+                    targets[name].write_bytes(data)
                 print(f"wrote 4 provenance files from stage {pkg4}")
                 return 0
             problems = 0
             for name, data in outputs.items():
-                target = provenance / name
+                target = targets[name]
                 if not target.is_file():
                     line = 1
                 else:
                     line = first_differing_line(data, target.read_bytes())
                 if line is not None:
-                    print(f"DIFFERS docs/provenance/{name}: line {line}")
+                    print(f"DIFFERS {target.relative_to(args.root).as_posix()}: line {line}")
                     problems += 1
             if problems:
                 print(f"{problems} problem(s)")

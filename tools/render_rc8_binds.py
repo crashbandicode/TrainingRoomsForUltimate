@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""Render the illustration of docs/design/rc8-binds.md (docs/decisions/rc8-binds.png): the two new rows in the Button
+"""Render the illustration of docs/DECISIONS.md#rc8-binds (docs/decisions/rc8-binds.png): the two new rows in the Button
 chords editor, the speed pop-up while the combo is held, and where each place writes the speed.
 
 Same look as tools/render_decisions.py (its canvas and helpers are reused). Drawn, not captured: no game-derived file.

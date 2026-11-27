@@ -250,7 +250,7 @@ fn the_format_docs_say_which_builds_read_a_named_link() {
     assert!(guide.contains("not backward compatible"));
     assert!(guide.contains("a945b0c1"));
     assert!(guide.contains("earlier shipped installs"));
-    let design = include_str!("../../docs/design/action-model.md");
+    let design = include_str!("../../docs/DECISIONS.md");
     assert!(design.contains("not backward compatible"));
     assert!(design.contains("a945b0c1"));
     assert!(design.contains("earlier shipped installs"));

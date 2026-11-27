@@ -6,7 +6,7 @@
 The rows below are the source of truth for labels, kinds and notes; the guard bytes come from the ELF (.text), the host
 test `native_seams::tests::compared_rows_match_the_owned_elf` re-checks them on every `cargo test`, and
 `model::game_speed`'s tests decode every offset the runtime uses from these guard words. Same tool as
-`tools/gen_rows_cpu_level.py`; the design is `docs/design/rc8-binds.md`.
+`tools/gen_rows_cpu_level.py`; the design is `docs/DECISIONS.md#rc8-binds`.
 """
 import struct
 import sys

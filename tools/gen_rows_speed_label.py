@@ -4,7 +4,7 @@
     python3 -I tools/gen_rows_speed_label.py <main-13.0.5.elf> data/tables/rows_speed_label.ROWS.tsv
 
 The guard bytes come from the ELF's .text, .rodata or .rodata.1 sections; `native_seams::tests::compared_rows_match_the_owned_elf`
-re-checks them, and `speed_label_rows_tests` decodes the constants. The design is `docs/design/rc15-fix-f5-f3.md`.
+re-checks them, and `speed_label_rows_tests` decodes the constants. The design is `docs/DECISIONS.md#rc15-fix-f5-f3`.
 """
 import struct
 import sys

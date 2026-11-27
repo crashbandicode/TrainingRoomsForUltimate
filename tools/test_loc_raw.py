@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host tests of tools/loc_raw.py (the raw line counter of docs/CODE-REDUCTION-rc10.md): python3 -I tools/test_loc_raw.py"""
+"""Host tests of tools/loc_raw.py (the raw line counter of docs/BUDGETS.md#code-reduction-rc10): python3 -I tools/test_loc_raw.py"""
 import os
 import sys
 import tempfile

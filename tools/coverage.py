@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rc.9 coverage (docs/COVERAGE-rc9.md): product-code line coverage of the host test builds.
+"""rc.9 coverage (docs/TEST-PROVENANCE.md#coverage-rc9): product-code line coverage of the host test builds.
 
     cargo llvm-cov --no-fail-fast --no-report                 # run the instrumented tests (own, fresh CARGO_TARGET_DIR)
     python3 -I tools/coverage.py export <target dir> <out.lcov>

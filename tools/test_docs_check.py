@@ -51,7 +51,7 @@ CLEAN = {
     ),
     "docs/README.md": (
         "# Docs\n\n- [Current release](CURRENT-RELEASE.md)\n- [Getting started](guide/getting-started.md)\n"
-        "- [Technical](TECHNICAL.md)\n- [Old notes](RELEASE-NOTES-rc9.md)\n"
+        "- [Technical](TECHNICAL.md)\n- [Old notes](RELEASE-NOTES.md)\n"
     ),
     "docs/CURRENT-RELEASE.md": CURRENT,
     "docs/guide/getting-started.md": (
@@ -59,14 +59,14 @@ CLEAN = {
         "## Which build\n\nSee [Technical](../TECHNICAL.md#status) and [this page](#which-build).\n"
     ),
     "docs/TECHNICAL.md": "# Technical\n\n## Status\n\nThe current release is rc.14, as the footer shows.\n\n## Other\n\nText.\n",
-    "docs/RELEASE-NOTES-rc9.md": "# rc.9\n\nThe newest build is rc.9.\n",
+    "docs/RELEASE-NOTES.md": "# rc.9\n\nThe newest build is rc.9.\n",
     "docs/media/pic.gif": "GIF",
 }
 
 def cfg(**changes):
     """A config with no allowance and no notice pages: the real lists name pages the small fixtures do not have.
     No word budget either: the fixtures of the other rules add a sentence to a guide page (`Budgets` turns it on)."""
-    base = dict(historical=[("docs/RELEASE-NOTES-rc*.md", "a past release")], orphan_ok=[], claim_ok=[], must_name=d.MUST_NAME,
+    base = dict(historical=[("docs/RELEASE-NOTES.md", "a past release")], orphan_ok=[], claim_ok=[], must_name=d.MUST_NAME,
                 notice_ok=[], notice_pages=[], notice_columns={}, wall_pending={}, budget_words=[], budget_pending={},
                 budget_visuals={})
     return d.Config(**dict(base, **changes))
@@ -349,7 +349,7 @@ class Versions(unittest.TestCase):
         self.assertEqual(problems({}, **{"docs/TECHNICAL.md": text}), [])
 
     def test_a_listed_historical_page_may_name_its_own_release(self):
-        self.assertEqual(problems({}), [])  # RELEASE-NOTES-rc9.md says "The newest build is rc.9." and is listed
+        self.assertEqual(problems({}), [])  # RELEASE-NOTES.md says "The newest build is rc.9." and is listed
         unlisted = cfg(historical=[])
         got = problems({}, config=unlisted)
         self.assertIn("version-stale", [r for r, _, _ in got])
@@ -601,7 +601,7 @@ class NoticeTexts(unittest.TestCase):
 
     def test_a_historical_page_may_quote_a_notice_that_is_gone(self):
         text = '# Notes\n\nThe notice read "Long gone".\n'
-        self.assertEqual(notice_problems("docs/RELEASE-NOTES-rc5.md", text), [])
+        self.assertEqual(notice_problems("docs/RELEASE-NOTES.md", text), [])
 
     def test_a_tree_without_rust_source_reports_every_quoted_text(self):
         files = dict(CLEAN, **{NOTICE_PAGE: '# T\n\n"Wait for the swap to finish".\n', "docs/README.md": CLEAN["docs/README.md"] + "- [t](guide/troubleshooting.md)\n"})

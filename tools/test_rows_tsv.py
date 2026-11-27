@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host tests of tools/rows_tsv.py (guard-table rows as data, docs/CODE-REDUCTION-rc10.md): python3 -I tools/test_rows_tsv.py"""
+"""Host tests of tools/rows_tsv.py (guard-table rows as data, docs/BUDGETS.md#code-reduction-rc10): python3 -I tools/test_rows_tsv.py"""
 import os
 import sys
 

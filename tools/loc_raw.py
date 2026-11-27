@@ -7,7 +7,7 @@ A line is classified by the innermost cfg-gated item (or cfg-gated `mod x;` file
   diag : predicate requires a diag-family feature (never in the shipped NRO)
   host : predicate requires not(target_os = "switch") (never in the NRO; host shim for tests)
   prod : everything else
-Usage: python3 -I tools/loc_raw.py <root> [--json out.json] [--depth N] [--top N]   (docs/CODE-REDUCTION-rc10.md; tests: tools/test_loc_raw.py)
+Usage: python3 -I tools/loc_raw.py <root> [--json out.json] [--depth N] [--top N]   (docs/BUDGETS.md#code-reduction-rc10; tests: tools/test_loc_raw.py)
 """
 import json
 import os
