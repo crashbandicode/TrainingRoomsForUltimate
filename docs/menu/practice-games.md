@@ -97,7 +97,7 @@ Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.
 | <a id="guard-the-edge"></a><a id="juggler"></a>Start, Stop | | Reuses your set-up on the floor it was made on. Otherwise the set-up opens. |
 | CPU fighter and mode | **Current CPU**, or a fighter; **CPU 9**, CPU 1 to 8, Perfect, Hero's Zoom | The CPU's fighter and how it recovers or escapes. |
 | Reaction | Frame-perfect, **Human 12 f**, Custom 1 to 30 frames | The CPU's reaction delay. Greyed unless the mode is Perfect. |
-| Set up… | Opens the set-up | The CPU's start and yours, then a preview. |
+| Set up… | Opens the set-up | Place both fighters; [Juggler](../guide/juggler.md) also asks for the CPU's percent. |
 | Attempts | **10**, 20, Free | How many attempts are scored. |
 | Zoom landing window | 1 to 30 frames, **10** | How long after Hero lands a hit or grab still wins. |
 | Guard the Edge: Under the stage | On, **Off** | On: the CPU's start may be under the stage. |
@@ -114,5 +114,5 @@ Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.
 | You start a second game | The first one stops. Only one game runs at a time. |
 | You close the menu with B after browsing settings | Browsing alone starts nothing; using a saved parry practice starts it on close. |
 | You change a setting while a game runs | It applies at the next Start. |
-| A Guard the Edge KO does not count | Player 1 must get back on stage after the CPU's KO. |
+| A Guard the Edge KO does not count | Check the [ground or ledge return window](../guide/guard-the-edge.md). |
 | Start reopens a saved set-up | Different floor, or Guard the Edge saved an under-stage start now disallowed. |

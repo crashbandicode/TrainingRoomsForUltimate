@@ -94,7 +94,7 @@ How a macro plays back, and how the Combo helper grades.
 | <a id="mash-interrupts-playback"></a>Mash interrupts playback | **On**, Off | On: a mash action stops a playing recording. [Clip](../media/rc11-mash-interrupts.gif) |
 | <a id="loop"></a>Loop | ∞, **1**, 2, 3, 5, 10 | How many times the active macro plays. X cycles it in MACROS. |
 | <a id="settings-override-playback"></a>Settings override playback | On, **Off** | Off: a playing recording wins over the DI, SDI, air-dodge, tech and throw settings. |
-| <a id="shared-start-save"></a>Shared start save | **Prompt**, Always change, Always copy | What Change placement does to a start save that several macros share. |
+| <a id="shared-start-save"></a>Shared start save | **Prompt**, Always change, Always copy | Applies when at least one macro starts from the save you're editing. |
 | <a id="combo-helper"></a>Combo helper | **On**, Off | The card shows the result; cells under the strip grade individual links. |
 | <a id="match-sweet-sour-spot"></a>Match sweet/sour spot | On, **Off** | On: a link counts only if it lands the saved spot. |
 | <a id="match-angle-and-deflection"></a>Match angle and deflection | On, **Off** | On: an aimed special must match the saved stick angle and deflection. |
