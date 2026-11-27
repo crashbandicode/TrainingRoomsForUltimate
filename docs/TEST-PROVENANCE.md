@@ -6,9 +6,9 @@
 
 ## rc.9 line coverage
 
-| State | Tests (`cargo test`) | Product lines | Covered | Line coverage |
-| --- | ---: | ---: | ---: | ---: |
-| Before the test cut (`28082c29`) | 41,918 | 40,012 | 36,345 | 90.84% |
+| Measurement date | Coverage revision |
+| --- | --- |
+| 2026-11-12 | `a25fbbc6` |
 
 - 2026-11-12.
 - Line coverage of the `training_rooms` crate's host-compiled product code, measured with `cargo llvm-cov` 0.9.1 (rustc 1.98.1, LLVM 22) at `a25fbbc6`.
@@ -292,9 +292,9 @@ file is the text it was, except a `#[cfg(test)] use` in `mii/replay.rs` that onl
 
 ## rc.9 test cut ledger
 
-| | Test binaries | Tests (`cargo test -- --list`) | Distinct test names |
-| --- | ---: | ---: | ---: |
-| Before (`28082c29`) | 148 | 41,918 | 3,292 |
+| Cut ledger date | Baseline |
+| --- | --- |
+| 2026-11-11 | `28082c29` |
 
 2026-11-11. Operator order (`artifacts/phase23/TASK-rc9-test-cut.md`): the host tests go to at most 1,000, a hard limit, keeping what
 guards real behaviour and the ship gates. This file lists every cut and why, and what is kept. Base: `28082c29` (rc.8 notes on `main`).
@@ -748,9 +748,9 @@ The cut modules of the two "mixed" areas, each with its test count:
 
 ## Test provenance — SPEC-core-06, the hitbox visualizer
 
-| RC7 R3-2 change | What remained |
+| Review opened | Revision |
 | --- | --- |
-| Runtime HB1 reader and three exclusive guards removed | Attack slots, pending grab boxes and their cleanup |
+| 2026-11-02 | `57008f81` |
 
 Historical review opened 2026-11-02 (`57008f81`). Implementation details and outstanding checks refer to the revisions reviewed below.
 
@@ -910,11 +910,11 @@ Saved pilot/after16-NRO card inventory scan-offsets.py found no references to ei
 
 ## Test provenance, package 1
 
-| Requirement | § | Host test | Eden row | Status |
-| --- | --- | --- | --- | --- |
-| Version guard matrix (display, build id, missing note) | §3, §9 | `core01_verdict_matrix`; carried `the_verdict_needs_both_the_version_and_the_build_id` | core01-E1 | host pass |
+| Record opened | Revision |
+| --- | --- |
+| 2026-11-01 | `39fd9e0f` |
 
-Package 1 test record opened 2026-11-01 (`39fd9e0f`). Each status records the evidence available at that stage.
+Each status records the evidence available at that stage.
 
 - `Requirement | spec § | host test | Eden row planned | status`.
 - Host tests run with `cargo test` (unit tests inside the model modules are also compiled into each by-path test binary, so the per-binary counts overlap; `cargo test` in total runs 7 + 8 + 6 + 17 lib unit tests plus the spec-named tests in `tests/`).
@@ -1089,11 +1089,11 @@ The Eden rows (labels `r1-NN`) are in `eden/EDEN-PACKAGE-1.md`, section "R1-fix"
 
 ## Test provenance, package 2 (CPU behaviour)
 
-| Requirement | § | Host test | Eden row | Status |
-| --- | --- | --- | --- | --- |
-| The game's constant table is keyed by XXH64 (seed `u64::MAX`) of the identifier; Hash40 is CRC-32 and length | cpu-01 §3 | `cpu_ids_hash_matches_the_published_vectors`, `cpu_ids_hash40_is_the_crc_and_the_length` | `cpu-01-install-line` (constants missing = 0) | host pass; runtime, unrun |
+| Record opened | Revision |
+| --- | --- |
+| 2026-11-01 | `fa8b77d3` |
 
-Package 2 test record opened 2026-11-01 (`fa8b77d3`). Each status records the evidence available at that stage.
+Each status records the evidence available at that stage.
 
 - `Requirement | spec § | host test | Eden row planned | status`.
 - Host tests run with `cargo test` (`tests/cpu_core.rs`, `tests/cpu02.rs`, `tests/cpu03.rs`, `tests/cpu_sites.rs`; the model's unit tests are compiled into each by-path binary, so per-binary counts overlap).
@@ -1291,11 +1291,11 @@ Evidence and raw lines: `eden/EDEN-PACKAGE-2.md`. Rows whose status changed:
 
 ## Test provenance, package 3 (save states, charges, buffs, items, fighter-specific restore, first-boot import)
 
-| Requirement | Host test | Eden row | Status |
-| --- | --- | --- | --- |
-| Chord passes on hold + press, not while a menu is open | not here: the chord engine is package 4's (`states::request_save/load` are its call surface; the diag build drives them from request files) | s3-01 (request files) | host n/a, Eden pass via request files |
+| Record opened | Revision |
+| --- | --- |
+| 2026-11-02 | `00d84b9e` |
 
-Package 3 test record opened 2026-11-02 (`00d84b9e`). Each status records the evidence available at that stage.
+Each status records the evidence available at that stage.
 
 - `Requirement | spec § | host test | Eden row | status`.
 - Host tests run with `cargo test` (`tests/state01_json.rs`, `state01_machine.rs`, `state01_setup.rs`, `state02_charges.rs`, `state03_buffs.rs`, `state04_convert.rs`, `state04_items.rs`, `state05_restore.rs`, `state_sites.rs`, `migration_run.rs`; each by-path binary also runs the model's unit tests, so per-binary counts overlap).
@@ -1379,11 +1379,11 @@ Package 3 test record opened 2026-11-02 (`00d84b9e`). Each status records the ev
 
 ## Test provenance, package 4 (recording, input display, chords, notifications)
 
-| Question | Decision | Where |
-| --- | --- | --- |
-| SPEC-input-01 question 2 (stick scale) | one scale, 1/120, clamped to +/-1; clamped fields drop values below 0.2 | `recording::inject_values`, `injected_stick_values` |
+| Record opened | Revision |
+| --- | --- |
+| 2026-11-01 | `b9d6497d` |
 
-Package 4 test record opened 2026-11-01 (`b9d6497d`). Each status records the evidence available at that stage.
+Each status records the evidence available at that stage.
 
 Stream `stream/pkg4` (Claude Sonnet 5.5 high under lead `0caa72b8`). Playbook followed: `009c9ac`. Host tests are in
 `tests/input01.rs` (SPEC-input-01), `tests/input02.rs` (SPEC-input-02), `tests/input04.rs` (SPEC-input-04),
@@ -1507,12 +1507,6 @@ Online review (read-only rules): the layer runs only in Training and the practic
 | Requirement (spec) | Host test | Eden row | Result |
 | --- | --- | --- | --- |
 | UI site rows match the owned ELF; anchor pins; manager slot decode (SPEC-core-05 §9) | `tests/ui_sites.rs` (4), `model::sites_ui::tests` | install line `ui_*=stock/near`, `[Ui] anchors installed` (s5-02..09) | pass |
-
-Package 5 test record opened 2026-11-02 (`d1de600e`). Each status records the evidence available at that stage.
-
-| Requirement (spec) | Host test | Eden row | Result |
-| --- | --- | --- | --- |
-| UI site rows match the owned ELF; anchor pins; manager slot decode (SPEC-core-05 §9) | `tests/ui_sites.rs` (4), `model::sites_ui::tests` | install line `ui_*=stock/near`, `[Ui] anchors installed` (s5-02..09) | pass |
 | Archive recipe rebuilds the target, refuses a changed stock archive and any partial or corrupted recipe | `model::archive_recipe::tests` | `[LayoutArchive] handed out ... bytes=467860 stock=451604` | pass |
 | SARC directory lookup (carried) and archive retirement (carried) | `model::archive_name::tests`, `model::archive_retire::tests` | handed out line | pass |
 | Pane table: unique names, indexes, linear colour | `model::panes::tests` | `resolved ... missing=0` | pass |
@@ -1526,17 +1520,20 @@ Package 5 test record opened 2026-11-02 (`d1de600e`). Each status records the ev
 | Pilot absent: the two fallback rows; Developer page in the ring only with `developer.ini` | `model::menu` tests | s5-11 (`20-developer.png`, `cpu-p1-fallback-rows.png`) | pass |
 | Run-time file route (SPEC-core-07 U1-U3) | - | s5-12 `[Probe]` lines: `arcrop_load_file` from a plugin thread returns the mod's file; `mods:/` serves only mod files; `arc:/` the vanilla view | answered |
 
+Package 5 test record opened 2026-11-02 (`d1de600e`). Each status records the evidence available at that stage.
+
+
 <a id="package-6"></a>
 
 <a id="package-6--test-provenance-package-6-the-fork-s-engines-carried-hot-swap-preload-kirby-hats-items-mii-lobby-practice-cpu-as-p1"></a>
 
 ## Test provenance, package 6 (the fork's engines carried: hot swap, preload, Kirby hats, items, Mii, lobby practice, CPU-as-P1)
 
-| Requirement | Host test | Eden row | Status |
-| --- | --- | --- | --- |
-| The plugin has one `#[global_allocator]` (`runtime::alloc`: the counting allocator, or the recorder's forwarding `TraceAllocator` under `console-practice-trace`) | `pkg6_features::the_plugin_has_one_global_allocator` | - | host pass |
+| Record opened | Revision |
+| --- | --- |
+| 2026-11-02 | `c008bcfc` |
 
-Package 6 test record opened 2026-11-02 (`c008bcfc`). Each status records the evidence available at that stage.
+Each status records the evidence available at that stage.
 
 - `Requirement | host test | Eden row | status`.
 - The carried engines bring their own host tests (the fork's unit and integration tests, run in every by-path test binary; counts overlap) and are not listed one by one: see `docs/provenance/pkg6-carry-ledger.md` and `tests/carry_pkg6.rs` (a hand edit of a carried file fails).
@@ -1576,6 +1573,7 @@ Package 6 test record opened 2026-11-02 (`c008bcfc`). Each status records the ev
 | Original PNG, copied without modification | Dimensions | SHA-256 |
 | --- | --- | --- |
 | [Normal colours](media/rc15-colour-legend-normal.png) | 1280 × 674 | `9d0b41973ab7d299a0a5bcdf708f4d25244fb80536c1f5b74a488739c5941a7f` |
+| [Frame data colours](media/rc15-colour-legend-frame-data.png) | 1280 × 674 | `42be49c942d872fb9dce16303c23e1764625f97fa2829f80002d560e2960e589` |
 
 These rc.15 captures show the former seven-item Hitbox Visualization checklist and its two colour schemes.
 
@@ -1595,10 +1593,6 @@ The existing per-press Ui trace records Checklist cursor 0 on opening and cursor
 The runner receipt and its start/end HUD gate captures are retained with the run. Automated collection alone is not
 visual acceptance; the separate image review establishes the observations above.
 
-| Original PNG, copied without modification | Dimensions | SHA-256 |
-| --- | --- | --- |
-| [Normal colours](media/rc15-colour-legend-normal.png) | 1280 × 674 | `9d0b41973ab7d299a0a5bcdf708f4d25244fb80536c1f5b74a488739c5941a7f` |
-| [Frame data colours](media/rc15-colour-legend-frame-data.png) | 1280 × 674 | `42be49c942d872fb9dce16303c23e1764625f97fa2829f80002d560e2960e589` |
 
 - Host coverage: `menu_swatches_match_the_renderer_in_both_schemes` checked actual renderer colours in both schemes and all 128 selection masks; `hitbox_checklist_colour_key_updates_and_clears_with_the_screen` checked menu updates and cleanup.
 - The merged XPS gate passed tests, Clippy with warnings denied, no-default-features, release, diag and size checks.

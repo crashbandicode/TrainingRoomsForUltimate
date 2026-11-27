@@ -1,6 +1,6 @@
 # Media
 
-The gameplay GIFs in [`media/`](media) use actual Eden footage. The tables record files, dimensions and pages **at capture time**;
+The gameplay clips in [`media/`](media) are MP4s recorded in Eden. The tables record files, dimensions and pages **at capture time**;
 they include retired takes, not just files still published. The 68 original comparison and composite GIFs were 1280 wide and
 404, 436 or 764 high. The raw takes stay outside git with their runs.
 
@@ -10,10 +10,6 @@ The [crop-editor GIF receipt](media/rc15-crop-editor.json) lists the source-fram
 [November 15 crop-editor take](EVIDENCE.md#evidence-rc15-crop-editor).
 
 ## README menu tour
-
-| Picture (`docs/media/`) | Source | Frame or time |
-| --- | --- | --- |
-| `readme-tour-key.png` | `tut-menu-tour.mp4`, CPU tab; navigation labels added outside the rows | 1.30 s |
 
 ![Menu pages, sections and rows](media/readme-tour-key.png)
 
@@ -29,13 +25,9 @@ The labelled menu key and six detail pictures in the [menu tour](../README.md#ab
 | `readme-tour-recording.png` | [Source still of the named combos](media/rc13-combo-library.png) | still |
 | `readme-tour-saves.png` | `tut-menu-tour.mp4`, damage and mirroring settings | 3.25 s |
 
-The README showcase also embeds the existing `tut-guard-edge-setup-and-score`, `tut-input-drill-record`, `tut-clip-snap`, `tut-fighter-cycle`, `tut-stage-change`, `tut-kirby-hat` and `tut-mii-pick` MP4s from the tutorial table. The three interim GIFs are `rc13-replay-capture`, `rc11-lobby-practice` and `rc11-give-item`.
+The README showcase also embeds the existing `tut-guard-edge-setup-and-score`, `tut-input-drill-record`, `tut-clip-snap`, `tut-fighter-cycle`, `tut-stage-change`, `tut-kirby-hat` and `tut-mii-pick` MP4s from the tutorial table. Three more clips show replay capture, lobby practice and item selection — `rc13-replay-capture`, `rc11-lobby-practice` and `rc11-give-item`.
 
 ## Tutorial clips (2026-11-25 through 2026-11-27)
-
-| Cut by the crop | Clips |
-| --- | --- |
-| The frame strip's top rows (IN, "now", the ADVANTAGE heading) | `tut-menu-tour`, `tut-menu-change-option`, `tut-controls-change-chord`, `tut-input-delay`, `tut-input-display`, `tut-input-drill-record` |
 
 ![Clip editor with In selected](diagrams/clip-editor-legend.svg)
 
@@ -249,10 +241,6 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 | [Guard the Edge in a waiting room](guide/waiting-rooms.md#what-works-there) | CPU placement and a recovery at the ledge, 0/1. Not an install 6 test. | `rc15-ib-17060a5e-yoga-lobby-3`, 720p export of `guard-the-edge-lobby.mp4` | 2,015,965 | `ac0699f06cf92fee` |
 
 ## Capture history
-
-| File | Shows | Picture | Bytes | sha256 |
-| --- | --- | --- | ---: | --- |
-| `media/i4-replay-editor-timeline.mp4` (removed) | The clip editor over the game | 1280×720 | 1,177,939 | `48a92a57` |
 
 ![Combos recorded for the rc.13 library](media/rc13-combo-library.png)
 

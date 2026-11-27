@@ -6,12 +6,12 @@
 
 ## rc.10 code reduction: measurement and plan
 
-| Baseline | Raw non-test lines |
+| Measurement date | Source revision |
 | --- | --- |
-| Upstream | 24,325 |
+| 2026-11-12 UTC | `b1e27e5a` |
 
-The plan of `TASK-rc10-code-reduction.md`, measured on `main` `b1e27e5a`, 2026-11-12 (UTC), and the result of each
-slice as it lands on `rc10`. Done so far: **S3**, **S1**, **S2**, **S4** and **S3b** (below, one section each).
+The plan of `TASK-rc10-code-reduction.md`, measured on `main` `b1e27e5a`, 2026-11-12 (UTC), recorded the results on
+`rc10`. The completed slices were **S3**, **S1**, **S2**, **S4** and **S3b** (below, one section each).
 
 <a id="code-reduction-rc10--the-short-answer"></a>
 
@@ -555,9 +555,9 @@ reduction of rc.10 ends with S3b. (The roughly 2,500 dead lines S3 had left are 
 
 ## Source-size plan and measurement history
 
-| Decision relayed by Astra lead | Measurement or requirement |
+| Baseline | Later measurements |
 | --- | --- |
-| Scope | Source lines, measured separately from NRO residency. |
+| 2026-11-02 | Dated by slice |
 
 [The latest total in the size budget](../size-budget.toml) sets the active normalized ceiling.
 
@@ -1193,9 +1193,9 @@ outside `automation_helper_native`. After the slice the census shows unconsumed 
 
 ## Resource costs of the upstream-origin features
 
-| Archive accounting | Basis |
+| Scope | Measurements |
 | --- | --- |
-| Requested capacity | Twice the largest stock or output archive length in the [recipe table](BUILD.md#layout-archive-recipe-package-5-host-tool). |
+| Historical resource costs | Archive buffers, image size and process memory |
 
 <a id="resource-costs--clean-room-archive-accounting"></a>
 
