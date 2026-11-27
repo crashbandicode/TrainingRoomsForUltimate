@@ -3288,3 +3288,11 @@ ceiling = 209561
 date = "2026-11-27"
 reason = "B7 Tech practice wall approach: the full count on c26e4b2d is 209561, two solver lines above 61bedffb. The 77 regression-test lines are excluded."
 approved_by = "tr-primary-2 2026-11-27 09:45:39Z (+2 for c26e4b2d)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 209575
+date = "2026-11-27"
+reason = "The menu's bridge provider publishes again when the test bridge comes back On, on main f2378a22 (209561): +14, measured by the size step of the gate on 2ad51e11. The publish rule's session step, the bridge's generation export call as its own function, and its read in the menu provider's pass. The 104 new test lines are excluded."
+approved_by = "tr-primary-3 2026-11-27 18:14:36Z (+14 lines; release NRO +0 B, .bss +0)."
