@@ -48,8 +48,9 @@ Read the help line below the row. It tells you what must change.
 
 ## A notice says no
 
-<!-- CLIP: tut-notice-save-states-off.mp4 | Save States Off → the save chord shows the refusal → Save States On → the chord saves -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/06348008e027aeaf9cc70d69c9ab74930ce388bc" autoplay muted loop playsinline controls></video>
+
+*With Save States Off, the save chord is refused and a notice at the top left says why. Saves › Save States is switched On, and the same chord saves. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-notice-save-states-off.mp4)
 
 | Notice | Why | What to do |
 | --- | --- | --- |

@@ -212,6 +212,12 @@ inside are listed in [MEDIA.md](MEDIA.md).*
 The direction chips show the game's own DI line and SDI streak; each A adds weight to a chip. *In* and *Out* are
 relative to you, on either side of the CPU.
 
+![The DI and SDI direction grids: a mock-up of the chosen look, then Eden captures with nothing picked, with Down x1 picked, the SDI grid, and Down enlarged five times](decisions/rc13-DI-lines-eden.png)
+
+*Left to right: design mock-up; DI with no direction picked; DI with Down picked once; SDI; and a 5× enlargement
+of Down. The last four panels are from Eden. The thinner, dimmer lines are the look kept for rc.13.
+[DI chip decision](DECISIONS.md#rc13-di-lines-di-chips-like-the-game-s-blue-di-indicator-rc-13-item-2-e1-x1)*
+
 *CPU Level* (CPU › Level: Off, or Lv 1–9) replaces Training's own CPU level. When the two differ as Training starts, a
 notice says so once.
 
@@ -243,41 +249,34 @@ Stages) chooses between the game's respawn platform (above) and the instant resp
 ### Recording and playback
 
 A save state only warps, and Load starts nothing. Each role has one active macro, a recording or a chain, and
-that role's Play chord plays it without warping back on later loops. On the Recording page, Y does nothing and
-X cycles the loop only while the cursor is in Macros.
+that role's Play chord plays it without warping back on later loops. In the Recording page's main lists, Y does
+nothing. X cycles the selected role's loop count in MACROS. On a drill with a saved, nonempty take, X requests
+a preview on Player 1. It does not interrupt a Play already queued or running for Player 1.
 The [Recording guide](guide/recording.md) is how to use it. The pop-up and the Recording page are in that doc.
 What rc.6 changes is [RELEASE-NOTES-rc6.md](RELEASE-NOTES-rc6.md).
 
 Where the recording code is (moved here from the Recording guide; named by function, not line, because the lines move):
 
-- The playback machine, the files, the grades, the chords and the migration: `src/model/playback.rs`,
-  `src/model/library/`, `src/model/combo.rs`, `src/model/drill.rs`, `src/model/chords.rs` and
-  `src/model/library/migrate.rs`. The pop-up, the Recording page and the file screens: `src/model/recording_menu.rs`
-  and `src/model/ui/frame.rs`. Record, Play and the pop-up chord are applied in `src/model/rr_host.rs`.
-- The start save keeps the recorded fighter's facing and speed in `note_record_start` (`rr_host.rs`). Momentum is
-  `play_start_speed` (`rr_host.rs`) and `apply_start_speed` (`src/runtime/features/recording_host.rs`).
-- Mash interrupts playback stops the CPU's macro through `note_mash` and the `MASH` flag in `rr_host.rs`.
-- Change placement (2026-11-25; it replaced Edit placement's offset editor): the picker is `Wizard` in
-  `src/model/record_place.rs`, the same wizard as Place fighters before Record, run from the fighter frame in
-  `src/runtime/features/record_place.rs`. On stage it steps between the floors of Tech practice's one traced outline
-  (`tech::floors`, `src/model/floor_hop.rs`). A fighter switched to Off stage is placed by `off_stage_spot`, on the
-  off-stage rule of `src/model/stage_geometry.rs`, read on that frame only. The worker writes the save in
-  `commit_placement` (`rr_host.rs`), only the edited fields. The Replays row's save and macro are
-  `active_placement_ids`, and Play's warp plus a macro's stored offset is `warp_pair` (both `rr_host.rs`).
-- Replay window: a capture's load no longer waits on the window (`Owners::REPLAY_LOADING`,
-  `src/model/input_delay.rs`). The Fighter Mismatch question and the exact Mii install came with cov-rest `66a9a53`,
-  `2891eaa` and `f2298ee`; final pass on `646a5f0d`: `yoga-cov` `cov-replay-window` PASS. A Mii from a replay is
-  installed through `installable` in `src/model/mii_install.rs` (cov-rest `cbe961a` and `f2298ee`; `cov-named-mii` and
-  `int-named-mii-twice` PASS). A chain's mismatch line is `screen=mismatch ask=macro1`.
-- The Saves page's Setup library: a setup restored with A only moves the fighters (`setup_restored` in `rr_host.rs`),
-  and binding one without restoring is `setup_bound` (same file). The checks A makes (Save States On, the stage, the
-  fighters) are in `src/model/state/setup_transaction.rs`; the file format is `src/model/state/setup.rs`; the two menu
-  rows are `src/runtime/ui/setups.rs` and `src/editors/setups.rs`, with the copy from the bound save in
-  `src/runtime/features/states/setups.rs`. Setup files are named from the setup's name (`corner-trap.json`) and never
-  overwritten.
-- The pop-up layout is the agreed r8 mockup (`docs/decisions/RECORDING-REDESIGN-r8-popup-*.png` on
-  `review/menu-proposal`). Its status line reads `hairline=5` even when the fifth row is scrolled out of the four-row
-  window.
+| Part | Where |
+| --- | --- |
+| The playback machine, the files, the grades, the chords and the migration | `src/model/playback.rs`, `src/model/library/`, `src/model/combo.rs`, `src/model/drill.rs`, `src/model/chords.rs` and `src/model/library/migrate.rs` |
+| The pop-up, the Recording page and the file screens | `src/model/recording_menu.rs` and `src/model/ui/frame.rs` |
+| Record, Play and the pop-up chord | Are applied in `src/model/rr_host.rs` |
+| The start save | Keeps the recorded fighter's facing and speed in `note_record_start` (`rr_host.rs`) |
+| Momentum | Is `play_start_speed` (`rr_host.rs`) and `apply_start_speed` (`src/runtime/features/recording_host.rs`) |
+| Mash interrupts playback | Stops the CPU's macro through `note_mash` and the `MASH` flag in `rr_host.rs` |
+| Placement picker | Change placement and Place fighters before Record share `Wizard` in `src/model/record_place.rs`. The fighter-frame code is in `src/runtime/features/record_place.rs`. |
+| Placement on and off stage | `tech::floors` supplies traced floors for `src/model/floor_hop.rs`. Switching to Off stage uses `off_stage_spot` and the rules in `src/model/stage_geometry.rs`. |
+| Saving and applying placement | In `rr_host.rs`, `commit_placement` writes the edited fields, `active_placement_ids` finds the active macro and its start save, and `warp_pair` applies the macro's offset. |
+| Replay window | `Owners::REPLAY_LOADING` in `src/model/input_delay.rs` lets a capture load without blocking its own request. It is not the visible editor's fighter-switch gate. |
+| Replay fighter mismatch | A chain checks its first macro (`screen=mismatch ask=macro1`). For a replay Mii, `installable` in `src/model/mii_install.rs` supplies a configuration the game can load. |
+| Restoring or binding a setup | A restores the fighters; Y binds without moving them. Neither writes the bound save. See `setup_restored` and `setup_bound` in `rr_host.rs`; `src/model/state/setup_transaction.rs` checks the restore. |
+| Setup files | `src/model/state/setup.rs` defines the format. Saving creates a new file; renaming updates the existing file and keeps its ID (`save_name` in `src/editors/setups.rs`). |
+| Setup menus | `src/runtime/ui/setups.rs` and `src/editors/setups.rs` handle the library screens; `src/runtime/features/states/setups.rs` takes the snapshot. |
+| Pop-up layout | `src/model/ui/panes.rs` defines the layout. `section_view` in `src/model/recording_menu.rs` puts the divider after the fifth file when more than five are listed, except in RECORDINGS. Leading action rows do not count as files. |
+
+Earlier replay checks: `cov-replay-window` passed on `646a5f0d`; the Mii install checks were `cov-named-mii` and
+`int-named-mii-twice`. These are historical checks, not preview-build results.
 
 **Clip** [`rc10-record-play-cpu.gif`](media/rc10-record-play-cpu.gif): Record on Player 1, then Play on CPU: the CPU does the recorded moves
 
@@ -332,18 +331,28 @@ starts, then a wrong move (up tilt) drops the sequence back to combo 1.* See [ME
 Kong 1, Link 2, Ness 3) and the blue ones the CPU's; in Training against Ryu (outside the cycle), each press of
 ZL + D-pad Right switches Player 1 to Donkey Kong, Link, then Ness, each standing clear of the notice. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-Cycle chords step through your own order of fighters per role (red for Player 1, blue for the CPU), drawn with the
-game's stock icons. The CPU's chord always works; Player 1's works only while Fighters & Stages › Player Swapping is On
-(it's Off at first).
+| Cycle chord | Rule |
+| --- | --- |
+| Both | Step through your own order of fighters for that role (red for Player 1, blue for the CPU), drawn with the game's stock icons |
+| The CPU's | Does not require Player Swapping. Neither cycle chord switches a fighter while the menu owns the input or another shortcut is pending |
+| Player 1's | Works only while Fighters & Stages › Player Swapping is On. It's Off at first |
 
-The fighters of your cycles load hot. Each role's first window of fighters is ready when Training starts, and the
-other groups are built in the background while you play; once the notice reads Ready or All loaded, a switch into a
-group took about 50–70 ms in Eden. Changing a cycle in Training builds the new fighters the same way, at once. The
-fighters that left it are freed when you next open the pause menu, or right away if the new ones need their room (a
-brief pause). Leaving a Mii for the fighters it replaced is a warm switch, not a reload. The background build
-waits only while Kirby is on screen, and for a second Mii group while a Mii is on screen
-(`background_build_eligible`, `src/model/swap/body_bank.rs:852`). Raising No. of CPUs brings in the CPU cycle's next
-fighters, a saved Mii included.
+With [fighter preloading](menu/fighters-and-stages.md#loading) enabled, eligible fighters load before you switch.
+With Cycle Preload Off, the fighter loads when you switch instead.
+
+| When | What happens |
+| --- | --- |
+| Training starts | Each role starts with the fighters its preload settings allow |
+| While you play | Eligible groups build in the background within the Ready Fighters limit. In the [rc.6 Eden measurements](RELEASE-NOTES-rc6.md#fighters-load-hot), switching into a ready group took about 50–70 ms; this was not a preview-build timing |
+| A cycle changes in Training | Preloading starts for eligible newcomers; they are not necessarily ready on that frame |
+| Fighters leave a cycle | They are freed when you next open the pause menu, or right away if the new ones need their room (a brief pause) |
+| You leave a Mii for a group already built | A warm switch, not a reload |
+| Kirby is on screen | The build waits if the game still handles Kirby's copy-loading step. Kirby alone does not block it when the fighter bank handles that step |
+| A Mii is on screen | A second Mii group waits. Other groups also wait if the loader has not identified the ordinary fighter group the Mii replaced |
+| No. of CPUs is raised | The CPU cycle's next fighters come in, a saved Mii included |
+
+`background_build_eligible` in `src/model/swap/body_bank.rs` also checks the target group's identity and the
+support needed for paired fighters. `live_kirby_gate` in `src/runtime/roster/native_body_bank.rs` supplies the Kirby check.
 
 **Clip** [`rc7-kirby-hats.gif`](media/rc7-kirby-hats.gif): Player 1's Kirby: the hat chord twice, two hats in turn
 
@@ -354,10 +363,15 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 
 ### Mii fighters
 
-Each Mii class (Fighters & Stages › Mii Brawler, Swordfighter, Gunner) lists your saved Miis per role (ZR switches
-Player and CPU). *Add New…* opens Smash's own Mii Fighter editor from Training. Saving creates a new Mii and leaves the
-others untouched, and leaving without saving creates nothing. Saving a Mii you already have saves nothing new and says
-"Same as ‹saved name›, nothing new saved". See [MII.md](MII.md).
+Each Mii class (Fighters & Stages › Extras › Mii Brawler, Swordfighter, Gunner) lists your saved Miis per role; ZR switches
+Player and CPU. More: [MII.md](MII.md).
+
+| In the list | Result |
+| --- | --- |
+| *Add New…* | Opens Smash's own Mii Fighter editor from Training |
+| Save a new configuration | Creates a new Mii and leaves the others untouched |
+| Leave without saving | Creates nothing |
+| Save a Mii you already have | Saves nothing new and says "Same as ‹saved name›, nothing new saved" |
 
 **Clip** [`rc6-mii-same.gif`](media/rc6-mii-same.gif): Add New, then Save with the copy unchanged: nothing new is saved
 
@@ -381,12 +395,15 @@ Mii file was written. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 A; "Practice Stage · Stage requested"; the static 2.8 s wait before the morph is cut; then the whole morph to
 Battlefield Ω (`[PracticeStageRequest] native_complete`) and its "Stage ready" notice. Cuts are listed in [MEDIA.md](MEDIA.md).*
 
-*Change Stage* (Fighters & Stages › Stages) goes to the stage you pick when the menu closes, in Training and in
-waiting-room practice; Y picks its form first.
+| Row (Fighters & Stages › Stages) | What it does |
+| --- | --- |
+| Change Stage | Goes to the stage you pick when the menu closes, in Training and in waiting-room practice. Y picks its form first |
+| Lobby Stages | Rotation sets the order for new waiting rooms; Direct uses the single stage you pick instead. Both apply to waiting rooms with Lobby Practice On |
+| Training Stage Rotation | Off by default. When On, Training opens on the stage you picked, then advances through the Rotation list when you return through character select, even if Lobby Stages is set to Direct |
 
 **Clip** [`rc11-lobby-stages.gif`](media/rc11-lobby-stages.gif): Lobby Stages: A on Battlefield adds it as number 2
 
-Pick the stages and their order for Training rotation and waiting-room practice. *Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Fighters & Stages ›
+*Eden, 2026-11-13, rc.11 `0c628724` (diag NRO `bd0bc61b`, log lines only), Fighters & Stages ›
 Lobby Stages; the grid with 1. Big Battlefield; the cursor to Battlefield, A, and the tile reads "2. Battlefield". Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
 **Clip** [`rc11-stage-rotation.gif`](media/rc11-stage-rotation.gif): Training Stage Rotation from Off to On; the next Training entry, the same fighters, opens on Big Battlefield
@@ -409,18 +426,24 @@ standing; the game's own waiting-room menu, Training Partners 1, Right to 2; a s
 guest leaves the room (Yes) and rejoins the host's next room (the host's approval); it opens with two partners
 standing still. The log: `[LobbyPersist] entry saved=Saved { partners: Some(2), behavior: Some(1) }` on entry. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-The same menu works while you wait in an online or local room, once Fighters & Stages › Lobby Practice is On (it's Off
-at first). The Training partners and CPU action you set in the
-game's own waiting-room menu are remembered for the next room, and CPU › Level › CPU Level sets the partners' level.
+| In a waiting room | Rule |
+| --- | --- |
+| The menu | Works in local wireless and Quickplay waiting rooms when Fighters & Stages › Stages › Lobby Practice is On. On is the default; a saved Off stays Off |
+| Training partners and CPU action | What you set in the game's own waiting-room menu is remembered for the next room |
+| The partners' level | CPU › Level › CPU Level |
+| Leaving a Quickplay room before the match | Close the TrainingRooms menu so Plus reaches the game. The separate QuickPlay cancel fix plugin keeps Pause › Leave Battle available for a few seconds after you join |
 
 With the CPU pilot plugin 0.2.3 (`libssbu_cpu_pilot.nro`), the pilot can also drive Player 1 in Quickplay's
-waiting-room practice. Arm it from its CPU Pilot page as in Training. The practice shows no `CPU Lv` tag, and when a
-match is found the pilot keeps Player 1 in the match. The lobby tools above work beside it, Record, Play on Player 1
-and Quick Reset are refused while it drives, and the Game speed chord works at every speed.
+waiting-room practice:
 
-To leave a Quickplay room before the match starts (the game's Pause › Leave Battle, which the QuickPlay cancel fix
-plugin keeps open for a few seconds after you join), close the TrainingRooms menu first: while it is open, Plus
-doesn't reach the game.
+| With the pilot driving Player 1 | What happens |
+| --- | --- |
+| Arming | From its CPU Pilot page, as in Training |
+| On screen | The practice shows no `CPU Lv` tag |
+| When a match is found | The pilot keeps Player 1 in the match |
+| Record | Records Player 1's inputs as the game receives them, including the pilot's inputs |
+| Refused in waiting-room practice | Play on Player 1 and Quick Reset (L + R + A) |
+| Game speed | The pilot does not disable the practice speed chord. [Waiting-room speed and frame step](guide/game-speed.md#in-the-waiting-rooms) |
 
 **Clip** [`rc11-lobby-combos.gif`](media/rc11-lobby-combos.gif): Save last combo in a Local Wireless waiting room, then the helper bar drills it and grades a try
 
@@ -438,9 +461,11 @@ fighters show their hurtboxes as pills. The first second (the CPU page) is a sep
 
 **Clip** [`menu-section-jump.gif`](media/menu-section-jump.gif): ZL + Down jumps through the CPU page's sections
 
-ZL + Up/Down jumps between a page's sections (in popup lists, a screenful). The menu reopens on the page and row you
-left. ZR no longer resets a page: each page ends with *Reset page to defaults*, which asks first. *Eden, 2026-11-05,
-`p23/menu-nav` diag NRO `1273c29f`, the navigation code rc.3 merged.*
+*Eden, 2026-11-05, `p23/menu-nav` diag NRO `1273c29f`, the navigation code rc.3 merged.*
+
+- **ZL + Up/Down** jumps between a page's sections; in popup lists, a screenful.
+- **Reopening:** the menu reopens on the page and row you left.
+- **Resetting a page:** each page ends with *Reset page to defaults*, which asks first. ZR no longer resets a page.
 
 ### The Developer page
 
@@ -463,7 +488,13 @@ Minus; A opens the chord editor, X starts the capture, ZL held with D-pad Up giv
 (`button_config.ini written`); back in Training, Minus opens nothing (no `[Ui] menu opened`), and ZL held (Mario
 shields) with D-pad Up opens the menu. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-Menu shortcuts are changed in the menu and work at once.
+Menu shortcut 1 and Menu shortcut 2 can be changed in the menu. B + D-pad Up is permanent.
+
+![Two designs for the menu's shortcut rows: A shows them read-only with the INI as the editor; B lets A re-bind a row in the menu, which writes button_config.ini](decisions/09-menu-shortcuts.png)
+
+*Left (A, marked “recommended”): the rejected read-only design. Right (B): the design chosen on 2026-11-01.
+Confirm a new shortcut in the menu and it applies at once; the menu writes `button_config.ini`.
+[Shortcut decision Q9](DECISIONS.md#q9-menu-shortcuts)*
 
 **Clip** [`rc11-replay-window.gif`](media/rc11-replay-window.gif): A capture cropped in the Replay window and saved; played on the CPU, which becomes the recorded Mii Gunner and replays the moves
 
@@ -486,7 +517,8 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 ## Status
 
 The current release is **rc.15**. Its newest build is install 6 (`5df3d9dc`, on the test console's card since
-2026-11-26): **installed and read back; its own Eden checks are in progress**. The
+2026-11-26): **installed and read back; its own Eden checks are in progress**. A preview build (`cc71537c`) is
+staged for the card and not installed ([release notes](RELEASE-NOTES-rc15.md#preview-build)). The
 [console reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console) distinguish a title-screen
 crash with no TrainingRooms frame from issues reported in TrainingRooms.
 [Current release](CURRENT-RELEASE.md) says what it adds, how to install it and what is known not to work;

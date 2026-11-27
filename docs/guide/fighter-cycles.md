@@ -3,8 +3,9 @@
 Switch fighters without leaving practice. A chord steps Player 1 or the CPU through a list you choose; Kirby can also
 step through a list of copy hats.
 
-<!-- CLIP: tut-fighter-cycle.mp4 | The Character Cycles grid → the Cycle CPU chord replaces Link with Donkey Kong in place -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6d08f7457ab8d11ca30c8d7ed1140dd4611397e9" autoplay muted loop playsinline controls></video>
+
+*The Cycle Player chord, ZL + D-pad Right, swaps Mario for Donkey Kong where he stands. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](../media/tut-fighter-cycle.mp4)
 
 ## The cycle chords
 

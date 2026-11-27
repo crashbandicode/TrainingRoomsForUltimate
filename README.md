@@ -4,7 +4,8 @@ TrainingRooms adds practice tools to Super Smash Bros. Ultimate's Training mode 
 local play: hitboxes, save states, recordings, combo drills, game speed and more, all from one menu.
 
 **Current release: [rc.15](docs/CURRENT-RELEASE.md).** Its newest build, install 6 (`5df3d9dc`, 2026-11-26), is
-installed and read back. Its Eden checks are in progress. What's new, how to install it and what is known not to work
+installed and read back. Its Eden checks are in progress. A preview build (`cc71537c`) is staged for the card and
+not installed. What's new, how to install it and what is known not to work
 are on that page; each build's changes are in the [release notes](docs/RELEASE-NOTES-rc15.md). New here? Start with [Getting started](docs/guide/getting-started.md). Something not
 working? See [Troubleshooting](docs/guide/troubleshooting.md).
 
@@ -61,8 +62,9 @@ On. See [Controls](docs/guide/controls.md) for GameCube and Online Deluxe.
 
 Hold R + D-pad Up, then tap Left for slower or Right for faster. Release R to keep the speed. See [Game speed](docs/guide/game-speed.md), including 1 Frame.
 
-<!-- CLIP: tut-game-speed.mp4 | A smash at x1 → hold R + D-pad Up, Left steps to 1/4, the stopwatch shows it → the same smash, slow -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35ffa4077d05c46d16bd34ef5b7bf93c4ac2fba2" autoplay muted loop playsinline controls></video>
+
+*Hold R + D-pad Up and tap Left: the label steps through 2/3, 1/2 and 1/4 to “1 Frame (Press ZL)”. This clip shows the label only, not a move played slowly. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-game-speed.mp4)
 
 ## The menu
 
@@ -78,8 +80,9 @@ menu. Changes apply when it closes; see [Using the menu](docs/guide/using-the-me
 Choose how the [CPU responds](docs/guide/cpu-behaviour.md): open **CPU › Mash** with A and tick an action, then choose
 when it fires in **Mash Triggers**.
 
-<!-- CLIP: tut-cpu-mash.mp4 | CPU › Mash set to Jab → Mario jabs the CPU → the CPU answers with a jab out of hitstun -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/67d92f30104dd21a740499e4b780336754029284" autoplay muted loop playsinline controls></video>
+
+*With CPU › Mash set to an attack, Mario jabs Link and Link hits back. Link ends at 2.7%, Mario at 3.7%. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-cpu-mash.mp4)
 
 ### Saves
 
@@ -95,8 +98,9 @@ With Save States On, save both fighters' positions with ZL + D-pad Down; ZL + D-
 Record a macro: select Player 1 or CPU in the Recording pop-up, press ZR + D-pad Down, do the moves, then press it
 again to stop.
 
-<!-- CLIP: tut-record-macro.mp4 | ZR + D-pad Down starts Record: the REC mark, Mario tinted → jab, jab, smash → the chord stops it and the notice names the macro -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/35e8edb3e156f65dc2b9cc87b450a10d83e2f8d9" autoplay muted loop playsinline controls></video>
+
+*ZR + D-pad Down starts Record. Mario is tinted red as his forward smash sends Link to 18.5%. The tint clears when recording stops. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-record-macro.mp4)
 
 To drill a combo, land it, then choose **Recording › Combos & Sequences › + Save last combo…**. The link cells grade
 your next attempts.
@@ -115,8 +119,9 @@ More: [Recording](docs/guide/recording.md) and [playback options](docs/menu/reco
 Switch fighters without leaving practice: choose the order in **Character Cycles**, then press ZL + D-pad Left to
 cycle the CPU. See [Fighter cycles](docs/guide/fighter-cycles.md).
 
-<!-- CLIP: tut-fighter-cycle.mp4 | The Character Cycles grid → the Cycle CPU chord replaces Link with Donkey Kong in place -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6d08f7457ab8d11ca30c8d7ed1140dd4611397e9" autoplay muted loop playsinline controls></video>
+
+*The Cycle Player chord, ZL + D-pad Right, swaps Mario for Donkey Kong where he stands. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-fighter-cycle.mp4)
 
 To change stage, open **Change Stage** with A, choose a stage and form, then press A. See [Stages](docs/guide/stages.md).
 
@@ -130,8 +135,9 @@ Choose and start a game under [Practice games](docs/menu/practice-games.md).
 See attacks and hurtboxes: press A on [Hitbox Visualization](docs/menu/display-and-controls.md#hitbox-visualization),
 then A to tick Hitboxes, Grab boxes and Hurtboxes. The Colour legend appears beside the checklist.
 
-<!-- CLIP: tut-hitbox-visualization.mp4 | Hitbox Visualization: tick Hitboxes, Grab boxes, Hurtboxes → the hurtbox pills → a neutral air's red hitbox -->
-*Clip coming.*
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b5760c58e2de36d18ee1fc677043ffb7c7376dce" autoplay muted loop playsinline controls></video>
+
+*With Hitboxes, Grab boxes and Hurtboxes ticked, both fighters show their hurtboxes as see-through pills. Look for the pink hitbox on Mario's jab and the purple box when he grabs. Eden, install 6's diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](docs/media/tut-hitbox-visualization.mp4)
 
 See hittable objects with [Article hurtboxes](docs/menu/display-and-controls.md#hitbox-visualization).
 

@@ -10,6 +10,10 @@ Current release: rc.15
 Status: **rc.15, whose newest build is install 6** (commit `5df3d9dc`, installed on the project's test console on
 2026-11-26).
 
+A **preview build** (`cc71537c`) is staged for the card and not installed. It adds recorded moves to scrubbing and
+fixes several of install 6's issues; two defects found in it are being fixed.
+[Preview build](RELEASE-NOTES-rc15.md#preview-build)
+
 | Check | Install 6 |
 | --- | --- |
 | Installed | The file on the card was read back and matches the build |
@@ -32,6 +36,7 @@ Open the menu (B + D-pad Up) and read the end of the key hints at the foot of th
 
 | The tag ends with | Build | Installed |
 | --- | --- | --- |
+| `cc71537c` | Preview build | Not installed; staged 2026-11-27 |
 | `5df3d9dc` | Install 6 | 2026-11-26 |
 | `b7a382e4` | Install 5 | 2026-11-25 |
 | `a945b0c1` | Install 4 | 2026-11-25 |
@@ -108,7 +113,7 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 | --- | --- | --- | --- |
 | Match capture: "In is mid-action" after Y | Plain Y can leave In mid-action, blocking preview and save. Install 4 has the same snap code. | With In selected, hold ZL or ZR (Z on GameCube) and press Y. **Release the modifier**, then press X to preview or A to save. | **Fixed:** Y resolves the move (`dbded2d1`). [Snap check on the earlier build](RELEASE-NOTES-rc15.md#y-on-in-makes-a-capture-previewable) |
 | Placement on a save | The Off stage fighter floats until it touches ground. It then stays grounded as the crosshair moves. | Switch On stage, then Off stage again. | Open; fix planned for the following build. |
-| Guard the Edge | From one chosen spot the CPU does not start every round the same way. It is let go at the same point each round; in some rounds the game's own AI air-dodges at once, toward the stage, and in others it falls first. | None. | Open; measured in Eden on install 6. Fixed in the next build. |
+| Guard the Edge | The release point was the same each round. At the in-view start the CPU sometimes air-dodged toward the stage and sometimes fell first. At the other three tested starts its motion or inputs first differed 6 to 9 frames after release. | None. | Open on install 6; unchanged in the preview. |
 
 The reports behind these: [The operator's reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console).
 
@@ -120,6 +125,22 @@ The reports behind these: [The operator's reports](EVIDENCE-rc15-installs.md#the
 | Scrubbing shows where the fighters were, not their moves | The fighters are moved in space and keep the pose they had. Reported by the operator on install 6. | None. | By design in install 6; recorded poses are in design for the following build. |
 
 The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#eden-on-install-6-itself-5df3d9dc-merge-17).
+
+| In the preview build (`cc71537c`, not installed) | State |
+| --- | --- |
+| Scrub positions can stop at 20 seconds | Fixed: a 1,610-frame take kept all its positions |
+| First X refused after a snap | Fixed: X plays after a held frame |
+| A fighter beside a wall is shown off its point | The editor refuses that point instead; host-tested only |
+| Scrubbing shows where the fighters were, not their moves | A matching fighter shows the recorded move on frames that have a pose |
+| Placement on a save | Fixed: the Off stage fighter floats again |
+| Guard the Edge | Not changed |
+
+| Found in testing the preview build | What happens | Workaround | Status |
+| --- | --- | --- | --- |
+| Fighter switch times out | After ZL + L the editor waits, then reads "The fighter did not load; the editor keeps the current one". The open editor blocks the roster. After 600 worker passes it stops waiting but leaves the switch pending. In Eden, ZL + L changed Player 1 only after the editor closed. The CPU side was not tested. | None established. | Not fixed in this preview. |
+| Fighters slide apart after B | The fighters are back at their places, but their push boxes can keep the scrubbed pose's width for a few ticks. The overlap pushes them apart. | None established. | Not fixed in this preview. |
+
+The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#preview-build-cc71537c).
 
 Other limits:
 
