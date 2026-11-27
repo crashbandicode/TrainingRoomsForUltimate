@@ -325,6 +325,26 @@ impl Role {
 const FIXTURE: &str = include_str!("support/roster_request_handoff_fixture.rs");
 
 #[test]
+fn only_the_own_install_clear_preserves_the_editor() {
+    let named = include_str!("../src/runtime/macros/named_macros.rs");
+    let event = named.lines().find(|l| l.starts_with("enum Lifecycle ")).unwrap();
+    let producer = block(named, "pub fn clear_session(");
+    let adapter = if producer.starts_with("pub fn clear_session()") { "clear_session();" } else { "clear_session(own);" };
+    let source = include_str!("support/clip_clear_fixture.rs").replace("// EVENT", event)
+        .replace("// PRODUCER", &format!("{producer}\nfn clear_for_test(own:bool){{{adapter}}}"))
+        .replace("// DRAIN",block(named,"pub fn worker_lifecycle()"));
+    let scratch = crate::test_scratch::Scratch::new("clip-install-clear");
+    let src = scratch.join("clear.rs");
+    let exe = scratch.join("clear");
+    fs::write(&src, source).unwrap();
+    let build = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
+        .args(["--edition=2021","-Awarnings"]).arg(src).arg("-o").arg(&exe).output().unwrap();
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let run = Command::new(exe).output().unwrap();
+    assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+}
+
+#[test]
 fn clip_switch_reports_the_rosters_answer_on_the_next_worker_pass() {
     let runtime = include_str!("../src/runtime/macros/replay_capture.rs");
     let source = include_str!("support/clip_admission.rs")
