@@ -91,7 +91,7 @@ How a macro plays back, and how the Combo helper grades.
 | <a id="trim-trailing-neutral"></a>Trim trailing neutral | Start, **End**, Both, Off | Removes idle frames from those sides of a new take. |
 | <a id="place-fighters-before-record"></a>Place fighters before Record | On, **Off** | On: Record first opens the placement picker. |
 | <a id="hitstun-timing"></a>Hitstun timing | **As Hitstun Ends**, As Hitstop Ends, As Hitstop Begins | When playback starts after the CPU is hit. [Clip](../media/rc12-hitstun-timing.gif) |
-| <a id="mash-interrupts-playback"></a>Mash interrupts playback | **On**, Off | On: a mash action stops a playing recording. [Clip](../media/rc11-mash-interrupts.gif) |
+| <a id="mash-interrupts-playback"></a>Mash interrupts playback | **On**, Off | On: Mash stops CPU playback, except during [Parry practice](../guide/parry-practice.md). [Clip](../media/rc11-mash-interrupts.gif) |
 | <a id="loop"></a>Loop | ∞, **1**, 2, 3, 5, 10 | How many times the active macro plays. X cycles it in MACROS. |
 | <a id="settings-override-playback"></a>Settings override playback | On, **Off** | Off: a playing recording wins over the DI, SDI, air-dodge, tech and throw settings. |
 | <a id="shared-start-save"></a>Shared start save | **Prompt**, Always change, Always copy | Applies when at least one macro starts from the save you're editing. |
