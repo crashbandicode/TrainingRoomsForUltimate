@@ -46,6 +46,11 @@ Rules (a problem's rule name is the first word of its line):
                    of more than two sentences, or of more than 300 visible characters; a list item that starts with
                    **Values:**, **Default:** or **How:**. Table rows, headings, code blocks, HTML and an image's alt
                    text are not read. A page still to be rewritten is in `WALL_PENDING` with its count, which only falls.
+  budget           a menu or guide page over its word budget (`BUDGET_WORDS`): more than 1,500 words on a menu page or
+                   800 on a guide page, counted as the file's text split on white space; a table cell of more than 15
+                   words; a caption of more than 60 visible characters; a section (the text under one heading) with
+                   more than one sentence of prose; a second "Good to know" heading, or more than five rows under it.
+                   A page not yet cut is in `BUDGET_PENDING` with its word count, which only falls.
   allowlist-stale  an entry of the lists below that matches no file, or whose sentence or text is gone.
 
 Anchors follow the slug rules of the forge's Markdown renderer (Forgejo). They are NOT GitHub's: GitHub drops punctuation
@@ -200,6 +205,18 @@ WALL_PENDING = {
 }
 
 
+# Word budgets (`budget`). Ordered 2026-11-27 (operator, through tr-primary-2 03:16:29Z): the pages were too long.
+# Words are counted as the order counted them: the file's text split on white space, tables and links included.
+BUDGET_WORDS = [("docs/menu/*.md", 1500), ("docs/guide/*.md", 800)]
+BUDGET_CELL = 15
+BUDGET_CAPTION = 60
+BUDGET_SENTENCES = 1
+BUDGET_GOOD_ROWS = 5
+# page -> its word count, for the pages not yet cut to the budget. Such a page is not held to the rule, but it may not
+# grow, a shorter page lowers its number, and a page that meets the budget leaves the list. Empty before a release.
+BUDGET_PENDING = {}
+
+
 class Problem(NamedTuple):
     rule: str
     path: str
@@ -220,6 +237,8 @@ class Config(NamedTuple):
     notice_columns: dict = NOTICE_COLUMNS
     wall_pages: list = WALL_PAGES
     wall_pending: dict = WALL_PENDING
+    budget_words: list = BUDGET_WORDS
+    budget_pending: dict = BUDGET_PENDING
 
 
 class Link(NamedTuple):
@@ -997,6 +1016,75 @@ def check_walls(tree, config, problems):
             problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"wall_pending entry `{rel}` matches no page"))
 
 
+def shown_words(text):
+    """The words a reader sees in a table cell or a line: link targets, HTML tags and emphasis marks gone."""
+    return claim_text(re.sub(r"<[^>]+>", "", text)).replace("*", "").split()
+
+
+def budget(text, limit):
+    """(line, what is wrong) of each way a page is over its word budget."""
+    words = len(text.split())
+    if words > limit:
+        yield 1, f"the page has {words} words (at most {limit})"
+    for number, line in enumerate(mask_blocks(text).split("\n"), 1):
+        if not line.lstrip().startswith("|") or re.match(r"^\s*\|[\s:|-]+$", line):
+            continue
+        for cell in line.replace("\\|", " ").strip().strip("|").split("|"):
+            count = len(shown_words(cell))
+            if count > BUDGET_CELL:
+                yield number, f"a table cell of {count} words (at most {BUDGET_CELL})"
+    heading, prose, good, rows = 1, 0, [], {}
+    for line, block in blocks(text):
+        body = re.sub(r"!\[.*?\]\([^)]*\)(?:<br>)?", "", block).strip()
+        if block.startswith("#"):
+            if prose > BUDGET_SENTENCES:
+                yield heading, f"{prose} sentences of prose in this section (at most {BUDGET_SENTENCES}, before its table, clip or picture)"
+            heading, prose = line, 0
+            if re.search(r"good to know", block, re.I):
+                good.append(line)
+            continue
+        if body.startswith("|"):
+            if good and heading == good[-1] and not re.match(r"^\|[\s:|-]+$", body):
+                rows[heading] = rows.get(heading, 0) + 1
+            continue
+        body = re.sub(r"^(?:[-*+]|\d+[.)])\s+", "", body)
+        if not body or body.startswith("<"):
+            continue
+        if body.startswith("*") and not body.startswith("**"):
+            shown = claim_text(re.sub(r"\[Open [^\]]*\]\([^)]*\)", "", body)).replace("*", "").strip()
+            if len(shown) > BUDGET_CAPTION:
+                yield line, f"a caption of {len(shown)} characters (at most {BUDGET_CAPTION})"
+            continue
+        prose += len(list(sentences(claim_text(body).replace("*", "").strip())))
+    if prose > BUDGET_SENTENCES:
+        yield heading, f"{prose} sentences of prose in this section (at most {BUDGET_SENTENCES}, before its table, clip or picture)"
+    for line in good[1:]:
+        yield line, "a second \"Good to know\" table (at most one on a page)"
+    for line, count in rows.items():
+        if count - 1 > BUDGET_GOOD_ROWS:
+            yield line, f"a \"Good to know\" table of {count - 1} rows (at most {BUDGET_GOOD_ROWS})"
+
+
+def check_budgets(tree, config, problems):
+    for rel in tree.files:
+        limit = next((words for pattern, words in config.budget_words if fnmatch.fnmatchcase(rel, pattern)), None)
+        if limit is None:
+            continue
+        text = tree.text(rel)
+        found, words, allowed = list(budget(text, limit)), len(text.split()), config.budget_pending.get(rel)
+        if allowed is None:
+            problems.extend(Problem("budget", rel, line, what) for line, what in found)
+        elif words > allowed:
+            problems.append(Problem("budget", rel, 1, f"the page has {words} words; it was pending at {allowed}, and that number only falls"))
+        elif not found:
+            problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"budget_pending entry for {rel}: the page meets its budget, remove the entry"))
+        elif words < allowed:
+            problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"budget_pending entry for {rel} is {allowed} but the page has {words} words: lower it to {words}"))
+    for rel in config.budget_pending:
+        if rel not in tree.files:
+            problems.append(Problem("allowlist-stale", "tools/docs_check.py", 1, f"budget_pending entry `{rel}` matches no page"))
+
+
 def check_allowlists(tree, config, used, problems):
     for name, entries in (("historical", config.historical), ("orphan_ok", config.orphan_ok)):
         for pattern, _ in entries:
@@ -1022,6 +1110,7 @@ def check(root, config=None, used=None):
     check_versions(tree, config, problems, used)
     check_notices(tree, config, problems, used)
     check_walls(tree, config, problems)
+    check_budgets(tree, config, problems)
     check_allowlists(tree, config, used, problems)
     return sorted(set(problems), key=lambda p: (p.path, p.line, p.rule, p.text))
 
