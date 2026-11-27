@@ -113,7 +113,7 @@ is there. The steps, and what to expect on the first start: [Getting started](gu
 | --- | --- | --- | --- |
 | Match capture: "In is mid-action" after Y | Plain Y can leave In mid-action, blocking preview and save. Install 4 has the same snap code. | With In selected, hold ZL or ZR (Z on GameCube) and press Y. **Release the modifier**, then press X to preview or A to save. | **Fixed:** Y resolves the move (`dbded2d1`). [Snap check on the earlier build](RELEASE-NOTES-rc15.md#y-on-in-makes-a-capture-previewable) |
 | Placement on a save | The Off stage fighter floats until it touches ground. It then stays grounded as the crosshair moves. | Switch On stage, then Off stage again. | Open; fix planned for the following build. |
-| Guard the Edge | From one chosen spot the CPU does not start every round the same way. It is let go at the same point each round; in some rounds the game's own AI air-dodges at once, toward the stage, and in others it falls first. From the other starts tested, the rounds agree for 6 to 9 frames; then the CPU's jump comes a frame or two earlier or later. | None. | Open; measured in Eden on install 6. Not changed in the preview build. |
+| Guard the Edge | The release point was the same each round. At the in-view start the CPU sometimes air-dodged toward the stage and sometimes fell first. At the other three tested starts its motion or inputs first differed 6 to 9 frames after release. | None. | Open on install 6; unchanged in the preview. |
 
 The reports behind these: [The operator's reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console).
 
