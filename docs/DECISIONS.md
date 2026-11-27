@@ -745,7 +745,7 @@ Asked for on 2026-11-14 about 17:28Z: improvements to the setup library and its 
 the two shipped GIFs and drew one mockup per change (`artifacts/setup-library-review/PROPOSAL.md`, not in this repo).
 Line counts are the review's estimates; the size gate measures the real ones.
 
-**Defaults the primary took (17:42Z); the operator may override them.**
+**Initial choices at 17:42Z, before the evening decision.**
 
 | # | Change | Where it lands |
 | --- | --- | --- |
@@ -754,7 +754,7 @@ Line counts are the review's estimates; the size gate measures the real ones.
 
 ![S1: the list's key legend, now and proposed](decisions/rc14-setup-S1-key-legend.png)
 
-**Open: answer by number.** Each one costs lines in rc.14, which already carries a temporary size raise.
+**Original recommendations and estimated costs.** The evening decision included SL1 through SL4 in rc.14.
 
 | # | Decision | Cost | Recommendation |
 | --- | --- | --- | --- |
