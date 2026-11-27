@@ -72,9 +72,9 @@ Player view only: the combos, input drills and sequences that the Combo helper g
 | <a id="change-placement"></a>Change placement | Opens the placement picker | Places both fighters of the active macro's start save. |
 | <a id="replay-window"></a>Replay window | Opens the capture list | Choose a capture, then select a fighter and input range in the editor. [Clip](../media/tut-clip-snap.mp4) |
 | <a id="replay-capture"></a>Replay capture | On, Off | On: saving a replay also captures its inputs. The choice is saved automatically. |
-| <a id="fighter-toggle"></a>ZL+L, ZL+R in the clip editor | Player 1, CPU | Switch recorded/original fighter; cancel only while the footer says **B cancels**. |
+| <a id="fighter-toggle"></a>ZL+L, ZL+R in the clip editor | Player 1, CPU | Switch recorded/original fighter; cancel only while the footer says **B cancels**. [Player 1](../media/tut-toggle-p1.mp4), [CPU](../media/tut-toggle-cpu.mp4) |
 | <a id="moves-while-you-scrub-preview-build"></a>Scrubbing in the clip editor | Positions | The opening In frame lines up with the playback target's current spot. |
-| Scrubbing, pose | Matching fighter and stored pose | Shows the recorded pose; otherwise the editor shows position only. |
+| Scrubbing, pose | Matching fighter and stored pose | Shows the recorded pose; otherwise the editor shows position only. [Clip](../media/tut-clip-scrub-home.mp4) |
 
 ![The clip editor's strip with twelve numbered labels](../diagrams/clip-editor-legend.svg)<br>
 *The clip editor's strip, labelled.* [Open the full-size legend](../diagrams/clip-editor-legend.svg)

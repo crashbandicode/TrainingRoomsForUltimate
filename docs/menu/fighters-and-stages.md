@@ -65,9 +65,9 @@ Keep fighters and hats ready to shorten swap times ([Fighter cycles](../guide/fi
 | Preload | Fighters, Hats, **Both** | What is kept ready. [Clip](../media/rc12-preload.gif) |
 | Ready Fighters | 2 to 12, **10** | The total kept ready across both roles, the two on screen included. |
 | Ready Hats | 0 to **5** | How many Kirby hats are kept ready. [Clip](../media/rc12-preload-hats.gif) |
-| Ready Fighter Bodies | Off, 2, **3** | Bodies in each role's own slot, including its active fighter. Off disables groups. [Clip](../media/rc12-ready-fighter-bodies.gif) |
+| Ready Fighter Bodies | Off, 2, **3** | Bodies in each role's own slot, including its active fighter. Off disables groups. [Clip](../media/rc12-ready-fighter-bodies.gif) [Still](../media/tut-loading-ready-fighter-bodies.png) |
 | Group Swap | **On**, Off | Allow extra groups beyond each slot. Off: no extras; both bank settings stay. [Clip](../media/rc12-group-swap.gif) |
-| Swap groups | Seven entries, **all On** | Which swaps are done as a group. A greyed entry says why. [Clip](../media/rc12-swap-groups.gif) |
+| Swap groups | Seven entries, **all On** | Which swaps are done as a group. A greyed entry says why. [Clip](../media/rc12-swap-groups.gif) [Help line](../media/tut-loading-swap-groups.png) |
 
 ## Practice games
 
