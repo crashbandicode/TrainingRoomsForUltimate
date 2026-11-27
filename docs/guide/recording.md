@@ -44,6 +44,7 @@
 | Snap selected handles | Y snaps In toward move starts or zero; Out includes move ends and take end. |
 | If no move end is known | Out uses the next start or the end of the take. |
 | Preview without saving | X previews a macro or capture; B stops it without closing the editor. |
+| Show a take's moves on its fighter | In the editor, ZL+L switches Player 1 and ZL+R the CPU to the take's fighter. |
 | X refuses a mid-action capture | Select In and press Y. If the move can start there, try X again. |
 | Keep the result | A names a new file; the original stays. Combos crop by link, drills by step. |
 | More controls | [Replay window](../menu/recording.md#replay-window) and [playback options](../menu/recording.md#options). |

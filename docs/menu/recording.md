@@ -71,6 +71,7 @@ Turn a match replay into a recording, or move a start save's fighters ([guide](.
 | <a id="change-placement"></a>Change placement | Opens the placement picker | Places both fighters of the active macro's start save. |
 | <a id="replay-window"></a>Replay window | Opens the clip editor | Pick a saved capture, a fighter and an input window. [Clip](../media/tut-clip-snap.mp4) |
 | <a id="replay-capture"></a>Replay capture | On, Off | On: saving a replay also captures its inputs. The choice is saved automatically. |
+| <a id="fighter-toggle"></a>ZL+L, ZL+R in the clip editor | Player 1, the CPU | Switches that side to the take's fighter to show its moves. B cancels early. |
 | <a id="moves-while-you-scrub-preview-build"></a>Scrubbing in the clip editor | Install 6, preview build | Install 6 shows recorded positions. The preview build `cc71537c` also shows recorded moves. |
 
 ![The clip editor's strip with twelve numbered labels](../diagrams/clip-editor-legend.svg)<br>
@@ -121,4 +122,4 @@ How a macro plays back, and how the Combo helper grades.
 | You press X or Y on this page | X never saves your defaults here, and Y does nothing. |
 | A file was recorded on another fighter | Play asks first, unless Ask before switching fighter is Off. |
 | You reset this page | Your files, the bound save, the active macros and the drill stay. |
-| You use ZL+L or ZL+R in the preview's editor | Known issue: the fighter can switch only after the editor closes. |
+| A fighter's moves do not show while you scrub | Switch that side to the take's fighter with ZL+L or ZL+R. |
