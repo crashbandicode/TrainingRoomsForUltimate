@@ -26,65 +26,77 @@ fn allocating_hook(id: HookId, bytes: usize) -> usize {
 
 #[test]
 fn handing_over_and_applying_overlay_commands_allocates_nothing_in_a_hook() {
-    use model::hitbox::{FighterGenerations, SetTable};
-    use model::hitbox_orbs::{self as orbs, Articles, Command, HandOff};
-    use model::pool_list::PoolList;
+    use model::handoff::{Handoff, Put};
+    use model::hitbox::{FighterGenerations, SetTable, Shape};
+    use model::hitbox_orbs::{self as orbs, Articles, Board};
     use std::sync::Barrier;
     let _turn = crate::allocation::hook_counter_turn();
     let generations = FighterGenerations::new();
-    let life = generations.stamp(0x10000).unwrap();
-    let catch = Command::Shape { key: 0x1000, id: life.id, life: Some(life), grab: true,
-        shape: model::hitbox::Shape { id: 0, joint: 1, size: 1.0, a: [0.0; 3], b: None }, status: 1 };
-    let wind = Command::Wind { key: 0x2000, id: 1 };
-    let rebound = Command::Rebound { key: 0x1000, life };
-    let list = PoolList::new(3).unwrap();
-    let table = hos_lock::Mutex::new(Box::new(SetTable::new()));
-    let articles = hos_lock::Mutex::new(Articles::new());
-    let begin = Barrier::new(3);
-    let end = Barrier::new(3);
+    let lives: Vec<_> = (1..=9).map(|n| generations.stamp((n as u32) << 16).unwrap()).collect();
+    let shape = Shape { id: 0, joint: 1, size: 1.0, a: [0.0; 3], b: None };
+    let link = &*Box::leak(Box::new(Handoff::new().unwrap()));
+    let mut table = Box::new(SetTable::new());
+    let mut articles = Articles::new();
+    let mut board = Box::new(Board::new());
+    table.link(link);
+    articles.link(link);
+    let begin = Barrier::new(4);
+    let bound = Barrier::new(4);
+    let end = Barrier::new(4);
     std::thread::scope(|scope| {
-        for (id, command) in [(HookId::HitboxWind, wind), (HookId::HitboxRebound, rebound)] {
-            let (begin, end, list) = (&begin, &end, &list);
-            scope.spawn(move || {
-                begin.wait();
-                {
-                    let _scope = HookScope::enter_hook(id);
-                    assert!(list.push(command));
+        let life = lives[8];
+        let (first, bound, last) = (&begin, &bound, &end);
+        scope.spawn(move || {
+            first.wait();
+            bound.wait();
+            {
+                let _scope = HookScope::enter_hook(HookId::HitboxRebound);
+                assert_eq!(link.rebound_command(9 * 16, life), Put::Stored);
+            }
+            last.wait();
+        });
+        let (first, bound, last) = (&begin, &bound, &end);
+        scope.spawn(move || {
+            first.wait();
+            bound.wait();
+            {
+                let _scope = HookScope::enter_hook(HookId::HitboxWind);
+                for id in 1..=5 {
+                    assert_eq!(link.article_command(id, id as usize * 16, None), Put::Stored);
                 }
-                end.wait();
-            });
-        }
+                assert_eq!(link.article_command(5, 80, Some((shape, 1))), Put::Stored);
+            }
+            last.wait();
+        });
+        let (first, bound, last, lives) = (&begin, &bound, &end, &lives);
+        scope.spawn(move || {
+            first.wait();
+            {
+                let _scope = HookScope::enter_hook(HookId::HitboxCatch);
+                for (index, &life) in lives.iter().enumerate() {
+                    assert_eq!(link.catch_command((index + 1) * 16, life, shape, 1), Put::Stored);
+                }
+            }
+            bound.wait();
+            last.wait();
+        });
         let before = hook_allocations();
-        {
-            let _scope = HookScope::enter_hook(HookId::HitboxCatch);
-            assert!(list.push(catch));
-        }
         begin.wait();
+        bound.wait();
         end.wait();
         {
             let _scope = HookScope::enter_hook(HookId::HitboxFrame);
-            assert_eq!(orbs::apply_all(&list, None, &mut table.lock(), &mut articles.lock(), &generations, &mut |_, _| {}), 3);
+            orbs::apply_fighters(&mut table, &generations, &mut |_, _| {});
+            articles.apply_grabs(&mut |_, _| {});
+            table.index_for(16, lives[0]);
+            generations.retire(lives[7].id);
+            table.forget_retired(&generations);
+            table.settle();
+            let _ = articles.track(5, 80, Some(&mut board), true);
+            articles.forget(5, &mut board);
+            articles.settle();
+            articles.apply_grabs(&mut |_, _| {});
         }
-        for command in [catch, wind, rebound] {
-            let _scope = HookScope::enter_hook(HookId::HitboxCatch);
-            assert!(list.push(command));
-        }
-        let owner = |run: &mut dyn FnMut(&mut SetTable, &mut Articles)| {
-            let (Some(mut table), Some(mut articles)) = (table.try_lock(), articles.try_lock()) else { return false };
-            run(&mut table, &mut articles);
-            true
-        };
-        {
-            let _scope = HookScope::enter_hook(HookId::HitboxRebound);
-            assert_eq!(orbs::hand_off(&list, &generations, rebound, owner, &mut |_, _| {}), HandOff::Direct);
-        }
-        for command in [catch, wind, rebound] { assert!(list.push(command)); }
-        let held = table.lock();
-        {
-            let _scope = HookScope::enter_hook(HookId::HitboxRebound);
-            assert_eq!(orbs::hand_off(&list, &generations, rebound, owner, &mut |_, _| {}), HandOff::Skipped);
-        }
-        drop(held);
         assert_eq!(hook_allocations(), before);
         {
             let _scope = HookScope::enter_hook(HookId::HitboxCatch);

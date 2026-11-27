@@ -16,102 +16,47 @@
 use super::cpu::role::FighterKey;
 use super::hitbox::{self, want_hits, AttackReader, Counts, Effects, FighterGenerations, FighterLife, HandleSet, SetTable, Shape, Sphere, FIGHTER_SETS, KIND_ARTICLE_HURT, KIND_HIT, KIND_HURT, MAX_HELD, SCALE, SLOTS};
 use super::legend::{self, KIND_MARK, KIND_WIND};
-use super::pool_list::PoolList;
+use super::handoff::{Handoff, Record};
 
-/// Nodes of the runtime's command pool: 32 times the most commands one frame handed over (2; 99.9th percentile 1) in Eden run
-/// `overlay-stress-xps-01` on the release NRO `4ffa754e` (Training, 35,020 frames; lane overlay-handoff, 2026-11-27). The waiting
-/// room was not measured.
-pub const COMMAND_NODES: usize = 64;
-
-/// A command recorded by an overlay hook for ordered application.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Command {
-    /// An ATTACK or CATCH that passed its hook's gates: `life` is a fighter's stamp taken before the shape was read, `None` an article;
-    /// `status` the status the command ran in.
-    Shape { key: usize, id: u32, life: Option<FighterLife>, grab: bool, shape: Shape, status: i32 },
-    /// An article's wind-area command.
-    Wind { key: usize, id: u32 },
-    /// A fighter's rebound was cleared and its spheres go.
-    Rebound { key: usize, life: FighterLife },
-}
-
-/// The result of applying one overlay command.
+/// What telling a set its waiting command did.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Applied {
-    /// The grab spheres queued in the object's set; `None` when the fighter's lifetime had ended.
-    Shape(Option<u32>),
-    /// An article was tracked.
-    Wind,
-    /// What clearing the fighter's set did and the spheres every fighter holds afterwards; `None` without a set of that lifetime.
+    /// The grab spheres the set took; `None` when the fighter's lifetime had ended.
+    Grab(Option<u32>),
+    /// What clearing the fighter's set did and the spheres every fighter holds afterwards; `None` when its lifetime had ended.
     Rebound(Option<(Counts, usize)>),
 }
 
-/// How the handoff handled a command.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HandOff {
-    /// The command was queued for a later drain.
-    Queued,
-    /// The caller lent the state and the command was applied directly.
-    Direct,
-    /// The pool was full and the state was busy.
-    Skipped,
+/// Queue a CATCH's spheres in `set` with the status the command ran in: how many the set took.
+pub fn push_grabs(set: &mut HandleSet, shape: &Shape, status: i32) -> u32 {
+    let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
+    let mut len = 0;
+    hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, shape, hitbox::legend_colour(hitbox::KIND_GRAB, None, 0));
+    wants[..len].iter().filter(|w| set.push_grab(**w, Some(status))).count() as u32
 }
 
-/// Apply one command to its fighter or article state.
-pub fn apply(table: &mut SetTable, articles: &mut Articles, generations: &FighterGenerations, command: &Command) -> Applied {
-    match *command {
-        Command::Shape { key, id, life, grab, shape, status } => {
-            let set = if let Some(life) = life {
-                if !generations.is_current(life) { return Applied::Shape(None); }
-                let i = table.index_for(key, life);
-                &mut table.sets[i]
-            } else {
-                articles.track(id, key, None, true).unwrap().0
+/// Phase 8, a linked table: adopt what the command hooks changed, then tell each fighter's set its waiting commands, oldest
+/// first: how many.
+pub fn apply_fighters(table: &mut SetTable, generations: &FighterGenerations, each: &mut dyn FnMut(&Record, Applied)) -> usize {
+    table.settle();
+    let mut count = 0;
+    for i in 0..FIGHTER_SETS {
+        while let Some(record) = table.next_waiting(i) {
+            let applied = match record {
+                Record::Grab { life: Some(life), shape, status, .. } => {
+                    Applied::Grab(generations.is_current(life).then(|| push_grabs(&mut table.sets[i], &shape, status)))
+                }
+                Record::Rebound { life, .. } => Applied::Rebound(generations.is_current(life).then(|| {
+                    let counts = table.sets[i].clear(&mut OrbSink { status: i32::MIN });
+                    (counts, table.held_spheres())
+                })),
+                Record::Grab { life: None, .. } => continue,
             };
-            let mut wants = [Sphere::NONE; hitbox::SHAPE_SPHERES];
-            let mut len = 0;
-            hitbox::push_shape(&mut wants, &mut len, hitbox::KIND_GRAB, shape.id as usize, &shape, hitbox::legend_colour(hitbox::KIND_GRAB, None, 0));
-            let made = wants[..len].iter().filter(|w| grab && set.push_grab(**w, Some(status))).count() as u32;
-            Applied::Shape(Some(made))
-        }
-        Command::Wind { key, id } => {
-            articles.track(id, key, None, true).unwrap();
-            Applied::Wind
-        }
-        Command::Rebound { key, life } => {
-            Applied::Rebound(table.find_life(key, life).filter(|_| generations.is_current(life)).map(|i| {
-                let counts = table.sets[i].clear(&mut OrbSink { status: i32::MIN });
-                (counts, table.held_spheres())
-            }))
+            each(&record, applied);
+            count += 1;
         }
     }
-}
-
-/// Apply the detached batch in issue order, followed by an optional direct command.
-pub fn apply_all(list: &PoolList<Command>, last: Option<Command>, table: &mut SetTable, articles: &mut Articles,
-    generations: &FighterGenerations, each: &mut dyn FnMut(&Command, Applied)) -> usize {
-    let mut run = |command| {
-        let applied = apply(table, articles, generations, &command);
-        each(&command, applied);
-    };
-    let count = list.drain(&mut run);
-    if let Some(command) = last {
-        run(command);
-        count + 1
-    } else {
-        count
-    }
-}
-
-/// Queue a command, or apply the batch directly when the pool is full and the owner can lend its state.
-pub fn hand_off(list: &PoolList<Command>, generations: &FighterGenerations, command: Command,
-    owner: impl FnOnce(&mut dyn FnMut(&mut SetTable, &mut Articles)) -> bool, each: &mut dyn FnMut(&Command, Applied)) -> HandOff {
-    if list.push(command) { return HandOff::Queued; }
-    if owner(&mut |table, articles| { apply_all(list, Some(command), table, articles, generations, each); }) {
-        HandOff::Direct
-    } else {
-        HandOff::Skipped
-    }
+    count
 }
 
 /// One fighter's orbs on the board: its spheres' and, with *Launch angles* On, up to two marks per hitbox, and with *Windboxes* its wind
@@ -468,56 +413,129 @@ pub fn slot_angle(attacks: &mut impl AttackReader, slot: i32) -> Option<i32> {
 /// Articles drawn at once: the board's slots past Training's fighter objects.
 pub const ARTICLES: usize = 4;
 
+/// Which article holds which slot: (battle-object id, accessor), the stamp it came in with (the oldest goes first) and whether it
+/// attacks. A plain value: the runtime's is the handoff's, which its command hooks change too (`Handoff::change_articles`).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Members {
+    pub ids: [(u32, usize); ARTICLES],
+    pub ages: [u64; ARTICLES],
+    pub attacking: [bool; ARTICLES],
+}
+
+impl Members {
+    /// Track an object and its priority at `stamp`: its slot and, when it is new there, what the slot held. Hurt-only discovery
+    /// takes free slots; attacks evict passive objects before the oldest attack.
+    pub fn track(&mut self, id: u32, key: usize, attacking: bool, stamp: u64) -> Option<(usize, Option<(u32, usize)>)> {
+        let i = (0..ARTICLES).min_by_key(|&i| (self.ids[i] != (id, key), self.ids[i].0 != 0, self.attacking[i], self.ages[i])).unwrap_or(0);
+        if !attacking && self.ids[i] != (id, key) && self.ids[i].0 != 0 { return None; }
+        let replaced = (self.ids[i] != (id, key)).then(|| std::mem::replace(&mut self.ids[i], (id, key)));
+        if replaced.is_some() {
+            (self.ages[i], self.attacking[i]) = (stamp, false);
+        }
+        self.attacking[i] |= attacking;
+        Some((i, replaced))
+    }
+}
+
 /// The articles whose `ATTACK` or `CATCH` ran (rc.13): (battle-object id, accessor), the accessor the board key of its
 /// orbs, and its spheres (a `CATCH`'s wait there with their status, as a fighter's do: Olimar's Pikmin); the oldest is
 /// replaced.
 #[derive(Default)]
 pub struct Articles {
-    ids: [(u32, usize); ARTICLES],
-    ages: [u32; ARTICLES],
-    clock: u32,
+    members: Members,
+    clock: u64,
     sets: [HandleSet; ARTICLES],
-    attacking: [bool; ARTICLES],
     evicted: bool,
+    /// The runtime's: the slots are the handoff's. `seen` is the version `members` was read at and `flags` its attacking flags
+    /// then; what the pass set since goes out with the next change.
+    link: Option<&'static Handoff>,
+    seen: u64,
+    flags: [bool; ARTICLES],
 }
 
 impl Articles {
     pub const fn new() -> Articles {
-        Articles { ids: [(0, 0); ARTICLES], ages: [0; ARTICLES], clock: 0, sets: [HandleSet::new(); ARTICLES], attacking: [false; ARTICLES], evicted: false }
+        Articles {
+            members: Members { ids: [(0, 0); ARTICLES], ages: [0; ARTICLES], attacking: [false; ARTICLES] },
+            clock: 0,
+            sets: [HandleSet::new(); ARTICLES],
+            evicted: false,
+            link: None,
+            seen: 0,
+            flags: [false; ARTICLES],
+        }
+    }
+
+    /// From now on the slots are `link`'s.
+    pub fn link(&mut self, link: &'static Handoff) {
+        self.link = Some(link);
+    }
+
+    /// Change the slots: its own, or the link's. Linked, the change carries the attacking flags the pass set (assigned when nothing
+    /// changed the slots since they were read, else only raised), and what the command hooks changed is adopted: a slot with a new
+    /// article forgets its set, and the board is to be cleared of what left. Without a buffer (which `handoff::BUFFERS` rules out)
+    /// the change stays on its own view.
+    fn change<R>(&mut self, mut op: impl FnMut(&mut Members, u64) -> R) -> R {
+        let (view, seen, flags) = (self.members, self.seen, self.flags);
+        let changed = self.link.and_then(|link| link.change_articles(|members, version| {
+            for i in 0..ARTICLES {
+                if view.attacking[i] != flags[i] && (members.ids[i], members.ages[i]) == (view.ids[i], view.ages[i]) {
+                    members.attacking[i] = view.attacking[i] || (version != seen + 1 && members.attacking[i]);
+                }
+            }
+            op(members, version)
+        }));
+        let Some((version, members, result)) = changed else {
+            self.clock += 1;
+            return op(&mut self.members, self.clock);
+        };
+        for i in 0..ARTICLES {
+            if (members.ids[i], members.ages[i]) != (view.ids[i], view.ages[i]) {
+                self.evicted |= view.ids[i].1 != 0;
+                if members.ids[i].0 != 0 {
+                    self.sets[i].forget();
+                }
+            }
+        }
+        (self.members, self.seen, self.flags) = (members, version, members.attacking);
+        result
     }
 
     /// Track an object and its priority. Hurt-only discovery takes free slots; attacks evict passive objects before the oldest attack.
     pub fn track(&mut self, id: u32, key: usize, board: Option<&mut Board>, attacking: bool) -> Option<(&mut HandleSet, &mut bool)> {
-        let i = (0..ARTICLES).min_by_key(|&i| (self.ids[i] != (id, key), self.ids[i].0 != 0, self.attacking[i], self.ages[i])).unwrap_or(0);
-        if !attacking && self.ids[i] != (id, key) && self.ids[i].0 != 0 { return None; }
-        if self.ids[i] != (id, key) {
-            self.clock = self.clock.wrapping_add(1);
+        let (i, replaced) = self.change(|members, stamp| members.track(id, key, attacking, stamp))?;
+        if let Some(old) = replaced {
             if let Some(board) = board {
-                board.clear(self.ids[i].1);
+                board.clear(old.1);
             } else {
-                self.evicted |= self.ids[i].1 != 0;
+                self.evicted |= old.1 != 0;
             }
-            (self.ids[i], self.ages[i]) = ((id, key), self.clock);
             self.sets[i].forget();
-            self.attacking[i] = false;
         }
-        self.attacking[i] |= attacking;
-        Some((&mut self.sets[i], &mut self.attacking[i]))
+        Some((&mut self.sets[i], &mut self.members.attacking[i]))
     }
 
     pub fn tracked(&self) -> [(u32, usize); ARTICLES] {
-        self.ids
+        self.members.ids
     }
 
     pub fn forget(&mut self, id: u32, board: &mut Board) {
-        for slot in self.ids.iter_mut().filter(|t| t.0 == id) {
-            board.clear(slot.1);
-            *slot = (0, 0);
+        let keys = self.change(|members, _| {
+            let mut keys = [0; ARTICLES];
+            for i in 0..ARTICLES {
+                if members.ids[i].0 == id {
+                    (keys[i], members.ids[i]) = (members.ids[i].1, (0, 0));
+                }
+            }
+            keys
+        });
+        for key in keys {
+            board.clear(key);
         }
     }
 
     pub fn forget_all(&mut self, board: Option<&mut Board>) {
-        self.ids = [(0, 0); ARTICLES];
+        self.change(|members, _| members.ids = [(0, 0); ARTICLES]);
         self.evicted = true;
         if let Some(board) = board {
             self.clear_evicted(board);
@@ -526,8 +544,32 @@ impl Articles {
 
     pub fn clear_evicted(&mut self, board: &mut Board) {
         if std::mem::take(&mut self.evicted) {
-            board.clear_evicted(&self.ids);
+            board.clear_evicted(&self.members.ids);
         }
+    }
+
+    /// Linked: send the attacking flags the pass set and adopt what the command hooks changed.
+    pub fn settle(&mut self) {
+        if self.link.is_some() {
+            self.change(|_, _| ());
+        }
+    }
+
+    /// Phase 8, linked: adopt what the command hooks changed, then queue each slot's waiting grab commands in its set, oldest
+    /// first: how many.
+    pub fn apply_grabs(&mut self, each: &mut dyn FnMut(&Record, Applied)) -> usize {
+        let Some(link) = self.link else { return 0 };
+        self.settle();
+        let mut count = 0;
+        for i in 0..ARTICLES {
+            while let Some(record) = (self.members.ids[i].0 != 0).then(|| link.next_waiting(FIGHTER_SETS + i, self.members.ages[i], self.seen)).flatten() {
+                if let Record::Grab { shape, status, .. } = record {
+                    each(&record, Applied::Grab(Some(push_grabs(&mut self.sets[i], &shape, status))));
+                    count += 1;
+                }
+            }
+        }
+        count
     }
 }
 

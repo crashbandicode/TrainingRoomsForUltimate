@@ -22,6 +22,8 @@
 
 use core::sync::atomic::{AtomicU32, Ordering};
 
+use super::handoff::{Handoff, Record};
+
 /// Eight attack slots per fighter (`AttackModule`).
 pub const SLOTS: i32 = 8;
 /// The sphere's scale per unit of hitbox size (`size x 19/200`).
@@ -955,6 +957,17 @@ pub struct FighterLife {
     generation: u32,
 }
 
+impl FighterLife {
+    /// Both fields in one word (the handoff's buffers).
+    pub fn bits(self) -> u64 {
+        u64::from(self.id) | (u64::from(self.generation) << 32)
+    }
+
+    pub fn from_bits(bits: u64) -> Self {
+        FighterLife { id: bits as u32, generation: (bits >> 32) as u32 }
+    }
+}
+
 pub struct FighterGenerations([AtomicU32; FIGHTER_OBJECTS]);
 
 impl FighterGenerations {
@@ -989,30 +1002,23 @@ impl Default for FighterGenerations {
     }
 }
 
-/// The fighters' sets, by accessor address; a new fighter takes a free or the least recently used set (forgotten, no call).
-#[derive(Clone, Copy, Debug)]
-pub struct SetTable {
-    keys: [usize; FIGHTER_SETS],
-    lives: [Option<FighterLife>; FIGHTER_SETS],
-    used: [u64; FIGHTER_SETS],
-    clock: u64,
-    pub sets: [HandleSet; FIGHTER_SETS],
+/// Which fighter holds which set: its accessor and lifetime, when the set was last used (the least recently used is taken over
+/// first) and the stamp its binding dates from. A plain value: the runtime's is the handoff's, which its command hooks change
+/// too (`Handoff::change_sets`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SetMembers {
+    pub keys: [usize; FIGHTER_SETS],
+    pub lives: [Option<FighterLife>; FIGHTER_SETS],
+    pub used: [u64; FIGHTER_SETS],
+    pub bound: [u64; FIGHTER_SETS],
 }
 
-impl Default for SetTable {
-    fn default() -> Self {
-        SetTable::new()
-    }
-}
+impl SetMembers {
+    pub const NONE: SetMembers = SetMembers { keys: [0; FIGHTER_SETS], lives: [None; FIGHTER_SETS], used: [0; FIGHTER_SETS], bound: [0; FIGHTER_SETS] };
 
-impl SetTable {
-    pub const fn new() -> SetTable {
-        SetTable { keys: [0; FIGHTER_SETS], lives: [None; FIGHTER_SETS], used: [0; FIGHTER_SETS], clock: 0, sets: [HandleSet::new(); FIGHTER_SETS] }
-    }
-
-    /// The set of `key` (an accessor address), taken over when new.
-    pub fn index_for(&mut self, key: usize, life: FighterLife) -> usize {
-        self.clock += 1;
+    /// The set of `key` (an accessor address) at `stamp`, taken over when new: its index, and whether it forgets what it held
+    /// (a new fighter or a new lifetime).
+    pub fn index_for(&mut self, key: usize, life: FighterLife, stamp: u64) -> (usize, bool) {
         let i = match self.keys.iter().position(|k| *k == key) {
             Some(i) => i,
             None => {
@@ -1022,12 +1028,12 @@ impl SetTable {
                 i
             }
         };
-        if self.lives[i] != Some(life) {
-            self.sets[i].forget();
-            self.lives[i] = Some(life);
+        let forgets = self.lives[i] != Some(life);
+        if forgets {
+            (self.lives[i], self.bound[i]) = (Some(life), stamp);
         }
-        self.used[i] = self.clock;
-        i
+        self.used[i] = stamp;
+        (i, forgets)
     }
 
     /// The set of `key` if it has one.
@@ -1039,13 +1045,98 @@ impl SetTable {
         self.find(key).filter(|&i| self.lives[i] == Some(life))
     }
 
-    pub fn forget_retired(&mut self, generations: &FighterGenerations) {
-        for (set, life) in self.sets.iter_mut().zip(&mut self.lives) {
-            if life.is_some_and(|life| !generations.is_current(life)) {
-                set.forget();
-                *life = None;
+    /// The sets whose lifetime ended lose it at `stamp`: which ones.
+    pub fn retire(&mut self, generations: &FighterGenerations, stamp: u64) -> [bool; FIGHTER_SETS] {
+        std::array::from_fn(|i| {
+            let ended = self.lives[i].is_some_and(|life| !generations.is_current(life));
+            if ended {
+                (self.lives[i], self.bound[i]) = (None, stamp);
+            }
+            ended
+        })
+    }
+}
+
+/// The fighters' sets, by accessor address; a new fighter takes a free or the least recently used set (forgotten, no call).
+#[derive(Clone, Copy, Debug)]
+pub struct SetTable {
+    members: SetMembers,
+    clock: u64,
+    pub sets: [HandleSet; FIGHTER_SETS],
+    /// The runtime's: the bindings are the handoff's. `seen` is the version `members` was read at.
+    link: Option<&'static Handoff>,
+    seen: u64,
+}
+
+impl Default for SetTable {
+    fn default() -> Self {
+        SetTable::new()
+    }
+}
+
+impl SetTable {
+    pub const fn new() -> SetTable {
+        SetTable { members: SetMembers::NONE, clock: 0, sets: [HandleSet::new(); FIGHTER_SETS], link: None, seen: 0 }
+    }
+
+    /// From now on the bindings are `link`'s.
+    pub fn link(&mut self, link: &'static Handoff) {
+        self.link = Some(link);
+    }
+
+    /// Change the bindings: its own, or the link's. Linked, what the command hooks changed is adopted: a set whose binding is
+    /// newer forgets what it held. Without a buffer (which `handoff::BUFFERS` rules out) the change stays on its own view.
+    fn change<R>(&mut self, mut op: impl FnMut(&mut SetMembers, u64) -> R) -> R {
+        let Some((version, members, result)) = self.link.and_then(|link| link.change_sets(&mut op)) else {
+            self.clock += 1;
+            return op(&mut self.members, self.clock);
+        };
+        for i in 0..FIGHTER_SETS {
+            if members.bound[i] != self.members.bound[i] {
+                self.sets[i].forget();
             }
         }
+        (self.members, self.seen) = (members, version);
+        result
+    }
+
+    /// The set of `key` (an accessor address), taken over when new.
+    pub fn index_for(&mut self, key: usize, life: FighterLife) -> usize {
+        let (i, forgets) = self.change(|members, stamp| members.index_for(key, life, stamp));
+        if forgets {
+            self.sets[i].forget();
+        }
+        i
+    }
+
+    /// The set of `key` if it has one.
+    pub fn find(&self, key: usize) -> Option<usize> {
+        self.members.find(key)
+    }
+
+    pub fn find_life(&self, key: usize, life: FighterLife) -> Option<usize> {
+        self.members.find_life(key, life)
+    }
+
+    pub fn forget_retired(&mut self, generations: &FighterGenerations) {
+        let ended = self.change(|members, stamp| members.retire(generations, stamp));
+        for (set, ended) in self.sets.iter_mut().zip(ended) {
+            if ended {
+                set.forget();
+            }
+        }
+    }
+
+    /// Linked: adopt what the command hooks changed.
+    pub fn settle(&mut self) {
+        if self.link.is_some() {
+            self.change(|_, _| ());
+        }
+    }
+
+    /// Phase 8, linked: take the oldest command waiting for set `i` since its binding, up to the version last adopted.
+    pub fn next_waiting(&mut self, i: usize) -> Option<Record> {
+        self.link?.next_waiting(i, self.members.bound[i], self.seen)
     }
 
     /// Spheres held by every fighter (diagnostics: the plugin's share of the effect pool).
