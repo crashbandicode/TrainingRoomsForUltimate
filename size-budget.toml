@@ -3296,3 +3296,11 @@ ceiling = 209587
 date = "2026-11-27"
 reason = "No NRO-load provider: TrainingRooms observes module loads at its own nro_loaded site (the success path of the game's only nn::ro::LoadModule call) instead of asking libnro_hook. The full count on 73d305d6 is 209587, +26 on 209561. Release NRO against 1bc8e7b8: file, text, ro, data and bss equal."
 approved_by = "tr-primary-3 2026-11-27 19:47:18Z (+26 for 73d305d6)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 209592
+date = "2026-11-27"
+reason = "Common-load hook: queue the install report and let the heartbeat write it without allocating on the loader thread. Full count on 0702bca5: 209592 (+5). Against 7fac418c, release NRO +0 bytes and BSS +4096 bytes (one page)."
+approved_by = "tr-primary-3 2026-11-27 21:56Z (+5 for 0702bca5)."
