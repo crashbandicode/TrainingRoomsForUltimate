@@ -1,4 +1,4 @@
-# rc.15 installs 1 to 6: what was installed and what was tested
+# rc.15 installs 1 to 6 and the preview build: what was installed and what was tested
 
 2026-11-25. The receipts behind [the rc.15 release notes](RELEASE-NOTES-rc15.md) and the status on
 [Current release](CURRENT-RELEASE.md). Three claims are kept apart:
@@ -382,3 +382,52 @@ files named below were read for this page.
   fighter walked off stage (SP-11). No match-capture preview fed inputs in `scrub-m17b-yoga-01`. In the separate
   filming boot, the deselected-In control **did** feed inputs; it is not a pass for X with In still selected.
   The playhead rows passed on Yoga; the filming boot also showed browsing, Y to a move and both cuts on one macro.
+
+## Preview build (`cc71537c`)
+
+Staged for the card on 2026-11-27 and **not installed**. Nothing here ran on a console.
+
+| Fact | Value | Where |
+| --- | --- | --- |
+| Commit | `cc71537c`, the head of the next build's branch with every part in | — |
+| Release file | sha256 `78db86f5378635a8ce6820b6cdace6feb3d9d1c73ef126aa4475da1e4f03e77a`, 5,419,008 bytes | `artifacts/phase23/card-install/20261127-0046Z-preview-cc71537c/` |
+| It would replace | install 6's file, `c1ced861…` | `operator-approval.json` in that folder |
+| Host gate | six steps exit 0; the test row reads 3,197 passed, 0 failed, 4 ignored | `artifacts/phase23/next-build/gate-cc71537c/SUMMARY.md` |
+
+### Eden, on the release file
+
+Two boots on one host (the XPS). Neither log has a panic, abort, crash or unmapped-access line. Source: dup-audit,
+inbox 2026-11-26 23:11:03Z and 2026-11-27 00:38:37Z. For this page the two posts were read, not the row files.
+
+| Check | First boot, `next-smoke-xps-01` | Second boot, `next-smoke-xps-02` |
+| --- | --- | --- |
+| A take past 1,200 frames | The take has 1,610 frames and its positions file 1,610. The last frame's held line was not read by the test | Not run |
+| Snapped X in the Replay window | Played | Played |
+| A point inside the stage, at frame 137 | Refused, with "Can't stand there on this stage." and both fighters at their homes | Not run |
+| Scrub poses | Shown for both fighters on a held frame | Shown for both |
+| The recorded-fighter choice | Not exercised | Failed for Player 1: loading, then "The fighter did not load; the editor keeps the current one"; the fighter changed three frames after the editor closed. The CPU side was not reached |
+| A save's Off stage fighter | Read in the air, on the ground, then in the air again | Not run |
+| Settings check | No option off its default, twice | Passed |
+| Waiting room, as host | The menu opened there; the footer read `rc15 cc71537c` | Not run |
+| A capture saved and read back | Not flown: the test's route stopped before the match | Not flown, for the same reason |
+
+- Three rows of the first boot passed on a second try in the same boot, after faults in the test's own steps.
+- Four clips were made in the second boot (`artifacts/phase23/final-smoke-media/`). They are not placed in the pages:
+  three are to be filmed again after the fixes.
+
+### Eden, on the diagnostic build of the same commit
+
+Source: place-t1a, inbox 2026-11-26 23:01:24Z and 23:19:06Z and 2026-11-27 00:35:36Z. Receipts:
+`artifacts/phase23/scrub-moves/proof/eden/evidence/`. The diagnostic file is sha256 `b156c5ff…`.
+
+| Run | What it showed |
+| --- | --- |
+| `moves-proof-yoga-01` | Frames 114, 130 and 144 of a take were shown exactly, with no hitbox, effect or sound from the held fighters. X and B from a posed frame let the fighters go. On two rows the closing check gave no verdict: both fighters stood up to 0.8 units off their places after B |
+| `moves-proof-yoga-02` | The slide. With 120 frames on the posed frame before B, both fighters stayed in place for all 474 and 475 frames watched. With B straight after the pose, both came to rest 0.5754 units from their places |
+| `moves-trace-yoga-01`, on the release file | B straight after a posed frame: four tries slid 0.592 units each way and two stayed in place. An unposed frame stayed in place. Ruled a defect of the posed hold (inbox 2026-11-27 00:36:24Z); its cause is not established |
+
+### Not covered
+
+- No console run: the build is not installed.
+- Captures keeping their animation has host tests only, including one where a second process reads the files back.
+- The CPU side of the fighter choice, the way back to the current fighter, and a second player in a waiting room.

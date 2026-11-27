@@ -10,6 +10,10 @@ Current release: rc.15
 Status: **rc.15, whose newest build is install 6** (commit `5df3d9dc`, installed on the project's test console on
 2026-11-26).
 
+A **preview build** (`cc71537c`) is staged for the card and not installed. It adds recorded moves to scrubbing and
+fixes several of install 6's issues; two defects found in it are being fixed.
+[Preview build](RELEASE-NOTES-rc15.md#preview-build)
+
 | Check | Install 6 |
 | --- | --- |
 | Installed | The file on the card was read back and matches the build |
@@ -32,6 +36,7 @@ Open the menu (B + D-pad Up) and read the end of the key hints at the foot of th
 
 | The tag ends with | Build | Installed |
 | --- | --- | --- |
+| `cc71537c` | Preview build | Not installed; staged 2026-11-27 |
 | `5df3d9dc` | Install 6 | 2026-11-26 |
 | `b7a382e4` | Install 5 | 2026-11-25 |
 | `a945b0c1` | Install 4 | 2026-11-25 |
@@ -120,6 +125,22 @@ The reports behind these: [The operator's reports](EVIDENCE-rc15-installs.md#the
 | Scrubbing shows where the fighters were, not their moves | The fighters are moved in space and keep the pose they had. Reported by the operator on install 6. | None. | By design in install 6; recorded poses are in design for the following build. |
 
 The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#eden-on-install-6-itself-5df3d9dc-merge-17).
+
+| In the preview build (`cc71537c`, not installed) | State |
+| --- | --- |
+| Scrub positions can stop at 20 seconds | Fixed: a 1,610-frame take kept all its positions |
+| First X refused after a snap | Fixed: X plays after a held frame |
+| A fighter beside a wall is shown off its point | The editor refuses that point instead; host-tested only |
+| Scrubbing shows where the fighters were, not their moves | It shows the recorded move |
+| Placement on a save | Fixed: the Off stage fighter floats again |
+| Guard the Edge | Not changed |
+
+| Found in testing the preview build | What happens | Workaround | Status |
+| --- | --- | --- | --- |
+| The recorded-fighter choice does not load in the editor | After ZL + L the strip says it is loading the take's fighter, then "The fighter did not load; the editor keeps the current one". The fighter changes after the editor is closed. Seen in Eden for Player 1; the CPU side was not flown. | None. | Fix in work. |
+| A slide after B from a posed frame | B pressed straight after stepping to a posed frame can leave both fighters about 0.6 units from their places: four of six tries in one run. With two seconds on the frame first, both stayed in place. | None established. | Cause not yet found; fix in work. |
+
+The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#preview-build-cc71537c).
 
 Other limits:
 

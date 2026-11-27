@@ -486,7 +486,8 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 ## Status
 
 The current release is **rc.15**. Its newest build is install 6 (`5df3d9dc`, on the test console's card since
-2026-11-26): **installed and read back; its own Eden checks are in progress**. The
+2026-11-26): **installed and read back; its own Eden checks are in progress**. A preview build (`cc71537c`) is
+staged for the card and not installed ([release notes](RELEASE-NOTES-rc15.md#preview-build)). The
 [console reports](EVIDENCE-rc15-installs.md#the-operator-s-reports-from-the-console) distinguish a title-screen
 crash with no TrainingRooms frame from issues reported in TrainingRooms.
 [Current release](CURRENT-RELEASE.md) says what it adds, how to install it and what is known not to work;
