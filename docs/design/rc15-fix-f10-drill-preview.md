@@ -36,7 +36,8 @@ When `+ Record drill…` stops and the drill is saved, the take's frames are sav
 - Its id comes from its name, so a drill copied from another card names no take here, says `Re-record to preview`, and deletes nothing.
 - Only a macro with such a name that a drill names counts as a take; the menu removes it from its catalog.
 - **Deleted with the drill:** deleting the drill deletes its take unless another drill file still names it. A file the library skips is not a drill and keeps no take. Whether the take goes is settled before the drill file is touched; when the folder cannot be read, nothing is deleted.
-- **The frames** are the ones an ordinary Record of Player 1 would have saved, with the recording trim applied (Start, End, Both or Off). No start save is written; the take is not an active macro and is not marked as used. The drill, the grading target, the Record role and `made_from` (empty for a direct drill) behave as before.
+- **The frames** are the ones an ordinary Record of Player 1 would have saved, with the recording trim applied (Start, End, Both or Off).
+- The take creates no start save, active macro or recent-use mark. The drill, the grading target, the Record role and `made_from` (empty for a direct drill) behave as before.
 - An overfull or empty take saves neither file, as before. A crop of a drill has other inputs, so the cropped drill has no take.
 
 ### 2.2 The preview
