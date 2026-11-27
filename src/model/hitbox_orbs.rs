@@ -533,8 +533,7 @@ impl Articles {
     pub fn forget(&mut self, id: u32, board: &mut Board) {
         let applied = self.applied;
         let (keys, retained) = self.change(|members, _| {
-            let mut keys = [0; ARTICLES];
-            let mut retained = [false; ARTICLES];
+            let (mut keys, mut retained) = ([0; ARTICLES], [false; ARTICLES]);
             for (i, key) in keys.iter_mut().enumerate() {
                 if members.ids[i].0 == id {
                     *key = members.ids[i].1;

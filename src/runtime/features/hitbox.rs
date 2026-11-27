@@ -1643,8 +1643,7 @@ unsafe fn wind_command(lua: usize) {
     }
     let id = (*(accessor as *const smash::app::BattleObjectModuleAccessor)).battle_object_id;
     if let Some(link) = COMMANDS.get() {
-        let put = link.article_command(id, accessor, None);
-        handed(put);
+        handed(link.article_command(id, accessor, None));
     }
 }
 
@@ -1692,8 +1691,7 @@ pub unsafe fn hitbox_rebound_hook(accessor: usize, rebound: bool) {
         let frame = SAMPLE.load(Ordering::Acquire);
         if FIGHTER_GENERATIONS.is_current(life) {
             if let Some(link) = COMMANDS.get() {
-                let put = link.rebound_command(accessor, life);
-                handed(put);
+                handed(link.rebound_command(accessor, life));
             }
             clear_board(accessor, life, frame);
         }

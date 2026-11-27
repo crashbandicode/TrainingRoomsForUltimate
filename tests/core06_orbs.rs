@@ -978,8 +978,8 @@ fn a_catch_during_the_pass_survives_the_passes_forget() {
         let mut board_b = Board::new();
         board_a.begin_frame(7);
         board_b.begin_frame(7);
-        let initially_tracked = match case { 0 | 4 => 1, 1 => 4, _ => 0 };
-        for id in 1..=initially_tracked {
+        let initially_tracked: &[u32] = match case { 0 | 4 => &[1], 1 => &[1, 2, 3, 4], 2 => &[2, 3, 4], _ => &[] };
+        for &id in initially_tracked {
             let key = id as usize * 16;
             aa.track(id, key, Some(&mut board_a), true).unwrap();
             ab.track(id, key, Some(&mut board_b), true).unwrap();
@@ -1018,12 +1018,12 @@ fn a_catch_during_the_pass_survives_the_passes_forget() {
         assert!(!board_b.in_draw_order().any(|o| o.centre[0] == 16.0));
         if case == 2 {
             assert_eq!(aa.tracked()[slot], (0, 0));
-            let command = Command::Wind { key: 32, id: 2 };
+            let command = Command::Wind { key: 80, id: 5 };
             immediate(&mut a, &mut aa, &generations, &command);
             assert_eq!(post(link, &generations, &command), Put::Stored);
             drain(&mut b, &mut ab, &generations);
-            assert_eq!(aa.tracked()[slot], (2, 32));
-            assert_eq!(ab.tracked()[slot], (2, 32));
+            assert_eq!(aa.tracked()[slot], (5, 80));
+            assert_eq!(ab.tracked()[slot], (5, 80));
         }
         assert_eq!(identities(&aa), identities(&ab), "case {case}");
         for (id, key) in identities(&aa) {
