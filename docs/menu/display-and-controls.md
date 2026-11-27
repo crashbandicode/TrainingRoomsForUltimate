@@ -12,6 +12,8 @@ Choose what you see during practice and which buttons control it.
 | --- | --- | --- |
 | <a id="hud"></a>HUD | **On**, Off | Off hides Training's damage panels, pointers and off-screen bubbles, not practice overlays. |
 | <a id="hitbox-visualization"></a>Hitbox Visualization | Hitboxes, Grab boxes, Hurtboxes, Launch angles, Windboxes, Article hurtboxes; **none** | Draws the ticked layers; the checklist shows their colours. |
+| Fighter windboxes | Crownerang, Blunderbuss, Palutena's Counter, Greninja's down taunt | Sky blue shows where a move pushes or pulls without causing hitstun. |
+| Wind areas | Triforce of Wisdom, Kaboom and items appear in olive. | Stage hazards such as Pac-Land's fire hydrant aren't drawn. |
 
 ## Colour legend
 
