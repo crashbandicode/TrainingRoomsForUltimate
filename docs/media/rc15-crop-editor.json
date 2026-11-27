@@ -1,0 +1,44 @@
+{
+  "source_dir": "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames",
+  "frame_count": 23,
+  "source_fps": 5.0,
+  "trim_margins": {
+    "top": 0,
+    "bottom": 0
+  },
+  "duration_seconds": 4.6,
+  "fps": 5.0,
+  "crop": null,
+  "width": 1280,
+  "output_dimensions": [
+    1280,
+    720
+  ],
+  "output": "/home/intpa/tr-fixes-20261113/rc15-crop-editor/docs/media/rc15-crop-editor.gif",
+  "frame_sha256": {
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0000.png": "3bc37cf857a9241d6604b0ac5dc3e33bac1d6cd6dc09fc6f3bd372c44942160f",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0001.png": "3c97f4542e5ab84d881f2c47009c6e1397a884d00a534a27ddb566e245a1ec7c",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0002.png": "7a6d1d41aeff1577400999f27eae1d1cd68abdca7fc9ada4fa17eceb9606fa4d",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0003.png": "2803c561e3712f3f109be79a79b373c5d3588db242260aac987cbaa17cb95f31",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0004.png": "3096e9ca22e402b25c56c986e264d6fee0abb719692d0eb2d9009f017e865401",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0005.png": "c4fe95e8864a370595e143fc2c256fb88de03b00fe9d80cfd0e568e1c55c0149",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0006.png": "0f082d230fbdc5ae45c4131114f3d1bccaab96dc843c2536fc8f6506712c8085",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0007.png": "4a0fc0e472bfbe7b7b8ddfcdf11632865deec2e7f3c9484ca0048bedfde61107",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0008.png": "31c39c275c2aa5a93bc436346205f6e7e8b593802afca08627e08b79a667310a",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0009.png": "f56dc18c9913516f05e85b4dbb38c089a9ec4cd1a309d94d4d06bbb215f115a2",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0010.png": "f6cd68abedc11b0a2e4898e799fb8c656cd4a12a80c2432426beb5523d85ef66",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0011.png": "2599341f3cc8786da6c1b649a1d138f41f3855c729e85bd540f0e4eb50df038c",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0012.png": "6665a840362e65108b021a1c70eb816ee1b5f3aa4b6ff39a7a3489baf69606aa",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0013.png": "e39d3fa6f999a9204c776685f5ddd1d7cd5bad48cdb81f4df0cf91cce17072a0",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0014.png": "e39d3fa6f999a9204c776685f5ddd1d7cd5bad48cdb81f4df0cf91cce17072a0",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0015.png": "e39d3fa6f999a9204c776685f5ddd1d7cd5bad48cdb81f4df0cf91cce17072a0",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0016.png": "e39d3fa6f999a9204c776685f5ddd1d7cd5bad48cdb81f4df0cf91cce17072a0",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0017.png": "e39d3fa6f999a9204c776685f5ddd1d7cd5bad48cdb81f4df0cf91cce17072a0",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0018.png": "e39d3fa6f999a9204c776685f5ddd1d7cd5bad48cdb81f4df0cf91cce17072a0",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0019.png": "e39d3fa6f999a9204c776685f5ddd1d7cd5bad48cdb81f4df0cf91cce17072a0",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0020.png": "e39d3fa6f999a9204c776685f5ddd1d7cd5bad48cdb81f4df0cf91cce17072a0",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0021.png": "e39d3fa6f999a9204c776685f5ddd1d7cd5bad48cdb81f4df0cf91cce17072a0",
+    "/home/intpa/smash-training-lobby/artifacts/rc15-crop-editor/gif-source-frames/0022.png": "e39d3fa6f999a9204c776685f5ddd1d7cd5bad48cdb81f4df0cf91cce17072a0"
+  },
+  "output_sha256": "115e7f4562dc9f057c26258ee06756c09c83ba503280e3f95a31a3dd8dad0e2e"
+}

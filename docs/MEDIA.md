@@ -6,6 +6,9 @@ they include retired takes, not just files still published. The 68 original comp
 
 The [zone-editor proof still](decisions/rc15-zone-editor-crop-proving-boot.png) omits the 28-row test banner at the top. The remaining 1280×646 pixels are unchanged.
 
+The [crop-editor GIF receipt](media/rc15-crop-editor.json) lists the source-frame hashes and output hash for the
+[November 15 crop-editor take](EVIDENCE-rc15-crop-editor.md).
+
 ## README menu tour
 
 ![Menu pages, sections and rows](media/readme-tour-key.png)
@@ -126,24 +129,22 @@ yellow `BRIDGE LIVE` mark and, when visible, the top input lane. The other rows 
 
 **tut-clip-snap.mp4**
 
-- **Shows** · Replay window on a King K.
-  - Rool capture: X refused with In mid-action, Y snaps In to the aerial's start, X previews on the CPU
+- **Shows** · Replay window on a King K. Rool capture: X is refused with In mid-action.
+  - Y snaps In to the aerial's start; X then previews on the CPU.
 
 <a id="take-tut-toggle-p1mp4"></a>
 
 **tut-toggle-p1.mp4**
 
-- **Shows** · Replay window on a King K.
-  - Rool capture: ZL+L loads King K.
-  - Rool as Player 1, ZL+L again brings Mario back, B closes
+- **Shows** · ZL+L loads King K. Rool as Player 1 in the replay window for his capture.
+  - ZL+L again brings Mario back; B closes the editor.
 - **Film, cut** · `k01-toggle-p1` of run `tut-61bedffb-xps-5` (the release build of `61bedffb`, 2026-11-27), 1.5–19.5 s, whole frame, the capture tool off during the take
 
 <a id="take-tut-toggle-cpump4"></a>
 
 **tut-toggle-cpu.mp4**
 
-- **Shows** · The same capture: ZL+R loads King K.
-  - Rool as the CPU, ZL+R again brings Link back.
+- **Shows** · In the same capture, ZL+R loads King K. Rool as the CPU; ZL+R again brings Link back.
   - The cut ends with the editor open
 - **Film, cut** · `k02-toggle-cpu` (first attempt) of the same run, 1.5–22.5 s, whole frame, the capture tool off during the take
 
@@ -894,18 +895,17 @@ One clip per CPU option of [menu/cpu](menu/cpu.md): the option at its starting v
 
 **rc11-cpu-level.gif**
 
-- **What the frames show** · CPU › Level › CPU Level Off, then 7 (Left/Right); the character select's Donkey Kong card reads CPU Lv.
-  - 3; in Training the notice "Lv 7 from TrainingRooms (Training menu: Lv 3)" (one judged line, one notice); Training's own menu sets CPU Behavior to CPU (Lv.
-  - 3); Donkey Kong attacks Mario, 0% → 28%.
+- **What the frames show** · CPU › Level › CPU Level changes from Off to 7 with Left/Right. Donkey Kong's character-select card reads CPU Lv. 3.
+  - Training shows "Lv 7 from TrainingRooms (Training menu: Lv 3)" (one judged line, one notice).
+  - Training's own menu sets CPU Behavior to CPU (Lv. 3); Donkey Kong attacks Mario, 0% → 28%.
   - Replaces `rc7-cpu-level-notice.gif` (the row never appeared; the CPU stood still).
 
 <a id="take-rc11-lobby-stagesgif"></a>
 
 **rc11-lobby-stages.gif**
 
-- **What the frames show** · Fighters & Stages › Lobby Stages; the grid with 1.
-  - Big Battlefield; the cursor to Battlefield; A, and the tile reads "2.
-  - Battlefield", held 2.5 s; back.
+- **What the frames show** · Fighters & Stages › Lobby Stages opens a grid with "1. Big Battlefield".
+  - The cursor moves to Battlefield. After A, the tile reads "2. Battlefield" for 2.5 s before backing out.
   - Replaces `menu-stages.gif` (an older menu; a static grid).
 
 <a id="take-rc11-stage-rotationgif"></a>
@@ -975,8 +975,8 @@ One clip per CPU option of [menu/cpu](menu/cpu.md): the option at its starting v
 
 **rc11-solo-popo.gif**
 
-- **What the frames show** · Popo and Nana vs a CPU Meta Knight; B + Up, A on Solo Popo (Off → On), B (each labelled); Player 1 leaves to reload; the gap (6.6–9.9 s) is cut; Popo alone, the notice "Player Character · 0.
-  - Ice Climbers".
+- **What the frames show** · Popo and Nana face a CPU Meta Knight. The labelled inputs are B + Up, A on Solo Popo (Off → On), then B.
+  - Player 1 leaves to reload; the gap (6.6–9.9 s) is cut. Popo returns alone with the notice "Player Character · 0. Ice Climbers".
   - Input labels from the take's reviewed press times; 15 fps cap, no fps halving.
 
 <a id="take-rc11-lobby-practicegif"></a>
@@ -1778,9 +1778,7 @@ Retired from the README (each carried the bar):
 
 **rc7-lobby-stages-rotation.gif**
 
-- **What the frames show** · 0–1.9 s the Lobby Stages grid: "1.
-  - Waiting Room", "2.
-  - Big Battlefield"
+- **What the frames show** · 0–1.9 s the Lobby Stages grid: "1. Waiting Room", "2. Big Battlefield"
   - 1.9–3.0 s Training Stage Rotation [ON], the menu closes
   - 3.0–4.4 s Training on the training stage (Mario vs Donkey Kong)
   - 4.4–5.3 s the character select, READY TO FIGHT
@@ -1804,12 +1802,10 @@ Retired from the README (each carried the bar):
 
 - **What the frames show** · 0–0.6 s Training, Mario vs Hero
   - 0.6–1.8 s the pause menu (CPU Behavior Stop), Quit Training
-  - 1.8–3.6 s the character select, the CPU card "Random, CPU Lv.
-  - 3"
+  - 1.8–3.6 s the character select, the CPU card "Random, CPU Lv. 3"
   - 3.6–4.5 s READY TO FIGHT
   - 4.5–5.4 s loading
-  - 5.4–9.5 s Training, Mario vs King K.
-  - Rool, the notice "CPU level · Lv 7 from TrainingRooms (Training menu: Lv 3)".
+  - 5.4–9.5 s Training, Mario vs King K. Rool, the notice "CPU level · Lv 7 from TrainingRooms (Training menu: Lv 3)".
   - CPU Behavior is Stop, so the CPU's play at Lv 7 isn't shown.
 
 ### rc.6 clips
@@ -3036,8 +3032,7 @@ rc.1 clip above; it and its provenance note remain in the history up to v0.2.0-r
 **rc14-windboxes.gif**
 
 - **Run, row** · `g5-rc14-ally-7`, `t-p2-wb-utilt (+ part t-p2-wb-fludd)` (gif-lane-5; Ally; diag 4f810d34 (the wind-area colour of f716ef60), footer "rc14 4f810d34")
-- **Raw windows kept** · F.L.U.D.D.
-  - 3.4-5.4 s of its take, then Ganondorf's up tilt 3.2-5.2 s twice (Windboxes alone, then Hitboxes + Windboxes), 25 % speed
+- **Raw windows kept** · F.L.U.D.D. at 3.4-5.4 s of its take, then Ganondorf's up tilt at 3.2-5.2 s twice (Windboxes alone, then Hitboxes + Windboxes), at 25 % speed
 - **What the frames show** · Windboxes ticked: F.L.U.D.D.'s water is a deep-blue disc and pushes the CPU (its x moves +47.7 in the game's own position dump); Ganondorf's up tilt draws deep-blue windboxes and the see-through wind-area box with its white line, the kick undrawn
   - Then the same up tilt with Hitboxes ticked too: the kick's hit is drawn (the last frames).
   - `[Hitbox] orbs drawn n=k` with k > 0 in every move.
@@ -3055,8 +3050,8 @@ rc.1 clip above; it and its provenance note remain in the history up to v0.2.0-r
 
 **rc14-eggs-n-targets.gif**
 
-- **What the frames show** · Eggs-ercise Off to 10 targets, the menu closes, the clock counts up, Fox breaks the targets one by one and the count climbs to 9/10; the tenth break stops the clock: "Done!
-  - 10 in 0:16.96 (best 0:16.96)".
+- **What the frames show** · Eggs-ercise changes from Off to 10 targets. The menu closes, the clock counts up and Fox breaks the targets one by one until the count reads 9/10.
+  - The tenth break stops the clock: "Done! 10 in 0:16.96 (best 0:16.96)".
   - The CPU is hidden: no tag, no panel.
   - First take after a fresh Yoga boot on the Training stage.
 
@@ -3064,8 +3059,8 @@ rc.1 clip above; it and its provenance note remain in the history up to v0.2.0-r
 
 **rc14-btt-run.gif**
 
-- **What the frames show** · Ready ("Targets 0/3   0:00.00", the clock waits), the first input starts the clock, Fox breaks the three targets one after another (jab, jab, short-hop neutral air), "Done!
-  - 3 in 0:04.15 (best 0:04.15)", then Ready again with every target back.
+- **What the frames show** · Ready shows "Targets 0/3   0:00.00" until the first input starts the clock. Fox breaks the three targets with a jab, another jab and a short-hop neutral air.
+  - "Done! 3 in 0:04.15 (best 0:04.15)" appears, then Ready returns with every target back.
   - The CPU is hidden: no tag, no panel.
 
 <a id="take-rc14-btt-placegif"></a>
@@ -3081,10 +3076,9 @@ rc.1 clip above; it and its provenance note remain in the history up to v0.2.0-r
 
 **rc14-windbox-krool-vacuum.gif**
 
-- **What the frames show** · King K.
-  - Rool (P1) holds B at 10 % speed with Hitbox Visualization on Windboxes only: the Blunderbuss fires its cannonball (Mario 0 to 16.3 %), then the vacuum's deep-blue windbox pulls Mario in without any change to his damage until he is caught.
-  - `[Hitbox] orbs drawn n=1`; Player 1 checked as K.
-  - Rool by the position dump.
+- **What the frames show** · King K. Rool (P1) holds B at 10 % speed with Hitbox Visualization on Windboxes only. The Blunderbuss fires its cannonball (Mario 0 to 16.3 %).
+  - The vacuum's deep-blue windbox then pulls Mario in without any change to his damage until he is caught.
+  - The log reads `[Hitbox] orbs drawn n=1`; the position dump identifies Player 1 as K. Rool.
   - Approved as is (no clean-pull variant).
 
 <a id="take-rc14-menu-tourgif"></a>
