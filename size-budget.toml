@@ -3294,5 +3294,5 @@ scope = "total"
 basis = "rustfmt-sloc4"
 ceiling = 209566
 date = "2026-11-27"
-reason = "Memory hygiene: a live capture track's storage grows with the frames it records instead of reserving MAX_FRAMES at the fighter's first sample, on main 2f2c1366 (209561): +5, measured by the size step of the gate on ab5177db. The growth step in LiveCapturePool::push and its constant. The 46 new test lines are excluded."
+reason = "Memory hygiene: a live capture track's storage grows with the frames it records instead of reserving MAX_FRAMES at the fighter's first sample, on main 2f2c1366 (209561): +5, measured by the size step of the gate on ab5177db. The growth step in LiveCapturePool::push and its constant. The 50 new test lines are excluded."
 approved_by = "tr-primary-3 2026-11-27 21:24Z (+5 lines; release NRO +0 B, .bss +0; memory hygiene, not the crash fix)."
