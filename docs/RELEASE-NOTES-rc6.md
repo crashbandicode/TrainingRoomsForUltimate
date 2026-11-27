@@ -5,6 +5,8 @@ Notes for players. 0.2.0-rc.5 was withdrawn before it ran on players' consoles, 
 use recording is [RECORDING.md](guide/recording.md), the Mii pages are [MII.md](MII.md), and the pictures are the list in
 [MEDIA.md](MEDIA.md).
 
+The switch and reset times below are the ranges reported for rc.6. The [feature ledger](FEATURE-LEDGER.md) names the candidate runs. Their original timing receipts were unavailable for the November 27 audit.
+
 ## New
 
 ### Sequence drilling
