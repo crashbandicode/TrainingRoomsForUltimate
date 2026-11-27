@@ -19,9 +19,11 @@ One refused draw then ended the session (`tech.rs`, `planning_failed`).
 1. **A spot is its line, a parameter `t` and one flag.** `picker::Spot { line, t, far }`: `t` is 0 at the end it is
    measured from and 1 at the other; `far` says it is measured from the line's second end.
    - One world-point function: `Spot::point` (`Line::at`).
-   - One membership function: `Spot::on_segment` (`t` from 0 to 1 on a line with a length). The solver calls it in
-     place of the snap-and-compare. No position is compared, and there is no tolerance. A parameter outside 0 to 1, or
-     not finite, is refused.
+   - One membership function: `Spot::on_segment` (`t` from 0 to 1 on a valid line; no projection in it). The solver
+     calls it in place of the snap-and-compare, the planner asks it first whatever the start mode, the wizard asks it
+     before it takes a spot, and saving and recovering a remembered spot go through it (the reviewer's correction,
+     rv-hit-streak 2026-11-27 06:38:56Z). No position is compared, and there is no tolerance. A parameter outside 0 to
+     1, or not finite, is refused.
    - Producers: the random spot (its drawn `t`), the cursor's nearest point and the picker's restore (the projection's
      clamped parameter, `Line::project`, `Surfaces::nearest`), the remembered spot.
    - The remembered spot stores its line's ends in the order `t` is measured in, and `t`. Rebinding keeps the fresh
@@ -53,6 +55,7 @@ One refused draw then ended the session (`tech.rs`, `planning_failed`).
 | "Bound the number of tries per attempt and say why that bound" (05:40:04Z); "8 TOTAL candidates, same attempt and frame" (05:50:07Z) | 2 | `an_attempt_draws_eight_candidates_in_all` |
 | "carry the target as its line plus its parameter ... ONE membership function shared by every producer and consumer" (05:50:07Z) | 1 | `every_position_of_every_producer_is_a_target_the_solver_takes` |
 | "Off-segment targets are still refused" (05:50:07Z) | 1 | `a_target_off_its_segment_is_refused` |
+| the same, for the wizard and for a Set or Random start (rv-hit-streak 06:38:56Z) | 1 | `off_segment_targets_never_replace_the_wizard_pick_or_get_a_manual_start` |
 | "Red first against a one-snap attempt using rv-hit-streak's two draws" (05:50:07Z) | 1 | `the_two_reviewed_draws_have_a_start_and_one_snap_is_not_why` |
 | "cover the Chosen/restore path" (05:50:07Z) | 1 | `every_position_of_every_producer_is_a_target_the_solver_takes` |
 | "zero redraws on the factory fixture" (05:50:07Z) | 1, 2 | `factory_draws_on_a_flat_floor_never_need_a_second_candidate` |
