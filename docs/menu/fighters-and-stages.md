@@ -106,5 +106,5 @@ A on a game opens its screen: Start first, then its settings ([Practice games](p
 | The Cycle Player chord does nothing | Check Player Swapping first; it defaults to Off. |
 | You pick a fighter in a waiting room | Only your practice fighter changes, not the match's. |
 | Respawn on platform is greyed | Save States and Auto-load on death are both On. |
-| A Pokémon Trainer or Pyra / Mythra swap group is greyed | PT / Aegis groups need free Ready Fighters: PT 3, Aegis 2. |
+| You want to preload Pokémon Trainer or Pyra / Mythra as a group | PT / Aegis groups need free Ready Fighters: PT 3, Aegis 2. |
 | You reset this page | The settings inside the games' screens reset too. |
