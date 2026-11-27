@@ -1,8 +1,6 @@
 use crate::common;
 use crate::model::{nro_load, sites, sites_pkg2};
-
-#[path = "common/owned_elf.rs"]
-mod owned_elf;
+use crate::pause_helper_sites as owned_elf;
 
 #[test]
 fn nro_load_module_name_reads_to_the_first_nul() {
