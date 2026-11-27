@@ -53,9 +53,8 @@ that ran them are listed under [Eden, rc.6](#eden-rc-6).
     writes the saved native Mii with the same look (row 12), or else the Mii with an ID made from its look and the name
     "New Mii". The game's own Mii setup binds no Mii resource for a CharInfo without them, and the body then read null
     memory (cov-rest `f2298ee`, `src/model/mii_install.rs` `installable`).
-  - **Edit placement** and the **Setup library** (Saves › Setup library) are back. Edit placement edits the active
-    macro of the role in view. (2026-11-25: Edit placement became Change placement, which edits the save itself;
-    [Recording guide](guide/recording.md#change-placement-and-the-replay-window).)
+  - **Edit placement** and the **Setup library** returned in that port. Edit placement changed the active macro's
+    offset until [Change placement](guide/recording.md#change-placement-and-the-replay-window) replaced it on 2026-11-25.
 - **Editor trace file** (`mii-editor-last.json`): diagnostic builds only; the fork wrote it in every build.
 - **Menu input gate:** the editor also waits while the game's pause or the native waiting-room menu is open (the
   shared `captures_input`), not only for the plugin menu.

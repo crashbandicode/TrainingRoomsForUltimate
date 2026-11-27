@@ -11,4 +11,5 @@
 | Pick the hold | In [Practice games](../menu/practice-games.md), open **Mash out → Fighter and move**. |
 | Choose a move | Press A on a fighter, then on a capture; Left/Right changes grab type. |
 | Practise | Choose Start, then move the stick and mash buttons once the CPU catches you. |
-| Compare attempts | Read the escape time and grade; Sora's Blizzard is practice only. |
+| Compare mash attempts | Read the escape time and grade; Sora's Blizzard is practice only. |
+| Ganondorf's Flame Choke (tech) | Tech the slam on contact; this move grades your tech, not your mash speed. |

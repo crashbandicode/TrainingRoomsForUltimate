@@ -248,7 +248,7 @@ Where the recording code is (moved here from the Recording guide; named by funct
 | Saving and applying placement | In `rr_host.rs`, `commit_placement` writes the edited fields, `active_placement_ids` finds the active macro and its start save, and `warp_pair` applies the macro's offset. |
 | Replay window | `Owners::REPLAY_LOADING` in `src/model/input_delay.rs` lets a capture load without blocking its own request. It is not the visible editor's fighter-switch gate. |
 | Replay fighter mismatch | A chain checks its first macro (`screen=mismatch ask=macro1`). For a replay Mii, `installable` in `src/model/mii_install.rs` supplies a configuration the game can load. |
-| Restoring or binding a setup | A restores the fighters; Y binds without moving them. Neither writes the bound save. See `setup_restored` and `setup_bound` in `rr_host.rs`; `src/model/state/setup_transaction.rs` checks the restore. |
+| [Named setup actions](guide/save-states.md#using-a-setup) | `Pane::leads_to` in `src/editors/setups.rs` distinguishes opening, restoring and binding; `src/model/state/setup_transaction.rs` validates the restore. |
 | Setup files | `src/model/state/setup.rs` defines the format. Saving creates a new file; renaming updates the existing file and keeps its ID (`save_name` in `src/editors/setups.rs`). |
 | Setup menus | `src/runtime/ui/setups.rs` and `src/editors/setups.rs` handle the library screens; `src/runtime/features/states/setups.rs` takes the snapshot. |
 | Pop-up layout | `src/model/ui/panes.rs` defines the layout. `section_view` in `src/model/recording_menu.rs` puts the divider after the fifth file when more than five are listed, except in RECORDINGS. Leading action rows do not count as files. |
