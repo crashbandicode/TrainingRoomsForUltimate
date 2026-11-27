@@ -90,6 +90,41 @@ fn factory_floor() -> crate::model::tech_settings::Config {
 }
 
 #[test]
+fn traced_wall_launch_needs_an_approach_from_the_contact_side() {
+    // The two draws at b7-trace-yoga-01:397 and :979 share the right-hand wall.
+    // Close the solid above the measured face; no unmeasured stage boundaries are needed.
+    let a = v(41.416_157, -40.118_07);
+    let b = v(64.387_29, -25.103_106);
+    let c = v(a.x, b.y);
+    let wall = Line { id: 1, ends: [a, b], normal: v(0.547_131_3, -0.837_046_74),
+        floor: false, wall: true, passable: false };
+    let mut surfaces = Surfaces::EMPTY;
+    for line in [wall, Line { id: 2, ends: [b, c], normal: v(0., 1.), floor: true, wall: false, ..wall },
+                 Line { id: 3, ends: [c, a], normal: v(-1., 0.), ..wall }] {
+        assert!(surfaces.push(line));
+    }
+    surfaces.state = surface::Walk::Closed;
+    let run = |t, frames, angle: Option<f32>| {
+        let mut config = factory_floor();
+        config.surface = 2;
+        config.time = Numeric { mode: Mode::Set, lo: frames, hi: frames };
+        if let Some(degrees) = angle {
+            config.angle = Numeric { mode: Mode::Set, lo: degrees, hi: degrees };
+        }
+        let ctx = planner::Context { damage_multiplier: Some(1.2), ..context(&surfaces, picker::Spot::at(wall, t)) };
+        planner::plan(config, ctx, &mut |_| 0).ok().map(|p| p.setup.launch)
+    };
+    let normal = 123.170_44;
+    let hit = run(0.654_409_35, 26., Some(normal)).expect("native wall bounce, request and entry 76");
+    assert_eq!((hit.start, hit.knockback, hit.percent), (v(90.056_21, -56.396_698), 100., 72.));
+    let t = 0.699_877_26;
+    assert_eq!(picker::Spot::at(wall, t).point(), v(57.493_134, -29.609_436));
+    let fixed = run(t, 25., Some(80.)).map(|launch| launch.angle);
+    let auto = run(t, 25., None).map(|launch| launch.angle);
+    assert_eq!((fixed, auto), (None, Some(normal)), "the fly-by must not replace the normal approach");
+}
+
+#[test]
 fn factory_draws_on_a_flat_floor_never_need_a_second_candidate() {
     for params in [PARAMS, FlightParams { gravity: 0.085, fall_speed_cap: 1.85, ..PARAMS }] {
         factory_first_candidates(params);
