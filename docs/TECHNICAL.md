@@ -383,14 +383,7 @@ starts, then a wrong move (up tilt) drops the sequence back to combo 1.* See [ME
 Kong 1, Link 2, Ness 3) and the blue ones the CPU's; in Training against Ryu (outside the cycle), each press of
 ZL + D-pad Right switches Player 1 to Donkey Kong, Link, then Ness, each standing clear of the notice. Cuts inside are listed in [MEDIA.md](MEDIA.md).*
 
-| Cycle chord | Rule |
-| --- | --- |
-| Both | Step through your own order of fighters for that role (red for Player 1, blue for the CPU), drawn with the game's stock icons |
-| The CPU's | Does not require Player Swapping. Neither cycle chord switches a fighter while the menu owns the input or another shortcut is pending |
-| Player 1's | Works only while Fighters & Stages › Player Swapping is On. It's Off at first |
-
-With [fighter preloading](menu/fighters-and-stages.md#loading) enabled, eligible fighters load before you switch.
-With Cycle Preload Off, the fighter loads when you switch instead.
+See [Player Swapping and Character Cycles](menu/fighters-and-stages.md#player-1-and-cpu) for the role settings and [Loading](menu/fighters-and-stages.md#loading) for the preload controls. Neither cycle chord switches a fighter while the menu owns the input or another shortcut is pending.
 
 | When | What happens |
 | --- | --- |
