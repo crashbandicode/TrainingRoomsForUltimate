@@ -69,7 +69,7 @@ const BOUNDARIES: &[Boundary] = &[
     // Zoom alone requires Hero's menu rows and the damage/capture readers.
     Boundary { function: "zoom::zoom_pad", owner: None, gate: Gate::Flag("installed") },
     Boundary { function: "zoom::observe_zoom", owner: None, gate: Gate::Flag("installed") },
-    Boundary { function: "zoom::held_by", owner: None, gate: Gate::Flag("installed") },
+    Boundary { function: "edge_juggle::held_by", owner: None, gate: Gate::Flag("capture_parent_granted") },
     // Steering PK Thunder needs the existing article grants. If any are missing,
     // the read yields to stock; other drill corrections do not depend on them.
     Boundary { function: "niche_pad::bolt_input", owner: None, gate: Gate::Flag("bolt_reads_granted") },

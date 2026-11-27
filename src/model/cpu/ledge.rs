@@ -9,7 +9,7 @@ use super::facts::{FrameFacts, FrameOut, PlaybackStart};
 use super::ids::{Table, C};
 use super::mash::Step;
 use super::playback::PlaybackState;
-use super::settings::{situation, trigger, CpuSettings};
+use super::settings::{situation, trigger, Weights};
 use super::status::Situation;
 
 /// Indices of the Ledge Options row.
@@ -94,10 +94,10 @@ impl Ledge {
     /// native automatic climb while the CPU waits, delays, or waits for its playback to start, and (CPU-091,
     /// DECISIONS B11a) while TR holds a case it performs itself, before and after its request, for at most
     /// `UNREQUESTED_BOUND` frames; otherwise the original answer.
-    pub fn transition_term(&self, t: &Table, s: &CpuSettings, counters: &Counters, playback: PlaybackState, q: TermQuery) -> bool {
+    pub fn transition_term(&self, t: &Table, options: Weights<10>, counters: &Counters, playback: PlaybackState, q: TermQuery) -> bool {
         let TermQuery { status, term, original } = q;
         let on_ledge_wait = t.is(C::StatusCliffWait, status);
-        if !original || !on_ledge_wait || s.ledge_state.is_empty() || !t.is(C::TermContCliffClimb, term) {
+        if !original || !on_ledge_wait || options.is_empty() || !t.is(C::TermContCliffClimb, term) {
             return original;
         }
         // CPU-091: no case yet (B11 cleared it at the menu change) holds the climb until the next frame rolls.

@@ -673,7 +673,7 @@ pub static ROWS: [Row; 185] = [
       "Pick the CPU fighter. X changes the CPU level in the fighter popup."),
     r(TRAP, "Set up…", "", Control::Editor(Editor::EdgeJuggleSetup(Game::LedgeTrap)),
       "Pick the CPU's ledge, then your own start, then preview both.\nOn the ledge page, Y takes the other ledge."),
-    r(TRAP, "Ledge options", "trap_options", Control::MultiSelect(&o::TRAP_OPTIONS),
+    r(TRAP, "Ledge options", "trap_options", Control::MultiSelect(o::LEDGE_OPTIONS.split_at(4).0),
       "What the CPU does from the ledge.\nWith several ticked it picks one at random."),
     delay(TRAP, "Ledge Delay", "ledge_delay", 10, "ledge_delay_range",
           "Frames the CPU waits before its ledge option.\nThe same setting as CPU > Ledge & Tech > Ledge Delay."),

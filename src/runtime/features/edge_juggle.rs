@@ -323,9 +323,22 @@ pub(super) fn cpu_entry() -> i32 {
     if scene::practice_scene() == Some(Scene::Lobby) { LOBBY_CPU_ENTRY } else { 1 }
 }
 
+fn capture_parent_granted() -> bool {
+    game::granted(crate::model::sites_pkg3::STATE_LINK_PARENT_OBJECT_ID_OFFSET)
+}
+
+/// Player 1 holds this CPU in a grab, or the CPU is being thrown.
+unsafe fn held_by(cpu: usize, status: i32, player: u32) -> bool {
+    if !capture_parent_granted() || status == UNRESOLVED { return false; }
+    let captured = [C::ClatterCapturePulled, C::ClatterCaptureWait, C::ClatterCapturePulledYoshi,
+        C::ClatterCaptureWaitYoshi, C::ClatterCaptureDamage, C::ClatterCaptureDamageYoshi];
+    status == konst(C::StatusThrown)
+        || captured.map(konst).contains(&status) && state::link_parent_object_id(cpu, 0) as u32 == player
+}
+
 pub fn allowed(drill: Drill) -> bool {
     if !INSTALLED.load(Ordering::Acquire) || scene::practice_scene().is_none()
-        || drill == Drill::LedgeTrap && !super::cpu::ledge_on()
+        || drill == Drill::LedgeTrap && !(super::cpu::ledge_on() && capture_parent_granted())
     {
         return false;
     }
@@ -1573,12 +1586,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         run.confirm_cpu = None;
         return true;
     }
-    if key_down(key::Y) && run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu {
-        wizard.set_side_default(run.stage, true);
-        run.confirm_cpu = None;
-        return true;
-    }
-    if key_down(key::Y) && run.drill == Drill::LedgeTrap && wizard.step == WizardStep::Cpu {
+    if key_down(key::Y) && matches!(run.drill, Drill::GuardEdge | Drill::LedgeTrap) && wizard.step == WizardStep::Cpu {
         wizard.set_side_default(run.stage, true);
         run.confirm_cpu = None;
         return true;
@@ -2253,7 +2261,7 @@ pub unsafe fn frame(fighter: usize) {
         player_ko: player_ko(p1),
         hanging: situation == konst(C::SituationCliff),
         on_run: run.stage.on_run(natives::pos_x(cpu)),
-        grabbed: zoom::held_by(cpu, status, natives::battle_object_id(p1)),
+        grabbed: drill == Drill::LedgeTrap && held_by(cpu, status, natives::battle_object_id(p1)),
         hit: damage_stop && !run.damage_stop
             || damage
                 .zip(run.previous_damage)

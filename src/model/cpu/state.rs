@@ -460,14 +460,13 @@ impl Cpu {
         let q = TermQuery { status, term, original };
         // The live bit decides: the cached state trails a request and a cancel until the next AI frame.
         let playback = PlaybackState { owed, running: self.playback.running || owed, ..self.playback };
-        fighter.ledge.transition_term(&self.ids, &self.settings, &fighter.counters, playback, q)
+        fighter.ledge.transition_term(&self.ids, self.settings.ledge_state, &fighter.counters, playback, q)
     }
 
     /// The transition-term hook for a body Ledge Trap owns.
     pub fn trap_transition_term(&self, key: FighterKey, status: i32, term: i32, original: bool, options: Weights<10>) -> bool {
         let fighter = &self.fighters[key.index()];
-        let settings = self.trap_settings(options);
-        fighter.ledge.transition_term(&self.ids, &settings, &fighter.counters, self.playback, TermQuery { status, term, original })
+        fighter.ledge.transition_term(&self.ids, options, &fighter.counters, self.playback, TermQuery { status, term, original })
     }
 }
 

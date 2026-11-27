@@ -296,7 +296,7 @@ fn edge_wizard_poll_binds_the_side_defaults_and_refuses_a_start_over_the_stage()
     let runtime = src("src/runtime/features/edge_juggle.rs");
     let poll = item(&runtime, "pub unsafe fn poll(");
     assert!(poll.contains("wizard.set_side_default(run.stage, false)"));
-    let y = poll.find("key_down(key::Y) && run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu").unwrap();
+    let y = poll.find("key_down(key::Y) && matches!(run.drill, Drill::GuardEdge | Drill::LedgeTrap) && wizard.step == WizardStep::Cpu").unwrap();
     let other = poll[y..].find("wizard.set_side_default(run.stage, true)").unwrap() + y;
     // A on the CPU page only records the point; the next fighter frame asks the off-stage rule and refuses there.
     let check = poll.find("run.confirm_cpu = Some(wizard.setup.cpu);").unwrap();

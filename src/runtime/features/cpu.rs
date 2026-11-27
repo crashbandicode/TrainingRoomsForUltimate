@@ -1049,19 +1049,31 @@ pub unsafe fn cpu_transition_term_hook(accessor: usize, term: i32) -> bool {
     if term != konst(C::TermContCliffClimb) {
         return !taunt_denied(accessor, term);
     }
-    let trap = super::edge_juggle::trap_options(accessor);
-    let key = match trap {
-        Some(_) => with(|cpu| role_adapter::role(cpu, role_scene(), accessor)).flatten(),
-        None => role_of(accessor),
-    };
-    let Some(key) = key else { return original };
+    if let Some(options) = super::edge_juggle::trap_options(accessor) {
+        return trap_climb(accessor, term, original, options).unwrap_or(original);
+    }
+    let Some(key) = role_of(accessor) else { return original };
     let status = natives::status_kind(accessor);
     let owed = crate::engine::rr_host::slot_owed();
-    let answer = match trap {
-        Some(options) => with(|cpu| cpu.trap_transition_term(key, status, term, original, options)),
-        None => with(|cpu| cpu.ledge_transition_term(key, status, term, original, owed)),
-    }.unwrap_or(original);
-    if answer && with(|cpu| cpu.fighters[key.index()].ledge.bound_released()).unwrap_or(false) {
+    let answer = with(|cpu| cpu.ledge_transition_term(key, status, term, original, owed)).unwrap_or(original);
+    let released = answer && with(|cpu| cpu.fighters[key.index()].ledge.bound_released()).unwrap_or(false);
+    climb_answer(key, status, answer, released)
+}
+
+unsafe fn trap_climb(accessor: usize, term: i32, original: bool, options: crate::model::cpu::settings::Weights<10>) -> Option<bool> {
+    let scene = try_role_scene().ok()?;
+    let status = natives::status_kind(accessor);
+    let (key, answer, released) = {
+        let mut guard = CPU.try_lock()?;
+        let cpu = guard.as_mut()?;
+        let key = role_adapter::role(cpu, scene, accessor)?;
+        (key, cpu.trap_transition_term(key, status, term, original, options), cpu.fighters[key.index()].ledge.bound_released())
+    };
+    Some(climb_answer(key, status, answer, released))
+}
+
+fn climb_answer(key: FighterKey, status: i32, answer: bool, released: bool) -> bool {
+    if answer && released {
         cpu_event_on_change!(ev::CLIMB_DENIED, key.index(), Some(2), "climb_bound_release entry={} status={status}", key.entry);
     } else if answer {
         cpu_event_rearm!(ev::CLIMB_DENIED, key.index());

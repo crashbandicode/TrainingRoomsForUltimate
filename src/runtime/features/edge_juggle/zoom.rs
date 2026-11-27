@@ -58,21 +58,6 @@ pub(super) fn installed() -> bool {
     BASE.load(Ordering::Acquire) != 0
 }
 
-/// Player 1 holds this body in a grab, or throws it.
-pub(super) unsafe fn held_by(cpu: usize, status: i32, player: u32) -> bool {
-    if !installed() || status == super::UNRESOLVED {
-        return false;
-    }
-    if status == konst(C::StatusThrown) {
-        return true;
-    }
-    let captured = [
-        C::ClatterCapturePulled, C::ClatterCaptureWait, C::ClatterCapturePulledYoshi,
-        C::ClatterCaptureWaitYoshi, C::ClatterCaptureDamage, C::ClatterCaptureDamageYoshi,
-    ].map(konst).contains(&status);
-    captured && state_natives::link_parent_object_id(cpu, LINK_NO_CAPTURE) as u32 == player
-}
-
 #[derive(Default)]
 pub(super) struct NativeAttempt {
     pub(super) attempt: Attempt,
