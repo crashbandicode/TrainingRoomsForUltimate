@@ -10,7 +10,7 @@
 //! NOT YET SWITCH-RUN.
 use super::placement;
 use super::stage_geometry::RayProbe;
-use crate::engine::macro_ui::scrub_pose::{asked_of, decide, drawn, takes_partner, Act, FALL, WAIT};
+use crate::engine::macro_ui::scrub_pose::{asked_of, decide, drawn, partner_sleep, takes_partner, Act, FALL, WAIT};
 use crate::engine::macro_ui::scrub_track::{can_stand, in_bounds, Ask, Block, Spot, POSE_NONE, POSE_SHOWN, SEEN_HELD, SEEN_IDLE, SEEN_OFF, SLOT};
 use crate::engine::macros::{PackedPose, Pose};
 use crate::model::crosshair::CpuPreview;
@@ -37,15 +37,13 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
             block.forget();
             block.set_pose(slot ^ 1, partner.0, partner.1);
         }
-        // Nobody is asked any more: the other role's body is let go here too, on this callback, so the game never
-        // tests the two fighters against each other with one home and one still held. Its own
-        // frame then finds no hold and only reports.
+        // Nobody is asked any more: the other role's body is put back here too, on this callback, so the game never
+        // tests the two fighters against each other with one home and one still held. It stays asleep and keeps its
+        // hold: its own frame wakes it and lets it go (`put_back`).
         let ask = block.frame_ask(generation);
-        if holds[slot ^ 1].is_some() && matches!(ask, Ask::None) {
-            let partner = other_body(slot).filter(|&body| holds[slot ^ 1].is_some_and(|hold| hold.body() == natives::battle_object_id(body)));
-            if let Some(partner) = partner {
-                let seen = release(block, slot ^ 1, &mut holds[slot ^ 1], partner);
-                block.set_seen(slot ^ 1, seen);
+        if let (Ask::None, Some(hold)) = (ask, holds[slot ^ 1].as_mut()) {
+            if let Some(partner) = other_body(slot).filter(|&body| hold.body() == natives::battle_object_id(body)) {
+                put_back(block, slot ^ 1, hold, partner);
             }
         }
         let began = holds[slot].is_none();
@@ -54,12 +52,16 @@ pub(super) unsafe fn frame(slot: usize, accessor: usize) {
             None => release(block, slot, &mut holds[slot], accessor),
         };
         // This role's hold began here: the other role's first hold step runs here too, so neither body is free
-        // beside a held one for a frame, to be pushed before its hold reads where it stands (`takes_partner`).
+        // beside a held one for a frame, to be pushed before its hold reads where it stands (`takes_partner`). It
+        // is left asleep at its point: its own frames place it awake, as a hold that began on its own frame.
         if takes_partner(began, holds[slot].is_some(), holds[slot ^ 1].is_some()) {
             if let Some(partner) = other_body(slot) {
                 if let Some(spot) = point(block, &ask, &holds, slot ^ 1, partner) {
                     let taken = hold(block, generation, slot ^ 1, &mut holds[slot ^ 1], partner, spot);
                     block.set_seen(slot ^ 1, taken);
+                    if let Some(hold) = holds[slot ^ 1].as_mut() {
+                        leave_asleep(hold, partner);
+                    }
                 }
             }
         }
@@ -75,6 +77,28 @@ unsafe fn other_body(slot: usize) -> Option<usize> {
         super::recorder::cpu_body().map(|body| body.accessor)
     } else {
         natives::module_accessor(0)
+    }
+}
+
+/// Nobody is asked any more, and this is the other role's frame: the body goes back where its hold found it, a
+/// posed one with its plain animation and its ground shape made again. It is not woken here and its hold stays:
+/// its own frame, after the game's frame function of that body, wakes it and lets it go (`partner_sleep`).
+unsafe fn put_back(block: &Block, index: usize, hold: &mut CpuPreview, accessor: usize) {
+    if block.pose(index).0 == POSE_SHOWN {
+        placement::restore_posed(accessor, hold.origin(), if hold.origin().grounded { WAIT } else { FALL });
+        block.set_pose(index, POSE_NONE, PackedPose::NONE);
+    } else {
+        placement::restore(accessor, hold.origin());
+    }
+    leave_asleep(hold, accessor);
+}
+
+/// A body placed from the other role's frame is asleep when that frame ends (`partner_sleep`): one still being
+/// placed awake is put to sleep, and the hold is told (`CpuPreview::rest`).
+unsafe fn leave_asleep(hold: &mut CpuPreview, accessor: usize) {
+    if let Some(asleep) = partner_sleep(hold.asleep) {
+        state::set_sleep(accessor, asleep);
+        hold.rest();
     }
 }
 

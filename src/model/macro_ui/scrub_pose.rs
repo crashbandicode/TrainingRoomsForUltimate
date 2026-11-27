@@ -54,8 +54,7 @@ pub fn takes_partner(began: bool, held: bool, partner_held: bool) -> bool {
 /// `asleep`: the hold has the body asleep. `Some(asleep)` to write: an awake body is put to sleep, a sleeping one is
 /// left, and none is ever woken from here.
 pub fn partner_sleep(asleep: bool) -> Option<bool> {
-    // expected-red: the build before this rule woke the partner it put back, and left the one it took awake.
-    asleep.then_some(false)
+    (!asleep).then_some(true)
 }
 
 /// One fighter frame of a held role. `asked_kind`, `asked`: the recorded fighter and its animation on the shown

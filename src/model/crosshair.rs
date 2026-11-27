@@ -186,7 +186,8 @@ impl CpuPreview {
     /// (`scrub_pose::partner_sleep`): whoever lets it go wakes it, and that frame is not one of its placing frames,
     /// so its own frames place it awake the full count.
     pub fn rest(&mut self) {
-        // expected-red: nothing yet.
+        self.asleep = true;
+        self.frames = self.frames.saturating_sub(1);
     }
 
     /// The caller asks for the placing frames again at the point now asked for. Once at a point; `false` when it
