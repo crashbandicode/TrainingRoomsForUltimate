@@ -4,7 +4,7 @@
 
 ## rc.15 · November 27, 2026
 
-For Training players editing recordings, practising against the CPU, and using practice tools.
+[Download TrainingRooms rc.15](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases/tag/v0.2.0-rc.15).
 
 TrainingRooms 0.2.0-rc.15 is the November 27, 2026 hardware-tested release for players editing recordings, practising against the CPU, and using practice tools.
 
