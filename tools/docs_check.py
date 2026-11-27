@@ -137,7 +137,6 @@ NOTICE_OK = [
     ("docs/TECHNICAL.md", "Same as 格斗, nothing new saved", "the notice with a Mii's name filled in: src/model/notify.rs joins 'Same as ', the name and ', nothing new saved'"),
     ("docs/guide/cpu-behaviour.md", "Selected: Up x3, In x1", "a help line built per chip: src/model/ui/screens.rs writes 'Selected: ' then '<direction> x<weight>' for each"),
     ("docs/menu/cpu.md", "Selected: Up x2, Out x1", "the same help line, built per chip in src/model/ui/screens.rs"),
-    ("docs/menu/fighters-and-stages.md", "1/3 Layout 2 · Battlefield: 6", "the Saved layouts notice, built from the position, the layout's name and its target count"),
     ("docs/RESTRICTIONS.md", "Combos work in Training", "a retired restriction: the row says the string is gone from src/"),
 ]
 
@@ -238,7 +237,6 @@ BUDGET_PENDING = {
     "docs/guide/waiting-rooms.md": 635,
     "docs/menu/cpu.md": 4895,
     "docs/menu/display-and-controls.md": 4116,
-    "docs/menu/fighters-and-stages.md": 11251,
     "docs/menu/practice-games.md": 1589,
     "docs/menu/recording.md": 10623,
     "docs/menu/saves.md": 2912,
