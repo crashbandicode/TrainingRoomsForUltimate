@@ -65,7 +65,7 @@ FUN_0135ca00 (the battle task entry, every update, main thread)
 - The match uses another class. With the slot freed and flag cleared, it starts at x1 (R9).
 - Boot compares ten `lobby_speed` rows from `tools/gen_rows_lobby_speed.py`. Install the hook only if those and the `game_speed` guards pass.
 - `lobby_speed_rows_tests` decodes offsets and constants from guard words. The 2026-11-11 rc.7 card scan found no plugin references to these sites.
-- The single inline hook runs after the prologue, uses `try_lock` and allocates no heap memory.
+- The rc.8 inline hook runs after the prologue, uses `try_lock` and allocates no heap memory.
 - World tasks can reach Player 1’s frame and take the `game_speed` lock. Release that lock before running them.
 - The pass holds only its exclusive static task buffer, keeping that buffer off the world ticks’ stack (finding 2).
 
@@ -80,7 +80,10 @@ FUN_0135ca00 (the battle task entry, every update, main thread)
 
 ## 5. Original rc.8 test plan and later evidence
 
-[Feature ledger, row 82](../FEATURE-LEDGER.md) records the later five-speed timing runs. The original plan used a Quickplay pair (b hosting, a joining), a diagnostic build and QCF’s trace points.
+| Evidence | Scope |
+| --- | --- |
+| [Feature ledger, row 82](../FEATURE-LEDGER.md) | Later five-speed timing runs. |
+| Original plan | A Quickplay pair (b hosting, a joining), diagnostic build and QCF’s trace points. |
 
 - per cycle (x1, 2/3, x1.5, 1/4): the host's room cadence (`main+0x1564088` hits), the round start and the match
   arrival on both consoles, a clean match (`sync_end … desync_seen=0` at the same frame);
