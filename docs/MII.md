@@ -14,9 +14,9 @@ that ran them are listed under [Eden, rc.6](#eden-rc-6).
 | # | Behaviour | Fork | Here | Status |
 | --- | --- | --- | --- | --- |
 | 1 | **Add New** opens Smash's own Mii Fighter editor from Training, Quickplay or Local Wireless waiting practice | `src/mii_editor_bridge/mod.rs` `request`, `editor_origin.rs` `admit` | `src/runtime/mii/mii_editor_bridge/mod.rs:146` `request`, `editor_origin.rs:14`; `NATIVE_EDITOR_AVAILABLE = true` (`src/model/mii_root/mii_menu.rs:12`) | present |
-| 2 | Add New starts from a copy of the role's Player choice, else the first saved Mii of the class, else the game's default | `training_mod_tui/src/mii_menu.rs:337-352`, `native_default.rs` | `mii_menu.rs:367` `editor_seed`, `native_default.rs` | present |
+| 2 | Add New starts from a copy of the role's Player choice, else the first saved Mii of the class, else the game's default | `training_mod_tui/src/mii_menu.rs:337-352`, `native_default.rs` | `mii_menu.rs:311` `editor_seed`, `native_default.rs` | present |
 | 3 | Add New with a Player/CPU choice made in the same opening: the choice stays saved, its reload is dropped, the editor opens alone | `training_mod_tui/src/containers/app.rs:923-931`, `src/common/menu.rs:483-491` | `src/editors/mii.rs` `close_for`, `src/runtime/mii/menu_handoff.rs` (editor request before the catalog close) | **ported 2026-11-05** |
-| 4 | **Save** makes a new native Smash Mii: only a fresh draft reaches the game's allocator (a new slot); a saved ID never enters, so no saved Mii or protected original is overwritten; an identical configuration reuses the saved one and says so: the notice "Same as ‹saved name›, nothing new saved" names the matched saved Mii (decision C, 2026-11-08; a rename alone is identical, row 12); refused when the catalog is incomplete or holds 99 files | `src/mii_editor_bridge/mod.rs:592-645` `edit_decide` | `mii_editor_bridge/mod.rs:634` `edit_decide`; post-save check `save_ready_for_return` `:723`, `catalog_read` `:747` | present |
+| 4 | **Save** makes a new native Smash Mii: only a fresh draft reaches the game's allocator (a new slot); a saved ID never enters, so no saved Mii or protected original is overwritten; an identical configuration reuses the saved one and says so: the notice "Same as ‹saved name›, nothing new saved" names the matched saved Mii (decision C, 2026-11-08; a rename alone is identical, row 12); refused when the catalog is incomplete or holds 99 files | `src/mii_editor_bridge/mod.rs:592-645` `edit_decide` | `mii_editor_bridge/mod.rs:632` `edit_decide`; post-save check `save_ready_for_return` `:728`, `catalog_read` `:747` | present |
 | 5 | **Name**: the editor's Name row uses the shared inline keyboard (10 UTF-16 units; empty Enter cancels; one keyboard lease shared with the macro keyboard) | `src/mii_editor_bridge/name_keyboard.rs` | `mii_editor_bridge/name_keyboard.rs:153`, `src/model/mii/inline_keyboard.rs` | present |
 | 6 | **Interrupted editor**: a match starting in Quickplay/Local Wireless while editing keeps the confirmed draft and the exact screen (Settings row, Name text and caret, Headgear/Outfit/Colour/Voice cursors, Specials picks, Test), in memory only; returning to the same lobby resumes it without saving | `connected.rs`, `resume_adapter.rs`, `ui_resume.rs`, `*_resume.rs` | the same files under `src/runtime/mii/mii_editor_bridge/` (`connected.rs:298/341` → `resume_adapter.rs:413` `try_auto_return` → `mod.rs:221` `resume_checkpoint`); `src/model/mii_root/resume.rs` | present |
 | 7 | **Leaving**: B / Exit Without Saving / Cancel discards the draft and creates nothing; the copied Mii never changes; Training (or the lobby's practice fighter and Ready card) comes back | `mod.rs` `editor_parent`, `training_state`; `connected.rs` `owner.reenter` | `mod.rs:503` `editor_parent`, `:345` `training_state`; `connected.rs` | present |
@@ -78,10 +78,10 @@ had no guard in the fork.
 ## Mii groups and seats in rc.6
 
 - **Async build:** a Mii group is constructed on the task worker like an ordinary group, not by the synchronous loop
-  on the game thread (`async_build_eligible`, `src/model/swap/body_bank.rs:790`). The 2026-11-02 restriction stays for
+  on the game thread (`async_build_eligible`, `src/model/swap/body_bank.rs:842`). The 2026-11-02 restriction stays for
   native groups (Pokémon Trainer, Aegis) and the Ice Climbers pair.
 - **Warm exit:** leaving a Mii group for the window it displaced is a warm exchange; the Mii switch's publication is
-  put back in the settle tick (`plan_mii_exit`, `src/runtime/roster/native_body_bank.rs:1224`). Mii groups are built
+  put back in the settle tick (`plan_mii_exit`, `src/runtime/roster/native_body_bank.rs:1677`). Mii groups are built
   in the background too (`p23/rc6-hot-slots-mii`). On the candidate `b04856b2`, `final-yoga-i3-mii-b04856b2-r2` 19/19:
   - P1's first switch into its background-built Mii group was `group-warm` in 72 ms, and later ones in 49–50 ms. The
     CPU's took 47 ms.
@@ -90,12 +90,12 @@ had no guard in the fork.
   - Beside the live Mii window, `final-yoga-i3-x6-b04856b2-r2` 14/14 built Pokémon Trainer, Samus and (once Samus's
     group slot was freed) the Ice Climbers pair in the background. Its lap left the Mii warm in 80 ms, to Link.
 - **No. of CPUs seats:** a seat member keeps its exact-Mii configuration, so a Mii seat loads through the Mii helper
-  (`seat_load`, `src/model/parked_entries.rs:270`), and the seats park at one CPU whatever the plan lists
-  (`parked_seat`, `:269`). A promoted seat parked again gets its Mii proof re-recorded only when its identity is
+  (`seat_load`, `src/model/parked_entries.rs:272`), and the seats park at one CPU whatever the plan lists
+  (`parked_seat`, `:284`). A promoted seat parked again gets its Mii proof re-recorded only when its identity is
   unchanged.
 - **Portrait first:** a Mii press waits while that role's HUD portrait renders on a helper, and a seat load holds back
   while a portrait waits for one (`Blocker::Portrait`, `src/model/swap/source_load.rs:150`;
-  `seat_load_waits`, `src/model/parked_entries.rs:359`). The press runs after the render; it is not dropped.
+  `seat_load_waits`, `src/model/parked_entries.rs:361`). The press runs after the render; it is not dropped.
 
 ## Eden, rc.6
 

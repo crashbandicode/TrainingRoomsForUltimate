@@ -2,9 +2,7 @@
 
 TrainingRooms re-specifies the features of this project's earlier Training Modpack fork (stage M5q) and keeps its
 behaviour unless an operator decision changed it ([DECISIONS.md](DECISIONS.md), [MENU-DRAFT.md](../MENU-DRAFT.md)).
-This historical comparison records changes through 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`,
-2026-11-05). The illustrations also include later releases, identified by their media filenames in
-[MEDIA.md](MEDIA.md).
+The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-05). Later changes and captures are identified below and in [Media](MEDIA.md).
 
 ## Install and files
 
@@ -28,7 +26,7 @@ This historical comparison records changes through 0.2.0-rc.3 (`p23/rc3-candidat
 | Dropdown rows change in place with Left/Right; A opens the list. | `src/model/menu/mod.rs:1060` (`cycle`) |
 | The seven delay rows offer a checklist and a min–max range; using one greys the other, Y clears. | `src/model/menu/table.rs:203-204` |
 | Direction grids carry a weight per chip: each A adds one. | `src/model/menu/mod.rs:1357-1358` |
-| Grids page more densely: 5×8 docked, 4×4 handheld. | `src/model/menu/grid.rs:76-77` |
+| Stage and item grids show 5×8 tiles docked or 4×4 handheld. Fighter grids show 13×7 in either mode. | `src/model/menu/grid.rs:76-77` |
 | Fighter grids show the game's own stock icons, loaded at run time through the game's mod-aware loader, so modded icons show. | `src/runtime/roster/character_roster.rs:2168-2174` |
 | The DI and SDI chips show the game's own DI line and SDI streak (the streak drawn ×2.0). | `src/model/effect_chips.rs:7-16` |
 | Menu shortcuts 1 and 2 are edited in the menu with a chord editor, apply at once and are saved to `button_config.ini`. B + D-pad Up always opens the menu. | `src/model/menu/table.rs:430-433` |
