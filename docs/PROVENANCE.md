@@ -18,21 +18,17 @@
 | Carried fact | Source (commit / doc) | Where it landed |
 |---|---|---|
 | Draw hurtboxes, yellow; shapes read per fighter per frame on the hitboxes' per-frame entry; cost measured in the diag build; help text | operator decision HB1 (a), 2026-11-02, `docs/DECISIONS.md`, spec update `dcbb2d1` | `src/model/hitbox.rs` (rules + reader + dispatch), `docs/HB1-RENDER-ROUTES.md`, `eden/phase23/rows-C.md` |
+| HitModule layout (accessor `+0xb0`; groups `+0x60`, `0x3c`/group, first `+4`, count `+6`; parts `+0x70`, `0x50`/part, status `+0`, offsets `+0x08`/`+0x14`, size `+0x20`, node `+0x28`; total `+0x78`; status 3 off) and the three relied windows (`0x203db10`, `0x469af0`, `0x468490`) | owned ELF, `docs/test-provenance/core-06.md:116-119` at `2550ef88`; guard bytes as in `stream/slim-phase3-rc6` `sites_hitbox.rs` | layout constants already in `model::hitbox::layout` (historical), re-read by `want_hurtboxes`; the three guard rows are NOT re-added yet — recorded in `docs/HB1-RENDER-ROUTES.md` as required with the wiring |
+| Sphere counts per fighter (Steve 19, Luigi 23; hb-03), Ridley's first pass (55 wanted, 53 asked, 2 pool-refused, then `failed=0`; hb-04) | `stream/hitbox` `eden/EDEN-HITBOX.md` (Eden, 2026-11-02) | `core06_ridley_first_pass_completes_in_the_model`, `eden/phase23/rows-C.md` C1/C3 |
+| lr02 part geometry (status 0, centres (0.6,0,0)/(2.4,0,0), radius 2.4, bone `0x51a36341b`; group first 0/count 10) | `docs/HB1-LR02-DISPOSITION.md` (stream/slim-phase3-rc6) | test fixtures' part geometry (synthetic tables built from it) |
+| Option A negative result and the A/B question going back to the operator | `tmp-slim/phase3-rc6/OPTION-A-DESIGN.md` (2026-11-03) | `docs/HB1-RENDER-ROUTES.md` (no route picked) |
+| The RC7 CPU-role lifetime correction the above composition depends on | composition `1769bdd` (ancestor of the baseline), `docs/RC7-R3-1-VALIDATION.md` | reported in `artifacts/phase23/C-REPORT.md`; no code change |
 
 What this branch re-implemented, and from where. Nothing was copied as bytes
 from another branch: the RC7 R3-2 removal (cab6603 on `stream/slim-rc7-r3`)
 took the runtime HB1 reader out of an older architecture, and `work/
 implementation` (42b510c) refactored the planner/dispatcher into the model
 behind `AttackReader`; the hurtbox side was rebuilt in that architecture.
-
-| Carried fact | Source (commit / doc) | Where it landed |
-|---|---|---|
-| Draw hurtboxes, yellow; shapes read per fighter per frame on the hitboxes' per-frame entry; cost measured in the diag build; help text | operator decision HB1 (a), 2026-11-02, `docs/DECISIONS.md`, spec update `dcbb2d1` | `src/model/hitbox.rs` (rules + reader + dispatch), `docs/HB1-RENDER-ROUTES.md`, `eden/phase23/rows-C.md` |
-| HitModule layout (accessor `+0xb0`; groups `+0x60`, `0x3c`/group, first `+4`, count `+6`; parts `+0x70`, `0x50`/part, status `+0`, offsets `+0x08`/`+0x14`, size `+0x20`, node `+0x28`; total `+0x78`; status 3 off) and the three relied windows (`0x203db10`, `0x469af0`, `0x468490`) | owned ELF, `docs/test-provenance/core-06.md:116-119` at `2550ef88`; guard bytes as in `stream/slim-phase3-rc6` `sites_hitbox.rs` | layout constants already in `model::hitbox::layout` (historical), re-read by `want_hurtboxes`; the three guard rows are NOT re-added yet — recorded in `docs/HB1-RENDER-ROUTES.md` as required with the wiring |
-| Sphere counts per fighter (Steve 19, Luigi 23; hb-03), Ridley's first pass (55 wanted, 53 asked, 2 pool-refused, then `failed=0`; hb-04) | `stream/hitbox` `eden/EDEN-HITBOX.md` (Eden, 2026-11-02) | `core06_ridley_first_pass_completes_in_the_model`, `eden/phase23/rows-C.md` C1/C3 |
-| lr02 part geometry (status 0, centres (0.6,0,0)/(2.4,0,0), radius 2.4, bone `0x51a36341b`; group first 0/count 10) | `docs/HB1-LR02-DISPOSITION.md` (stream/slim-phase3-rc6) | test fixtures' part geometry (synthetic tables built from it) |
-| Option A negative result and the A/B question going back to the operator | `tmp-slim/phase3-rc6/OPTION-A-DESIGN.md` (2026-11-03) | `docs/HB1-RENDER-ROUTES.md` (no route picked) |
-| The RC7 CPU-role lifetime correction the above composition depends on | composition `1769bdd` (ancestor of the baseline), `docs/RC7-R3-1-VALIDATION.md` | reported in `artifacts/phase23/C-REPORT.md`; no code change |
 
 Files this worker changed: `src/model/hitbox.rs`,
 `src/runtime/features/hitbox.rs` (comments and the `None` argument only),
@@ -726,16 +722,6 @@ callbacks; preserving exclusion avoids assuming those callbacks cannot overlap.
 | Fork commit | Fork file | Added lines | Here | Verbatim |
 | --- | --- | --- | --- | --- |
 | `eb4eec2` (accelerating scrub) | `training_mod_tui/src/clip_panel.rs` | +16-124, +288, +477-537 | `src/model/macro_ui/clip_panel.rs` | 84 of 111 |
-
-- The crop and preview editor of install 4 (`feat/replay-editor`, base `b5177cdb`) copies no fork code.
-- The fork-own hunks it uses were already in this repository through the package-4 carry of 2026-11-02 (`tools/carry_pkg4.py`, stage m5q, ledger [package-4 carry ledger](../tools/provenance-data/pkg4-carry-ledger.txt)).
-- This table lists them by the fork commit that added them.
-- Fork worktree: `UltimateTrainingModpack-lobby-parity`; line ranges are the added lines at that commit.
-- "Verbatim" counts the added lines of more than 14 characters found unchanged in this repository at `b5177cdb`.
-
-| Fork commit | Fork file | Added lines | Here | Verbatim |
-| --- | --- | --- | --- | --- |
-| `eb4eec2` (accelerating scrub) | `training_mod_tui/src/clip_panel.rs` | +16-124, +288, +477-537 | `src/model/macro_ui/clip_panel.rs` | 84 of 111 |
 | `eb4eec2` | `src/replay_capture.rs` | +15, +361-364, +386-395, +399-407, +419-420, +423-427 | `src/runtime/macros/replay_capture.rs` | 18 of 19 |
 | `eb4eec2` | `src/training/ui/clip_editor.rs` | +12, +474-484, +486-496, +498-499 | not carried | 3 of 20 |
 | `15ada37` (snap to move starts) | `training_mod_macros/src/move_start.rs` | +1-256 | `src/model/macros/move_start.rs` | 145 of 185 |
@@ -746,6 +732,12 @@ callbacks; preserving exclusion avoids assuming those callbacks cannot overlap.
 | `6f250bb` (preview without a manual save) | `src/training/save_states.rs` | 17 hunks from +2 to +1177 | not carried | 1 of 88 |
 | `6f250bb` | `src/replay_preview.rs` | +31-32, +56, +59, +155, +165, +188, +208, +211-214 | not carried | 0 of 11 |
 | `6f250bb` | `training_mod_tui/src/clip_panel.rs` | +119 | `src/model/macro_ui/clip_panel.rs` | 1 of 1 |
+
+- The crop and preview editor of install 4 (`feat/replay-editor`, base `b5177cdb`) copies no fork code.
+- The fork-own hunks it uses were already in this repository through the package-4 carry of 2026-11-02 (`tools/carry_pkg4.py`, stage m5q, ledger [package-4 carry ledger](../tools/provenance-data/pkg4-carry-ledger.txt)).
+- This table lists them by the fork commit that added them.
+- Fork worktree: `UltimateTrainingModpack-lobby-parity`; line ranges are the added lines at that commit.
+- "Verbatim" counts the added lines of more than 14 characters found unchanged in this repository at `b5177cdb`.
 
 - **`6f250bb`:** its preview is not here. Previews play through Recording's player and keep the pair in a game-side
   checkpoint (fix F7, `6bc005f6`), written in this repository.
@@ -802,5 +794,4 @@ Host regressions cover the constructor address point (old guard RED), native cou
 | --- | --- |
 | Vault and Recordings, 2026-11-24 | Written in TrainingRooms for the accepted design. |
 
-2026-11-24. Written in TrainingRooms for the accepted Vault and Recordings design. No line was copied from the fork
-or upstream Training Modpack. Decision provenance: inbox 2026-11-24 22:45:56Z, design accepted 23:02:29Z.
+The decision was recorded at 22:45:56Z and the design accepted at 23:02:29Z. The implementation copied no lines from the fork or upstream Training Modpack.
