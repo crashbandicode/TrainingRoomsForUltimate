@@ -1,34 +1,47 @@
 # Guard the Edge and Juggler: Player cursor
 
-## Cause
+Both [Guard the Edge](../guide/guard-the-edge.md) and [Juggler](../guide/juggler.md) use this floor check on the Player page.
 
-On the Player page, the stick moves the cursor, but the crosshair, notice and bridge show the last Player point
-with a floor below it. Past a floor's end the cursor keeps moving unseen, so A is refused and reversing or D-pad
-movement shows nothing until the cursor returns. In install 1's Yoga run Juggler read `-64`, `-78`, `-78`;
-Guard the Edge in the same boot read `-66`, `-78.9856`.
-See `artifacts/phase23/fix-round-20261123/gj4/gj4-8/CAUSE.md` and the receipts named there.
+## Original defect, 2026-11-23
 
-## Rule
+| Install 1 observation | What the player saw |
+| --- | --- |
+| Stick crossed the end of a floor | The cursor moved unseen beyond the last valid Player point. |
+| Crosshair, notice and bridge | All three continued to show the last point with a floor below. |
+| A, reversal or D-pad movement | A failed. Movement stayed invisible until the cursor returned over the floor. |
+| Juggler, Yoga | Successive reads were −64, −78 and −78. |
+| Guard the Edge, same boot | Successive reads were −66 and −78.9856. |
 
-The Player page reads the floor below the cursor. On a miss it returns the cursor to its last floor position and
-reads that position again. If that floor is gone too, the point is refused on A. A successful read updates the
-cursor's last floor position and the Player point. Both drills use this rule; the floor read itself is unchanged.
+- The original record named the external `artifacts/phase23/fix-round-20261123/gj4/gj4-8/CAUSE.md` receipt.
+- The published [GJ4 decision](../DECISIONS.md) preserves the placement history.
+
+## Shipped cursor rule
+
+| Floor read | Result |
+| --- | --- |
+| Floor below the new cursor | Update the last floor position and the Player point. |
+| New position misses | Restore the last floor position and read it again. |
+| That floor is gone too | A refuses the point. |
+
+The fix kept the existing floor lookup for both drills.
 
 ## Requirement trace
 
 | Ruling clause (tr-primary-2 2026-11-23 20:11:55Z) | Design | Test |
 | --- | --- | --- |
-| a cursor move with no floor under it is not kept | A missed move is undone | `a_juggler_player_cursor_stays_where_its_floor_was_read`, `a_guard_player_cursor_on_a_point_with_no_floor_goes_back_to_its_last_floor` |
-| the cursor returns to the last position that had one | The cursor and Player point use the last floor position | `a_dpad_step_reaches_the_last_whole_unit_of_a_floor`, `a_player_point_whose_floor_is_gone_is_refused` |
-| no Player point without a floor (the restriction keeps its meaning) | A missing floor at both positions refuses A | `a_player_point_whose_floor_is_gone_is_refused`, `a_player_point_with_no_floor_is_refused_and_the_floor_read_stays_the_card_build_s` |
-| after a stick hold past the floor's end the point reads -78; one D-pad Right gives -77 | The cursor returns on each missed move, then answers the D-pad | `a_juggler_player_cursor_stays_where_its_floor_was_read` |
+| Reject a move without a floor | A missed move is undone | `a_juggler_player_cursor_stays_where_its_floor_was_read`, `a_guard_player_cursor_on_a_point_with_no_floor_goes_back_to_its_last_floor` |
+| Restore the last position with a floor | The cursor and Player point use the last floor position | `a_dpad_step_reaches_the_last_whole_unit_of_a_floor`, `a_player_point_whose_floor_is_gone_is_refused` |
+| Require a floor for the Player point | A missing floor at both positions refuses A | `a_player_point_whose_floor_is_gone_is_refused`, `a_player_point_with_no_floor_is_refused_and_the_floor_read_stays_the_card_build_s` |
+| After a stick hold reads −78, one D-pad Right gives −77 | The cursor returns on each missed move, then answers the D-pad | `a_juggler_player_cursor_stays_where_its_floor_was_read` |
 
 ## Limits
 
-- Not flown at this head.
-- A floor separated sideways by empty space wider than one cursor step can no longer be picked.
-- In Juggler the cursor's height above the highest floor is still unseen.
-- The stick still cannot place the point closer than 2.0 to a floor's end; the D-pad's 1.0 step reaches the last whole unit.
-- A Juggler point within 1.06 of an end teeters at release; see [Player 1's start](gj4-player-start.md).
-- A floor read that misses at one exact x, where a floor meets a wall, stops a step that lands exactly on it;
-  a step that passes over it is kept. This is not measured on a stage.
+| Case | Limit |
+| --- | --- |
+| Evidence at the original revision | The 2026-11-23 design recorded host tests. |
+| Gap wider than one cursor step | The cursor cannot cross it to select the next floor. |
+| Juggler cursor above the highest floor | Its height remains unseen. |
+| Juggler fixture, stick and D-pad | Two-unit stick steps stopped at −78. A one-unit D-pad step reached −79. |
+| Juggler release near an end | Within the facing-end teeter range (1.06), see [Player 1’s start](gj4-player-start.md). |
+| Missing floor at a wall joint | A step landing on that x stops. A step crossing it succeeds. |
+| Wall joint evidence | Host fixture only. The original design recorded no stage measurement. |

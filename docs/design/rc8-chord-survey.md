@@ -1,42 +1,52 @@
-# Card chord survey for the rc.8 binds (R + D-pad Up / Down / Left / Right), 2026-11-11
+# Card survey for the rc.8 button chords
 
-The survey behind `docs/design/rc8-binds.md` §3.1 ("Not while L is held"), done on the primary's order of 20:01Z.
-Everything was read-only:
+This read-only survey on 2026-11-11 informed the [rc.8 bind decision](rc8-binds.md) at 20:01Z.
 
-- the configs under `/run/media/intpa/SWITCH SD/ultimate/` (the SD the user exposed; nothing was mounted, written or
-  unmounted);
-- the strings of the card's 19 plugin NROs in `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/`
-  (`nro_chords.py`, `nro_grep.py`, `nro_context.py`; kept with the README searches in the docs lane's
-  `artifacts/phase23/feature-gifs-rc8/survey-tools/`);
-- the plugins' READMEs on this machine.
+## Sources checked
 
-## Overlaps with the rc.8 chords
+| Source | Extent |
+| --- | --- |
+| Card configs | `/run/media/intpa/SWITCH SD/ultimate/`, as exposed by the user. |
+| Plugin binaries | Strings from 19 NROs in `atmosphere/contents/01006A800016E000/romfs/skyline/plugins/`. |
+| Tools | `nro_chords.py`, `nro_grep.py`, `nro_context.py`. |
+| Search receipts | `artifacts/phase23/feature-gifs-rc8/survey-tools/`, with the README searches. |
+| Documentation | Plugin READMEs available on the machine that day. |
+| Scope | R with D-pad Up, Down, Left and Right. No mounting, unmounting or card writes. |
 
-| Plugin (card) | Chord | Overlaps | Source |
-| --- | --- | --- | --- |
-| Online Deluxe 0.10.4 (`libssbu_online_deluxe_rewrite.nro`) | **L + R + D-pad Down**: next window page | **Input display, R + D-pad Down**: every press flipped the strip (both `fx-record-refused` takes) | README "Hold L+R and tap D-pad Down"; NRO string "L+R+Down next page" |
-| Online Deluxe 0.10.4 | **L + R + D-pad Up**: "Capture … L+R+Up (30 s)" on its Performance page | **Game speed, R + D-pad Up**: would open the speed pop-up | NRO string at `0xf201c` |
-| Online Deluxe 0.10.4 | L + R + X: toggles the framed icon / profile | none (X) | README; NRO string |
-| Online Deluxe 0.10.4 | ZR + D-pad Left/Right: edits a row; plain D-pad Up/Down: selects a row | none with R. ZR + Left/Right is TrainingRooms' own Play on Player 1 / Recording pop-up (rc.7 behaviour, not new) | README; NRO string |
-| CPU pilot 0.2.3 (`libssbu_cpu_pilot.nro`) | its CPU Pilot page in Deluxe's window: L + R + Down, ZR + Left/Right, L + R + X | the same as Deluxe's | its README |
-| Stages + Counterpick (`libelite_stages_counterpick.nro`, folder `elite-legal-stages-public`) | its own page in Deluxe's window (L + R + Down, ZR + Left/Right) | the same as Deluxe's | its README. The folder's `settings.toml` comment still says "in-game menu (L+R+Up)", but its NRO has no "L+R+Up" string (only Deluxe's has one), so the comment is stale. |
-| Smash Replay to MP4 | the game's own L + R + A + Plus (quit playback) and X + D-pad Down (hide display) | none (no R + D-pad) | its README and inventory |
-| QuickPlay cancel fix | no chord (`config.ini`: `hold_seconds` only; its 6 source files have no chord) | none | source |
-| TrainingRooms itself | Minus (menu shortcut, card `button_config.ini`), B + D-pad Up (permanent), L + R + A (reset, option), ZL/ZR + D-pad (eight rows), R + D-pad Down/Up (rc.8) | none besides the two rc.8 rows' own | `button_config.ini`; `model::chords` |
+## Overlaps on the surveyed card
 
-## Nothing found
+| Plugin | Control on 2026-11-11 | Finding |
+| --- | --- | --- |
+| Online Deluxe 0.10.4 | L + R + Down: next window page | Flipped Input display (R + Down) on both `fx-record-refused` takes. |
+| `libssbu_online_deluxe_rewrite.nro` | README and NRO named the page chord. | Both sources agreed. |
+| Online Deluxe, Performance | L + R + Up: 30-second capture | Could open Game speed (R + Up). NRO string at `0xf201c`. |
+| Online Deluxe | L + R + X: toggle framed icon/profile | No R-and-D-pad overlap. README and NRO string. |
+| Online Deluxe | ZR + Left/Right: edit; plain Up/Down: select | No R overlap. README and NRO string. |
+| TrainingRooms, rc.7 | ZR + Left/Right | Already used for Play on Player 1 and Recording popup. |
+| CPU pilot 0.2.3 | L + R + Down; ZR + Left/Right; L + R + X | Same Deluxe-window overlap, per `libssbu_cpu_pilot.nro`’s README. |
+| Stages + Counterpick | L + R + Down; ZR + Left/Right | Same overlap on its Deluxe-window page, per README. |
+| `libelite_stages_counterpick.nro` | `elite-legal-stages-public/settings.toml` named L+R+Up. | Stale comment. Only Deluxe’s NRO contained that string. |
+| Smash Replay to MP4 | L + R + A + Plus: quit playback | No R-and-D-pad overlap. README and inventory. |
+| Smash Replay to MP4 | X + Down: hide display | No R-and-D-pad overlap. README and inventory. |
+| QuickPlay cancel fix | No chord in six source files | Its `config.ini` contained only `hold_seconds`. |
+| TrainingRooms on survey card | Minus, configured menu shortcut; B + Up, permanent shortcut | From `button_config.ini` and `model::chords`. |
+| TrainingRooms on survey card | L + R + A, optional reset; eight ZL/ZR + D-pad rows | Neither overlapped the two new defaults. |
+| TrainingRooms rc.8 | R + Down, Input display; R + Up, Game speed | The two new rows were the survey subjects. |
 
-ARCropolis, css_preserve, elite_rematch, gsp_visualizer, imgui_smash, instant_back, memory_guard, nro_hook, param_hook,
-smash_gamepad_overlay, ssbu_desync_detector, ssbu_quiet_elite_switch, ssbu_refresh_clock:
+## Plugins without a documented chord on the survey date
 
-- no chord text in their NROs;
-- no config with a chord;
-- no README with a chord on this machine.
+| Sources checked | Plugins |
+| --- | --- |
+| NRO strings, configs and local READMEs | ARCropolis, css_preserve, elite_rematch, gsp_visualizer, imgui_smash |
+| Same sources | instant_back, memory_guard, nro_hook, param_hook, smash_gamepad_overlay |
+| Same sources | ssbu_desync_detector, ssbu_quiet_elite_switch, ssbu_refresh_clock |
 
-**Not covered:** a chord compiled as a button mask with no text. The sources of these plugins aren't on this machine.
+A compiled button mask could exist without any string; these plugins’ sources were unavailable on the survey machine.
 
-## What option 2 covers, and what it doesn't
+## Decision and later behavior
 
-- **Covered:** L + R + D-pad Down and L + R + D-pad Up, whatever order the buttons come in, while L is held.
-- **Not covered:** in Deluxe's window, letting go of L but keeping R held while tapping D-pad Up or Down to pick a row.
-  That reaches R + Up or R + Down. Deluxe's README says rows are picked with a plain Up/Down.
+| State | Result |
+| --- | --- |
+| rc.8, L held | Protected both default R + D-pad chords regardless of press order. |
+| rc.8, L released but R held | Pressing Up/Down still matched TrainingRooms’ default chords. Deluxe documented plain Up/Down for selection. |
+| Shipped overlay handling | The detector also checks whether Deluxe owns row selection while its overlay is open. |

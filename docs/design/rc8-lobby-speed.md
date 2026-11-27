@@ -1,15 +1,25 @@
 # rc.8 R2: 2/3 and x1.5 in the waiting-room practice
 
-2026-11-11, QCF (`tr-opus-qcf`), branch `p23/rc8-lobby-speed` from `9626926c`. Scope: `artifacts/phase23/TASK-rc8.md`
-"SCOPE REOPENED" R2 and R9. Research: `quickplay-cancel-fix-work/RESEARCH-rc8-speed.md` §9 (static RE, Eden pairs
-`qcf-spd04y` and `qcf-spd05y`). The bind itself (the chord, the pop-up, Training) is `docs/design/rc8-binds.md`.
+- 2026-11-11, QCF (`tr-opus-qcf`), branch `p23/rc8-lobby-speed` from `9626926c`.
+- Scope: `artifacts/phase23/TASK-rc8.md` "SCOPE REOPENED" R2 and R9.
+- Research: `quickplay-cancel-fix-work/RESEARCH-rc8-speed.md` §9 (static RE, Eden pairs `qcf-spd04y` and `qcf-spd05y`).
+- The bind itself (the chord, the pop-up, Training) is in the [rc.8 bind design](rc8-binds.md).
 
-## 1. Why not Training's way
+- The five-speed design shipped in rc.8.
+- By 2026-11-27, [1 Frame](rc15-speed-frame.md) preceded those five speeds in both Training and waiting-room practice.
+- See the [Game speed guide](../guide/game-speed.md).
 
-Training's 2/3 and x1.5 raise the game's update rate (`[main+0x593b444]` code 4 or 6, `[main+0x523d004]` 120 or 180)
-and add a slow slot. The update rate drives every task, the Quickplay room's timers too, so the peer would see the host's
-room run fast. `qcf-spd04y` ran the whole battle task entry twice per two updates: the host's room code hit every 40
-frames instead of 59 and the peer got the match 0.62 s late. **The lobby never writes those two words.**
+## 1. Why the waiting room used a separate clock
+
+| Observation | Result |
+| --- | --- |
+| Training at 2/3 or x1.5 | Adds a slow slot and raises the game update rate. |
+| Rate words | `[main+0x593b444]`: code 4 or 6. `[main+0x523d004]`: 120 or 180. |
+| Side effect | The update rate also clocks Quickplay room timers. |
+| `qcf-spd04y` experiment | Ran the whole battle task entry twice per two updates. |
+| Host room code | Hit every 40 frames instead of 59. |
+| Peer | Received the match 0.62 seconds late. |
+| Waiting-room rule | Leave both rate words untouched. |
 
 ## 2. One update in the waiting area (13.0.5)
 
@@ -28,53 +38,55 @@ FUN_0135ca00 (the battle task entry, every update, main thread)
 
 ## 3. Design
 
-1. **The list:** the lobby offers Training's five, 1/4, 1/2, 2/3, x1, x1.5, in the same order (`LOBBY_SPEEDS`).
-2. **1/2 and 1/4:** unchanged from `9626926c`: a slot `{1, N}` taken on Player 1's frame, freed by the practice's
-   teardown.
-3. **2/3, a paced slot (`LobbyPlan::TwoThirds`):** the same slot, taken as `{1, 1}`. On every waiting-area update, after
-   the slow step, the hook reads N and the sub-counter; at a period's end (sub 0) it rewrites the slot's divisor to 2
-   after a period of 1 and to 1 after a period of 2 (`paced_divisor`, `LobbySlot::pace`). The slow step latches the
-   target only at a period's end, so the periods alternate 1, 2: two logic frames per three updates. Only the slot's
-   divisor byte and the dirty byte are written, in the table the slot was taken from, while it still holds ours.
-   - **Picture (updates →):** `| 1 | 2 2 | 1 | 2 2 | 1 |` with one logic frame per period: 2 per 3 updates.
-   - A hit's slow (a larger divisor) wins over the paced slot, as natively.
-4. **x1.5, an extra world step (`LobbyPlan::ExtraPass`):** on every other allowed update (`Cadence`), after this
-   update's scheduler pass, the hook runs `run_pass`: it checks the whole walk first, as `FUN_0137b3f0` walks it
-   unpaused (`plan_phases`), then reads each phase again right before ticking it, as the scheduler does, and ticks
-   every unmasked task except the registry walker (the task whose tick is `main+0x1358970`), in the scheduler's order
-   and with its phase word. A whole pass then adds the slow step's own two counter increments for that step (what the
-   native step does at x1). **The room object and the mode object stay at x1**, every world task (fighters, items, stage) runs 1.5
-   times per update.
-   - **Allowed only** (`pass_allowed`) while the practice is live, its UI is free, the game isn't paused, no slow of
-     any kind is active (`N` and the target both 1), and the scheduler is between passes (phase word -1).
-   - **Skipped** (nothing ticked; diag `lobby pass skipped`) unless the walk is whole: every pointer checked, at most
-     96 tasks in any phase, the walker found exactly once (`Plan::runnable`).
-   - **Stopped**, not whole (no counters), when a phase's second read isn't clean (a tick changed a later phase) or the
-     live flag drops between two ticks (the practice's teardown began inside one). From the docs lane's R2 review,
-     finding 1.
-5. **Teardown (R9 too):** the practice's live flag is armed by Player 1's frame in the practice and cleared by
-   `game_speed::session_clear`, the same teardown that frees the slot in `9626926c` (the practice P1's destroy, the
-   exit, a scene change). The pace and the extra pass stop there, before the native teardown. A match found starts at
-   x1: no slot (freed), no extra pass (the match is another class, and the flag is clear).
-6. **Guards:** ten `lobby_speed` rows (`tools/gen_rows_lobby_speed.py`, compared at boot; the hook is installed only
-   when they and `game_speed`'s rows pass). The host tests decode every offset and constant from the guard words
-   (`lobby_speed_rows_tests`). Card scan 2026-11-11 over the rc.7 card copy: no plugin refers to any of the sites.
-7. **Hook rules:** one inline hook, mid-function after the prologue; no lock but `try_lock`. No `game_speed` lock is
-   held while the world's tasks run (Player 1's frame inside them takes it), only the pass's own task buffer, a static
-   that nothing else takes (finding 2: no buffer on the stack under the world's ticks); no heap.
+| Speed in rc.8 | Waiting-room implementation |
+| --- | --- |
+| 1/4, 1/2 | Take slot `{1, N}` on Player 1’s frame. Teardown frees it, as in `9626926c`. |
+| 2/3 | `LobbyPlan::TwoThirds` takes a paced slot, initially `{1, 1}`. |
+| x1 | Normal update cadence. |
+| x1.5 | `LobbyPlan::ExtraPass` adds a world step every other allowed update (`Cadence`). |
+
+**Paced slot**
+
+- After each waiting-area slow step, read N and the sub-counter.
+- At sub 0, the slow step latches its target. `paced_divisor` and `LobbySlot::pace` alternate the slot divisor between 2 and 1.
+- A one-update period followed by a two-update period gives two logic frames per three updates. A hit’s larger divisor still wins.
+- Write only the divisor byte and dirty byte while the original table still holds the practice slot.
+
+**Extra pass**
+
+- After the scheduler pass, `run_pass` checks the entire walk using `plan_phases`, following the unpaused `FUN_0137b3f0` order.
+- Read each phase again immediately before ticking it. Use the scheduler’s phase word and skip masked tasks and the registry walker (tick `main+0x1358970`).
+- Fighters, items and stage receive the extra step. The room and mode objects stay at x1.
+- A complete pass adds both slow-step counter increments, as the native x1 step does.
+- `pass_allowed` requires live practice, free UI, unpaused play, N and target both 1, and phase word −1 between passes.
+- `Plan::runnable` checks every pointer, caps each phase at 96 tasks and requires exactly one walker. Otherwise nothing ticks and diagnostics record `lobby pass skipped`.
+- Stop if a tick invalidates a later phase or teardown clears the live flag between ticks. An incomplete pass adds no counters (R2 review, finding 1).
+
+**Teardown and hooks**
+
+- Player 1’s practice frame arms the live flag. `game_speed::session_clear` clears it and frees the slot on practice P1 destruction, exit or scene change, before native teardown.
+- The match uses another class. With the slot freed and flag cleared, it starts at x1 (R9).
+- Boot compares ten `lobby_speed` rows from `tools/gen_rows_lobby_speed.py`. Install the hook only if those and the `game_speed` guards pass.
+- `lobby_speed_rows_tests` decodes offsets and constants from guard words. The 2026-11-11 rc.7 card scan found no plugin references to these sites.
+- The rc.8 inline hook runs after the prologue, uses `try_lock` and allocates no heap memory.
+- World tasks can reach Player 1’s frame and take the `game_speed` lock. Release that lock before running them.
+- The pass holds only its exclusive static task buffer, keeping that buffer off the world ticks’ stack (finding 2).
 
 ## 4. Requirement trace
 
 | Requirement clause | Design | Test |
 | --- | --- | --- |
-| The speed bind works in the waiting room | §3.1–3.5: every speed of the bind works in the waiting-room practice, with the same list as Training | `lobby_offers_the_training_speeds`, `each_lobby_speed_has_its_plan_and_none_raises_the_update_rate` |
-| The speed-up is local too | §3.4: x1.5 is an extra world step that leaves the room and mode objects at x1 | `the_walk_follows_the_scheduler_and_leaves_out_the_walker_and_masked_groups`, `the_extra_pass_needs_the_live_practice_unpaused_with_no_slow_and_between_passes`, `the_extra_pass_runs_on_every_other_update_and_restarts_after_a_reset`, `the_skipped_tick_is_the_registry_walker`, `the_pass_ticks_every_task_in_the_schedulers_order_and_is_whole`, `each_phase_is_read_again_right_before_its_ticks`, `counting_and_listing_walks_agree_and_a_phase_wider_than_the_buffer_is_not_run` |
-| The speed changes ship in rc.8, not in a later release | §3.1, 3.3, 3.4: 2/3 and x1.5 in the lobby in this release | `lobby_offers_the_training_speeds`, `two_thirds_paces_periods_of_one_and_two_updates`, `half_and_quarter_are_not_paced_and_two_thirds_yields_to_a_longer_slow` |
-| None of it is deferred to rc.9 | §3.5: the teardown row R9 (1/4 match found) is proven with R2's pair, not deferred | `match_found_at_two_thirds_frees_the_paced_slot_before_the_drop`, `match_found_with_no_busy_edge_frees_the_slot_before_the_drop`, `the_paced_slot_is_kept_through_its_divisors_and_freed_with_the_one_it_holds`, `the_pass_stops_between_ticks_once_the_practice_is_no_longer_live` |
+| The speed bind works in the waiting room | The rc.8 list matched Training. | `lobby_offers_the_training_speeds`, `each_lobby_speed_has_its_plan_and_none_raises_the_update_rate` |
+| The speed-up is local too | The extra pass leaves room and mode objects at x1. | `the_walk_follows_the_scheduler_and_leaves_out_the_walker_and_masked_groups`, `the_extra_pass_needs_the_live_practice_unpaused_with_no_slow_and_between_passes`, `the_extra_pass_runs_on_every_other_update_and_restarts_after_a_reset`, `the_skipped_tick_is_the_registry_walker`, `the_pass_ticks_every_task_in_the_schedulers_order_and_is_whole`, `each_phase_is_read_again_right_before_its_ticks`, `counting_and_listing_walks_agree_and_a_phase_wider_than_the_buffer_is_not_run` |
+| The speed changes ship in rc.8, not in a later release | Paced slot and extra pass shipped together. | `lobby_offers_the_training_speeds`, `two_thirds_paces_periods_of_one_and_two_updates`, `half_and_quarter_are_not_paced_and_two_thirds_yields_to_a_longer_slow` |
+| None of it is deferred to rc.9 | R2’s pair also covered R9 teardown at 1/4. | `match_found_at_two_thirds_frees_the_paced_slot_before_the_drop`, `match_found_with_no_busy_edge_frees_the_slot_before_the_drop`, `the_paced_slot_is_kept_through_its_divisors_and_freed_with_the_one_it_holds`, `the_pass_stops_between_ticks_once_the_practice_is_no_longer_live` |
 
-## 5. Eden proof (planned)
+## 5. Original rc.8 test plan and later evidence
 
-A Quickplay pair (b hosts and waits; a joins), the diag build, QCF's trace points:
+| Evidence | Scope |
+| --- | --- |
+| [Feature ledger, row 82](../FEATURE-LEDGER.md) | Later five-speed timing runs. |
+| Original plan | A Quickplay pair (b hosting, a joining), diagnostic build and QCF’s trace points. |
 
 - per cycle (x1, 2/3, x1.5, 1/4): the host's room cadence (`main+0x1564088` hits), the round start and the match
   arrival on both consoles, a clean match (`sync_end … desync_seen=0` at the same frame);
