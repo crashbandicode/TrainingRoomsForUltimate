@@ -6,9 +6,9 @@
 
 ## rc.15: the builds of November 2026
 
-| Release record | Where to look |
-| --- | --- |
-| Installed file and test evidence | [Card readback](EVIDENCE.md#evidence-rc15-installs--fixed-build) |
+| Build | Installed | Footer ends with | In short |
+| --- | --- | --- | --- |
+| [Fixed build](#release-notes-rc15--fixed-build) | 2026-11-27 | `dc5302f1` | Clip editor, menu help and Tech practice fixes |
 
 These notes cover the November builds of the untagged rc.15 candidate. Each build's menu footer reads
 `0.2.0-rc.15 · rc15` and then the commit it was made from, so the commit tells the builds apart
@@ -159,9 +159,7 @@ found this on install 5, where the way round is ZL or ZR + Y: [Known issues](CUR
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
 
-*Right moves the playhead. Y snaps to the nearest move.* [Open the clip](media/tut-clip-playhead.mp4)
-
-With neither handle selected, Right moves the playhead. Y takes it to the start of the nearest move, at 66. L sets In there; R later keeps frame 100 as the last frame (Out 101). Eden diagnostic build `5df3d9dc`, 2026-11-26.
+*With neither handle selected, Right moves the playhead. Y takes it to the start of the nearest move, at 66. L sets In there; R later keeps frame 100 as the last frame (Out 101). Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](media/tut-clip-playhead.mp4)
 
 With no handle selected, on a macro or a capture:
 
@@ -189,9 +187,7 @@ With no handle selected, on a macro or a capture:
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/867d9322ecba30bf1c344ca71e5a3b394461e594" autoplay muted loop playsinline controls></video>
 
-*Both fighters follow the selected frame.* [Open the clip](media/tut-clip-scrub.mp4)
-
-Crop on Macro 3: L and R select the handles, and the fighters follow the selected frame without playing a preview. Eden diagnostic build `5df3d9dc`, 2026-11-26.
+*Crop on Macro 3: L and R select the handles, and the fighters follow the selected frame without playing a preview. Eden diagnostic build `5df3d9dc`, 2026-11-26.* [Open the clip](media/tut-clip-scrub.mp4)
 
 With In or Out selected, or once the playhead has moved, both fighters are shown where the take had them on that
 frame, without playing a preview. Both use the target's position when the hold begins, so their recorded spacing
@@ -282,7 +278,7 @@ The runs and what they did not cover: [Install evidence](EVIDENCE.md#evidence-rc
 
 #### Record works while an AI plays Player 1
 
-
+*No clip: Record under an AI is not filmed.*
 
 An AI here is the CPU pilot plugin, or TrainingRooms' own Player 1 control.
 
@@ -312,7 +308,7 @@ More: [Combo files › The format](guide/combos.md#the-format).
 
 #### B stops a preview, and the pop-up shows its chords
 
-
+*No clip: B stopping a preview is not filmed.*
 
 | When | The key line reads | What happens |
 | --- | --- | --- |
@@ -329,7 +325,7 @@ More: [Recording › Replay window](menu/recording.md#replay-window) and
 
 #### Delete for replay captures
 
-
+*No clip: deleting a capture is not filmed.*
 
 | Where | How |
 | --- | --- |
@@ -379,8 +375,8 @@ More: [Playback delay](menu/recording.md#playback-delay).
 
 #### Guard the Edge and Juggler start from the floor you stand on
 
-See the setup in both guides:
-[Guard the Edge](guide/guard-the-edge.md) and [Juggler](guide/juggler.md).
+*No clip of the choice of floor. Each drill's set-up is filmed in its guide:
+[Guard the Edge](guide/guard-the-edge.md) and [Juggler](guide/juggler.md).*
 
 | Rule | What it means |
 | --- | --- |
@@ -403,7 +399,7 @@ More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stage
 
 #### Two Guard the Edge options
 
-
+*No clip: the two options are not filmed.*
 
 | Option | Default | The other setting |
 | --- | --- | --- |
@@ -422,7 +418,7 @@ More: [Fighters & Stages › Guard the Edge and Juggler](menu/fighters-and-stage
 
 #### Eggs-ercise's off-stage zone follows the stage
 
-
+*No clip: the zone on another stage is not filmed.*
 
 | The off-stage zone | Install 5 |
 | --- | --- |
@@ -438,7 +434,7 @@ More: [Fighters & Stages › Eggs-ercise](menu/fighters-and-stages.md#eggs-ercis
 
 #### A save's placement is changed with the crosshair
 
-
+*No clip: Change placement is not filmed.*
 
 **Change placement** moves where a save state puts the fighters. The menu closes and a picker opens on the live
 game: move the fighters with the crosshair.
@@ -511,37 +507,27 @@ Move names changes the labels from jab, side tilt and up b to Jab 1, Forward til
 **Match angle and deflection, Off**
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4857608ce263f1c0ce535dea1b78cfe447b81cc1" autoplay muted loop playsinline controls></video><br>
-*147° passes with the direction option off.* [Open the clip](media/i4-action-off-147-zoom.mp4)
-
-Close-up of the drill panel. A warp recorded at 135° is cast at 147° with the option Off: the attempt is green. Eden, 2026-11-25, build `a945b0c1`.
+*Close-up of the drill panel. A warp recorded at 135° is cast at 147° with the option Off: the attempt is green. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-action-off-147-zoom.mp4)
 
 **Match angle and deflection, On, another angle**
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f8fe3ec94aa9ed3aa18a6313f3a1c581f3b5a261" autoplay muted loop playsinline controls></video><br>
-*147° fails with the direction option on.* [Open the clip](media/i4-action-on-147-zoom.mp4)
-
-Close-up of the drill panel. The same cast at 147° with the option On: the attempt is red. Eden, 2026-11-25, build `a945b0c1`.
+*Close-up of the drill panel. The same cast at 147° with the option On: the attempt is red. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-action-on-147-zoom.mp4)
 
 **Match angle and deflection, On, the recorded angle**
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4b1d65d8fab1b83e5d0199467a063377dc1463de" autoplay muted loop playsinline controls></video><br>
-*The recorded 135° passes with the option on.* [Open the clip](media/i4-action-on-135-zoom.mp4)
-
-Close-up of the drill panel. A cast at the recorded 135° with the option On: the attempt is green. Eden, 2026-11-25, build `a945b0c1`.
+*Close-up of the drill panel. A cast at the recorded 135° with the option On: the attempt is green. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-action-on-135-zoom.mp4)
 
 **A steered special, steered**
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3601efee83d20e7401cbe74b217770e30cd3fc1d" autoplay muted loop playsinline controls></video><br>
-*The steered up special passes.* [Open the clip](media/i4-steer-steered-zoom.mp4)
-
-Close-up of the drill panel. A drill recorded with an up special steered up-left: the steered cast is green. Eden, 2026-11-25, build `a945b0c1`.
+*Close-up of the drill panel. A drill recorded with an up special steered up-left: the steered cast is green. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-steer-steered-zoom.mp4)
 
 **A steered special, not steered**
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6e2be13321f0d19ec828e933ef905fdf6b4a2a96" autoplay muted loop playsinline controls></video><br>
-*The straight up special fails.* [Open the clip](media/i4-steer-straight-zoom.mp4)
-
-Close-up of the drill panel. The same drill with the up special cast straight: the attempt is red. Eden, 2026-11-25, build `a945b0c1`.
+*Close-up of the drill panel. The same drill with the up special cast straight: the attempt is red. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-steer-straight-zoom.mp4)
 
 **A get-up attack, recorded**
 
@@ -554,16 +540,12 @@ Playing the take puts Kirby down again and repeats the get-up attack.
 **L + R + A by itself**
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/ff5c2315ca6efcb51bbb8fea5d3205962e7c7295" autoplay muted loop playsinline controls></video><br>
-*The reset chord leaves the streak at one.* [Open the clip](media/i4-reset-chord-alone-zoom.mp4)
-
-Close-up of the drill panel. After one green attempt, L + R + A alone, short and long, adds no square: the streak stays at 1. Eden, 2026-11-25, build `a945b0c1`.
+*Close-up of the drill panel. After one green attempt, L + R + A alone, short and long, adds no square: the streak stays at 1. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-reset-chord-alone-zoom.mp4)
 
 **L + R + A after a failed attempt**
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/ffcc3cfe7871855d69a43591dbbcfef92944d0ef" autoplay muted loop playsinline controls></video><br>
-*Reset preserves the red square after a failed attempt.* [Open the clip](media/i4-reset-after-fail-zoom.mp4)
-
-Close-up of the drill panel. A failed attempt adds a red square, and the reset after it leaves that square in place. Eden, 2026-11-25, build `a945b0c1`.
+*Close-up of the drill panel. A failed attempt adds a red square, and the reset after it leaves that square in place. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-reset-after-fail-zoom.mp4)
 
 **A ledge attack:** not filmed. The trip attack is filmed like the get-up attack and kept with the test records.
 
@@ -603,16 +585,12 @@ Play back runs King K. Rool on the CPU, with the capture's timeline below.
 **Trim: Off, Start, End and Both**
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e9f977ffad992d303fca7844745d5bf6847d48d8" autoplay muted loop playsinline controls></video><br>
-*Start and Both skip the idle lead-in.* [Open the clip](media/i4-trim-modes.mp4)
-
-The same inputs were recorded four times, once per Trim setting. On playback, Start and Both skip the idle lead-in; Off and End keep it. Eden, 2026-11-25, build `a945b0c1`.
+*The same inputs were recorded four times, once per Trim setting. On playback, Start and Both skip the idle lead-in; Off and End keep it. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-trim-modes.mp4)
 
 **The playback indicator**
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e8416edabcabf441325f0d62e064fb3f6bf22e20" autoplay muted loop playsinline controls></video><br>
-*PLAY CPU disappears when the take ends.* [Open the clip](media/i4-playback-indicator-zoom.mp4)
-
-Close-up of the top left of the screen: the PLAY CPU mark shows while the CPU plays a take and goes when it ends. Eden, 2026-11-25, build `a945b0c1`.
+*Close-up of the top left of the screen: the PLAY CPU mark shows while the CPU plays a take and goes when it ends. Eden, 2026-11-25, build `a945b0c1`.* [Open the clip](media/i4-playback-indicator-zoom.mp4)
 
 | Change | What it does | More |
 | --- | --- | --- |
@@ -650,7 +628,7 @@ Taps and a hold move Min from 0 through 0.5 and 3 to 8%, and Max from 150 throug
 
 #### Waiting rooms
 
-
+*No clip: install 4's waiting-room changes are not filmed.*
 
 | Change | What it does | More |
 | --- | --- | --- |
@@ -783,7 +761,8 @@ Taps and a hold move Min from 0 through 0.5 and 3 to 8%, and Max from 150 throug
 | The menu | A held Up or Down repeats and speeds up, and L and R turn the page from inside a game's screen, a fighter grid or an editor. | [Moving around](guide/using-the-menu.md#moving-around) |
 
 The first rc.15 build (2026-11-15) added the clip editor, input drills, article hurtboxes and the colour legend
-([Current release](CURRENT-RELEASE.md)). Between that build and install 1, the features in the table above also entered rc.15.
+([Current release](CURRENT-RELEASE.md)). Between that build and install 1, more went into rc.15 without notes of its
+own. By theme, with the page that describes each:
 
 
 The build on the card just before install 1 (`17060a5e`, installed 2026-11-23 at 11:40) was played by the operator
@@ -807,13 +786,13 @@ See [Earlier releases](CURRENT-RELEASE.md#earlier-releases) for the notes and pu
 
 ## rc.9
 
-| rc.9 record | Section |
+| Fix | Recorded result |
 | --- | --- |
-| Shortcut conflicts | [Fixes](#release-notes-rc9--fixed) |
+| Deluxe window shows a page with rows | TrainingRooms D-pad chords are suppressed |
 
 - The rc.9 menu footer read `0.2.0-rc.6 · rc9` followed by the build's commit. rc.9 fixes the places where a TrainingRooms shortcut and another plugin's shortcut on the same buttons both fired, and it ships beside new builds of three of those plugins.
 - The fix IDs (C3, C4, …) are the numbers of the conflict survey the fixes came from.
-- See the [rc.8 release notes](#release-notes-rc8).
+- What rc.8 changed is [RELEASE-NOTES-rc8.md](#release-notes-rc8).
 
 <a id="release-notes-rc9--fixed"></a>
 
@@ -952,10 +931,10 @@ See [Earlier releases](CURRENT-RELEASE.md#earlier-releases) for the notes and pu
 | Test count | 41,918 before the cut, 865 after the table-driven replacements |
 
 - **The host tests:** the suite went from 41,918 tests to 865, under the 1,000 limit.
-  - The cut first took it to 942. Every cut and the reason for it is in [rc.9 test-cut ledger](TEST-PROVENANCE.md#test-cut-ledger-rc9).
+  - The cut first took it to 942. Every cut and the reason for it is in [TEST-CUT-LEDGER-rc9.md](TEST-PROVENANCE.md#test-cut-ledger-rc9).
   - The cut tests then came back as table-driven tests.
 - **Coverage:** line coverage is 91.5% with those 865 tests (90.8% before the cut, 34.2% just after it). How it was
-  measured, and what keeps it below 95%, is in [rc.9 coverage report](TEST-PROVENANCE.md#coverage-rc9).
+  measured, and what keeps it below 95%, is in [COVERAGE-rc9.md](TEST-PROVENANCE.md#coverage-rc9).
 - **Where the rules live:**
   - The chord rules are `model::chords::passes_row` (C3, C4) and `model::game_speed::Hold` (the speed hold).
   - Deluxe's export is read by `model::deluxe_overlay` and `runtime::deluxe_overlay`: looked up once, then again after
@@ -971,13 +950,13 @@ See [Earlier releases](CURRENT-RELEASE.md#earlier-releases) for the notes and pu
 
 ## rc.8
 
-| rc.8 record | Section |
+| Control | Recorded result |
 | --- | --- |
-| Controls and display | [Additions](#release-notes-rc8--new) |
+| R + D-pad Down | Toggles the input display |
 
 These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer identified that build as
 `0.2.0-rc.6 · rc8` followed by its commit. How to use recording is
-[Recording guide](guide/recording.md), the frame strip is [Frame strip guide](guide/frame-strip.md), and the pictures are the list in
+[RECORDING.md](guide/recording.md), the frame strip is [FRAME-STRIP.md](guide/frame-strip.md), and the pictures are the list in
 [MEDIA.md](MEDIA.md).
 
 <a id="release-notes-rc8--new"></a>
@@ -1008,9 +987,7 @@ These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0f02cbc3879c9295bbfa358cbfa8a7d907eeaac3" autoplay muted loop playsinline controls></video>
 
-*Jabs slow as Game speed drops to 1/2, then 1/4.* [Open the clip](media/rc8-game-speed-chord.mp4)
-
-The Game speed pop-up steps to 1/2, then 1/4; the jabs slow down; the pause menu shows Speed 1/4
+*The Game speed pop-up steps to 1/2, then 1/4; the jabs slow down; the pause menu shows Speed 1/4* [Open the clip](media/rc8-game-speed-chord.mp4)
 
 - Hold the chord and a small "Game speed" pop-up shows the current speed between two D-pad arrows.
 - While you hold it, D-pad Left and Right step one speed at a time, slowest on the left. The steps stop at the slowest
@@ -1027,9 +1004,7 @@ The Game speed pop-up steps to 1/2, then 1/4; the jabs slow down; the pause menu
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b8908852fc9c93984c0a88a9076d2a394f260fa8" autoplay muted loop playsinline controls></video>
 
-*The stopwatch appears at ×1.5 and disappears at ×1.* [Open the clip](media/rc8-speed-hud-fixed.mp4)
-
-Hold R + D-pad Up, Right: the stopwatch reads x1.5; Left back to x1: it goes away
+*Hold R + D-pad Up, Right: the stopwatch reads x1.5; Left back to x1: it goes away* [Open the clip](media/rc8-speed-hud-fixed.mp4)
   - 1 Frame stays in the pause menu. While Training is on 1 Frame, the pop-up shows "1 Frame", and the first step goes
     from x1.
 - **In the waiting-room practice:** 1/4, 1/2, 2/3, x1 and x1.5, local only.
@@ -1056,9 +1031,7 @@ Hold R + D-pad Up, Right: the stopwatch reads x1.5; Left back to x1: it goes awa
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bdce4e2f0ba4681509a24cf720e1f9d5948dd818" autoplay muted loop playsinline controls></video>
 
-*Both pages show the rc.8 footer.* [Open the clip](media/rc8-footer-tag.mp4)
-
-Two menu pages: the key hints end with 0.2.0-rc.6 · rc8 3f9d61dd
+*Two menu pages: the key hints end with 0.2.0-rc.6 · rc8 3f9d61dd* [Open the clip](media/rc8-footer-tag.mp4)
 
 - The rc.8 key hints at the foot of every menu page ended with the build tag: the version, then `rc8` and the commit the NRO
   was built from, for example `0.2.0-rc.6 · rc8 3f9d61dd`.
@@ -1114,13 +1087,13 @@ The CPU pilot is a separate plugin, `libssbu_cpu_pilot.nro`. Its 0.2.3 ships bes
 
 ## 0.2.0-rc.6
 
-| rc.6 record | Section |
+| Addition | Recorded result |
 | --- | --- |
-| Sequence drilling and other additions | [New features](#release-notes-rc6--new) |
+| Sequence drilling | Practise an ordered list of combos |
 
 Notes for players. 0.2.0-rc.5 was withdrawn before it ran on players' consoles, so rc.6 followed
-`0.2.0-rc.3.1`. Everything the [rc.5 release notes](#release-notes-rc5) lists is in it, with the changes below. How to
-use recording is [Recording guide](guide/recording.md), the Mii pages are [Mii technical notes](TECHNICAL.md#mii), and the pictures are the list in
+`0.2.0-rc.3.1`. Everything [RELEASE-NOTES-rc5.md](#release-notes-rc5) lists is in it, with the changes below. How to
+use recording is [RECORDING.md](guide/recording.md), the Mii pages are [MII.md](TECHNICAL.md#mii), and the pictures are the list in
 [MEDIA.md](MEDIA.md).
 
 The switch and reset times below are the ranges reported for rc.6. The [feature ledger](FEATURE-LEDGER.md) names the candidate runs. Their original timing receipts were unavailable for the November 27 audit.
@@ -1159,9 +1132,7 @@ rc.5 let you build and edit sequences, but not drill them. rc.6 drills them.
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/42a8345eed3afe5d5842008cd1ed4fb229d18c7f" autoplay muted loop playsinline controls></video>
 
-*The rc.7 take shows the sequence drill.* [Open the clip](media/rc7-sequence-drill.mp4)
-
-Shown on rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only), 2026-11-11; the rc.6 clip carried another plugin's input bar.
+*Shown on rc.7 `722525a5` as shipped (diag NRO `cfec85c7`, log lines only), 2026-11-11; the rc.6 clip carried another plugin's input bar.* [Open the clip](media/rc7-sequence-drill.mp4)
 
 The sequence bar is taller than the combo bar, so notices sit 56 layout units (about 37 pixels at 1280×720) lower
 than in rc.5, under either bar.
@@ -1385,14 +1356,14 @@ leaves the game's own level everywhere.
 
 ## 0.2.0-rc.5
 
-| rc.5 record | Section |
+| Display | Recorded result |
 | --- | --- |
-| Input history and timing | [Frame strip](#release-notes-rc5--frame-strip) |
+| Input history | Last second for Player 1 and the CPU |
 
 0.2.0-rc.5 was withdrawn before players ran it. Its contents were included in 0.2.0-rc.6, with the changes and corrections in
-[rc.6 release notes](#release-notes-rc6).
+[RELEASE-NOTES-rc6.md](#release-notes-rc6).
 
-Notes for players. rc.5 followed `0.2.0-rc.3.1`. There is no separate `0.2.0-rc.4`. How to read the frame strip is [Frame strip guide](guide/frame-strip.md). How to use recording is [Recording guide](guide/recording.md). The pictures for those pages are the list in [MEDIA.md](MEDIA.md).
+Notes for players. rc.5 followed `0.2.0-rc.3.1`. There is no separate `0.2.0-rc.4`. How to read the frame strip is [FRAME-STRIP.md](guide/frame-strip.md). How to use recording is [RECORDING.md](guide/recording.md). The pictures for those pages are the list in [MEDIA.md](MEDIA.md).
 
 <a id="release-notes-rc5--frame-strip"></a>
 
@@ -1431,7 +1402,7 @@ Holding one direction long enough can freeze the strip. A new binned direction, 
 - A chain starts at its first macro's start save, plays its recordings in order, and cannot contain a chain.
 - rc.5 omitted Save last combo. [rc.6 restored the row](#release-notes-rc6--save-last-combo). A drilled combo counts without having to be a true combo. A different move drops.
 - Make combo plays the file under the cursor once on Player 1, from that file's own start save, and saves the links as a new combo named Combo N. In rc.5, a playback with no hit saved the previous exchange.
-- Crop opens a handle screen and saves a new file. The original stays. Both rows are on the file's screen; what they do is in [Recording guide](guide/recording.md).
+- Crop opens a handle screen and saves a new file. The original stays. Both rows are on the file's screen; what they do is in [RECORDING.md](guide/recording.md).
 - A sequence is an ordered list of combos. rc.5 could build and edit sequences. Its helper drilled one combo. [rc.6 added sequence drilling](#release-notes-rc6--sequence-drilling).
 - Play on a macro or a chain whose first macro was recorded on another fighter asks Fighter Mismatch first: Keep, Switch, or B to cancel. The frame strip is hidden while it is up.
 - The pop-up and the Recording page are how you bind a save, set a macro active, and drill.
