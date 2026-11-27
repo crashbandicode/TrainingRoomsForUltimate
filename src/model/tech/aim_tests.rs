@@ -121,8 +121,8 @@ fn traced_wall_launch_needs_an_approach_from_the_contact_side() {
     assert_eq!(picker::Spot::at(wall, t).point(), v(57.493_134, -29.609_436));
     let fixed = run(t, 25., Some(80.)).map(|launch| launch.angle);
     let auto = run(t, 25., None).map(|launch| launch.angle);
-    // The trace pins the fixed control; atan2's last bit is not portable between hosts.
-    let inward = (-wall.normal.y).atan2(-wall.normal.x).to_degrees();
+    // Solid is left of A->B, so rotate its tangent counterclockwise: (-dy, dx).
+    let inward = (b.x - a.x).atan2(a.y - b.y).to_degrees();
     assert_eq!((fixed, auto), (None, Some(inward)), "the fly-by must not replace the normal approach");
 }
 
