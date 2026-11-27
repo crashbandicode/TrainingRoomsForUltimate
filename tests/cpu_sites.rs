@@ -12,7 +12,7 @@ use model::sites::{self, Feature, Site};
 use model::sites_pkg2;
 
 /// (row, symbol) of every package-2 row that is a named function in the owned ELF.
-const SYMBOLS: [(&str, &str); 45] = [
+const SYMBOLS: [(&str, &str); 46] = [
     ("lua_const_lookup", "_ZN3lib18lua_bind_get_valueIiEEbmRT_"),
     ("stage_id_call", "_ZN3app14sv_information8stage_idEv"),
     ("status_kind", "_ZN3app8lua_bind30StatusModule__status_kind_implEPNS_26BattleObjectModuleAccessorE"),
@@ -58,6 +58,7 @@ const SYMBOLS: [(&str, &str); 45] = [
     ("stick_y_no_clamp_hook", "_ZN3app8lua_bind40ControlModule__get_stick_y_no_clamp_implEPNS_26BattleObjectModuleAccessorE"),
     ("utility_get_category", "_ZN3app7utility12get_categoryEj"),
     ("utility_get_kind", "_ZN3app7utility8get_kindEPKNS_26BattleObjectModuleAccessorE"),
+    ("motion_is_anim_resource", "_ZN3app8lua_bind35MotionModule__is_anim_resource_implEPNS_26BattleObjectModuleAccessorEN3phx6Hash40E"),
 ];
 
 /// Offsets of every site of `ssbu-cpu-pilot` (commit 0162eed, `src/model.rs`; the list is the one
@@ -230,6 +231,30 @@ fn record_place_calls_the_guarded_motion_change_hook() {
     let usable = |row: &Site| row.name != "motion_change_hook";
     assert!(!Granted::from_usable(&usable).allows(site.offset));
     assert!(!sites::feature_usable(Feature::RecordPlace, usable));
+}
+
+/// The scrub asks whether a fighter has an animation before it starts it (scrub moves, SM1). The read is the
+/// placement unit's own row: refused, it turns that unit off and no other.
+#[test]
+fn the_scrubs_animation_read_is_the_placement_units_own_guarded_row() {
+    use model::capabilities::{self, Granted};
+    let site = capabilities::find("motion_is_anim_resource").expect("the guarded row");
+    assert_eq!((site.offset, site.feature), (0x205_ce10, Feature::RecordPlace));
+    assert!(matches!(site.kind, SeamKind::Called), "called, never hooked");
+    assert_eq!(capabilities::call_rows(site.offset).map(|row| row.name).collect::<Vec<_>>(), ["motion_is_anim_resource"]);
+    assert!(sites::feature_usable(Feature::RecordPlace, |_| true));
+    let usable = |row: &Site| row.name != "motion_is_anim_resource";
+    assert!(!Granted::from_usable(&usable).allows(site.offset));
+    assert_eq!(capabilities::blocked_by(Feature::RecordPlace, &usable), Some("motion_is_anim_resource"));
+    for unit in [Feature::CpuCore, Feature::CpuTech, Feature::Recording, Feature::NamedMacros, Feature::StateCore, Feature::EdgeJuggle] {
+        assert!(capabilities::unit_usable(unit, &usable), "{} does not need the read", unit.name());
+    }
+    // Its window is the game's bytes, next to the animation reads the unit already calls.
+    if let Some(owned) = common::owned_main("the_scrubs_animation_read_is_the_placement_units_own_guarded_row") {
+        assert_eq!(owned.window(site.offset), site.guard);
+        assert_eq!(&site.guard[..16], &[0x00, 0x44, 0x40, 0xf9, 0x08, 0x00, 0x40, 0xf9, 0x02, 0x39, 0x41, 0xf9, 0x40, 0x00, 0x1f, 0xd6],
+            "a thunk through the animation module's slot 0x270");
+    }
 }
 
 #[test]

@@ -64,7 +64,7 @@ fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 /// The text with comments, string and char literals blanked (same length, newlines kept), so line numbers still hold.
-fn code_only(text: &str) -> String {
+pub(super) fn code_only(text: &str) -> String {
     let b = text.as_bytes();
     let mut out = b.to_vec();
     let blank = |out: &mut Vec<u8>, from: usize, to: usize| {

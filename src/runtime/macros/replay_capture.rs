@@ -15,9 +15,14 @@ use crate::engine::library::Role;
 use crate::engine::macro_ui::clip_marks::{Span, WATCH_SPANS};
 use crate::engine::rr_host;
 use {crate::engine::macros::InputFrame, crate::engine::macros::LiveFrame, crate::engine::macros::LiveInput, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplaySession, crate::engine::macros::StartState, crate::engine::macros::MAX_FRAMES};
-use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, ClipAction, ClipContext, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};
+use {crate::engine::macro_ui::macro_panel::{fighter_gate, FighterChoice, FighterGate, LibraryRow, Pad, View}, crate::engine::macro_ui::clip_browser::{ClipBrowser, Effect as BrowserEffect}, crate::engine::macro_ui::clip_panel::{direction_action, scrub_repeat_step, shoulder_action, ClipAction, ClipEditor, ClipEffect, ClipView, CloseInputGuard, PreviewTail}};
 
 use crate::runtime::lobby::game_mode;
+use crate::runtime::game::{self, natives};
+use crate::runtime::roster::{character_roster, roster_requests};
+use crate::runtime::ui::facts;
+use crate::model::sites_pkg2::{MOTION_FRAME_OFFSET, MOTION_KIND_OFFSET};
+use crate::engine::macros::{PackedPose, Pose};
 
 const REPLAY_MODE_13_0_5: u32 = 0x05010100;
 // Native calibration: all 4,222 post-frame samples exactly recovered the mapped
@@ -921,17 +926,95 @@ fn scrub_service() {
         let _ = SLOT.publish(Block::new());
     }
     let (shown, ask) = (editor.shown_frame(), editor.scrub().0);
-    let pos = SLOT.with(|block| {
+    let observed = SLOT.with(|block| {
         block.ask_at(shown, ask);
-        block.pos()
+        (block.pos(), [block.pose(0).0, block.pose(1).0])
     });
-    if pos.is_some_and(|pos| editor.note_scrub(pos)) {
+    let mut changed = editor.note_fighters(
+        [roster_requests::player_kind().map(|kind| kind as i32), facts::fact_cpu_kind()],
+        !character_roster::busy() && facts::fact_ready_go(),
+    );
+    if let Some((pos, poses)) = observed {
+        changed |= editor.note_scrub(pos);
+        changed |= editor.note_poses(poses);
+    }
+    if changed {
         crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+    }
+}
+
+/// X while the fighters are held at a shown frame (tr-primary-2 2026-11-26 12:54:05Z): the hold lets them go first.
+/// The editor keeps the play as wanted and shows no frame, so "nobody" is published at once; `service_wanted_play`
+/// starts it on the pass that finds the bodies released. `false`: nothing is held and the play starts now.
+fn hold_play(action: ClipAction, playback: bool) -> bool {
+    use crate::engine::macro_ui::scrub_track::SLOT;
+    {
+        let mut editor = EDITOR.lock().unwrap();
+        let Some(editor) = editor.as_mut() else { return false };
+        if editor.view().playing || SLOT.released() { return false; }
+        editor.want_play(action, playback);
+    }
+    crate::runtime::diag_log::diagnostic(format_args!("[Scrub] play wanted: the hold lets the fighters go first"));
+    scrub_service();
+    crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+    true
+}
+
+/// Every worker pass: a wanted play starts once the hold reports the bodies released. The start that follows waits
+/// for the released CPU by its state on the game side (`states::preview::take_home`).
+fn service_wanted_play() {
+    use crate::engine::macro_ui::scrub_track::SLOT;
+    let wanted = {
+        let mut editor = EDITOR.lock().unwrap();
+        let Some(editor) = editor.as_mut() else { return };
+        if editor.wanted_play().is_none() || !SLOT.released() { return; }
+        SLOT.with(|block| block.await_settle());
+        editor.take_wanted_play()
+    };
+    if let Some((action, playback)) = wanted {
+        crate::runtime::diag_log::diagnostic(format_args!("[Scrub] released: the play is asked"));
+        apply_action_as(action, playback);
+    }
+}
+
+fn service_wanted_fighter() {
+    use crate::engine::macro_ui::scrub_track::SLOT;
+    if roster_requests::take_clip_reply() == Some(false) {
+        let refused = EDITOR.lock().unwrap().as_mut().is_some_and(|editor| editor.fighter_loading().is_some() && editor.cancel_fighter());
+        if refused {
+            // restriction: clip-fighter-refused
+            notify("The roster refused the fighter switch".into());
+            return;
+        }
+    }
+    let (wanted, timed_out) = {
+        let mut editor = EDITOR.lock().unwrap();
+        let Some(editor) = editor.as_mut() else { return };
+        if editor.tick_fighter_load() {
+            (None, true)
+        } else if editor.wanted_fighter().is_some() && SLOT.released() {
+            (editor.take_wanted_fighter(), false)
+        } else {
+            (None, false)
+        }
+    };
+    if timed_out {
+        notify("The fighter did not load; the editor keeps the current one".into());
+        crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+        return;
+    }
+    if let Some((player, kind)) = wanted {
+        // restriction: clip-fighter-by-kind
+        roster_requests::request_clip_kind(player, kind as u32);
+        crate::runtime::diag_log::diagnostic(format_args!(
+            "[Scrub] fighter role={} kind={kind}: the roster is asked", if player { "p1" } else { "cpu" }));
     }
 }
 
 pub fn worker_preview_notices() {
     scrub_service();
+    service_wanted_play();
+    service_wanted_fighter();
     if rr_host::take_generated() {
         let id = EDITOR.lock().unwrap().as_ref().and_then(|editor| editor.source.as_ref().map(|(id, _)| id.clone()));
         if let Some(id) = id {
@@ -1079,6 +1162,7 @@ fn apply_action_as(action: ClipAction, playback: bool) {
         notify("Wait for the requested fighter to load".into());
         return;
     }
+    if matches!(action, ClipAction::TogglePlay | ClipAction::Restart) && hold_play(action, playback) { return; }
     if matches!(action, ClipAction::PreviousFighter | ClipAction::NextFighter | ClipAction::ToggleCapture) {
         // A previous track's Switch is not authority to swap for a later Keep.
         if let Some(editor) = EDITOR.lock().unwrap().as_mut() { editor.switch = false; }
@@ -1165,21 +1249,38 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
         if controller.just_down.b() { cancel_reload(); }
         return;
     }
+    {
+        let mut editor = EDITOR.lock().unwrap();
+        if let Some(editor) = editor.as_mut().filter(|editor| editor.wanted_fighter().is_some() || editor.fighter_loading().is_some()) {
+            if controller.just_down.b() {
+                editor.cancel_fighter();
+                crate::runtime::macros::port::sync::assign(&crate::runtime::compat::common::menu::MENU_RECEIVED_INPUT, true);
+            }
+            return;
+        }
+    }
+    let p = controller.just_down;
+    let b = controller.current_buttons;
+    let gcc = controller.style == ControllerStyle::GCController;
+    let modifier = if gcc { b.zr() } else { b.zl() || b.zr() };
     let held = controller.current_buttons;
     if TARGET_TAP.lock().unwrap().zr_tap(held)
         && clip_view().is_some_and(|v| v.target.is_some()) {
         on_action(ClipAction::SwapTarget);
         return;
     }
+    if modifier && clip_view().is_some_and(|v| v.playing) {
+        if let Some(action) = shoulder_action(p.l() || (gcc && p.real_digital_l()), p.r() || (gcc && p.real_digital_r()), modifier) {
+            on_action(action);
+            *HOLD.lock().unwrap() = (0, 0, false);
+            return;
+        }
+    }
     if clip_view().is_some_and(|v| v.playing) {
         if controller.just_down.x() || controller.just_down.b() { on_action(ClipAction::TogglePlay); }
         *HOLD.lock().unwrap() = (0, 0, false);
         return;
     }
-    let p = controller.just_down;
-    let b = controller.current_buttons;
-    let gcc = controller.style == ControllerStyle::GCController;
-    let modifier = if gcc { b.zr() } else { b.zl() || b.zr() };
     let left = b.dpad_left() || b.l_left() || b.r_left();
     let right = b.dpad_right() || b.l_right() || b.r_right();
     let direction = i32::from(right) - i32::from(left);
@@ -1197,8 +1298,7 @@ pub fn on_input(controller: &crate::runtime::macros::port::input::Controller) {
         else if confirm { Some(ClipAction::Confirm) }
         else if p.x() { Some(if modifier { ClipAction::ToggleCapture } else { ClipAction::TogglePlay }) }
         else if p.y() { Some(if modifier { ClipAction::UseLeadIn } else { ClipAction::Snap }) }
-        else if p.l() || (gcc && p.real_digital_l()) { Some(ClipAction::SelectIn) }
-        else if p.r() || (gcc && p.real_digital_r()) { Some(ClipAction::SelectOut) }
+        else if let Some(action) = shoulder_action(p.l() || (gcc && p.real_digital_l()), p.r() || (gcc && p.real_digital_r()), modifier) { Some(action) }
         else {
             direction_action(
                 p.dpad_left() || p.l_left() || p.r_left(),
@@ -1243,8 +1343,23 @@ pub fn after_draw() {
     }
 }
 
+/// Both animation reads are granted. A refused read returns 0, which is also a real frame, so one alone is no pose.
+fn pose_reads_granted() -> bool {
+    game::granted(MOTION_KIND_OFFSET) && game::granted(MOTION_FRAME_OFFSET)
+}
+
+/// The fighter's animation and its frame now, or no pose when either read is refused (scrub-moves SM5 B).
+unsafe fn sampled_pose(accessor: usize) -> PackedPose {
+    if !pose_reads_granted() {
+        return PackedPose::NONE;
+    }
+    PackedPose::pack(Pose { motion: natives::motion_kind(accessor), frame: natives::motion_frame(accessor) })
+}
+
 pub(crate) unsafe fn state(module: &mut BattleObjectModuleAccessor) -> ReplayFrame {
-    ReplayFrame { input: InputFrame::default(), start: StartState {
+    let accessor = module as *mut BattleObjectModuleAccessor as usize;
+    ReplayFrame { pose: sampled_pose(accessor),
+        input: InputFrame::default(), start: StartState {
         fighter_kind: app::utility::get_kind(module),
         costume: WorkModule::get_int(module, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR) as u32,
         facing: PostureModule::lr(module),
@@ -1288,7 +1403,7 @@ pub(crate) unsafe fn live_state(module: &mut BattleObjectModuleAccessor) -> Opti
             velocity.map(f32::to_bits));
         return None;
     }
-    let sample = LiveFrame { input: LiveInput::default(), start: before.start,
+    let sample = LiveFrame { pose: before.pose, input: LiveInput::default(), start: before.start,
         x: before.x, y: before.y, position_z: PostureModule::pos_z(module),
         speed_z: velocity[2], body: module.battle_object_id };
     #[cfg(feature = "named-input-trace")]

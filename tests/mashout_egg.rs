@@ -274,7 +274,7 @@ fn actual_runtime_egg_preparation_and_native_seed() {
 fn actual_floor_ray_requires_layout_grants_and_valid_platforms() {
     let runtime = include_str!("../src/runtime/features/stage_geometry.rs");
     let reader_start = runtime.find("#[repr(C, align(16))]").unwrap();
-    let reader_end = runtime.find("/// The main floor under the camera's middle").unwrap();
+    let reader_end = runtime.find("use crate::model::stage_geometry::{is_placement_floor").unwrap();
     let model = include_str!("../src/model/stage_geometry.rs");
     let rule_start = model.find("/// True when the line is a placement floor.").unwrap();
     let rule_end = model.find("/// One ray of the column scan").unwrap();
@@ -447,15 +447,7 @@ fn run_fixture(fixture: String, label: &str) {
 fn run_fixture_with_args(fixture: String, label: &str, args: &[&str]) {
     // Inner module docs need their original position before imports.
     let fixture = fixture.replace("//!", "//");
-    let dir = std::env::temp_dir().join(format!("tr-mashout-{label}-{}", std::process::id()));
-    fs::create_dir_all(&dir).unwrap();
-    struct Cleanup(std::path::PathBuf);
-    impl Drop for Cleanup {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
-    let _cleanup = Cleanup(dir.clone());
+    let dir = crate::test_scratch::Scratch::new(&format!("tr-mashout-{label}"));
     let input = dir.join("actual.rs");
     let binary = dir.join("actual");
     fs::write(&input, fixture).unwrap();

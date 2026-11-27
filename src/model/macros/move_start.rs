@@ -168,7 +168,7 @@ mod tests {
     }
     fn track(statuses: &[i32]) -> ReplayTrack {
         ReplayTrack { fighter: None, entry: 1, quantized_analog: false, frames: statuses.iter().enumerate()
-            .map(|(i, &status)| ReplayFrame { input: InputFrame { buttons: i as u32, ..Default::default() },
+            .map(|(i, &status)| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: i as u32, ..Default::default() },
                 start: StartState { status, ..StartState::neutral(74, 0, 1.0) }, x: 0.0, y: 0.0 }).collect() }
     }
 

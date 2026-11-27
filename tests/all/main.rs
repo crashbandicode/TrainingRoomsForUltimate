@@ -9,6 +9,9 @@ macro_rules! callgraph_self_tests {
     ($($body:tt)*) => { $($body)* };
 }
 
+#[path = "../support/scratch.rs"]
+mod test_scratch;
+
 #[path = "../common/callgraph.rs"]
 mod callgraph;
 #[path = "../common/mod.rs"]
@@ -33,6 +36,8 @@ mod scrub_play_timing;
 mod generated_idle;
 #[path = "../scrub_save_heap.rs"]
 mod scrub_save_heap;
+#[path = "../capture_fresh_process.rs"]
+mod capture_fresh_process;
 #[path = "../../src/test_table.rs"]
 mod test_table;
 #[path = "../build_tag.rs"]
@@ -109,6 +114,8 @@ mod frame_strip_settings;
 mod fs027_busy_sees_rr_host;
 #[path = "../game_thread_handoffs.rs"]
 mod game_thread_handoffs;
+#[path = "../temp_dir_scan.rs"]
+mod temp_dir_scan;
 #[path = "../hook_alloc.rs"]
 mod hook_alloc;
 #[path = "../hook_locks.rs"]
@@ -227,6 +234,8 @@ mod pristine_load;
 mod release_warnings;
 #[path = "../roster_request_handoff.rs"]
 mod roster_request_handoff;
+#[path = "../rows_tables.rs"]
+mod rows_tables;
 #[path = "../sav002_load_stops_rr_playback.rs"]
 mod sav002_load_stops_rr_playback;
 #[path = "../size_budget.rs"]

@@ -167,6 +167,8 @@ pub struct MacroRecording {
     /// A crop inherits the source of its rows; exporting it is not another Record.
     #[serde(skip)]
     pub(super) track_source: super::positions::Source,
+    #[serde(skip)]
+    pub(super) track_moves: super::positions::Moves,
 }
 
 impl MacroRecording {
@@ -193,6 +195,7 @@ impl MacroRecording {
             start_save_on: true,
             track: None,
             track_source: super::positions::Source::Recorded,
+            track_moves: super::positions::Moves::None,
         };
         recording.validate()?;
         Ok(recording)
@@ -264,16 +267,20 @@ impl MacroRecording {
     pub fn set_track(&mut self, track: Option<Vec<[super::ReplayFrame; 2]>>) {
         self.track = track;
         self.track_source = super::positions::Source::Recorded;
+        self.track_moves = super::positions::Moves::Take;
     }
 
-    pub fn set_sourced_track(&mut self, source: super::positions::Source, track: Vec<[super::ReplayFrame; 2]>) {
+    pub fn set_sourced_track(&mut self, source: super::positions::Source, moves: super::positions::Moves, track: Vec<[super::ReplayFrame; 2]>) {
         self.track = Some(track);
         self.track_source = source;
+        self.track_moves = moves;
     }
 
-    pub fn take_sourced_track(&mut self) -> Option<(super::positions::Source, Vec<[super::ReplayFrame; 2]>)> {
-        self.track.take().map(|track| (self.track_source, track))
+    pub fn take_sourced_track(&mut self) -> Option<(super::positions::Source, super::positions::Moves, Vec<[super::ReplayFrame; 2]>)> {
+        self.track.take().map(|track| (self.track_source, self.track_moves, track))
     }
+
+    pub fn has_moves(&self) -> bool { self.track_moves != super::positions::Moves::None }
 
     /// Keep frames `range` of the recording, with the same slice of its track.
     pub fn keep(&mut self, range: std::ops::Range<usize>) {

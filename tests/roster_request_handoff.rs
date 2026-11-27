@@ -292,22 +292,7 @@ impl Role {
 "#,
     );
 
-    let unique = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let dir = std::env::temp_dir().join(format!(
-        "roster-request-handoff-{}-{unique}",
-        std::process::id()
-    ));
-    fs::create_dir(&dir).unwrap();
-    struct Cleanup(std::path::PathBuf);
-    impl Drop for Cleanup {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
-    let _cleanup = Cleanup(dir.clone());
+    let dir = crate::test_scratch::Scratch::new("roster-request-handoff");
     let input = dir.join("actual.rs");
     let binary = dir.join(format!("actual{}", std::env::consts::EXE_SUFFIX));
     fs::write(&input, fixture).unwrap();
@@ -338,3 +323,20 @@ impl Role {
 }
 
 const FIXTURE: &str = include_str!("support/roster_request_handoff_fixture.rs");
+
+#[test]
+fn clip_switch_reports_the_rosters_answer_on_the_next_worker_pass() {
+    let runtime = include_str!("../src/runtime/macros/replay_capture.rs");
+    let source = include_str!("support/clip_admission.rs")
+        .replace("// WORKER", block(runtime, "fn service_wanted_fighter()"))
+        .replace("PROJECT_ROOT", env!("CARGO_MANIFEST_DIR"));
+    let scratch = crate::test_scratch::Scratch::new("clip-admission");
+    let src = scratch.join("check.rs");
+    let exe = scratch.join("check");
+    fs::write(&src, source).unwrap();
+    let build = Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
+        .args(["--edition=2021", "-Awarnings"]).arg(src).arg("-o").arg(&exe).output().unwrap();
+    assert!(build.status.success(), "{}", String::from_utf8_lossy(&build.stderr));
+    let run = Command::new(exe).output().unwrap();
+    assert!(run.status.success(), "{}", String::from_utf8_lossy(&run.stderr));
+}

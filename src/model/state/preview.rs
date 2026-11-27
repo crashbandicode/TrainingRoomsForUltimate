@@ -1,8 +1,56 @@
 //! A clip editor's transient checkpoint. Numbered slots and persistence are not
 //! part of this owner; native adapters supply freshly qualified identities.
 use super::record::SavedState;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 pub fn playing_index(player: bool) -> usize { usize::from(!player) }
+
+/// Consume only the checked request. A changed value must get its own check next frame.
+pub fn take_home_ask(ask: &AtomicU8, wait: impl FnOnce(u8) -> bool) -> u8 {
+    let checked = ask.load(Ordering::Acquire);
+    if wait(checked) || checked == 0 { return 0; }
+    ask.compare_exchange(checked, 0, Ordering::AcqRel, Ordering::Acquire).unwrap_or(0)
+}
+
+/// What a preview's start does about a CPU the scrub hold has just let go (`scrub_track::Block::settling`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Settle {
+    /// On the ground and idle: the checkpoint's own condition.
+    Ready,
+    /// In a state the game always leaves for the ground: the start stays asked.
+    Wait,
+    /// It will not settle: the start is refused, as a start with no release before it is.
+    Refuse,
+}
+
+/// The CPU on this frame, as the game reports it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Body {
+    pub ground: bool,
+    pub air: bool,
+    pub idle: bool,
+    /// The Fall status: what the hold put the body in, and what it is in until it lands.
+    pub falling: bool,
+    /// A landing status.
+    pub landing: bool,
+    /// Dead, waiting to come back, or on the rebirth platform.
+    pub gone: bool,
+    /// In the air with a floor under its point by the shared stage rule: it lands.
+    pub floor: bool,
+}
+
+/// No clock: every state waited on is one the game leaves by itself, and every other state refuses at once.
+pub fn settle(body: Body) -> Settle {
+    if body.gone {
+        Settle::Refuse
+    } else if body.ground && body.idle {
+        Settle::Ready
+    } else if body.ground && (body.falling || body.landing) || body.air && body.floor {
+        Settle::Wait
+    } else {
+        Settle::Refuse
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {
@@ -79,6 +127,49 @@ mod tests {
         })
     }
 
+    fn a_released_cpu_is_waited_for_by_its_state_and_never_by_a_clock() {
+        let on_ground = Body { ground: true, ..Body::default() };
+        let in_air = Body { air: true, ..Body::default() };
+        assert_eq!(settle(Body { idle: true, ..on_ground }), Settle::Ready);
+        // The game always leaves these: the released body's Fall on the ground, a landing, a fall onto a floor.
+        assert_eq!(settle(Body { falling: true, ..on_ground }), Settle::Wait);
+        assert_eq!(settle(Body { landing: true, ..on_ground }), Settle::Wait);
+        assert_eq!(settle(Body { floor: true, falling: true, ..in_air }), Settle::Wait);
+        assert_eq!(settle(Body { floor: true, ..in_air }), Settle::Wait);
+        // It will not settle: no floor to land on, the ledge (neither ground nor air), busy on the ground.
+        assert_eq!(settle(Body { falling: true, ..in_air }), Settle::Refuse);
+        assert_eq!(settle(Body::default()), Settle::Refuse);
+        assert_eq!(settle(on_ground), Settle::Refuse);
+        assert_eq!(settle(Body { idle: true, ..in_air }), Settle::Refuse, "idle in the air is not the gate's condition");
+        // Dead or coming back refuses whatever else is read.
+        for body in [Body { idle: true, ..on_ground }, Body { floor: true, ..in_air }, Body { landing: true, ..on_ground }] {
+            assert_eq!(settle(Body { gone: true, ..body }), Settle::Refuse);
+        }
+        // The game side keeps the start asked while it waits, and takes it only then.
+        let runtime = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/runtime/features/states/preview.rs")).unwrap_or_default();
+        assert!(runtime.contains("take_home_ask(&ASK") && runtime.contains("waiting != 0 && waiting != 3 && settling() == Some(Settle::Wait)"),
+            "only starts wait for the released CPU");
+        assert!(!runtime.contains("Instant") && !runtime.contains("elapsed"), "no clock");
+    }
+
+    #[test]
+    fn a_preview_request_published_during_the_check_waits_for_its_own_frame() {
+        // Empty -> Start, Start -> different Start, Start -> Return, Return -> Start.
+        let results = [(0, 1), (1, 5), (5, 3), (3, 2)].map(|(first, next)| {
+            let ask = AtomicU8::new(first);
+            let taken = take_home_ask(&ask, |checked| {
+                assert_eq!(checked, first);
+                ask.store(next, Ordering::Release);
+                false
+            });
+            (taken, ask.load(Ordering::Acquire), take_home_ask(&ask, |_| false), ask.load(Ordering::Acquire))
+        });
+        assert_eq!(results, [(0, 1, 1, 0), (0, 5, 5, 0), (0, 3, 3, 0), (0, 2, 2, 0)]);
+        let ask = AtomicU8::new(4);
+        assert_eq!(take_home_ask(&ask, |_| true), 0);
+        assert_eq!(take_home_ask(&ask, |_| false), 4);
+    }
+
     fn restarts_crop_edits_and_stop_keep_first_checkpoint_until_close() {
         let mut checkpoint = Checkpoint::new();
         let identity = ([100usize, 200], [7, 8], 8);
@@ -123,6 +214,7 @@ mod tests {
     fn case_table() {
         crate::test_table::run(&[
             ("restarts_crop_edits_and_stop_keep_first_checkpoint_until_close", restarts_crop_edits_and_stop_keep_first_checkpoint_until_close as fn()),
+            ("a_released_cpu_is_waited_for_by_its_state_and_never_by_a_clock", a_released_cpu_is_waited_for_by_its_state_and_never_by_a_clock as fn()),
             ("a_full_pair_comes_back_at_the_start_the_finish_and_a_stop_and_a_retired_home_gives_nothing", a_full_pair_comes_back_at_the_start_the_finish_and_a_stop_and_a_retired_home_gives_nothing as fn()),
         ]);
     }

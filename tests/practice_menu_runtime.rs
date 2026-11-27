@@ -35,6 +35,21 @@ fn member<'a>(text: &'a str, head: &str) -> &'a str {
 }
 
 #[test]
+fn the_samplers_read_the_animation_and_its_frame() {
+    let replay = src("src/runtime/macros/replay_capture.rs");
+    let state = item(&replay, "fn state(");
+    assert!(state.contains("sampled_pose("));
+    assert!(!state.contains("natives::motion_kind("));
+    assert!(!state.contains("natives::motion_frame("));
+    let sampled = item(&replay, "fn sampled_pose(");
+    assert!(sampled.contains("pose_reads_granted()"));
+    assert!(sampled.contains("natives::motion_kind("));
+    assert!(sampled.contains("natives::motion_frame("));
+    assert!(sampled.contains("PackedPose::pack("));
+    assert!(item(&replay, "fn live_state(").contains("pose: before.pose"));
+}
+
+#[test]
 fn f9_runtime_name_wiring() {
     let named = src("src/runtime/macros/named_macros.rs");
     let service = item(&named, "pub fn service_keyboard(");

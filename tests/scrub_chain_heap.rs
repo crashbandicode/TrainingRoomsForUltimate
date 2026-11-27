@@ -15,10 +15,9 @@ fn a_chain_start_does_not_build_the_steps_position_tracks() {
     const KEY: &str = "TR_SCRUB_CHAIN_ROOT";
     let Some(root) = env::var_os(KEY).map(std::path::PathBuf::from) else {
         // The allocator's peak is process-wide: write the files in one fresh process and start the chain in another.
-        let root = env::temp_dir().join(format!("tr-scrub-chain-{}", std::process::id()));
-        fs::create_dir(&root).unwrap();
+        let root = crate::test_scratch::Scratch::new("tr-scrub-chain");
         let run = |phase| Command::new(env::current_exe().unwrap()).args(["--exact", TEST, "--nocapture"])
-            .env(KEY, &root).env("TR_SCRUB_CHAIN_PHASE", phase).status().unwrap().success();
+            .env(KEY, root.path()).env("TR_SCRUB_CHAIN_PHASE", phase).status().unwrap().success();
         let made = run("make");
         let started = made && run("start");
         fs::remove_dir_all(root).unwrap();
@@ -28,7 +27,7 @@ fn a_chain_start_does_not_build_the_steps_position_tracks() {
     let library = Library::new(root.join(MACROS_DIR));
     let tracks = (STEPS * FRAMES * size_of::<[ReplayFrame; 2]>()) as isize;
     if env::var("TR_SCRUB_CHAIN_PHASE").as_deref() == Ok("make") {
-        let body = |kind, i: usize| ReplayFrame { input: InputFrame::default(),
+        let body = |kind, i: usize| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(),
             start: StartState { status: 14, ..StartState::neutral(kind, 0, 1.0) }, x: (i % 1600) as f32 / 16.0, y: 0.0 };
         let mut ids = Vec::new();
         for step in 0..STEPS {

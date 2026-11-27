@@ -23,7 +23,11 @@ pub mod notices;
 pub mod practice;
 pub mod edge_juggle;
 mod placement;
+#[cfg(feature = "diag")]
+mod placement_probe;
 mod scrub_hold;
+#[cfg(feature = "diag")]
+mod scrub_pose_probe;
 mod stage_geometry;
 #[cfg(feature = "diag")]
 mod stage_probe;

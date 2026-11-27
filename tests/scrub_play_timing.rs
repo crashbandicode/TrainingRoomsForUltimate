@@ -26,10 +26,9 @@ fn play_start_timings() {
         let exe = env::current_exe().unwrap();
         let pinned = Path::new("/usr/bin/taskset").exists();
         for frames in SIZES {
-            let root = env::temp_dir().join(format!("tr-scrub-timing-{}-{frames}", std::process::id()));
-            fs::create_dir(&root).unwrap();
+            let root = crate::test_scratch::Scratch::new(&format!("tr-scrub-timing-{frames}"));
             let mut child = if pinned { let mut c = Command::new("/usr/bin/taskset"); c.args(["-c", CPU]).arg(&exe); c } else { Command::new(&exe) };
-            let ran = child.args(["--exact", TEST, "--nocapture"]).env(KEY, &root).env("TR_SCRUB_TIMING_FRAMES", frames.to_string())
+            let ran = child.args(["--exact", TEST, "--nocapture"]).env(KEY, root.path()).env("TR_SCRUB_TIMING_FRAMES", frames.to_string())
                 .env("TR_SCRUB_TIMING_PINNED", if pinned { "cpu3" } else { "no" }).status().unwrap().success();
             fs::remove_dir_all(root).unwrap();
             assert!(ran, "the timed process for {frames} frames failed");
@@ -44,7 +43,7 @@ fn play_start_timings() {
         let inputs = (0..frames).map(|i| InputFrame { buttons: (i % 7 + 1) as u32, ..InputFrame::default() }).collect();
         #[allow(unused_mut)]
         let mut rec = MacroRecording::new(name, "13.0.5", StartState::neutral(8, 0, 1.0), inputs).unwrap();
-        rec.set_track(Some(vec![[crate::engine::macros::ReplayFrame { input: InputFrame::default(), start: StartState::neutral(8, 0, 1.0), x: 1.0, y: 2.0 }; 2]; frames])); // head-only
+        rec.set_track(Some(vec![[crate::engine::macros::ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState::neutral(8, 0, 1.0), x: 1.0, y: 2.0 }; 2]; frames])); // head-only
         let id = library.save_new(&rec).unwrap();
         // main-only: positions_file(&root.join(MACROS_DIR), &id, frames);
         id
@@ -58,7 +57,7 @@ fn play_start_timings() {
     let armed_json = fs::metadata(root.join(MACROS_DIR).join(format!("{armed_id}.json"))).unwrap().len();
     let json = fs::metadata(root.join(MACROS_DIR).join(format!("{}.json", ids[0]))).unwrap().len();
     let pos = fs::metadata(root.join(MACROS_DIR).join(format!("{}.pos", ids[0]))).unwrap().len();
-    assert_eq!(pos, 40 + 72 * frames as u64, "both sides have the same positions file beside each macro");
+    assert_eq!(pos, 40 + 88 * frames as u64, "both sides have the same positions file beside each macro");
     // Everything written so far is flushed, and the host settles, before anything is timed.
     assert!(Command::new("sync").status().unwrap().success());
     std::thread::sleep(Duration::from_millis(500));
@@ -98,12 +97,12 @@ fn play_start_timings() {
     host_state("end", frames);
 }
 
-// main-only: /// What the head's library writes beside a macro with positions: 40 + 72 B a frame, through a temporary name, synced.
+// main-only: /// What the head's library writes beside a macro with positions: 40 + 88 B a frame, through a temporary name, synced.
 // main-only: fn positions_file(dir: &Path, id: &str, frames: usize) {
 // main-only:     use std::io::Write;
 // main-only:     let (tmp, path) = (dir.join(format!("{id}.pos.tmp")), dir.join(format!("{id}.pos")));
 // main-only:     let mut file = fs::File::create(&tmp).unwrap();
-// main-only:     file.write_all(&vec![0u8; 40 + 72 * frames]).unwrap();
+// main-only:     file.write_all(&vec![0u8; 40 + 88 * frames]).unwrap();
 // main-only:     file.sync_all().unwrap();
 // main-only:     fs::rename(tmp, path).unwrap();
 // main-only: }

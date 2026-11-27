@@ -1,8 +1,9 @@
 //! Clip checkpoints are game-owned values, observed and restored on a fighter callback.
 use super::{Raw, Role, ACTIVE, CONSTS_READY, LOADING};
+use crate::engine::macro_ui::scrub_track::SLOT;
 use crate::engine::rr_host::HomeWarp;
 use crate::engine::mii::lifetime::Configuration;
-use crate::model::state::{ids::C, preview::{Checkpoint, Error}};
+use crate::model::state::{ids::C, preview::{settle, take_home_ask, Body, Checkpoint, Error, Settle}};
 use crate::runtime::features::recorder;
 use crate::runtime::{game::natives, lobby::training::practice};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -40,7 +41,9 @@ pub(super) unsafe fn take_home() -> bool {
     if LOADING.load(Ordering::Acquire) {
         return false;
     }
-    let ask = ASK.swap(0, Ordering::AcqRel);
+    // A start that follows the scrub hold's release stays asked, as it does while a load runs, until the released CPU
+    // has settled or will not (tr-primary-2 2026-11-26 12:54:05Z). The wait is on the CPU's state, never on a clock.
+    let ask = take_home_ask(&ASK, |waiting| waiting != 0 && waiting != 3 && settling() == Some(Settle::Wait));
     if ask == 0 {
         return false;
     }
@@ -49,6 +52,7 @@ pub(super) unsafe fn take_home() -> bool {
         CHECKPOINT.lock().clear();
         result
     } else {
+        SLOT.with(|block| block.settled());
         request(true, ask == 2 || ask == 5, ask >= 4)
     };
     match result {
@@ -62,6 +66,42 @@ pub(super) unsafe fn take_home() -> bool {
             false
         }
     }
+}
+
+/// The released CPU's state for a start the editor asked after its hold let go; none when no such start waits. A
+/// verdict other than `Wait` ends the wait: the checkpoint's own gate then takes or refuses the start.
+unsafe fn settling() -> Option<Settle> {
+    if !SLOT.with(|block| block.settling()).unwrap_or(false) {
+        return None;
+    }
+    Some(observe().map_or(Settle::Refuse, |(_, raws)| settle(cpu_body(&raws[1]))))
+}
+
+/// The CPU for `settle`: the gate's own situation and status reads, the landing statuses, and the floor under an
+/// airborne body by the shared stage rule.
+unsafe fn cpu_body(cpu: &Raw) -> Body {
+    use crate::model::cpu::ids::{C as Cpu, UNRESOLVED};
+    use crate::model::stage_geometry::{classify, Place, Unread};
+    use crate::runtime::features::{cpu::konst, stage_geometry::RayProbe, tech_surfaces};
+    let (first, last) = (konst(Cpu::StatusLanding), konst(Cpu::StatusLandingDamageLight));
+    let landing = first != UNRESOLVED && last != UNRESOLVED && (first..=last).contains(&cpu.status);
+    let mut body = super::with(|state| Body {
+        ground: state.ids.is(C::SituationGround, cpu.situation),
+        air: state.ids.is(C::SituationAir, cpu.situation),
+        idle: state.ids.is(C::StatusWait, cpu.status),
+        falling: state.ids.is(C::StatusFall, cpu.status),
+        landing,
+        gone: [C::StatusDead, C::StatusStandby, C::StatusRebirth].into_iter().any(|gone| state.ids.is(gone, cpu.status)),
+        floor: false,
+    })
+    .unwrap_or(Body { gone: true, ..Body::default() });
+    if body.air {
+        let at = [natives::pos_x(cpu.accessor), natives::pos_y(cpu.accessor)];
+        body.floor = tech_surfaces::blast_bounds().is_some_and(|blast| {
+            RayProbe::new(cpu.accessor).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at)) == Ok(Place::OverStage)
+        });
+    }
+    body
 }
 
 pub(super) unsafe fn observe() -> Result<(Identity, [Raw; 2]), &'static str> {

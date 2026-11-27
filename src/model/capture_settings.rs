@@ -196,28 +196,15 @@ mod tests {
 
     /// A unique directory under the system temp dir, removed on drop (the fork's test_util::TempDir,
     /// reduced to what these tests use).
-    struct TempDir(std::path::PathBuf);
+    struct TempDir(crate::test_scratch::Scratch);
 
     impl TempDir {
         fn new() -> Self {
-            static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-            let path = std::env::temp_dir().join(format!(
-                "trainingrooms-capture-settings-{}-{}",
-                std::process::id(),
-                NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-            ));
-            fs::create_dir_all(&path).unwrap();
-            Self(path)
+            Self(crate::test_scratch::Scratch::new("trainingrooms-capture-settings"))
         }
 
         fn path(&self) -> &std::path::Path {
-            &self.0
-        }
-    }
-
-    impl Drop for TempDir {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
+            self.0.path()
         }
     }
 

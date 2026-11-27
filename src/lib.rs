@@ -4,6 +4,9 @@
 //! game and exists only for the Switch. The crate is a `cdylib` only, so tests include `model` by
 //! path.
 
+// The host gates deny warnings through clippy; this is the same rule for the code only the Switch builds compile.
+#![cfg_attr(target_os = "switch", deny(warnings))]
+
 /// rc.9 test cut: the unit tests of the `model` and `engine` files compile in this crate only. A test crate that includes one of
 /// those files by path (`tests/*.rs`) defines this macro empty, so each unit test runs once and not once per test crate.
 #[cfg(test)]
@@ -14,6 +17,10 @@ macro_rules! lib_unit_tests {
 /// rc.9 coverage: the runner of the table-driven tests (`case_table`).
 #[cfg(test)]
 mod test_table;
+
+#[cfg(test)]
+#[path = "../tests/support/scratch.rs"]
+mod test_scratch;
 
 pub mod model;
 

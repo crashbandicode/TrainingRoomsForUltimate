@@ -38,6 +38,7 @@ mod library;
 mod live_capture;
 mod live_frame;
 mod move_start;
+mod pose;
 pub mod positions;
 mod recording;
 mod replay;
@@ -70,6 +71,7 @@ pub use window::FrameWindow;
 #[cfg(test)]
 pub use window::{timestamp, Step};
 pub use replay::{ReplayFrame, ReplaySession, ReplayTrack};
+pub use pose::{PackedPose, Pose};
 pub use move_start::{MoveFamily, MoveStart, MoveStartRules};
 #[cfg(test)]
 pub use move_start::MAX_MOVE_SETUP;

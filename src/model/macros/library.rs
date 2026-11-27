@@ -53,8 +53,8 @@ impl Store<MacroRecording> {
     /// (`positions`). Playback, the list and every other load read the macro only (`load`).
     pub fn load_edited(&self, id: &str) -> Result<MacroRecording, MacroError> {
         let mut recording = self.load(id)?;
-        if let Some((source, track)) = super::positions::read_with_source(self.dir(), id, &recording.frames) {
-            recording.set_sourced_track(source, track);
+        if let Some((source, moves, track)) = super::positions::read_with_source(self.dir(), id, &recording.frames) {
+            recording.set_sourced_track(source, moves, track);
         }
         Ok(recording)
     }
@@ -83,7 +83,7 @@ impl Record for MacroRecording {
     /// The positions go beside the macro once it is in place. A failed write leaves a macro without positions.
     fn after_write(&self, dir: &std::path::Path, id: &str) {
         if let Some(track) = &self.track {
-            if super::positions::write(dir, id, &self.frames, track, self.track_source).is_err() {
+            if super::positions::write(dir, id, &self.frames, track, self.track_source, self.track_moves).is_err() {
                 super::positions::remove(dir, id);
             }
         }

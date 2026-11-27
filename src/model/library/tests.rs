@@ -17,14 +17,8 @@ use crate::model::store::{Store, SELECTED};
 
 const DATE: &str = "2026-03-04";
 
-fn scratch(tag: &str) -> std::path::PathBuf {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static NEXT: AtomicU64 = AtomicU64::new(0);
-    let n = NEXT.fetch_add(1, Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!("tr-rr1-{tag}-{n}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
+fn scratch(tag: &str) -> crate::test_scratch::Scratch {
+    crate::test_scratch::Scratch::new(&format!("tr-rr1-{tag}"))
 }
 
 fn frame(buttons: u32) -> Vec<InputFrame> {

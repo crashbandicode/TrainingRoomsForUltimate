@@ -155,7 +155,7 @@ mod tests {
     use {crate::engine::macros::InputFrame, crate::engine::macros::ReplayFrame, crate::engine::macros::ReplayTrack, crate::engine::macros::StartState};
 
     fn editor() -> ReplayEditor {
-        let frames = (0..2000).map(|i| ReplayFrame { input: InputFrame::default(),
+        let frames = (0..2000).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(),
             start: StartState { status: 14, speed_y: i as f32, ..StartState::neutral(18, 0, 1.0) },
             x: i as f32, y: 0.0 }).collect();
         ReplayEditor::new(ReplaySession { tracks: vec![ReplayTrack { fighter: None, entry: 1, frames,

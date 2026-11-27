@@ -3204,7 +3204,55 @@ approved_by = "tr-primary-2 2026-11-26 00:58:36Z (approved at the measured count
 [[budget]]
 scope = "total"
 basis = "rustfmt-sloc4"
-ceiling = 207820
+ceiling = 208022
 date = "2026-11-26"
-reason = "Scrub positions, the whole build (operator 2026-11-25 23:58:25Z, 2026-11-26 00:21:37Z, 03:06:35Z and about 03:30Z: scrubbing shows where the fighters were with no preview first; the positions live in a file beside the macro, whose own file is unchanged; an old macro gets its positions from a playback), on main 6dbf9aa9 (206279): +1496, measured by the size step of the gate on ecffcaca. Record keeps both fighters' per-frame state; the clip editor holds the bodies at the shown frame; the positions sidecar and its library rules; the streamed macro write and the list without a JSON tree (reviewer rv-preview-vis a09dccb5, bb87f939, 5a628150, b513519c folded); generated positions (place-t1a 9466fa45, reviewer rv-edge-juggle-sol). Raised from 207775 to 207820 (+45, measured by the size step of the gate on 8e5be75e) for the Eden session's SP-10 defect: a point inside a solid or past a blast line holds nobody, by the shared stage rule."
-approved_by = "tr-primary-2 2026-11-26 01:08:43Z (lines approved at the measured count of the joined head), 03:42:54Z (ONE budget entry for the whole scrub build) and 06:11:43Z (fold 9466fa45, then the one entry); 10:27:48Z (SP-10 is fixed for this build) and 10:58:07Z (the entry moves to the measured count of the folded head)."
+reason = "Scrub positions, the whole build (operator 2026-11-25 23:58:25Z, 2026-11-26 00:21:37Z, 03:06:35Z and about 03:30Z: scrubbing shows where the fighters were with no preview first; the positions live in a file beside the macro, whose own file is unchanged; an old macro gets its positions from a playback), on main 6dbf9aa9 (206279): +1496, measured by the size step of the gate on ecffcaca. Record keeps both fighters' per-frame state; the clip editor holds the bodies at the shown frame; the positions sidecar and its library rules; the streamed macro write and the list without a JSON tree (reviewer rv-preview-vis a09dccb5, bb87f939, 5a628150, b513519c folded); generated positions (place-t1a 9466fa45, reviewer rv-edge-juggle-sol). Raised from 207775 to 207820 (+45, measured by the size step of the gate on 8e5be75e) for the Eden session's SP-10 defect: a point inside a solid or past a blast line holds nobody, by the shared stage rule. Raised from 207820 to 208010 (+190, measured by the size step of the gate on a887df5f) for three next-build defects of merge 17 (tr-primary-2 2026-11-26 12:48:20Z, 12:51:42Z, 12:54:05Z): a take's positions past 1,200 frames with the heal rule, the key line's order, and X after a held frame; then to 208018 (+8) for the reviewer's release proof 3b2e2494 (tr-primary-2 2026-11-26 14:20:05Z)."
+approved_by = "tr-primary-2 2026-11-26 01:08:43Z (lines approved at the measured count of the joined head), 03:42:54Z (ONE budget entry for the whole scrub build) and 06:11:43Z (fold 9466fa45, then the one entry); 10:27:48Z (SP-10 is fixed for this build) and 10:58:07Z (the entry moves to the measured count of the folded head); 15:41:57Z (+4, from 208018 to 208022 measured on c2030453, to consume only the checked preview request)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 208210
+date = "2026-11-26"
+reason = "The placement float fix (operator hardware report 2026-11-26 11:57Z, and the operator's own route about 15:25Z: a body carried onto the stage with Off stage selected lands and never floats again), on rc-next 93d29c28 (208022): +188, measured by tools/size_gate.py on the joined tree: +165 for the fix, then +23 (from 208187, measured by the size step of the gate on aaae6884) for the named-save card fix (reviewer rv-edge-juggle-sol a3b5364e: the card keeps the moved bodies' lines and shortens only the displayed save name). The shared hold reads the body before each write and reports one the game moved, by an exact rule with the body's own speed (run place-float-xps-05's words); the placement picker lifts a landed body again at a spot of free air with no floor's surface above it, and shows the game's point on its card; the hold's clock counts the held body's own game frames, where the UI facts' count could stand still (reviewer rv-edge-juggle-sol 14:58:37Z); the release trace point at the hold's seam. The animation and status reads of the seam are in the diag build only and are not counted."
+approved_by = "tr-primary-2 2026-11-26 15:02:49Z (+132 lines approved as bug A's budget entry) and 15:43:30Z (+47 lines approved, ONE budget entry at the final measured count; the count came out at +165 in all, under the +179 approved); 16:41:35Z (the card fix's +23 lines approved: the allowance is +188, the entry at the measured count of the folded head). Beside the lines: raw release .bss +32 B for placement::CLOCK (24 B and alignment), approved by the operator (tr-primary-2's inbox posts after 16:20:29Z)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 208284
+date = "2026-11-26"
+reason = "Scrub positions, P3 of the next build (item 4: SP-10's CPU at x -81.72 was held and stood 5.13 away, pushed by the wall beside its point), on rc-next fa4b8b2b (208210): +74, measured by the size step of the gate on e1d1ad22. The scrub lets go of a body the game moved sideways off the point it wrote, as the shared hold reports it, and keeps the refusal for that shown request, point and body; a report counts only against the role's own write for that request; the group's home is kept when the target role is let go while its partner is held (a one-frame misplacement in merge 17)."
+approved_by = "tr-primary-2 2026-11-26 17:56:04Z (P3's +74 lines approved; the rise from the estimated 25 is the reviewer's controls accepted at 16:21Z: the refusal keyed by body id, the own-write rule, and the home fix)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 208324
+date = "2026-11-26"
+reason = "Scrub-moves SM5 B, captures keep the animation (operator 2026-11-26 about 14:07Z: SM5 B; docs/DECISIONS.md, Clip editor: scrubbing shows the moves, on feat/scrub-moves 00b54514), on rc-next ea0d8f6a (208022): +108, measured by the size step of the gate on d149bfa2 (+112 against the lane's base 6e428b2d, 208018). The packed pose type (model/macros/pose.rs); the pose field of ReplayFrame and LiveFrame; the sampler's optional boundary over the two existing animation reads; the capture file as schema 2 with 52-byte records while schema 1 still lists and loads; the bundle cache's poses copied by entry and frame. Memory, measured on cc7e144b against rc-next 9816f1c6 (this replaces the figures first written here, which were measured against 93d29c28 and gave page-rounded segments only): the release NRO grows by 4,096 B, one page of text (raw .text +1,120 B, 2,772,336 to 2,773,456); raw .bss +8,256 B (1,706,792 to 1,715,048), +8,192 B as packed in the NRO: the Vault mailbox's 1,024 slots grow from 64 to 72 B and the live mailbox's slot stays 200 B; resident +12,288 B (7,110,656 to 7,122,944); a capture keeps +8 B a fighter a frame in memory and in its file; a loaded ten-minute macro's decoded track in the editor grows by 576,000 B (3,168,000 to 3,744,000; the load peak of the longest take is 4,311,514 B), accepted by the operator. Re-measured after the fold of rc-next 9816f1c6: 208250, and after the fold of rc-next 3bb1db63: 208324."
+approved_by = "tr-primary-2 2026-11-26 15:37:11Z (+120 non-test lines approved for SM5 B, within the operator's approved costs; BSS at most +16,384 B) and 16:32:25Z (the operator accepts the editor's +576,000 B)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 208329
+date = "2026-11-26"
+reason = "Scrub positions, P3b of the next build, on rc-next d1d67d92 (208324): +5, measured by the size step of the gate on eec428a9. The fighter callback that forgets a hold made on another body lets go on that callback, whatever the worker has published since: a request published between the two steps had the old hold's origin read as the group's home, used for the new body and kept."
+approved_by = "tr-primary-2 2026-11-26 19:19:11Z (+5 lines approved; P3b of this build)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 208689
+date = "2026-11-26"
+reason = "Scrub moves, P5b part B (SM1: the clip editor's scrub draws the recorded animation on a held fighter without its script lines, asks the game whether the fighter has that animation first, and lets a posed body go plain before the wake), on feat/scrub-moves-p5b de33380e (208555: part A with the capture crop fix; part A's own +226 entry is place-t1a's and is not in this tree): +134, measured by the size step of the gate on 7d92c201 (208684 against part A's 208550 on f74a277c). The ceiling is this branch's count; the join's entry is the sum of the three parts."
+approved_by = "tr-primary-2 2026-11-26 20:51:11Z (P5b pre-approved: each part raises its own entry by its own figure, up to +900 lines in all on rc-next cbd709f9's 208329; release NRO at most +8 KiB and release raw .bss +0 against cbd709f9)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 209091
+date = "2026-11-26"
+reason = "Scrub moves, P5b of the next build, the join of its three parts on rc-next 4da7f807 (208329): the positions file version 2 with 44-byte rows and the rule by which a playback gives an older file its moves (part A, with the shared names and the capture crop fix), the recorded animation drawn on a held fighter without its script lines (part B), and the per-fighter toggle on ZL+L and ZL+R (part C). +762 in all, measured by the size step on the joined head: part A +233, part B +134, part C +395."
+approved_by = "tr-primary-2 2026-11-26 20:51:11Z and 21:24:01Z (P5b pre-approved up to +900 lines in all on rc-next's 208329; one joined entry by place-t1a) and 21:42:46Z (release NRO at most +16,384 B on merge 17 5df3d9dc, at most +12,288 B on 4da7f807; release raw .bss +0; the 8-byte reply word of part C accepted at 21:45:17Z wherever it lands)."

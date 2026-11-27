@@ -1,6 +1,8 @@
-use super::{cpu::konst, stage_geometry::FloorRay};
+use super::{cpu::konst, stage_geometry::{FloorRay, RayProbe}};
+use crate::engine::macro_ui::scrub_track::can_stand;
 use crate::model::cpu::ids::{C, UNRESOLVED};
-use crate::model::crosshair::{self, CpuPreview, Origin, PreviewAct};
+use crate::model::crosshair::{self, BodyRead, CpuPreview, HoldClock, Origin, PreviewAct};
+use crate::model::stage_geometry::{classify, Unread};
 use crate::runtime::{game::{self, natives}, state_natives as state};
 
 /// The floor point a fighter stands on for a crosshair at `at`. With `platforms`, the first floor at or below the
@@ -80,6 +82,26 @@ pub(super) unsafe fn preview(slot: &mut Option<CpuPreview>, body: usize, id: u32
     hold_at(slot, body, id, at, false)
 }
 
+/// The hold's clock (`HoldClock`): the game's own frames of the bodies the holds hold.
+static CLOCK: HoldClock = HoldClock::new();
+
+/// The game ran a frame of this fighter: the fighter-frame wrapper, for every fighter, first thing after the
+/// game's frame function returns.
+pub(super) unsafe fn ran(fighter: usize) {
+    CLOCK.ran(natives::fighter_accessor(fighter));
+}
+
+/// Read by the release tracer at the hold's seam, before this frame's write: the body's id with its flags (bit 32
+/// the game has it on the ground, 33 a floor stand is asked, 34 its speed was read, 35 the hold reports it moved,
+/// 36 and 37 this frame's act: 0 lift, 1 hold, 2 stand) and the game frame's low 24 bits from bit 40, then three
+/// pairs of f32 words: the point asked for on this frame, where the game left the body, and its speed. The diag
+/// build's `placement_probe` reads the body's animation and status beside it.
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn placement_hold_seam(meta: u64, asked: u64, seen: u64, speed: u64) {
+    std::hint::black_box((meta, asked, seen, speed));
+}
+
 /// `preview` for either fighter and either place (the placement picker). `grounded`: the body stands on its floor
 /// point, awake, every frame; a body the hold had put to sleep is woken first.
 pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32, at: [f32; 2], grounded: bool) -> Option<bool> {
@@ -87,11 +109,29 @@ pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32
         *slot = None;
         return None;
     }
-    let act = crosshair::hold_step(slot, id, grounded, || Origin {
+    // The body as the game left it, before this frame's write. A hold that cannot read the body's speed cannot
+    // tell a moved body from a falling one: it does not run.
+    let Some((speed_x, speed_y)) = super::recording_host::fighter_speed(body) else {
+        *slot = None;
+        return None;
+    };
+    let read = BodyRead {
         at: [natives::pos_x(body), natives::pos_y(body)],
-        grounded: natives::situation_kind(body) == konst(C::SituationGround),
-        facing: natives::lr(body),
-    });
+        landed: natives::situation_kind(body) == konst(C::SituationGround),
+        speed: Some([speed_x, speed_y]),
+        frame: CLOCK.frame(usize::from(natives::module_accessor(0) != Some(body)), body),
+    };
+    let act = crosshair::hold_step(slot, id, grounded, || Origin { at: read.at, grounded: read.landed, facing: natives::lr(body) });
+    if let Some(preview) = slot {
+        preview.observe(at, read, grounded);
+    }
+    let pack = |[low, high]: [f32; 2]| u64::from(low.to_bits()) | (u64::from(high.to_bits()) << 32);
+    let meta = u64::from(id) | (u64::from(read.landed) << 32) | (u64::from(grounded) << 33) | (1 << 34)
+        | (u64::from(slot.is_some_and(|preview| preview.displaced.is_some())) << 35) | ((act as u64) << 36)
+        | (u64::from(read.frame & 0xff_ffff) << 40);
+    placement_hold_seam(meta, pack(at), pack(read.at), pack([speed_x, speed_y]));
+    #[cfg(feature = "diag")]
+    super::placement_probe::hold_state(meta, body);
     if act != PreviewAct::Hold && slot.is_some_and(|preview| preview.asleep) {
         state::set_sleep(body, false);
     }
@@ -116,6 +156,14 @@ pub(super) unsafe fn hold_at(slot: &mut Option<CpuPreview>, body: usize, id: u32
         preview.magnified = loupe != UNRESOLVED && natives::is_flag(body, loupe);
     }
     Some(asleep)
+}
+
+/// The shared stage rule for a point, through this body's own ray: free for a body to be at (over the stage, in
+/// open air or under the stage), not inside a solid and not past a blast line. A stage that cannot be read frees
+/// nothing.
+pub(super) unsafe fn free_at(body: usize, at: [f32; 2]) -> bool {
+    let Some(blast) = super::tech_surfaces::blast_bounds() else { return false };
+    can_stand(RayProbe::new(body).ok_or(Unread).and_then(|mut stage| classify(&mut stage, blast, at)))
 }
 
 /// Put a previewed body back where its picker found it. A preview only exists where `preview_ready` held.

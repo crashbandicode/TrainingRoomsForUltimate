@@ -226,8 +226,7 @@ fn actual_clatter_set_arm_restore_poison_and_add_instance() {
         .replace("// NATIVE\n", production(include_str!("../src/model/mashout/native.rs")))
         .replace("// CLATTER\n", production(include_str!("../src/model/mashout/clatter.rs")));
     let program = format!("{}\n{STUBS}\n{fixture}", runtime.replace("//!", "//"));
-    let dir = std::env::temp_dir().join(format!("tr-clatter-set-{}", std::process::id()));
-    fs::create_dir_all(&dir).unwrap();
+    let dir = crate::test_scratch::Scratch::new("tr-clatter-set");
     let input = dir.join("actual.rs");
     let binary = dir.join("actual");
     fs::write(&input, program).unwrap();

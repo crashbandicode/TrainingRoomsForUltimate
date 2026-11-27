@@ -1470,6 +1470,19 @@ pub fn service_pending(root: &Path, player: SavedState, cpu: SavedState) -> Tick
     tick
 }
 
+/// The worker's pass once migration has finished. A take that is being recorded gets its next block of positions on
+/// every pass, whether or not anything else waits: with the pending test in front of it the positions stopped at
+/// the two blocks the Record chord's pass had made (SP-17). Then what waits is serviced.
+pub fn worker_tick(root: &Path, player: SavedState, cpu: SavedState) -> Option<Tick> {
+    if CAP_ROLE.load(Ordering::Acquire) != 0 {
+        TAKE.service(true, CAP_LEN.load(Ordering::Acquire));
+    }
+    if !pending() {
+        return None;
+    }
+    Some(service_pending(root, player, cpu))
+}
+
 pub fn set_role_fighter(role: Role, kind: i32) {
     ROLE_KIND[role_index(role)].store(kind, Ordering::Release);
     if role == Role::Player {
@@ -1544,8 +1557,8 @@ pub fn take_generated() -> bool { PLAY.take_written() }
 
 #[inline(never)]
 pub fn play_track_service(root: &Path) {
-    use super::macro_ui::play_track::PlayTrack;
-    use super::macros::positions::{self, Source};
+    use super::macro_ui::play_track::{PlayTrack, Wanted};
+    use super::macros::positions::{self, Moves, Source};
     if PLAY_PLAYER.load(Ordering::Acquire) || PLAY_CPU.load(Ordering::Acquire) || lock(&PREVIEW_ASK).start.is_some() {
         return;
     }
@@ -1566,10 +1579,17 @@ pub fn play_track_service(root: &Path) {
     if !matches { return; }
     if open.pass { rows.truncate(rows.len().min(recording.trim.window(&recording.frames).end)); }
     let existing = positions::check(&dir, open.id.as_str(), &recording.frames);
-    let (write, done) = PlayTrack::write_wanted(existing, rows.len(), recording.frames.len());
-    if write {
-        if positions::write(&dir, open.id.as_str(), &recording.frames, &rows, Source::Generated).is_err() { return; }
-        PLAY.note_written();
+    let (wanted, done) = PlayTrack::write_wanted(existing, rows.len(), recording.frames.len());
+    match wanted {
+        Wanted::Keep => {},
+        Wanted::Write => {
+            if positions::write(&dir, open.id.as_str(), &recording.frames, &rows, Source::Generated, Moves::Playback).is_err() { return; }
+            PLAY.note_written();
+        },
+        Wanted::Merge => {
+            if !matches!(positions::merge(&dir, open.id.as_str(), &recording.frames, &rows), Ok(true)) { return; }
+            PLAY.note_written();
+        },
     }
     if done { PLAY.note_done(open.id.as_str(), open.version); }
 }
@@ -3086,14 +3106,8 @@ mod tests {
         TEST_LOCK.lock().unwrap_or_else(|err| err.into_inner())
     }
 
-    fn scratch(tag: &str) -> std::path::PathBuf {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let n = NEXT.fetch_add(1, Ordering::Relaxed);
-        let dir =
-            std::env::temp_dir().join(format!("tr-rr7-host-{tag}-{n}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
+    fn scratch(tag: &str) -> crate::test_scratch::Scratch {
+        crate::test_scratch::Scratch::new(&format!("tr-rr7-host-{tag}"))
     }
 
     #[test]
@@ -4980,7 +4994,7 @@ mod tests {
         let _ = service_at(root, &none(), "2026-11-08", state(8), state(7));
     }
 
-    fn generated_fixture(tag: &str, frames: u32) -> (PathBuf, String, MacroRecording) {
+    fn generated_fixture(tag: &str, frames: u32) -> (crate::test_scratch::Scratch, String, MacroRecording) {
         reset_host();
         let root = scratch(tag);
         let _ = service_at(&root, &none(), "2026-11-08", state(8), state(7));
@@ -4996,6 +5010,7 @@ mod tests {
 
     fn generated_sample(role: Role, index: u32) {
         let sample = |kind, x| ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x, y: 0.0,
         };
         let slot = role_index(role);
@@ -5017,6 +5032,120 @@ mod tests {
         super::super::macros::positions::read(&root.join(MACROS_DIR), id, &recording.frames)
     }
 
+    fn generation_v1(dir: &Path, id: &str, inputs: &[InputFrame], source: crate::engine::macros::positions::Source) -> Vec<[ReplayFrame; 2]> {
+        use crate::engine::macros::positions;
+        let fnv = |bytes: &[u8]| bytes.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, b| (h ^ u64::from(*b)).wrapping_mul(0x100_0000_01b3));
+        let input_bytes: Vec<_> = inputs.iter().flat_map(|input| input.buttons.to_le_bytes().into_iter()
+            .chain([input.lstick_x as u8, input.lstick_y as u8, input.rstick_x as u8, input.rstick_y as u8])).collect();
+        let rows: Vec<_> = (0..inputs.len()).map(|i| {
+            [7, 8].map(|kind| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(),
+                start: StartState::neutral(kind, 0, 1.0), x: 500.0 + i as f32 + kind as f32, y: -30.0 })
+        }).collect();
+        let mut bytes = vec![0; 40];
+        bytes[..4].copy_from_slice(b"TRPS");
+        bytes[4..6].copy_from_slice(&1u16.to_le_bytes());
+        bytes[6] = 2;
+        bytes[7] = 36;
+        bytes[8..12].copy_from_slice(&(inputs.len() as u32).to_le_bytes());
+        bytes[12..16].copy_from_slice(&(inputs.len() as u32).to_le_bytes());
+        bytes[16..24].copy_from_slice(&fnv(id.as_bytes()).to_le_bytes());
+        bytes[24..32].copy_from_slice(&fnv(&input_bytes).to_le_bytes());
+        bytes[32] = source as u8;
+        for frame in rows.iter().flatten() {
+            let s = frame.start;
+            for word in [s.fighter_kind as u32, s.costume, s.facing.to_bits(), s.situation as u32, s.status as u32,
+                s.speed_x.to_bits(), s.speed_y.to_bits(), frame.x.to_bits(), frame.y.to_bits()] {
+                bytes.extend_from_slice(&word.to_le_bytes());
+            }
+        }
+        std::fs::write(positions::path(dir, id), bytes).unwrap();
+        rows
+    }
+
+    fn generation_pose_take(i: u32) -> Option<InputFrame> {
+        let sample = |kind, x| ReplayFrame {
+            pose: crate::engine::macros::PackedPose([i + kind as u32 + 1, (i + 1) << 8]),
+            input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x, y: 0.0,
+        };
+        play_live(1, &sample(7, i as f32));
+        play_live(0, &sample(8, 100.0 + i as f32));
+        take_cpu_frame()
+    }
+
+    fn a_playback_gives_a_recorded_macro_without_moves_its_moves() {
+        use crate::engine::macros::positions::{self, Moves, Source};
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-merge", 5);
+        let dir = root.join(MACROS_DIR);
+        let old = generation_v1(&dir, &id, &recording.frames, Source::Recorded);
+        generated_play(&root, Role::Cpu);
+        for i in 0..5 { assert_eq!(generation_pose_take(i), Some(recording.frames[i as usize])); }
+        tick(&root);
+        assert_eq!(positions::check(&dir, &id, &recording.frames), Some((Source::Recorded, 5, Moves::Playback)));
+        let rows = generated_rows(&root, &id, &recording).unwrap();
+        for i in 0..5 {
+            for role in 0..2 {
+                let mut expected = old[i][role];
+                expected.pose = crate::engine::macros::PackedPose([i as u32 + expected.start.fighter_kind as u32 + 1, (i as u32 + 1) << 8]);
+                assert_eq!(rows[i][role], expected);
+            }
+        }
+        generated_play(&root, Role::Cpu);
+        assert!(!play_sampling());
+    }
+
+    fn a_stopped_playback_leaves_a_file_without_moves_as_it_was() {
+        use crate::engine::macros::positions::{self, Source};
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-merge-stop", 5);
+        let dir = root.join(MACROS_DIR);
+        generation_v1(&dir, &id, &recording.frames, Source::Recorded);
+        let before = std::fs::read(positions::path(&dir, &id)).unwrap();
+        generated_play(&root, Role::Cpu);
+        for i in 0..2 { assert!(generation_pose_take(i).is_some()); }
+        generated_play(&root, Role::Cpu);
+        tick(&root);
+        assert_eq!(std::fs::read(positions::path(&dir, &id)).unwrap(), before);
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+    }
+
+    fn a_generated_file_without_moves_is_replaced_by_a_whole_playback() {
+        use crate::engine::macros::positions::{self, Moves, Source};
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-replace-v1", 5);
+        let dir = root.join(MACROS_DIR);
+        generation_v1(&dir, &id, &recording.frames, Source::Generated);
+        generated_play(&root, Role::Cpu);
+        for i in 0..5 { assert!(generation_pose_take(i).is_some()); }
+        tick(&root);
+        assert_eq!(positions::check(&dir, &id, &recording.frames), Some((Source::Generated, 5, Moves::Playback)));
+        let rows = generated_rows(&root, &id, &recording).unwrap();
+        assert_eq!(rows[0][0].x, 0.0);
+        assert_ne!(rows[0][0].pose, crate::engine::macros::PackedPose::NONE);
+    }
+
+    fn a_file_with_moves_is_not_touched_by_a_playback() {
+        use crate::engine::macros::positions::{self, Moves, Source};
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-keep-moves", 5);
+        let dir = root.join(MACROS_DIR);
+        let mut rows = generation_v1(&dir, &id, &recording.frames, Source::Recorded);
+        for (i, pair) in rows.iter_mut().enumerate() {
+            for (role, frame) in pair.iter_mut().enumerate() {
+                frame.pose = crate::engine::macros::PackedPose([i as u32 + role as u32 + 1, (i as u32 + 1) << 8]);
+            }
+        }
+        positions::write(&dir, &id, &recording.frames, &rows, Source::Recorded, Moves::Take).unwrap();
+        let before = std::fs::read(positions::path(&dir, &id)).unwrap();
+        generated_play(&root, Role::Cpu);
+        for i in 0..5 { assert!(generation_pose_take(i).is_some()); }
+        tick(&root);
+        assert_eq!(std::fs::read(positions::path(&dir, &id)).unwrap(), before);
+        generated_play(&root, Role::Cpu);
+        assert!(!play_sampling());
+    }
+
     fn a_poll_that_straddles_generation_arm_seeds_the_first_input_once() {
         let _hold = hold();
         for role in [Role::Cpu, Role::Player] { straddle_arm(role); }
@@ -5031,7 +5160,7 @@ mod tests {
             set_role_fighter(role, 7);
             set_playback_delay(2);
         }
-        let publish_root = root.clone();
+        let publish_root = root.path().to_path_buf();
         BEFORE_TAKE.set(Some(Box::new(move || generated_play(&publish_root, role))));
         let seeds = std::cell::Cell::new(0);
         let seed = || {
@@ -5059,7 +5188,7 @@ mod tests {
     fn a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter() {
         let _hold = hold();
         let (root, first_id, first) = generated_fixture("generated-missing-partner", 3);
-        let sample = |kind| ReplayFrame { input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0 };
+        let sample = |kind| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0 };
         generated_play(&root, Role::Cpu);
         assert!(play_sampling());
         play_seed(1, Some(sample(7)));
@@ -5089,12 +5218,12 @@ mod tests {
         let (root, id, recording) = generated_fixture("generated-body", 605);
         let dir = root.join(MACROS_DIR);
         let path = positions::path(&dir, &id);
-        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: -22.0, y: 20.0 };
+        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: -22.0, y: 20.0 };
         let old = vec![[frame, frame]; 601];
-        positions::write(&dir, &id, &recording.frames, &old, source).unwrap();
+        positions::write(&dir, &id, &recording.frames, &old, source, positions::Moves::Take).unwrap();
         if damaged {
             let mut bytes = std::fs::read(&path).unwrap();
-            let partner_x = 40 + 600 * 72 + 36 + 28;
+            let partner_x = 40 + 600 * 88 + 44 + 28;
             bytes[partner_x..partner_x + 4].copy_from_slice(&f32::NAN.to_le_bytes());
             std::fs::write(&path, bytes).unwrap();
         }
@@ -5250,8 +5379,8 @@ mod tests {
         let _hold = hold();
         let (root, id, recording) = generated_fixture("generated-recorded", 5);
         let dir = root.join(MACROS_DIR);
-        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 99.0, y: 3.0 };
-        positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 5], Source::Recorded).unwrap();
+        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: 99.0, y: 3.0 };
+        positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 5], Source::Recorded, positions::Moves::Take).unwrap();
         let original = std::fs::read(positions::path(&dir, &id)).unwrap();
         let writes = positions::writes();
         generated_play(&root, Role::Cpu);
@@ -5264,6 +5393,22 @@ mod tests {
         assert!(!play_sampling());
     }
 
+    /// A positions file a take left short (SP-17) heals through use: a playback that covers more frames replaces it.
+    fn a_short_recorded_track_heals_on_a_full_playback() {
+        use crate::engine::macros::positions::{self, Source};
+        let _hold = hold();
+        let (root, id, recording) = generated_fixture("generated-heal", 5);
+        let dir = root.join(MACROS_DIR);
+        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: 99.0, y: 3.0 };
+        positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 3], Source::Recorded, positions::Moves::Take).unwrap();
+        generated_play(&root, Role::Cpu);
+        assert!(play_sampling());
+        for i in 0..5 { assert!(generated_take(Role::Cpu, i).is_some()); }
+        tick(&root);
+        assert_eq!(positions::kept(&dir, &id, &recording.frames), Some((Source::Generated, 5)));
+        assert_eq!(generated_rows(&root, &id, &recording).unwrap()[4][0].x, 4.0);
+    }
+
     fn an_adopted_generated_track_is_cropped_as_generated() {
         use crate::engine::macro_ui::clip_panel::{ClipAction, ClipEditor, ClipEffect};
         use crate::engine::macros::positions::{self, Source};
@@ -5274,11 +5419,11 @@ mod tests {
             let library = Library::new(&dir);
             let mut editor = ClipEditor::macro_file(library.load(&id).unwrap(), false).unwrap();
             let rows: Vec<[ReplayFrame; 2]> = (0..5).map(|i| {
-                let sample = |kind, x| ReplayFrame { input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x, y: 0.0 };
+                let sample = |kind, x| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState::neutral(kind, 0, 1.0), x, y: 0.0 };
                 [sample(7, i as f32), sample(8, i as f32 + 100.0)]
             }).collect();
             if source == Source::Recorded {
-                positions::write(&dir, &id, &recording.frames, &rows, source).unwrap();
+                positions::write(&dir, &id, &recording.frames, &rows, source, positions::Moves::Take).unwrap();
             }
             request_preview(&id, Role::Cpu, 0, 5);
             tick(&root);
@@ -5438,8 +5583,8 @@ mod tests {
         for i in 0..2 { assert!(generated_take(Role::Cpu, i).is_some()); }
         generated_play(&root, Role::Cpu);
         let dir = root.join(MACROS_DIR);
-        let frame = ReplayFrame { input: InputFrame::default(), start: recording.start, x: 99.0, y: 0.0 };
-        positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 5], Source::Recorded).unwrap();
+        let frame = ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: recording.start, x: 99.0, y: 0.0 };
+        positions::write(&dir, &id, &recording.frames, &[[frame, frame]; 5], Source::Recorded, positions::Moves::Take).unwrap();
         let original = std::fs::read(positions::path(&dir, &id)).unwrap();
         tick(&root);
         assert_eq!(std::fs::read(positions::path(&dir, &id)).unwrap(), original);
@@ -6671,7 +6816,7 @@ mod tests {
         assert!(!pair_settled(), "a captured pair waits for the worker");
         let (taken_tx, taken_rx) = std::sync::mpsc::channel();
         let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
-        let worker_root = root.clone();
+        let worker_root = root.path().to_path_buf();
         let worker = std::thread::spawn(move || {
             write_saved_with(&worker_root, move || {
                 taken_tx.send(()).unwrap();
@@ -7606,6 +7751,46 @@ mod tests {
         assert_eq!((absent.poses[0].fighter_kind, absent.poses[1].fighter_kind, absent.speeds), (-1, -1, [(0.0, 0.0); 2]), "a role without a body is a never-seen pose at rest");
     }
 
+    /// SP-17 (dup-audit, 2026-11-26 12:45:51Z): takes of 1,553 and 3,253 frames kept 1,200 frames of positions. The
+    /// worker's pass reached the take's blocks only while other work was pending. This drives the pass the worker
+    /// runs and nothing else, and reads the positions file back.
+    fn a_long_take_keeps_its_positions_on_the_workers_pass_alone() {
+        use crate::engine::macro_ui::scrub_track::TAKE;
+        use crate::engine::macros::positions;
+        const FRAMES: usize = 1_553;
+        let _hold = hold();
+        reset_host();
+        let root = scratch("long-take");
+        let _ = service_at(&root, &none(), "2026-11-26", state(8), state(7));
+        let pass = || worker_tick(&root, state(8), state(7));
+        let at = |index: usize| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState::neutral(8, 0, 1.0), x: index as f32, y: 2.0 };
+        set_record_role(Role::Player);
+        on_chords(true, false, false);
+        assert!(pass().is_some(), "the Record edge is serviced");
+        for index in 0..FRAMES {
+            TAKE.live(0, &at(index));
+            push_capture(ROLE_PLAYER, InputFrame { buttons: (index % 7 + 1) as u32, ..InputFrame::default() });
+            // Two game frames to a worker pass. Nothing else waits, so the pass has no tick.
+            if index % 2 == 1 {
+                assert!(!pending(), "a take alone is not pending work (frame {index})");
+                assert!(pass().is_none());
+            }
+        }
+        on_chords(true, false, false);
+        assert!(pass().is_some(), "the stop is serviced");
+        let dir = root.join(MACROS_DIR);
+        let macros = Library::new(&dir);
+        let id = macros.list().unwrap().entries[0].id.clone();
+        let recording = macros.load(&id).unwrap();
+        assert_eq!(recording.frames.len(), FRAMES);
+        let rows = positions::read(&dir, &id, &recording.frames).expect("a positions file");
+        assert_eq!(rows.len(), FRAMES, "the positions stop before the take does");
+        assert_eq!((rows[0][0].x, rows[1_200][0].x, rows[FRAMES - 1][0].x), (0.0, 1_200.0, (FRAMES - 1) as f32));
+        let host = include_str!("../runtime/features/recording_host.rs");
+        assert!(host.contains("if let Some(tick) = rr_host::worker_tick(root, player, cpu) {") && !host.contains("rr_host::pending()"),
+            "the worker's pass has a pending test of its own in front of the take");
+    }
+
     /// The runtime's side of the two tests above: the fighter frame hands its live pose to `fighter_frame` before the
     /// Save States Off return and keeps no pose of its own; Record reads the two role bodies the chord step resolved,
     /// not a published pose or accessor.
@@ -7768,7 +7953,7 @@ mod tests {
         let track = |entry: i32, base: u32| ReplayTrack {
             fighter: None,
             entry, quantized_analog: false,
-            frames: (0..3).map(|i| ReplayFrame { input: InputFrame { buttons: base + i, ..InputFrame::default() },
+            frames: (0..3).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: base + i, ..InputFrame::default() },
                 start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
         };
         let session = ReplaySession { tracks: vec![track(0, 1), track(1, 101)], truncated: false, breaks: Vec::new() };
@@ -7806,7 +7991,7 @@ mod tests {
         let track = |entry: i32, base: u32| ReplayTrack {
             fighter: None,
             entry, quantized_analog: false,
-            frames: (0..3).map(|i| ReplayFrame { input: InputFrame { buttons: base + i, ..InputFrame::default() },
+            frames: (0..3).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame { buttons: base + i, ..InputFrame::default() },
                 start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
         };
         ReplaySession { tracks: vec![track(0, 1), track(1, 101)], truncated: false, breaks: Vec::new() }
@@ -8158,6 +8343,7 @@ mod tests {
             ("a_recording_keeps_where_and_how_fast_it_started", a_recording_keeps_where_and_how_fast_it_started as fn()),
             ("the_live_pose_is_published_with_save_states_off", the_live_pose_is_published_with_save_states_off as fn()),
             ("a_take_starts_at_the_bodies_read_at_the_chord", a_take_starts_at_the_bodies_read_at_the_chord as fn()),
+            ("a_long_take_keeps_its_positions_on_the_workers_pass_alone", a_long_take_keeps_its_positions_on_the_workers_pass_alone as fn()),
             ("the_runtime_publishes_before_the_off_return_and_record_reads_the_bodies", the_runtime_publishes_before_the_off_return_and_record_reads_the_bodies as fn()),
             ("play_gives_the_recorded_start_speed_only_with_momentum_kept", play_gives_the_recorded_start_speed_only_with_momentum_kept as fn()),
         ]);
@@ -8179,12 +8365,17 @@ mod tests {
                 assert!(status.success(), "the generation cases failed in their own process");
             } else {
                 crate::test_table::run(&[
+                    ("a_playback_gives_a_recorded_macro_without_moves_its_moves", super::a_playback_gives_a_recorded_macro_without_moves_its_moves as fn()),
+                    ("a_stopped_playback_leaves_a_file_without_moves_as_it_was", super::a_stopped_playback_leaves_a_file_without_moves_as_it_was as fn()),
+                    ("a_generated_file_without_moves_is_replaced_by_a_whole_playback", super::a_generated_file_without_moves_is_replaced_by_a_whole_playback as fn()),
+                    ("a_file_with_moves_is_not_touched_by_a_playback", super::a_file_with_moves_is_not_touched_by_a_playback as fn()),
                     ("an_old_macro_played_once_from_zero_gets_generated_positions", super::an_old_macro_played_once_from_zero_gets_generated_positions as fn()),
                     ("a_stopped_playback_writes_the_inputs_that_were_consumed", super::a_stopped_playback_writes_the_inputs_that_were_consumed as fn()),
                     ("an_editor_preview_from_zero_binds_the_whole_macro", super::an_editor_preview_from_zero_binds_the_whole_macro as fn()),
                     ("delay_polls_and_a_stop_before_the_first_input_keep_nothing", super::delay_polls_and_a_stop_before_the_first_input_keep_nothing as fn()),
                     ("a_longer_generated_track_replaces_a_shorter_one_only", super::a_longer_generated_track_replaces_a_shorter_one_only as fn()),
                     ("a_generated_track_never_replaces_a_recorded_one", super::a_generated_track_never_replaces_a_recorded_one as fn()),
+                    ("a_short_recorded_track_heals_on_a_full_playback", super::a_short_recorded_track_heals_on_a_full_playback as fn()),
                     ("a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter", super::a_generated_run_with_no_partner_does_not_keep_the_last_runs_fighter as fn()),
                     ("an_adopted_generated_track_is_cropped_as_generated", super::an_adopted_generated_track_is_cropped_as_generated as fn()),
                     ("the_play_chord_pass_opens_and_writes_no_positions_file", super::the_play_chord_pass_opens_and_writes_no_positions_file as fn()),

@@ -590,7 +590,7 @@ impl record_place::DownBody for DownAccess {
     fn set_face(&mut self, up: bool, motion: u64) {
         unsafe {
             natives::set_flag(self.0, up, konst(C::FlagDownUp));
-            natives::change_motion(self.0, motion, 0.0, 1.0);
+            natives::change_motion(self.0, motion, 0.0, 1.0, true);
         }
     }
 }
@@ -878,7 +878,12 @@ pub unsafe fn frame(fighter: usize) {
                                 Some(visit) => ("Change placement", save_name(&engine, visit.ticket)),
                                 None => ("Recording", ""),
                             };
-                            let _ = wizard.write_text(recorded, name, &mut text);
+                            // The card reserves space for the readbacks and controls before fitting the save name.
+                            let bodies = holds.map(|hold| hold.and_then(|hold| hold.displaced).map(|moved| moved.at));
+                            if wizard.write_text_at(recorded, name, bodies, &mut text).is_err() {
+                                text = FixedPath::new();
+                                let _ = wizard.write_text(recorded, name, &mut text);
+                            }
                             post_text(&mut notice, header, text);
                         }
                     }
@@ -888,6 +893,14 @@ pub unsafe fn frame(fighter: usize) {
             let fighter = wizard.setup[who.index()];
             placement::hold_at(&mut holds[who.index()], accessor, natives::battle_object_id(accessor), fighter.at,
                 fighter.place == Place::OnStage);
+            // The crosshair carried the body into the ground and the game landed it: it leaves the ground again
+            // as soon as its spot is free air.
+            if let Some(hold) = holds[who.index()].as_mut().filter(|hold| hold.displaced.is_some_and(|moved| moved.landed)) {
+                let floor = placement::floor_under(accessor, fighter.at, true).map(|floor| floor[1]);
+                if record_place::leaves_ground(placement::free_at(accessor, fighter.at), fighter.at[1], floor) {
+                    hold.lift_again();
+                }
+            }
             engine.session = Some(Session::Pages { wizard, stage, recorded, notice, pad, holds, save });
         }
         Session::Start(mut start) => {

@@ -15,8 +15,7 @@ use library::{Chain, LoopCount, NamedSave, RecordingIndex, Role, Sequence, MACRO
 use macros::{InputFrame, Library, MacroRecording, StartState};
 use playback::{Book, Playback};
 use crate::model::store::Store;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
 use crate::engine::rr_host as host;
@@ -54,7 +53,7 @@ fn free_y_snaps_to_a_real_move_even_near_the_unmarked_start() {
 #[test]
 fn a_refused_mii_capture_export_keeps_the_browsed_cut() {
     let track = macros::ReplayTrack { entry: 0, quantized_analog: false, fighter: None,
-        frames: (0..12).map(|i| macros::ReplayFrame { start: StartState::neutral(if i < 6 { 0x48 } else { 8 }, 0, 1.0),
+        frames: (0..12).map(|i| macros::ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, start: StartState::neutral(if i < 6 { 0x48 } else { 8 }, 0, 1.0),
             input: InputFrame::default(), x: 0.0, y: 0.0 }).collect() };
     let mut editor = ClipEditor::new(macros::ReplaySession { tracks: vec![track], ..Default::default() }, vec![0]).unwrap();
     editor.on_action(ClipAction::SelectOut);
@@ -80,7 +79,7 @@ fn a_refused_mii_capture_export_keeps_the_browsed_cut() {
 #[test]
 fn switching_tracks_shows_the_selected_handle_on_the_new_track() {
     let track = |entry, len| macros::ReplayTrack { entry, quantized_analog: false, fighter: None,
-        frames: vec![macros::ReplayFrame { start: StartState::neutral(entry, 0, 1.0),
+        frames: vec![macros::ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, start: StartState::neutral(entry, 0, 1.0),
             input: InputFrame::default(), x: 0.0, y: 0.0 }; len] };
     let session = macros::ReplaySession { tracks: vec![track(0, 10), track(1, 30)], ..Default::default() };
     let mut editor = ClipEditor::new(session, vec![0]).unwrap();
@@ -114,6 +113,7 @@ fn install5_previewable_capture_windows_remain_previewable() {
             16..=18 | 35..=36 => 46, 19 | 37 => 47, 20..=27 => 15, 28..=31 => 7, _ => 99,
         };
         ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame { buttons: u32::from([5, 10, 31].contains(&i)), lstick_x: i as i8, ..Default::default() },
             start: StartState { status, situation: if (4..=27).contains(&i) { 2 } else { 0 },
                 ..StartState::neutral(if i < 40 { 74 } else { 8 }, 0, 1.0) }, x: 0.0, y: 0.0,
@@ -163,26 +163,13 @@ fn install5_previewable_capture_windows_remain_previewable() {
     assert!(accepted.iter().all(|&count| count > 0), "{accepted:?}");
 }
 
-static NEXT: AtomicUsize = AtomicUsize::new(0);
 static HOST: Mutex<()> = Mutex::new(());
 
-struct Scratch(PathBuf);
+struct Scratch(crate::test_scratch::Scratch);
 
 impl Scratch {
     fn new() -> Self {
-        let path = std::env::temp_dir().join(format!(
-            "tr-trim-test-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        std::fs::create_dir(&path).unwrap();
-        Self(path)
-    }
-}
-
-impl Drop for Scratch {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        Self(crate::test_scratch::Scratch::new("tr-trim-test"))
     }
 }
 

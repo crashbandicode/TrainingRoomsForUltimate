@@ -992,14 +992,8 @@ mod tests {
         }
     }
 
-    fn scratch(tag: &str) -> std::path::PathBuf {
-        use std::sync::atomic::{AtomicU64, Ordering};
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let n = NEXT.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!("tr-rr7-{tag}-{n}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
+    fn scratch(tag: &str) -> crate::test_scratch::Scratch {
+        crate::test_scratch::Scratch::new(&format!("tr-rr7-{tag}"))
     }
 
     fn state(kind: i32) -> SavedState {
@@ -1753,7 +1747,7 @@ mod tests {
     }
 
     /// A card with `files` recordings and its index, as the menu lists it.
-    fn library_card(tag: &str, files: usize) -> std::path::PathBuf {
+    fn library_card(tag: &str, files: usize) -> crate::test_scratch::Scratch {
         let root = scratch(tag);
         RecordingIndex::load(&root).unwrap().save(&root).unwrap();
         let macros = Library::new(root.join(MACROS_DIR));
@@ -1864,7 +1858,7 @@ mod tests {
         use crate::model::store::before_next_store_list;
 
         let root = library_card("save-chord-slot-race", 1);
-        let path = root.clone();
+        let path = root.path().to_path_buf();
         before_next_store_list(move || {
             let index = RecordingIndex::load(&path).unwrap();
             assert_eq!(index.bound(), None, "the save has not committed");
@@ -1968,7 +1962,7 @@ mod tests {
                 let track = |entry: i32, base: u32| ReplayTrack {
                     fighter: None,
                     entry, quantized_analog: false,
-                    frames: (0..3).map(|i| ReplayFrame { input: frame(base + i),
+                    frames: (0..3).map(|i| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: frame(base + i),
                         start: StartState::neutral(entry + 7, 0, 1.0), x: 0.0, y: 0.0 }).collect(),
                 };
                 let session = ReplaySession { tracks: vec![track(0, 1), track(1, 101)], truncated: false, breaks: Vec::new() };

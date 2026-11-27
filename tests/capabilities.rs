@@ -129,6 +129,8 @@ const BOUNDARIES: &[Boundary] = &[
     // The native hurt-shape read is optional; boot sets its flag only when every grader row passed.
     Boundary { function: "input_display::spacing_hit", owner: Some(Feature::InputDisplay), gate: Gate::Flag("GRADER_LIVE") },
     Boundary { function: "input_display::attacker_owner", owner: Some(Feature::Hitbox), gate: Gate::Flag("OWNER_ON") },
+    // Animation reads are optional for capture and its callers.
+    Boundary { function: "replay_capture::sampled_pose", owner: None, gate: Gate::Flag("pose_reads_granted") },
     // The recorder's entry points the other features call: dormant until boot enables the recorder.
     Boundary { function: "recorder::request_playback", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
     Boundary { function: "recorder::on_p1_poll", owner: Some(Feature::Recording), gate: Gate::Flag("ENABLED") },
@@ -726,6 +728,31 @@ fn a_missing_motion_frame_read_declines_startup_forecast_and_preserves_both_dril
     let usable = |site: &model::sites::Site| !rejected.contains(&site.name);
     assert!(capabilities::unit_usable(Feature::EdgeJuggle, &usable));
     assert!(!Granted::from_usable(&usable).allows(row.offset));
+}
+
+#[test]
+fn a_refused_animation_read_stores_no_pose_and_keeps_its_units_installed() {
+    let a = Analysis::new();
+    let sample = "replay_capture::sampled_pose";
+    let start = a.graph.find(sample)[0];
+    let reached = a.reach(start).0;
+    let boundary = BOUNDARIES.iter().find(|b| b.function == sample).unwrap();
+    assert_eq!(boundary.owner, None);
+    let Gate::Flag(name) = boundary.gate;
+    let guard = &a.graph.funcs[a.graph.find(&format!("replay_capture::{name}"))[0]];
+    for (name, offset) in [("motion_kind", "MOTION_KIND_OFFSET"), ("motion_frame", "MOTION_FRAME_OFFSET")] {
+        let row = capabilities::find(name).unwrap();
+        assert!(reached.contains(&row.offset), "pose sampling must reach {name}");
+        assert!(a.own_offsets(guard).contains(&row.offset));
+        let check = callgraph::lex(&format!("game::granted({offset})"));
+        assert!(guard.body.windows(check.len()).any(|ts| ts == check));
+        let rejected: Vec<_> = capabilities::equivalent_rows(row).map(|same| same.name).collect();
+        let usable = |site: &model::sites::Site| !rejected.contains(&site.name);
+        for unit in [Feature::Recording, Feature::NamedMacros, Feature::StateCore] {
+            assert!(capabilities::unit_usable(unit, &usable), "{name} disabled {}", unit.name());
+        }
+        assert!(!Granted::from_usable(&usable).allows(row.offset));
+    }
 }
 
 #[test]

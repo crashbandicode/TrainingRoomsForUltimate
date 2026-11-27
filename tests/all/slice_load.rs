@@ -7,7 +7,8 @@ fn the_production_load_keeps_up_with_a_slice_of_the_same_file() {
     const KEY: &str = "TR_SLICE_LOAD_ROOT";
     const TEST: &str = "slice_load::the_production_load_keeps_up_with_a_slice_of_the_same_file";
     let Some(dir) = env::var_os(KEY).map(PathBuf::from) else {
-        let dir = env::temp_dir().join(format!("tr-slice-load-{}", std::process::id()));
+        let scratch = crate::test_scratch::Scratch::new("tr-slice-load");
+        let dir = scratch.join("root");
         let frames = (0..MAX_FRAMES).map(|i| InputFrame { buttons: (i % 7 + 1) as u32, ..InputFrame::default() }).collect();
         let rec = MacroRecording::new("Timed", "13.0.5", StartState::neutral(8, 0, 1.0), frames).unwrap();
         assert_eq!(Library::new(&dir).save_new(&rec).unwrap(), "timed");

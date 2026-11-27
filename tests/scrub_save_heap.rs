@@ -11,10 +11,9 @@ fn a_maximum_take_serializes_without_a_second_track() {
     const KEY: &str = "TR_SCRUB_SAVE_HEAP_ROOT";
     let Some(root) = env::var_os(KEY).map(std::path::PathBuf::from) else {
         // The production allocator's peak is process-wide: run just this case in a fresh process.
-        let root = env::temp_dir().join(format!("tr-scrub-save-{}", std::process::id()));
-        fs::create_dir(&root).unwrap();
+        let root = crate::test_scratch::Scratch::new("tr-scrub-save");
         let run = |phase| Command::new(env::current_exe().unwrap()).args(["--exact", TEST, "--nocapture"])
-            .env(KEY, &root).env("TR_SCRUB_PHASE", phase).status().unwrap().success();
+            .env(KEY, root.path()).env("TR_SCRUB_PHASE", phase).status().unwrap().success();
         let saved = run("save");
         let loaded = root.join("measured").is_file() && run("load");
         let listed = root.join("measured").is_file() && run("list");
@@ -61,7 +60,8 @@ fn a_maximum_take_serializes_without_a_second_track() {
         let overwrite_alloc = heap_bytes().total - before.total;
         assert_eq!(fs::read(folder.join(format!("{id}.json"))).unwrap(), serde_json::to_vec(&rec).unwrap());
         writeln!(std::io::stderr(), "SCRUB_LOAD frames={MAX_FRAMES} peak_above_idle={load_peak} overwrite_alloc={overwrite_alloc}").unwrap();
-        assert!(load_peak < 4 * 1024 * 1024, "load kept a second large allocation");
+        // One decoded track and the slack this check always had (4 MiB − 3,168,000 B, the track before the pose).
+        assert!(load_peak < (MAX_FRAMES * size_of::<[ReplayFrame; 2]>() + 1_026_304) as isize, "load kept a second large allocation");
         assert!(overwrite_alloc < 256 * 1024, "overwrite buffered the whole macro");
         return;
     }
@@ -69,7 +69,7 @@ fn a_maximum_take_serializes_without_a_second_track() {
     let baseline = heap_bytes();
     let take = TakeTrack::new();
     let mut inputs = Vec::with_capacity(MAX_FRAMES);
-    let body = |kind, sign, i: usize| ReplayFrame { input: InputFrame::default(), start: StartState {
+    let body = |kind, sign, i: usize| ReplayFrame { pose: crate::engine::macros::PackedPose::NONE, input: InputFrame::default(), start: StartState {
         situation: 2, status: 14, speed_x: sign * 0.8125, speed_y: -0.4375,
         ..StartState::neutral(kind, 2, sign)
     }, x: sign * (i % 1600) as f32 / 16.0, y: (i % 768) as f32 / 16.0 };
@@ -108,7 +108,8 @@ fn a_maximum_take_serializes_without_a_second_track() {
         bytes.len(), encoded.capacity()).unwrap();
     assert!(scratch < 4096, "serializing to a nonallocating writer requested {scratch} bytes");
     let timed = Instant::now();
-    crate::engine::macros::positions::write(&folder, "timing", &rec.frames, stored, crate::engine::macros::positions::Source::Recorded).unwrap();
+    crate::engine::macros::positions::write(&folder, "timing", &rec.frames, stored,
+        crate::engine::macros::positions::Source::Recorded, crate::engine::macros::positions::Moves::Take).unwrap();
     let write_us = timed.elapsed().as_micros();
     let timed = Instant::now();
     let read = crate::engine::macros::positions::read(&folder, "timing", &rec.frames).map(|track| track.len());
@@ -117,13 +118,13 @@ fn a_maximum_take_serializes_without_a_second_track() {
     let before = heap_bytes().total;
     let checked = crate::engine::macros::positions::check(&folder, "timing", &rec.frames);
     let check_alloc = heap_bytes().total - before;
-    assert_eq!(checked, Some((crate::engine::macros::positions::Source::Recorded, MAX_FRAMES as u32)));
+    assert_eq!(checked, Some((crate::engine::macros::positions::Source::Recorded, MAX_FRAMES as u32, crate::engine::macros::positions::Moves::Take)));
     eprintln!("SCRUB_CHECK frames={MAX_FRAMES} allocated={check_alloc}");
     assert!(check_alloc < 64 * 1024, "validating the existing sidecar allocated {check_alloc} bytes");
     crate::engine::macros::positions::remove(&folder, "timing");
     writeln!(std::io::stderr(), "SCRUB_SIDECAR frames={MAX_FRAMES} bytes={sidecar} write_us={write_us} read_us={read_us}").unwrap();
-    assert_eq!((read, sidecar), (Some(MAX_FRAMES), 40 + 72 * MAX_FRAMES as u64));
+    assert_eq!((read, sidecar), (Some(MAX_FRAMES), 40 + 88 * MAX_FRAMES as u64));
     fs::write(root.join("measured"), id).unwrap();
     // At drain the packed recording blocks and decoded track briefly coexist; not two whole tracks plus JSON.
-    assert!(peak < 7 * 1024 * 1024, "saving still buffered the entire JSON file");
+    assert!(peak < (7 * 1024 * 1024 + MAX_FRAMES * 16) as isize, "saving still buffered the entire JSON file");
 }

@@ -17,7 +17,7 @@ use {crate::engine::macros::InputFrame, crate::engine::macros::ReplayFrame, crat
 
 const MAGIC: &[u8; 8] = b"TMRCAP01";
 const FIXED_HEADER_BYTES: usize = 12;
-const CAPTURE_SCHEMA_VERSION: u32 = 1;
+const CAPTURE_SCHEMA_VERSION: u32 = 2;
 const TEMP_CREATE_ATTEMPTS: usize = 64;
 static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -25,8 +25,9 @@ static NEXT_TEMP_ID: AtomicU64 = AtomicU64::new(0);
 pub const MAX_CAPTURE_HEADER_BYTES: usize = 16 * 1024;
 /// Largest number of concurrent fighter entries represented in a capture.
 pub const MAX_CAPTURE_TRACKS: usize = 8;
-/// Explicit binary record size: input (8), start state (28), and position (8).
-pub const CAPTURE_RECORD_BYTES: usize = 44;
+/// Explicit binary record size: input (8), start state (28), position (8), and pose (8).
+pub const CAPTURE_RECORD_BYTES: usize = 52;
+pub const LEGACY_CAPTURE_RECORD_BYTES: usize = 44;
 /// Maximum UTF-8 byte length of the native replay id stored in the header.
 pub const MAX_CAPTURE_REPLAY_ID_BYTES: usize = 96;
 /// Maximum UTF-8 byte length of the display name stored in the header.
@@ -131,12 +132,13 @@ impl CaptureArchive {
                     return Err(invalid_data("capture path is not a regular file"));
                 }
                 let (mut capture, header) = open_capture(&path, id)?;
+                let record_bytes = capture_record_bytes(header.schema_version)?;
                 let mut sides = Vec::with_capacity(header.tracks.len());
                 for track in &header.tracks {
                     let mut first = [0u8; CAPTURE_RECORD_BYTES];
-                    read_exact_capture(&mut capture, &mut first, "sample data")?;
+                    read_exact_capture(&mut capture, &mut first[..record_bytes], "sample data")?;
                     sides.push((track.entry, read_i32(&first, 8)));
-                    capture.seek(SeekFrom::Current(i64::from(track.frames - 1) * CAPTURE_RECORD_BYTES as i64))?;
+                    capture.seek(SeekFrom::Current(i64::from(track.frames - 1) * record_bytes as i64))?;
                 }
                 Ok(Some(CaptureEntry {
                     id: id.to_owned(),
@@ -180,13 +182,14 @@ impl CaptureArchive {
         // Menu/frame code never parses the potentially large shared JSONL stream.
         let path = self.shared_cache_path(id)?.unwrap_or_else(|| self.capture_path(id));
         let (file, header) = open_capture(&path, id)?;
+        let record_bytes = capture_record_bytes(header.schema_version)?;
         let mut reader = BufReader::new(file);
         let mut tracks = Vec::with_capacity(header.tracks.len());
 
         for track_header in &header.tracks {
             let mut frames = Vec::with_capacity(track_header.frames as usize);
             for frame_index in 0..track_header.frames {
-                let frame = read_frame(&mut reader)?;
+                let frame = read_frame(&mut reader, record_bytes)?;
                 if let Some(problem) = frame_problem(&frame) {
                     return Err(invalid_data(format!(
                         "invalid sample in entry {} frame {}: {problem}",
@@ -308,7 +311,7 @@ impl CaptureArchive {
                 header_bytes.len()
             )));
         }
-        let expected_len = expected_file_len(header_bytes.len(), &header.tracks)?;
+        let expected_len = expected_file_len(header_bytes.len(), &header.tracks, CAPTURE_RECORD_BYTES)?;
         if expected_len > MAX_CAPTURE_FILE_BYTES {
             return Err(invalid_input(format!(
                 "capture would be {expected_len} bytes (maximum {MAX_CAPTURE_FILE_BYTES})"
@@ -467,17 +470,12 @@ fn read_capture_header(
     read_exact_capture(file, &mut header_bytes, "JSON header")?;
     let version: HeaderVersion = serde_json::from_slice(&header_bytes)
         .map_err(|err| invalid_data(format!("malformed capture JSON header: {err}")))?;
-    if version.schema_version != CAPTURE_SCHEMA_VERSION {
-        return Err(invalid_data(format!(
-            "unsupported capture schema version {} (supported: {CAPTURE_SCHEMA_VERSION})",
-            version.schema_version
-        )));
-    }
+    let record_bytes = capture_record_bytes(version.schema_version)?;
     let header: CaptureHeader = serde_json::from_slice(&header_bytes)
         .map_err(|err| invalid_data(format!("malformed capture JSON header: {err}")))?;
     validate_header(&header, file_id)?;
 
-    let expected_len = expected_file_len(header_len, &header.tracks)?;
+    let expected_len = expected_file_len(header_len, &header.tracks, record_bytes)?;
     if expected_len != file_len {
         return Err(if expected_len > file_len {
             invalid_data(format!(
@@ -493,12 +491,7 @@ fn read_capture_header(
 }
 
 fn validate_header(header: &CaptureHeader, file_id: &str) -> io::Result<()> {
-    if header.schema_version != CAPTURE_SCHEMA_VERSION {
-        return Err(invalid_data(format!(
-            "unsupported capture schema version {} (supported: {CAPTURE_SCHEMA_VERSION})",
-            header.schema_version
-        )));
-    }
+    capture_record_bytes(header.schema_version)?;
     validate_replay_id(&header.replay_id).map_err(invalid_data)?;
     validate_replay_name(&header.replay_name).map_err(invalid_data)?;
     validate_game_version(&header.game_version).map_err(invalid_data)?;
@@ -546,11 +539,21 @@ fn validate_header(header: &CaptureHeader, file_id: &str) -> io::Result<()> {
     Ok(())
 }
 
-fn expected_file_len(header_len: usize, tracks: &[TrackHeader]) -> io::Result<u64> {
+fn capture_record_bytes(schema: u32) -> io::Result<usize> {
+    match schema {
+        1 => Ok(LEGACY_CAPTURE_RECORD_BYTES),
+        CAPTURE_SCHEMA_VERSION => Ok(CAPTURE_RECORD_BYTES),
+        _ => Err(invalid_data(format!(
+            "unsupported capture schema version {schema} (supported: 1, {CAPTURE_SCHEMA_VERSION})"
+        ))),
+    }
+}
+
+fn expected_file_len(header_len: usize, tracks: &[TrackHeader], record_bytes: usize) -> io::Result<u64> {
     let sample_bytes = tracks
         .iter()
         .try_fold(0u64, |total, track| {
-            total.checked_add(u64::from(track.frames).checked_mul(CAPTURE_RECORD_BYTES as u64)?)
+            total.checked_add(u64::from(track.frames).checked_mul(record_bytes as u64)?)
         })
         .ok_or_else(|| invalid_data("capture size calculation overflowed"))?;
     (FIXED_HEADER_BYTES as u64)
@@ -761,13 +764,17 @@ fn write_frame(writer: &mut impl Write, frame: &ReplayFrame) -> io::Result<()> {
     record[32..36].copy_from_slice(&frame.start.speed_y.to_le_bytes());
     record[36..40].copy_from_slice(&frame.x.to_le_bytes());
     record[40..44].copy_from_slice(&frame.y.to_le_bytes());
+    record[44..52].copy_from_slice(&frame.pose.to_le_bytes());
     writer.write_all(&record)
 }
 
-fn read_frame(reader: &mut impl Read) -> io::Result<ReplayFrame> {
+fn read_frame(reader: &mut impl Read, record_bytes: usize) -> io::Result<ReplayFrame> {
     let mut record = [0u8; CAPTURE_RECORD_BYTES];
-    read_exact_capture(reader, &mut record, "sample data")?;
+    read_exact_capture(reader, &mut record[..record_bytes], "sample data")?;
     let frame = ReplayFrame {
+        pose: if record_bytes == CAPTURE_RECORD_BYTES {
+            crate::engine::macros::PackedPose::from_le_bytes(record[44..52].try_into().unwrap())
+        } else { crate::engine::macros::PackedPose::NONE },
         input: InputFrame {
             buttons: read_u32(&record, 0),
             lstick_x: record[4] as i8,
@@ -875,30 +882,17 @@ mod tests {
     use super::*;
     use std::io::{Seek, SeekFrom};
 
-    static NEXT_TEST_DIR: AtomicU64 = AtomicU64::new(0);
-
-    struct TestDir(PathBuf);
+    struct TestDir(crate::test_scratch::Scratch);
 
     impl TestDir {
         fn new() -> Self {
-            let path = std::env::temp_dir().join(format!(
-                "training-mod-capture-{}-{}",
-                std::process::id(),
-                NEXT_TEST_DIR.fetch_add(1, Ordering::Relaxed)
-            ));
-            fs::create_dir_all(&path).unwrap();
-            Self(path)
-        }
-    }
-
-    impl Drop for TestDir {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
+            Self(crate::test_scratch::Scratch::new("training-mod-capture"))
         }
     }
 
     fn sample_session() -> ReplaySession {
         let first = ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame {
                 buttons: 0xa1b2_c3d4,
                 lstick_x: -127,
@@ -1172,7 +1166,7 @@ mod tests {
         let unsupported_id = encode_file_id("unsupported");
         fs::write(
             temp.0.join(format!("{unsupported_id}.tmrc")),
-            capture_file(br#"{"schema_version":2}"#),
+            capture_file(br#"{"schema_version":3}"#),
         )
         .unwrap();
         let oversized_id = encode_file_id("oversized");
@@ -1200,8 +1194,142 @@ mod tests {
         }
     }
 
+    fn pose_session() -> ReplaySession {
+        use crate::engine::macros::{PackedPose, Pose};
+        let frame = |n: u32, kind| ReplayFrame {
+            pose: PackedPose::pack(Pose { motion: 100 + u64::from(n), frame: n as f32 + 0.5 }),
+            input: InputFrame { buttons: n, ..InputFrame::default() },
+            start: StartState::neutral(kind, 0, 1.0), x: n as f32, y: -(n as f32),
+        };
+        ReplaySession { tracks: vec![
+            ReplayTrack { fighter: None, entry: 0, frames: vec![frame(1, 5), frame(2, 5), frame(3, 5)], quantized_analog: false },
+            ReplayTrack { fighter: None, entry: 3, frames: vec![frame(4, 9)], quantized_analog: false },
+        ], truncated: false, breaks: Vec::new() }
+    }
+
+    fn manual_capture(id: &str, schema: u32, record_size: usize) -> Vec<u8> {
+        let session = pose_session();
+        let header = serde_json::json!({
+            "schema_version": schema, "replay_id": id, "replay_name": "Match",
+            "game_version": "13.0.5", "truncated": false,
+            "tracks": [
+                {"entry": 0, "frames": 3, "quantized_analog": false},
+                {"entry": 3, "frames": 1, "quantized_analog": false}
+            ]
+        });
+        let mut bytes = capture_file(&serde_json::to_vec(&header).unwrap());
+        for frame in session.tracks.iter().flat_map(|track| &track.frames) {
+            let mut record = [0u8; 44];
+            record[0..4].copy_from_slice(&frame.input.buttons.to_le_bytes());
+            record[8..12].copy_from_slice(&frame.start.fighter_kind.to_le_bytes());
+            record[16..20].copy_from_slice(&frame.start.facing.to_le_bytes());
+            record[36..40].copy_from_slice(&frame.x.to_le_bytes());
+            record[40..44].copy_from_slice(&frame.y.to_le_bytes());
+            bytes.extend_from_slice(&record);
+            if record_size == 52 { bytes.extend_from_slice(&frame.pose.to_le_bytes()); }
+        }
+        bytes
+    }
+
+    fn a_capture_is_written_as_schema_2_with_52_byte_records_and_keeps_each_pose() {
+        let temp = TestDir::new();
+        let archive = CaptureArchive::new(&temp.0);
+        let session = pose_session();
+        let id = archive.save("schema2", "Match", "13.0.5", &session).unwrap();
+        let bytes = fs::read(archive.capture_path(&id)).unwrap();
+        let len = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+        let header: serde_json::Value = serde_json::from_slice(&bytes[12..12 + len]).unwrap();
+        assert_eq!(header["schema_version"], 2);
+        assert_eq!(bytes.len(), 12 + len + 4 * 52);
+        assert_eq!(&bytes[12 + len + 44..12 + len + 52], &session.tracks[0].frames[0].pose.to_le_bytes());
+        let loaded = archive.load(&id).unwrap();
+        for (expected, actual) in session.tracks.iter().zip(&loaded.session.tracks) {
+            assert_eq!(expected.entry, actual.entry);
+            assert_eq!(expected.frames.len(), actual.frames.len());
+            for (expected, actual) in expected.frames.iter().zip(&actual.frames) {
+                assert_eq!(actual.pose, expected.pose);
+            }
+        }
+        let foreign = crate::engine::macros::PackedPose([0, 0x500]);
+        let mut bytes = bytes;
+        bytes[12 + len + 44..12 + len + 52].copy_from_slice(&foreign.to_le_bytes());
+        fs::write(archive.capture_path(&id), bytes).unwrap();
+        assert_eq!(archive.load(&id).unwrap().session.tracks[0].frames[0].pose, foreign);
+    }
+
+    fn a_schema_1_capture_loads_with_no_pose() {
+        let temp = TestDir::new();
+        let id = encode_file_id("old");
+        fs::write(temp.0.join(format!("{id}.tmrc")), manual_capture("old", 1, 44)).unwrap();
+        let loaded = CaptureArchive::new(&temp.0).load(&id).unwrap();
+        for (expected, actual) in pose_session().tracks.iter().zip(&loaded.session.tracks) {
+            assert_eq!(expected.entry, actual.entry);
+            assert_eq!(expected.frames.len(), actual.frames.len());
+            for (expected, actual) in expected.frames.iter().zip(&actual.frames) {
+                assert_frame_eq(expected, actual);
+                assert_eq!(actual.pose, crate::engine::macros::PackedPose::NONE);
+            }
+        }
+    }
+
+    fn the_list_strides_by_the_files_schema() {
+        let temp = TestDir::new();
+        for (name, schema, size) in [("old", 1, 44), ("new", 2, 52)] {
+            let id = encode_file_id(name);
+            fs::write(temp.0.join(format!("{id}.tmrc")), manual_capture(name, schema, size)).unwrap();
+        }
+        let listing = CaptureArchive::new(&temp.0).list().unwrap();
+        assert!(listing.skipped.is_empty(), "{:?}", listing.skipped);
+        assert_eq!(listing.entries.len(), 2);
+        for entry in listing.entries {
+            assert_eq!(entry.sides, [(0, 5), (3, 9)]);
+            assert_eq!(entry.frames, 3);
+        }
+    }
+
+    fn saving_over_a_schema_1_capture_keeps_the_old_file() {
+        let temp = TestDir::new();
+        let id = encode_file_id("old");
+        let path = temp.0.join(format!("{id}.tmrc"));
+        let before = manual_capture("old", 1, 44);
+        fs::write(&path, &before).unwrap();
+        let outcome = CaptureArchive::new(&temp.0).save_with_outcome("old", "Match", "13.0.5", &pose_session()).unwrap();
+        assert_eq!(outcome.id, id);
+        assert!(!outcome.created);
+        assert_eq!(fs::read(path).unwrap(), before);
+    }
+
+    fn a_capture_cut_short_or_padded_is_refused_at_either_record_size() {
+        for (schema, size, cut) in [(2, 52, true), (2, 44, false), (1, 52, false)] {
+            let temp = TestDir::new();
+            let id = encode_file_id("bad");
+            let mut bytes = manual_capture("bad", schema, size);
+            if cut { bytes.truncate(bytes.len() - 8); }
+            fs::write(temp.0.join(format!("{id}.tmrc")), bytes).unwrap();
+            let archive = CaptureArchive::new(&temp.0);
+            assert!(archive.load(&id).is_err());
+            let listing = archive.list().unwrap();
+            assert!(listing.entries.is_empty());
+            assert_eq!(listing.skipped.len(), 1);
+            assert_eq!(listing.skipped[0].file, format!("{id}.tmrc"));
+        }
+    }
+
+    fn schema_3_is_refused() {
+        let temp = TestDir::new();
+        let id = encode_file_id("future");
+        fs::write(temp.0.join(format!("{id}.tmrc")), manual_capture("future", 3, 52)).unwrap();
+        let archive = CaptureArchive::new(&temp.0);
+        assert!(archive.load(&id).is_err());
+        let listing = archive.list().unwrap();
+        assert!(listing.entries.is_empty());
+        assert_eq!(listing.skipped.len(), 1);
+        assert!(listing.skipped[0].reason.contains("unsupported"));
+    }
+
     fn two_sides() -> ReplaySession {
         let frame = |buttons, kind| ReplayFrame {
+            pose: crate::engine::macros::PackedPose::NONE,
             input: InputFrame { buttons, ..InputFrame::default() },
             start: StartState::neutral(kind, 0, 1.0), x: 0.0, y: 0.0,
         };
@@ -1246,7 +1374,7 @@ mod tests {
         let archive = CaptureArchive::new(&temp.0);
         let session = two_sides();
         let id = encode_file_id("staged");
-        let header = CaptureHeader { schema_version: 1, replay_id: "staged".into(), replay_name: "Staged".into(),
+        let header = CaptureHeader { schema_version: CAPTURE_SCHEMA_VERSION, replay_id: "staged".into(), replay_name: "Staged".into(),
             game_version: "13.0.5".into(), miis: None, truncated: false, breaks: Vec::new(),
             tracks: session.tracks.iter().map(|track| TrackHeader {
                 entry: track.entry, frames: track.frames.len() as u32, quantized_analog: track.quantized_analog,
@@ -1312,6 +1440,12 @@ mod tests {
     #[test]
     fn case_table() {
         crate::test_table::run(&[
+            ("a_capture_is_written_as_schema_2_with_52_byte_records_and_keeps_each_pose", a_capture_is_written_as_schema_2_with_52_byte_records_and_keeps_each_pose as fn()),
+            ("a_schema_1_capture_loads_with_no_pose", a_schema_1_capture_loads_with_no_pose as fn()),
+            ("the_list_strides_by_the_files_schema", the_list_strides_by_the_files_schema as fn()),
+            ("saving_over_a_schema_1_capture_keeps_the_old_file", saving_over_a_schema_1_capture_keeps_the_old_file as fn()),
+            ("a_capture_cut_short_or_padded_is_refused_at_either_record_size", a_capture_cut_short_or_padded_is_refused_at_either_record_size as fn()),
+            ("schema_3_is_refused", schema_3_is_refused as fn()),
             ("delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them", delete_removes_a_bundle_and_a_plain_capture_and_the_listing_drops_them as fn()),
             ("a_delete_that_fails_after_it_commits_never_lists_a_broken_capture", a_delete_that_fails_after_it_commits_never_lists_a_broken_capture as fn()),
             ("a_saved_capture_lists_each_side_with_its_fighter", a_saved_capture_lists_each_side_with_its_fighter as fn()),

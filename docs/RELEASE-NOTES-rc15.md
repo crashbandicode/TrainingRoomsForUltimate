@@ -5,10 +5,12 @@ Notes for players. rc.15 is one release name for a line of builds. Each build's 
 ([Which build you have](guide/getting-started.md#which-build-you-have)).
 
 Six of these builds were installed on the project's test console one after another, and are called install 1 to 6.
+The preview build is staged for the card; install 6 is still the newest installed build.
 Times are UTC.
 
 | Build | Installed | Footer ends with | In short |
 | --- | --- | --- | --- |
+| [Preview build](#preview-build) | Not installed; staged 2026-11-27 | `cc71537c` | Scrubbing shows each fighter's recorded move; fixes to install 6's scrubbing and to a save's placement |
 | [Install 6](#install-6) | 2026-11-26 | `5df3d9dc` | The clip editor: Y on In makes a capture previewable, a free playhead, and the fighters shown while you scrub |
 | [Install 5](#install-5) | 2026-11-25 | `b7a382e4` | Record with an AI on Player 1, named grab and throw keys, B stops a preview, Delete for replay captures, named move marks, playback that starts without reading the library, Guard the Edge and Juggler use the floor you stand on, the eggs' off-stage zone, a save's placement changed with the crosshair |
 | [Install 4](#install-4) | 2026-11-25 | `a945b0c1` | Drills and combos read moves the same way for every fighter; the clip editor over the game; Recordings; Trim; input scroll-back |
@@ -24,6 +26,66 @@ What "tested" means in these notes:
   are reports, not a list of passes, and only reports that are on record are written.
 
 The runs, verdicts and file hashes behind every line are in [Install evidence](EVIDENCE-rc15-installs.md).
+
+## Preview build
+
+An in-between build for the operator to play while two defects are fixed. It is **staged for the card and not
+installed**, and it is not the next release.
+
+| Preview | Details |
+| --- | --- |
+| Built from | `cc71537c` (the footer ends with it) |
+| Release file | `78db86f5…`, 5,419,008 bytes |
+| Replaces | Install 6, when it is installed |
+
+### Scrubbing shows the recorded moves
+
+On install 6 a scrubbed fighter was moved to its recorded place and kept the pose it had. On this build it also
+shows the recorded move when that frame has a pose and the fighter matches the take.
+
+| What | How it works |
+| --- | --- |
+| A macro recorded on this build | Record keeps each frame's animation with its position |
+| A match capture or a Vault recording made on this build | Keeps each frame's animation too |
+| A macro without recorded moves | Still loads and plays. The editor reads "Play it once to see the moves while scrubbing." |
+| An older capture | Still loads. It shows positions only |
+| Fighter choice | Each side shows the fighter on stage or the take's recorded fighter. ZL + L requests the switch for Player 1; ZL + R requests it for the CPU. The Player 1 switch did not finish in the editor; the CPU switch was not tested |
+| Not shown | Projectiles, items and damage, as before |
+
+### Fixes to install 6
+
+| Install 6 | This build |
+| --- | --- |
+| A long take kept only its first 1,200 frames of scrub positions | It keeps them all. A 1,610-frame take had 1,610 |
+| The first X after a snap could be refused | X plays after a held frame |
+| A fighter beside a wall was shown off its point | The editor refuses that point instead: "Can't stand there on this stage." |
+| At a refused point the snap hint could hide that line | The refusal line shows |
+| A save's Off stage fighter stayed grounded once it touched the ground | It floats again |
+
+Guard the Edge's uneven start is not changed by this build.
+
+### Known issues
+
+| Issue | What happens | Way round | Status |
+| --- | --- | --- | --- |
+| Fighter switch times out | After ZL + L the editor waits, then reads "The fighter did not load; the editor keeps the current one". The open editor blocks the roster from applying the switch. After 600 worker passes it gives up without withdrawing the request. In Eden, Player 1 changed fighters only after the editor closed; the CPU side was not tested | None established | Not fixed in this preview |
+| Fighters slide apart after B | Both fighters return to their places, but their push boxes can keep the width of the scrubbed pose for a few ticks. The boxes still overlap, so the game pushes the fighters apart. A quick B left each about 0.6 units off in four of six tries | None established | Not fixed in this preview |
+
+Both are to be fixed before the next release.
+
+### Tested
+
+| Check | Preview build |
+| --- | --- |
+| Installed | No. The file is staged with its approval record |
+| Host | Tests and all builds passed on `cc71537c`. Refusing a fighter pushed by a wall, and captures keeping their animation, are host-tested only |
+| Eden, on the release file, first boot | No crash. Passed: a long take, snapped X, the refusal at a point inside the stage, a save's fighter floating again, the settings check, and the menu in a waiting room as host. Scrub poses showed for both fighters |
+| Eden, on the release file, second boot | No crash. Snapped X, scrub poses and the settings check passed again. The fighter choice failed as above |
+| Eden, on the diagnostic build | Three chosen frames were shown exactly, and X and B let the fighters go. The slide was found there |
+| Not flown | A capture saved and read back in a game; a fighter pushed by a wall; a macro gaining its moves from one Play; the CPU side of the fighter choice; a second player in a waiting room |
+| On the console | Nothing yet |
+
+The runs behind these: [Install evidence](EVIDENCE-rc15-installs.md#preview-build-cc71537c).
 
 ## Install 6
 

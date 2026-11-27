@@ -2,6 +2,9 @@ macro_rules! lib_unit_tests {
     ($($body:tt)*) => {};
 }
 
+#[path = "support/scratch.rs"]
+mod test_scratch;
+
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 

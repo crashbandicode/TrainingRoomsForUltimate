@@ -568,7 +568,8 @@ fn aim_files_are_versions_three_and_four_and_old_files_read_as_before() {
     let value = serde_json::to_value(&hit).unwrap();
     assert_eq!(value["schema_version"], 3);
     assert_eq!(serde_json::from_value::<ComboRecord>(value.clone()).unwrap(), hit);
-    let root = std::env::temp_dir().join(format!("tr-aim-steps-{}", std::process::id()));
+    let scratch = crate::test_scratch::Scratch::new("tr-aim-steps");
+    let root = scratch.join("root");
     let lib = crate::model::combo_record::ComboLibrary::new(&root);
     let drill_id = lib.save_new(&record).unwrap();
     let hit_id = lib.save_new(&hit).unwrap();
