@@ -10,7 +10,7 @@
 |---|---|
 | Choose a class | Open Mii Brawler, Swordfighter or Gunner under [Extras](../menu/fighters-and-stages.md#extras). |
 | Pick for the CPU | ZR switches from Player to CPU; A selects the highlighted Mii. |
-| Apply the pick | Close the menu; otherwise [cycle to that class](fighter-cycles.md) if another fighter is out. |
+| Apply the pick | Close the menu. If another class is out, [cycle to the selected class](fighter-cycles.md). |
 | Use a replay Mii | Look after the saved entries; an equivalent saved Mii appears under its saved name. |
 | Make a new one | Select **Add New…**, edit the copy, save, then pick it from the list. |
 | Keep the original | Leave the editor without saving; changing only the name doesn't create another configuration. |

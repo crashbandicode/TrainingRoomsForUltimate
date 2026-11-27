@@ -10,8 +10,9 @@
 |---|---|
 | <a id='mash-and-followup'></a>Pick a first response | Choose Jump in **Mash**. |
 | Add a second action | Choose Air Dodge in **Followup**. |
-| <a id='mash-triggers'></a>Tell it when | Tick Hitstun in **Mash Triggers**, then hit the CPU and watch its response. |
-| <a id='situation-overrides'></a>Change just this situation | Set the Hitstun override to Up Special; other situations keep their Mash choice. |
+| <a id='mash-triggers'></a>Tell it when | Tick Hitstun in **Mash Triggers**. |
+| Try the response | Close the menu, hit the CPU, then watch for Jump followed by Air Dodge. |
+| <a id='situation-overrides'></a>Change just this situation | In **Situation overrides**, choose Hitstun, then Up Special. Other situations keep Mash. |
 
 ## Steer a launch
 
