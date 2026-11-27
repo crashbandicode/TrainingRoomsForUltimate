@@ -614,6 +614,7 @@ fn case_table() {
         ("a_hurtbox_without_a_valid_bone_scale_is_not_drawn", a_hurtbox_without_a_valid_bone_scale_is_not_drawn as fn()),
         ("a_live_targets_hurtbox_is_its_picture_disc", a_live_targets_hurtbox_is_its_picture_disc as fn()),
         ("a_busy_board_tick_leaves_the_fighters_panes_to_the_target", a_busy_board_tick_leaves_the_fighters_panes_to_the_target as fn()),
+        ("a_command_is_never_lost_while_the_store_is_busy", a_command_is_never_lost_while_the_store_is_busy as fn()),
         ("handed_off_commands_leave_what_immediate_commands_left", handed_off_commands_leave_what_immediate_commands_left as fn()),
         ("commands_pushed_from_several_threads_match_the_synchronous_result", commands_pushed_from_several_threads_match_the_synchronous_result as fn()),
         ("an_exhausted_pool_applies_directly_in_issue_order_or_skips_when_the_store_is_busy", an_exhausted_pool_applies_directly_in_issue_order_or_skips_when_the_store_is_busy as fn()),
@@ -699,6 +700,32 @@ fn parity(table_a: &mut hitbox::SetTable, articles_a: &mut orbs::Articles, table
     articles_b.clear_evicted(&mut board_b);
     assert_eq!(board_a.draw_slots_in_order(u8::MAX).copied().collect::<Vec<_>>(),
         board_b.draw_slots_in_order(u8::MAX).copied().collect::<Vec<_>>());
+}
+
+/// The operator's rule (2026-11-27): no command is skipped. While another thread holds the overlay's data, an article runs more
+/// wind commands than the handoff keeps commands, and a fighter then runs CATCH: its grab box must reach its set.
+fn a_command_is_never_lost_while_the_store_is_busy() {
+    use model::pool_list::PoolList;
+    let generations = hitbox::FighterGenerations::new();
+    let life = generations.stamp(0x10000).unwrap();
+    let list = PoolList::new(orbs::COMMAND_NODES).unwrap();
+    let table = hos_lock::Mutex::new(Box::new(hitbox::SetTable::new()));
+    let articles = hos_lock::Mutex::new(orbs::Articles::new());
+    let owner = |run: &mut dyn FnMut(&mut hitbox::SetTable, &mut orbs::Articles)| {
+        let (Some(mut table), Some(mut articles)) = (table.try_lock(), articles.try_lock()) else { return false };
+        run(&mut table, &mut articles);
+        true
+    };
+    let busy = table.lock();
+    for _ in 0..orbs::COMMAND_NODES {
+        orbs::hand_off(&list, &generations, orbs::Command::Wind { key: 16, id: 1 }, owner, &mut |_, _| {});
+    }
+    let handed = orbs::hand_off(&list, &generations, command_shape(0x1000, life.id, Some(life), true, 10), owner, &mut |_, _| {});
+    drop(busy);
+    orbs::apply_all(&list, None, &mut table.lock(), &mut articles.lock(), &generations, &mut |_, _| {});
+    let table = table.lock();
+    let waiting = table.find_life(0x1000, life).is_some_and(|i| !table.sets[i].is_empty());
+    assert!(waiting, "the fighter's grab box was dropped: {handed:?}");
 }
 
 fn handed_off_commands_leave_what_immediate_commands_left() {
