@@ -10,6 +10,11 @@ The same owned ELF SHA `0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317
 
 ## Established ordering and rejected substitutions
 
+| Evidence | Limit |
+| --- | --- |
+| Manager teardown | Entry cleanup does not prove retirement of the separate resource owner |
+| Deleting destructor | Must match the resource identity under review |
+
 - `14f139c..13a0` gates the manager cleanup on the current manager singleton.
   - `14f13a4..13ac` reads context `*(5324680)` and owner alias0.
   - The subsequent unrolled pass visits aliases through7 (`14f1dbc` reads alias7 at context+0x120).
@@ -24,6 +29,11 @@ The same owned ELF SHA `0789f0a4ae9652f335eca5eabc7df3e58b0954012a0bebdea374f317
 The exact missing link is a qualified caller of the context-owned resource's virtual deleting destructor, ordered after the old created lifetime and before native construction/use of waiting4. The current evidence does not identify that caller or show all requested transitions reach it. Further unrelated native scanning would exceed this bounded review's purpose.
 
 ## Proposed bounded observation using existing diagnostics
+
+| Proposed observation | Status at review |
+| --- | --- |
+| Training exit to waiting entry 4 | Not run |
+| Baseline with only entry 7 created | Cannot test retirement of a created entry 4 |
 
 This is a proposal for lead review, not an executed run or activation authorization. A row4 candidate must first receive explicit review/permission to activate its strict native creation path; current code still cannot create4. A baseline that creates only7 cannot establish retirement of a nonexistent created4.
 
@@ -45,6 +55,11 @@ Use one fresh, coherently gated diagnostic process and the normal Training exit 
 No product/native policy was changed for this follow-up. The pure ownership WIP received only test-fixture corrections for four owners and explicit cross-owner row rejection; it remains uncompiled. Four-row implementation and all runtime acceptance remain conditional on the lead's disposition.
 
 ## Accepted observation refinement (lead, 2026-11-03 05:45Z)
+
+| Observation at the menu | Decision before entering waiting |
+| --- | --- |
+| All four retirements matched | Proceed and bind the fresh waiting identity |
+| Missing or ambiguous marker | Stop and restore |
 
 - Existing diagnostics contain a global sequence but no producer-thread ID.
 - Supersede the producing-thread criterion above with an interactive causal barrier: observe every exact entry/listener/owner/claim retirement for all four created rows while still at the menu, BEFORE sending any waiting-entry command.

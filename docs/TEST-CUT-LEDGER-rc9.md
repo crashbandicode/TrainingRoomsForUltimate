@@ -53,6 +53,15 @@ rows, are counted there. The integration rows' numbers are their own files' test
 
 ## Cut: integration test files (80)
 
+| Group | Files cut |
+| --- | --- |
+| Source pins | 30 |
+| UI wording, glyphs and palette | 8 |
+| Mii by-path suites | 13 |
+| Pure model detail | 15 |
+| Host shims and diagnostics | 10 |
+| Runners and duplicates | 4 |
+
 ### `*_wiring.rs` and other source pins (30 files, 115 tests of their own)
 
 - Why not necessary: Source-text pin of one past fix: it reads the Switch-only runtime's `.rs` text through the call-graph scanner and asserts that one named call path or line still exists.
@@ -222,6 +231,10 @@ The cut modules of the two "mixed" areas, each with its test count:
 
 ## Non-test lines this touched, and the proof nothing shipped changed
 
+| Switch build | Effect of test-side edits |
+| --- | --- |
+| `cfg(test)` | Unset; test declarations and helpers do not ship |
+
 `cfg(test)` is never set in the Switch build, so none of these changes it:
 
 - `src/lib.rs`: the `#[cfg(test)]` macro `lib_unit_tests!`; the declarations of the removed test modules.
@@ -238,6 +251,11 @@ The cut modules of the two "mixed" areas, each with its test count:
 - `proof.py` (kept with the lane's evidence, `artifacts/phase23/rc9-test-cut/` in the workspace) compares every `src/`, `crates/` and `third_party/` file with its test modules removed: 671 identical, 14 differ (the files above and wrapped test files).
 
 ## Gate scripts and tools changed
+
+| Tool | Role in the cut |
+| --- | --- |
+| `tools/test_cut.py` | Remove or wrap test-gated modules |
+| Carry generators | Record removed or wrapped tests in carry manifests |
 
 - `tools/test_cut.py` (new): removes or wraps test-gated modules, lexer-aware; `python3 -I tools/test_cut.py selftest`.
 - `tools/carry_pkg4.py`, `tools/carry_pkg6.py`: the manifest edits `cut_tests`, `wrap_tests`, `wrap_file` and the entry flag `removed`,

@@ -10,6 +10,11 @@ member, not merely its class kind. Defaults/capacity changes are separate work.
 
 ## Ownership transition
 
+| Proposed count transition | Body ownership |
+| --- | --- |
+| Increase | Retain the helper body; transfer its receipt to the visible CPU |
+| Decrease | Wait for native deactivation before re-adopting the parked entry |
+
 1. Before native activation, capture the exact scene/source generation, entry
    address, body IDs, selected member, costume and saved-Mii configuration.
    Exclude newly active entries from speculative and demand-source replacement.
@@ -29,6 +34,11 @@ member, not merely its class kind. Defaults/capacity changes are separate work.
    no helper occupies an active CPU entry while count exceeds one.
 
 ## Source findings and implementation gaps
+
+| November 2 review | Gap at that revision |
+| --- | --- |
+| Source selection | Demand-first selection did not guarantee fixed seat order |
+| Presentation | Two visible-role stores did not represent owners 2 and 3 independently |
 
 - `character_sources::service` calls `service_owned` before admission gates.
   Loading source authority/INSTALL is retained until actual native completion;
@@ -52,6 +62,11 @@ member, not merely its class kind. Defaults/capacity changes are separate work.
   No delayed setter or silent loading-helper restriction is authorized here.
 
 ## Evidence required
+
+| Evidence requested | Coverage |
+| --- | --- |
+| Host regressions | Seat order, receipt lifetime and exact Mii identity |
+| Eden sequence | Count changes, reset and save/load with multiple CPUs |
 
 - Original regressions: fixed seat selection; transfer with live leases; loading completion after count increase; stale scene/entry callbacks; reverse adoption; exact-Mii identity and independent CPU1/2/3 reset/save-load receipts.
 - Then compiled native stack/guard gates and batched Eden count 1→2→3→2→1, loading helper, exact Mii, L+R+A and save/load at 2–3 CPUs, with full console zero Unmapped and all hook allocation deltas zero.

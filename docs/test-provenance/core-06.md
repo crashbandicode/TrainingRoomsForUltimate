@@ -4,6 +4,10 @@ Historical review opened 2026-11-02 (`57008f81`). Implementation details and out
 
 ## RC7 R3-2 boundary — 2026-11-03
 
+| RC7 R3-2 change | What remained |
+| --- | --- |
+| Runtime HB1 reader and three exclusive guards removed | Attack slots, pending grab boxes and their cleanup |
+
 The RC removes the runtime HB1 enumerator and its three exclusive HitModule
 guard/generator rows. Ordinary attack slots and pending grab boxes still use
 the same sphere geometry, tints, owned handles and cleanup. Menu help now says
@@ -47,11 +51,6 @@ Stream `hitbox` (branch `stream/hitbox`), 2026-11-02. Spec: `specs/SPEC-core-06-
 
 ## Where the layouts come from (13.0.5 `main`, owned ELF `research/game-13.0.5/main-13.0.5.elf`)
 
-Reproduce with `python3 -I tools/re_hitbox_layout.py <elf>` (it finds the `AttackModule` vtable from the NSO's relocation table, `main+0x4f6a5b8`,
-and prints the functions below). `tests/core06_hitbox.rs` re-reads the ELF and asserts each instruction word named here.
-
-`AttackData` (one attack slot; `attack_data(accessor, slot, false)` returns it):
-
 | Fact | Evidence (instruction at `main+...`) |
 | --- | --- |
 | slots are 0x130 bytes from the pointer at module `+0x68` | `attack_data` (vtable slot 0x1e8, `0x3dda80`): `ldr x9,[x0,#0x68]; mov w10,#0x130; madd x0,x8,x10,x9` (`0x3dda9c`..) |
@@ -60,6 +59,11 @@ and prints the functions below). `tests/core06_hitbox.rs` re-reads the ELF and a
 | offset vector (x, y, z) at `+0x00`, second vector at `+0x10` | `set_attack` (slot 0x68, `0x3dc180`): `str q0,[x19]` and `str q0,[x27,#0x10]`; `get_offset2` (slot 0x140, `0x3dd500`) calls `attack_data` and loads the vector at `+0x10` |
 | active word at `+0x108` | `is_attack` (slot 0xc8, `0x3dd1f0`): `ldr w8,[x8,#0x108]` (non-zero, and the module's `+0x238` byte clear) |
 | a second centre is the vector at `+0x10`, zero for a point hitbox | the `ATTACK` command zeroes the argument (`stp xzr,xzr,[sp,#0x30]`, `0x2284bd0`) and stores `q2` there only for a present second centre (`0x2285320`) |
+
+Reproduce with `python3 -I tools/re_hitbox_layout.py <elf>` (it finds the `AttackModule` vtable from the NSO's relocation table, `main+0x4f6a5b8`,
+and prints the functions below). `tests/core06_hitbox.rs` re-reads the ELF and asserts each instruction word named here.
+
+`AttackData` (one attack slot; `attack_data(accessor, slot, false)` returns it):
 
 The `ATTACK` command (`0x2284b80`, behind the `0x2284b20` wrapper) builds the same structure at `sp+0x20` (vectors `+0`, `+0x10`, size `+0x24` from
 argument 9, node `+0x48` from argument 3) and calls vtable slot 0x68 with it (`ldr x8,[x8,#0x68]; add x3,sp,#0x20; blr x8`, `0x2285ba0`).
@@ -75,11 +79,19 @@ Natives (symbol, owned ELF): `EffectModule::req_follow` `0x2017730` (`...Hash40,
 
 ## Card scan (playbook "Card scan before the site is chosen")
 
+| Dated card copy | Scan outcome |
+| --- | --- |
+| 16 plugins, 2026-11-01 | Only the fork referenced the three hook sites and `req_follow` |
+
 - `python3 -I tools/build/scan-offsets.py <plugins> 2284b20 22ac290 2027bb0 1fd01c0 1fd0520 2017730 2017860 2017c80 2017ce0 2069140 227daf0 2284cd0 22ac2ec 2087720 3728e10 2017a50` over `/home/intpa/ssbu-cpu-pilot-install/switch-mtp-v0101-v021/pilot/after/atmosphere/contents/01006A800016E000/romfs/skyline/plugins` (16 plugins, folder dated 2026-11-01 10:19): only `libtraining_modpack.nro` (the fork, never installed with this plugin) references the three hook sites and `req_follow`; no other plugin references any of the 16 offsets.
 - The `Called` rows tolerate another plugin's hook anywhere in their window; the hooks' rows are `Hook/Replace/Entry` like the CPU package's.
 - Sharing v1 / chain: N/A (the scan showed nobody at the sites); a later plugin that hooks them is the case `GuardOutcome::HookedByOther` handles (the feature stays off and the install line names the row).
 
 ## Decisions made without the lead (reported at the gate)
+
+| Observed refusal | What it established |
+| --- | --- |
+| `req_follow` returned zero | Failure observed; pool exhaustion was not established |
 
 ### Lead refusal investigation, 2026-11-02 17:2xZ — not a fix
 

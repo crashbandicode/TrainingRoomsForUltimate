@@ -21,6 +21,11 @@
 
 ## How it was raised
 
+| Coverage change | What the suite retained |
+| --- | --- |
+| Restored cases | Original assertions in table-driven tests |
+| Special harness behavior | Tests using `ignore` or `should_panic` stayed standalone |
+
 - **The cut tests came back as cases.** `tools/test_cut.py` (`tabulate_region`) turns the `#[test]` functions of a module into the rows of one `#[test] fn case_table()`.
   - Each case is the test function it was, unchanged, and asserts what it asserted.
   - `src/test_table.rs` runs each case on its own thread, as the harness did, runs every case even after one fails, and names the failed ones.
@@ -40,6 +45,10 @@
   (written for the earlier `input` signature) stay cut.
 
 ## Scope and exclusions
+
+| Counted | Excluded |
+| --- | --- |
+| Instrumented host-product lines in `src/` | Test code, vendored crates, the layout builder and uncompiled Switch-only paths |
 
 - **Counted:** every line llvm-cov instruments in a `src/` file compiled into a host test build (the lib's test binary and
   the by-path test crates), outside test code.
@@ -89,6 +98,12 @@ A dash: the module was not compiled into that state's host test builds.
 
 ## Why not 95%
 
+| 95% target on 39,457 lines | Observed |
+| --- | --- |
+| Maximum uncovered | 1,972 lines |
+| Actual uncovered | 3,339 lines |
+| Gap | 1,367 lines |
+
 95% of 39,457 lines leaves at most 1,972 uncovered; 3,339 are. The other 1,367 lines are not blocked by the 1,000 limit
 (135 tests of headroom; 83 with the vendored crates counted). They are blocked by what they are:
 
@@ -116,6 +131,11 @@ The per-file table of every uncovered line count is reproducible with the comman
 
 ## Reproduce
 
+| Reproduction input | Why it matters |
+| --- | --- |
+| Fresh target directory | Avoid stale binaries with zero counts |
+| LCOV export | Include product files reached through by-path test crates |
+
 ```text
 rustup component add llvm-tools                      # into the project's RUSTUP_HOME (toolchain 1.98.1)
 cargo install cargo-llvm-cov --locked                # 0.9.1, into the project's CARGO_HOME
@@ -131,20 +151,26 @@ A target directory reused from an earlier commit also skews the export (old bina
 
 ## Product code
 
+| NRO comparison with `ef4113c2` | Bytes changed per NRO |
+| --- | --- |
+| Build ID | 32 |
+| Commit tag | 7 |
+| Panic line numbers | 17 |
+
 - No product behaviour change.
-- The release and diag NROs built at the commit before this work (`ef4113c2`) and at this commit have the same size and differ in 56 bytes each: the 32-byte build id, 7 characters of the commit in the build tag and 17 bytes of line numbers in 16 panic locations.
+- Release and diag NRO sizes stayed unchanged. Each differed in 56 bytes, including line numbers at 16 panic locations.
 - The test cut's re-gates of `swap/mod.rs`, `stages/mod.rs` and `rr_host.rs` and its removed `#[cfg(test)]` helpers are back as they were at `28082c29`, because their tests are back; the import edit in `compat/menu.rs` stays (the two names are imported by its test module).
 - `docs/TEST-CUT-LEDGER-rc9.md` describes the cut as it was made; where it says a module's tests are removed, this file says how they returned.
 
 ## Option (b): only the cases that add coverage (2026-11-12)
 
-The table tests above put the cut tests back as rows: 863 test functions, but 2,894 cases. The operator chose to keep only the
-cases that add coverage nothing else gives, with at most a 1.5-point drop.
-
 | | Test functions | Cases | Line coverage |
 | --- | ---: | ---: | ---: |
 | Before (`b1e27e5a`) | 863 | 2,894 | 91.53% (36,116 of 39,457) |
 | After | 821 | 1,689 | 90.18% (35,583 of 39,457) |
+
+The table tests above put the cut tests back as rows: 863 test functions, but 2,894 cases. The operator chose to keep only the
+cases that add coverage nothing else gives, with at most a 1.5-point drop.
 
 - A case is one row of a `case_table` or one plain `#[test]`. After: 1,113 rows in 245 tables and 576 plain tests.
 - With the two vendored crates' own gates the test functions are 873. The limit is 1,000.

@@ -106,11 +106,6 @@ them would erase the player's other settings until their packages land; they are
 
 ## Menu model (SPEC-core-02, SPEC-core-03 §2.5, SPEC-core-04 `last_page`, SPEC-input-04 N7), `tests/core02_menu.rs`
 
-`src/model/menu/` (pure; no rendering, no hooks) and the factory table `src/model/factory.rs`. Rows that the
-new page layout replaced (the 8 x 4 submenu grid, tabs, R-confirm reset) keep their spec test name where the
-requirement survives in the new structure, adapted as noted. Names with the `chords::` prefix in SPEC-input-04
-§10 are written `chords_...` here.
-
 | Requirement | § | Host test | Eden row planned | Status |
 | --- | --- | --- | --- | --- |
 | Factory table: every row of §2.7 with kind, option count, default; draft 9 rows; the two sliders; the seven delay ranges; `character_item` and `update_policy` not in the table | core02 §2.7, §9 | `core02_factory_table_matches_spec`, `every_menu_row_with_an_id_binds_to_its_row_or_is_an_editor_key` | core02-E5 | host pass |
@@ -137,11 +132,14 @@ requirement survives in the new structure, adapted as noted. Names with the `cho
 | N5 paging by console mode: items docked 5 x 8 one page, handheld 4 x 4 pages 16 / 16 / 6; stages docked 3 pages 40 / 40 / 38, handheld 8 pages; every tile once; layout fixed at open | N5, core03 §2.5, §9 | `core03_item_grid_layout_docked`, `core03_item_grid_layout_handheld`, `core03_item_grid_layout_fixed_at_open`, `core03_item_grid_pages_cover_38_items_once`, `core03_stage_grid_layout_docked`, `core03_stage_grid_layout_handheld`, `core03_stage_grid_pages_docked_40_40_38`, `core03_stage_grid_pages_handheld_8`, `core03_stage_grid_pages_cover_118_tiles_once`, `core03_stage_grid_rotation_and_form_same_in_both_layouts`, `grid_screen_pages_with_l_r_and_keeps_the_cursor_on_a_tile` | core03-E12, E15 | host pass (rotation badges and the form tag are drawn per tile: package 5) |
 | Dropdown lists read back and have unique labels | MENU-DRAFT §2 | `dropdown_options_are_unique_and_row_values_read_back` | - | host pass |
 
+`src/model/menu/` (pure; no rendering, no hooks) and the factory table `src/model/factory.rs`. Rows that the
+new page layout replaced (the 8 x 4 submenu grid, tabs, R-confirm reset) keep their spec test name where the
+requirement survives in the new structure, adapted as noted. Names with the `chords::` prefix in SPEC-input-04
+§10 are written `chords_...` here.
+
 Not covered by the model (later packages): the fork's grid contents (portraits, hats, Mii lists, stage and
 item actions), the named-macro and setup libraries, rendering of every screen, the INI text writer.
 ## Review R1 fixes (2026-11-02, stream `r1fix`, base 4895ea3; review `artifacts/trainingrooms-reviews/R1-astra-pkg1/REVIEW.md`)
-
-One commit per finding on `stream/r1fix`; `cargo test`, `cargo clippy --all-targets -- -D warnings` and `cargo build --no-default-features` green after each.
 
 | Finding | Root cause | Fix | Regression |
 | --- | --- | --- | --- |
@@ -150,5 +148,7 @@ One commit per finding on `stream/r1fix`; `cargo test`, `cargo clippy --all-targ
 | R3 delay 0 played a stale record | the oldest queued record was read before the queue was trimmed | `DelayQueue::step` handles 0 first (clear, return the current record); the decreasing-nonzero transition satisfies the spec's observable rule and is pinned | `tests/input_delay.rs` (three tests) |
 | R4 developer gate accepted duplicates, oversize, read errors | last-line-wins parse of an 8 KiB prefix, `read_to_end` error ignored | `developer_ini::load` fails closed (above) | `tests/core01.rs` (three tests), install-line test |
 | R5 no post-exercise allocation observation | the counter was read only at boot | `model::hook_stats` (allocator, per-hook counters), diag-only `hook_stats` line from the heartbeat thread, Eden gate `eden/hook_stats.py` | `tests/hook_alloc.rs` (allocating stub), `tests/eden/test_analyze.py` (gate) |
+
+One commit per finding on `stream/r1fix`; `cargo test`, `cargo clippy --all-targets -- -D warnings` and `cargo build --no-default-features` green after each.
 
 The Eden rows (labels `r1-NN`) are in `eden/EDEN-PACKAGE-1.md`, section "R1-fix".

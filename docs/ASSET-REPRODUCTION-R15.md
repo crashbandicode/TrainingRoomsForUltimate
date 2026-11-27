@@ -27,7 +27,13 @@ Private evidence: ../artifacts/trainingrooms-lead-astra4/main-r15/asset-reproduc
 
 ## Exact layout reversal, 07:38 UTC
 
-A separate inverse starts from each generated target layout, removes only the added TrMod/tr_ pane subtrees, appended item materials, waiting text material and item texture references, then recomputes the section offsets/counts. It does not copy original layout bytes into its output. Both inverses reproduce the stock BFLYT byte for byte: Training43,204B/SHA25642fc96ea79d148ca4bde0a3f687f1cc4f1056886f4e5054ce152ca95b4308046; Waiting16,136B/6f4ee9b4e2709ab2b894ff691403582f7075f8d93965821e0d25145aa821ce1d.
+| Stock BFLYT reproduced byte for byte | Bytes | Inverse SHA-256 |
+| --- | ---: | --- |
+| Training | 43,204 | `42fc96ea79d148ca4bde0a3f687f1cc4f1056886f4e5054ce152ca95b4308046` |
+| Waiting | 16,136 | `6f4ee9b4e2709ab2b894ff691403582f7075f8d93965821e0d25145aa821ce1d` |
+
+The inverse removed only the added `TrMod`/`tr_` pane subtrees, item materials, waiting text material and item texture
+references from each generated layout. It recomputed section offsets and counts without copying original layout bytes.
 
 Neither stock layout has a pane-name collision with the owned prefixes. Mutating an original pane alpha in each target causes the inverse comparison to fail. The173 Training and182 Waiting members other than the modified layout and appended BNTX remain byte-identical to stock. Private scripts, original independent parser and reversed layouts are retained at main-r15/layout-reversal; receipt SHA25695fa7c25314628bcc1d9f4cb38fab3b6debc84bcce589e687c2c0c3429cac684.
 
@@ -35,6 +41,12 @@ Neither stock layout has a pane-name collision with the owned prefixes. Mutating
 - The pinned SARC writer explicitly guarantees member preservation rather than original serialization; its untouched-roundtrip differences are not a claim of changed stock payloads. No compiler, native build, live profile change or runtime acceptance is associated with this audit.
 
 ## Required preservation contract reconciled, 08:08 UTC
+
+| Preservation check | 08:08 UTC result |
+| --- | --- |
+| Stock textures | 43 Training and 91 Waiting textures preserved |
+| Layouts | Both stock layouts recovered byte for byte |
+| Original SARC padding | Not required by the contract |
 
 - SPEC-core-07 section4.2 requires stock texture metadata, pixels, mip offset arrays and4KiB pool alignment to survive.
 - Section4.4 specifies byte-for-byte reversal of the original layout.

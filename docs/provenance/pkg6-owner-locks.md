@@ -17,11 +17,6 @@ independent runtime attribution of every `note` allocation.
 
 ## Audited scene chain and ownership
 
-`input_delay::note -> lobby::update -> training::lobby::update` detects a mode
-transition and invokes `character_roster::scene_changed` and
-`practice::scene_departed`. These locks are also used by their owners' regular
-callbacks; preserving exclusion avoids assuming those callbacks cannot overlap.
-
 | State | Entry paths and protected contract |
 | --- | --- |
 | roster STATES[2], WAITING_MEMORY | scene/input/service/destruction and settled roster queries; role state and remembered value remain under the same guards |
@@ -38,6 +33,11 @@ callbacks; preserving exclusion avoids assuming those callbacks cannot overlap.
 | practice-stage STATE | UI context/request/status, native stage update, scene departure; nonblocking refusal and epoch invalidation retained |
 | training-stage ROTATION | sequence initialization, entry/reentry, resource callback and direct-stage completion/departure; menu snapshot precedes rotation guard, stage STATE -> ROTATION order retained |
 
+`input_delay::note -> lobby::update -> training::lobby::update` detects a mode
+transition and invokes `character_roster::scene_changed` and
+`practice::scene_departed`. These locks are also used by their owners' regular
+callbacks; preserving exclusion avoids assuming those callbacks cannot overlap.
+
 - The composed `4f9878d` diag ELF proves another cold scene path: `practice_stage_request::depart` at `0xa2018` calls its standard-mutex `try_lock` at `0x5c3f8`; the null branch at `0x5c408` reaches OnceBox initialization at `0x1f7e1c`.
 - Nonblocking acquisition did not avoid lazy allocation.
 - Neither stage owner's init acquires its lock.
@@ -52,6 +52,11 @@ callbacks; preserving exclusion avoids assuming those callbacks cannot overlap.
 
 ## Required evidence
 
+| Environment | What the tests can establish |
+| --- | --- |
+| Host | Exclusion, waiter handoff and allocation checks on the host path |
+| Switch | Needs exact compiled paths, stack gates and first-use counts |
+
 - The cold/fresh-host-thread test exercises the actual public primitive's first lock, held-lock refusal, settlement and repeated reads with zero allocations.
 - Existing lock tests cover mutual exclusion and sleeping-waiter handoff.
 - Host futex waiting differs from Horizon; these tests do not prove native no-heap.
@@ -60,6 +65,12 @@ callbacks; preserving exclusion avoids assuming those callbacks cannot overlap.
 
 
 ## Preload bookkeeping continuation
+
+| Preload state | Lock boundary |
+| --- | --- |
+| Grace | No source, roster or native lock held inside GRACE |
+| Requests | Release before source metrics |
+| Condition | Release before metrics |
 
 - `character_sources::scene_changed` invokes `cycle_preload::scene_end`, which touches GRACE, CONDITION, REQUESTS and STATUS even before preload first use.
 - Settings changes and visible-player planning use those same value owners.
@@ -83,6 +94,11 @@ callbacks; preserving exclusion avoids assuming those callbacks cannot overlap.
 
 
 ## Managed creation registry
+
+| Managed creation receipts | Review finding |
+| --- | --- |
+| Protected value | Fixed numeric receipt table |
+| Inside its guard | Slot copies or updates; no native call or nested owner lock |
 
 - native_source_capacity::managed CREATED is a fixed numeric receipt table.
 - Only created/register/unregister acquire it; they copy or update table slots, without native calls or nested owner locks.

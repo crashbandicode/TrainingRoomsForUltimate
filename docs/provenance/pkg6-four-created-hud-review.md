@@ -6,6 +6,12 @@ The owned 13.0.5 ELF is `/home/intpa/trainingrooms-build-pkg6-host/70d4927/resea
 
 ## Result
 
+| Static review | Result |
+| --- | --- |
+| Entry 4 | Creation and entry destruction supported by static evidence |
+| Resource-owner lifetime | Not proved across Training exit and waiting-room entry |
+| Runtime result | No row-4 run in this review |
+
 - There is positive static evidence for index 4 creation, count 8, linked-list service, eight-owner Mii protection, a physical request row 4, and entry-4 destruction in normal manager teardown.
 - No native three-extra ceiling was found in these paths.
 - **The complete Training-to-waiting lifetime requirement is not yet proved**: the addressed manager teardown destroys the FighterEntry, while the separately context-owned resource must also retire, and the specific transition must reach both before native waiting entry 4 construction.
@@ -28,6 +34,11 @@ The historical `three-source-capacity/resource-context-cleanup.asm` is explicitl
 
 ## Existing source proof obligations that must stay strict
 
+| Guard under review | What must remain true |
+| --- | --- |
+| Preflight | Fresh manager, context and service; exact prior roots |
+| Admission | No new row inferred from count alone |
+
 - `native_source_capacity::preflight_checked` already checks current manager/internal/context/service, creation-order prefix, exact prior registered roots, native count `4+earlier`, all backups zero, target primary/resource/alias vacant, target selection type2, target input routes `slot` and `slot+8` unused, and all original body/group/visible/resource identities.
 - For fourth Training creation these checks mean count7, target4, routes4/12 and the three already registered creations unchanged.
 - Neither requested CPU quantity nor a null primary alone is admission.
@@ -45,6 +56,11 @@ The historical `three-source-capacity/resource-context-cleanup.asm` is explicitl
 
 ## Minimal coherent source change, if approved after the lifetime gate
 
+| Proposed layout | Created-row plan |
+| --- | --- |
+| Training | `[7,6,5,4]` after lifetime approval |
+| Waiting | `[7,3,2]` unchanged |
+
 1. Separate Training plan `[7,6,5,4]` from unchanged waiting `[7,3,2]`. Current APIs couple both to `[usize;3]`; use an explicit per-layout plan length and a bounded four-record storage whose unused waiting tail must be absent. Add4 to the physical retirement union only. Preserve serial prefix, claims and all fresh native pre/postflight predicates. Do not widen waiting or generic `Layout::helper`.
 2. Give each of the four visible Training owners a stable distinct **renderer row** from that plan, for example `[7,6,5,4]`. Keep BOUND/PREPARED/in-flight exclusions and same-owner three-request rotation. No cross-owner table aliases, post-bind releases, whole-batch reset or active-fighter render. Exact source readiness still needs the existing CreatedDestination/G/resource proof.
 3. Make portrait demand explicit in creation/admission.
@@ -59,6 +75,11 @@ The historical `three-source-capacity/resource-context-cleanup.asm` is explicitl
 5. Add original policy tests for four-prefix Training, unchanged waiting row4 rejection, wrong-layout registrations, all-eight protected union/bounds/collisions, exclusive four-row ownership and both-order retirement. Keep current test evidence separate from these new, unexecuted cases.
 
 ## Remaining acceptance boundary
+
+| Acceptance boundary | Evidence still required at review |
+| --- | --- |
+| Separate resource owner | Ordered cleanup before the next waiting entry 4 |
+| Four native sources | Measured memory headroom and runtime checks |
 
 - Before activation, resolve the native resource-owner cleanup ordering for normal Training exit and subsequent waiting entry4 construction, using the existing owned lifetime evidence or a specifically authorized bounded observation.
 - Existing `66e850` proof establishes entry cleanup only.

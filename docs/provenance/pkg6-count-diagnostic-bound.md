@@ -12,15 +12,6 @@ Main logger WRITER has one store, true/Release, and readiness loads Acquire. A t
 
 ## Conservative line bound
 
-- Receipt and expanded upper strings: `artifacts/trainingrooms-nro-archive/pkg6/count-format-bound/`; generator `/tmp/pkg6-count-format-bound.py` (retained in handoff).
-- This is a static derived-Debug schema bound, not a native formatter execution.
-- Every unsigned field, even u8/u32, is charged twenty decimal digits (target usize64).
-- All field/type/punctuation strings follow the actual derived Debug structures.
-- Only fixed ASCII outcome and body-field literals are allowed; the generator asserts their maximum source lengths.
-- SourceToken includes all four fields; PromotionToken includes its full SourceToken again; each NativeIdentity includes all three body pairs.
-- Count has both helper and both source/promotion tuples.
-- Completion compares both expected and maximum actual Ok(identity)/Err(failure) shapes, including full EntryState.
-
 | Record | Conservative bytes |
 | --- | ---: |
 | count Observation | 1273 |
@@ -29,6 +20,15 @@ Main logger WRITER has one store, true/Release, and readiness loads Acquire. A t
 | cut marker + newline reserve | 10 |
 | maximum required ring room | 1458 |
 | existing diag LINE_MAX | 12288 |
+
+- Receipt and expanded upper strings: `artifacts/trainingrooms-nro-archive/pkg6/count-format-bound/`; generator `/tmp/pkg6-count-format-bound.py` (retained in handoff).
+- This is a static derived-Debug schema bound, not a native formatter execution.
+- Every unsigned field, even u8/u32, is charged twenty decimal digits (target usize64).
+- All field/type/punctuation strings follow the actual derived Debug structures.
+- Only fixed ASCII outcome and body-field literals are allowed; the generator asserts their maximum source lengths.
+- SourceToken includes all four fields; PromotionToken includes its full SourceToken again; each NativeIdentity includes all three body pairs.
+- Count has both helper and both source/promotion tuples.
+- Completion compares both expected and maximum actual Ok(identity)/Err(failure) shapes, including full EntryState.
 
 - StackLine512 is a first formatting attempt, not a512-byte line cap: on overflow `diagnostic` passes original Arguments to ByteRing::push, which formats directly into the ring.
 - No larger stack buffer or allocation is introduced.

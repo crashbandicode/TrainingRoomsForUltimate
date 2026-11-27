@@ -149,11 +149,15 @@ state against the spec's roughly 128 bytes for one shared table; the clock still
 
 ## Not in this milestone
 
-The fixed camera (stage table) and the shield damage multiplier are open (IMPLEMENTATION-PROGRESS-pkg2.md (removed after v0.2.0-rc.1; see that tag), "Still open").
+| Package-2 milestone | Status at handoff |
+| --- | --- |
+| Fixed camera stage table | Open |
+| Shield damage multiplier | Open |
+
+The original handoff is under “Still open” in `IMPLEMENTATION-PROGRESS-pkg2.md` at `v0.2.0-rc.1`.
+The November 2 update records the later results.
 
 ## Update 2026-11-02 (successor worker): Eden runs s2-01..s2-04 on the Ally, the two open items closed
-
-Evidence and raw lines: `eden/EDEN-PACKAGE-2.md`. Rows whose status changed:
 
 | Requirement | § | Host test | Eden row | Status |
 | --- | --- | --- | --- | --- |
@@ -167,3 +171,5 @@ Evidence and raw lines: `eden/EDEN-PACKAGE-2.md`. Rows whose status changed:
 | Mash, each action | cpu-01 §5 | `cpu01_action_flags_table` | `cpu-01-mash-each-action` | **Eden pass** for 16 of 18 actions |
 | Playback request word | cpu-03 §5 | `cpu03_playback_request_word_round_trips_for_every_slot` | - | host pass |
 | Install line fits its buffer | core-01 §7 | `the_install_line_of_every_site_and_feature_fits_its_buffer_with_room_to_spare` | `cpu-0N-install-line` | host pass; found by Eden (line cut at 2048 bytes) |
+
+Evidence and raw lines: `eden/EDEN-PACKAGE-2.md`. Rows whose status changed:

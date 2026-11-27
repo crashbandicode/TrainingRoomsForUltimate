@@ -39,6 +39,11 @@ The test and native adapter remain uncompiled pending the coherent candidate.
 
 ## Integrated loader qualification
 
+| Loader review | What it established |
+| --- | --- |
+| Yoga Skyline `9959ecb1` | Static placement qualified |
+| Compiled stack and live count transitions | Not established by the relocation review |
+
 - Exact Yoga Skyline 9959ecb1 static conditional relocation is qualified in adjacent count-conditional-qualification.json.
 - Far BEQ emits condition-preserving BEQ +8, B +20, LDR x17 literal and BR x17 to original155d9a0; false path continues via the qualified tail to155c198.
 - Near hook displaces only BIC; original CMP/STR/BEQ remain.
