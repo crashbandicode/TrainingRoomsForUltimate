@@ -6,7 +6,7 @@
 #[cfg(any(feature = "diag", test))]
 use core::fmt;
 
-use super::scrub_track::{POSE_NONE, POSE_OTHER, POSE_SHOWN};
+use super::scrub_track::{Block, POSE_NONE, POSE_OTHER, POSE_SHOWN};
 use crate::engine::macros::{PackedPose, Pose};
 use crate::model::hash40::hash40;
 
@@ -33,6 +33,15 @@ pub fn asked_of(recorded: PackedPose, has: impl FnOnce(u64) -> bool) -> PackedPo
         Some(pose) if has(pose.motion) => recorded,
         _ => PackedPose::NONE,
     }
+}
+
+/// Nobody is asked any more (the editor's request is none, or the hold was forgotten): the role whose fighter
+/// frame reads that first lets its partner go in the same callback, before itself. The worker publishes the
+/// release at any moment; each role reads it on its own callback, and the game tests the two fighters against
+/// each other after both. Read by one role alone, one body would be home and the other still held for that test.
+pub fn lets_partner_go(block: &Block) -> bool {
+    let _ = block;
+    false
 }
 
 /// One fighter frame of a held role. `asked_kind`, `asked`: the recorded fighter and its animation on the shown
@@ -382,6 +391,95 @@ mod tests {
         let posed = release.find("if block.pose(index).0 == POSE_SHOWN {").expect("the release reads the role's report");
         let plain = release.find("placement::restore_posed(accessor, hold.origin(), if hold.origin().grounded { WAIT } else { FALL });").expect("the plain animation");
         assert!(posed < plain && plain < release.find("state::set_sleep(accessor, false);").expect("the wake"));
+    }
+
+    /// One fighter frame of a role, as `scrub_hold::frame` runs it: the partner is let go first when nobody is asked
+    /// any more; then the role is held at its point, or let go.
+    fn callback(block: &Block, held: &mut [bool; 2], slot: usize) {
+        if held[slot ^ 1] && lets_partner_go(block) {
+            held[slot ^ 1] = false;
+        }
+        held[slot] = block.point(slot, |_| Some([0.0; 2]), |_| Some([0.0; 2])).is_some();
+    }
+
+    /// The staggered release (place-t1a's trace C, 2026-11-27 02:53Z, rows a3 and u1; the base build's third
+    /// release): in one frame the CPU's callback read the release and put its body back; Player 1's read it a frame
+    /// later. The game's test of the two fighters ran in between, with Player 1's box still at its held place, and
+    /// pushed the CPU 0.33. tr-primary-2, 02:54:12Z: both roles are released on the same tick.
+    #[test]
+    fn both_fighters_are_let_go_on_the_frame_the_first_of_them_reads_the_release() {
+        use super::super::scrub_track::{Ask, Spot};
+        let spot = Some(Spot { at: [0.0; 2], facing: 1.0, kind: KIRBY, pose: pose(12.5) });
+        let both = Ask::Group { target: 0, deltas: [spot; 2] };
+        // A frame is Player 1's callback, the CPU's, then the game's test of the two. The worker publishes the release
+        // on frame 1: before Player 1's callback (0), between the two callbacks (1), or after both (2).
+        for published in 0..3 {
+            let block = Block::new();
+            let mut held = [false; 2];
+            block.set_ask(both);
+            for frame in 0..4 {
+                for step in 0..3 {
+                    if frame == 1 && step == published {
+                        block.set_ask(Ask::None);
+                    }
+                    if step < 2 {
+                        callback(&block, &mut held, step);
+                    }
+                }
+                assert_eq!(held[0], held[1], "published at {published}, frame {frame}: one fighter is home and the other held");
+                assert_eq!(held[0], frame == 0 || (frame == 1 && published == 2), "published at {published}, frame {frame}");
+            }
+        }
+        // A request that still asks one role is no release: the other is let go alone, as before.
+        let block = Block::new();
+        let mut held = [false; 2];
+        block.set_ask(both);
+        callback(&block, &mut held, 0);
+        callback(&block, &mut held, 1);
+        block.set_ask(Ask::Group { target: 0, deltas: [spot, None] });
+        callback(&block, &mut held, 0);
+        callback(&block, &mut held, 1);
+        assert_eq!(held, [true, false], "Player 1 is still asked for");
+        // A hold found on another body is forgotten: nobody is asked until the editor asks again, and both go at once.
+        block.set_ask(both);
+        callback(&block, &mut held, 0);
+        callback(&block, &mut held, 1);
+        assert_eq!(held, [true; 2]);
+        block.forget();
+        callback(&block, &mut held, 1);
+        assert_eq!(held, [false; 2], "the CPU's frame forgot the hold: Player 1 is let go with it");
+    }
+
+    #[test]
+    fn the_role_that_reads_the_release_first_lets_its_partner_go_in_the_same_callback() {
+        let hold = include_str!("../../runtime/features/scrub_hold.rs");
+        let item = |head: &str| hold.split_once(head).map_or("", |(_, rest)| rest).split("\n}").next().unwrap_or("");
+        let lines = |text: &'static str| text.lines().map(str::trim).filter(|line| !line.is_empty() && !line.starts_with("//")).collect::<Vec<_>>();
+        let frame = lines(item("pub(super) unsafe fn frame(slot: usize, accessor: usize) {"));
+        let at = |text: &str| frame.iter().position(|line| *line == text);
+        // The partner is let go only when its hold is on the body found, and it reports as it does on its own frame.
+        let together = [
+            "if holds[slot ^ 1].is_some() && lets_partner_go(block) {",
+            "let partner = other_body(slot).filter(|&body| holds[slot ^ 1].is_some_and(|hold| hold.body() == natives::battle_object_id(body)));",
+            "if let Some(partner) = partner {",
+            "let seen = release(block, slot ^ 1, &mut holds[slot ^ 1], partner);",
+            "block.set_seen(slot ^ 1, seen);",
+            "}",
+            "}",
+        ];
+        let first = at(together[0]).expect("the partner is let go in the role's callback");
+        assert_eq!(frame[first..first + together.len()], together);
+        // After a hold on another body was forgotten, and before this role reads its own point.
+        let forgot = at("block.set_pose(slot ^ 1, partner.0, partner.1);").expect("the forgotten hold");
+        let own = at("let seen = match point(block, &holds, slot, accessor) {").expect("the role's own point");
+        assert!(forgot < first && first + together.len() <= own);
+        assert_eq!(hold.matches("lets_partner_go(block)").count(), 1);
+        // The other role's body is found the way the placement picker finds the two; the picker's call is as it was.
+        assert_eq!(lines(item("unsafe fn other_body(slot: usize) -> Option<usize> {")),
+            ["if slot == 0 {", "super::recorder::cpu_body().map(|body| body.accessor)", "} else {", "natives::module_accessor(0)", "}"]);
+        assert_eq!(include_str!("../../runtime/features/record_place.rs").matches("super::scrub_hold::frame(slot, accessor);").count(), 1);
+        // Nothing is kept for a later frame, and no push switch is called.
+        assert!(!hold.contains("jostle") && !hold.contains("\nstatic "));
     }
     }
 }
