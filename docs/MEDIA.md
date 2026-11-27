@@ -1449,7 +1449,7 @@ One clip per CPU option of [menu/cpu](menu/cpu.md): the option at its starting v
 - It comes from another plugin, `libsmash_gamepad_overlay.nro`, which was in the capture sessions' plugin set.
 - The rc.1–rc.4 clips also show the fork's old 15-row input log at the left edge.
   - The audit is `artifacts/phase23/feature-gifs/POSTSHIP-RETAKES.md`: 43 of the 68 GIFs carry the bar.
-  - Every docs capture now leaves that plugin out.
+  - The rc.7 refresh left that plugin out of its captures.
 - **Build:** rc.7 `722525a5` as shipped (release NRO `b6e60bb9…`). The clips use the same commit's diag NRO
   `cfec85c7…`, because the rows check its log lines; the diag build adds log lines only.
 - **Runs:** one instance each, 2026-11-11:
