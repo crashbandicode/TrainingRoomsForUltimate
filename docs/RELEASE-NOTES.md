@@ -6,9 +6,9 @@
 
 ## rc.15: the builds of November 2026
 
-| Build | Installed | Footer ends with | In short |
-| --- | --- | --- | --- |
-| [Fixed build](#release-notes-rc15--fixed-build) | 2026-11-27 | `dc5302f1` | Clip editor, menu help and Tech practice fixes |
+| Release record | Where to look |
+| --- | --- |
+| Installed file and test evidence | [Card readback](EVIDENCE.md#evidence-rc15-installs--fixed-build) |
 
 These notes cover the November builds of the untagged rc.15 candidate. Each build's menu footer reads
 `0.2.0-rc.15 · rc15` and then the commit it was made from, so the commit tells the builds apart
@@ -783,8 +783,7 @@ Taps and a hold move Min from 0 through 0.5 and 3 to 8%, and Max from 150 throug
 | The menu | A held Up or Down repeats and speeds up, and L and R turn the page from inside a game's screen, a fighter grid or an editor. | [Moving around](guide/using-the-menu.md#moving-around) |
 
 The first rc.15 build (2026-11-15) added the clip editor, input drills, article hurtboxes and the colour legend
-([Current release](CURRENT-RELEASE.md)). Between that build and install 1, more went into rc.15 without notes of its
-own. By theme, with the page that describes each:
+([Current release](CURRENT-RELEASE.md)). Between that build and install 1, the features in the table above also entered rc.15.
 
 
 The build on the card just before install 1 (`17060a5e`, installed 2026-11-23 at 11:40) was played by the operator
@@ -808,13 +807,13 @@ See [Earlier releases](CURRENT-RELEASE.md#earlier-releases) for the notes and pu
 
 ## rc.9
 
-| Fix | Recorded result |
+| rc.9 record | Section |
 | --- | --- |
-| Deluxe window shows a page with rows | TrainingRooms D-pad chords are suppressed |
+| Shortcut conflicts | [Fixes](#release-notes-rc9--fixed) |
 
 - The rc.9 menu footer read `0.2.0-rc.6 · rc9` followed by the build's commit. rc.9 fixes the places where a TrainingRooms shortcut and another plugin's shortcut on the same buttons both fired, and it ships beside new builds of three of those plugins.
 - The fix IDs (C3, C4, …) are the numbers of the conflict survey the fixes came from.
-- What rc.8 changed is [rc.8 release notes](#release-notes-rc8).
+- See the [rc.8 release notes](#release-notes-rc8).
 
 <a id="release-notes-rc9--fixed"></a>
 
@@ -972,9 +971,9 @@ See [Earlier releases](CURRENT-RELEASE.md#earlier-releases) for the notes and pu
 
 ## rc.8
 
-| Control | Recorded result |
+| rc.8 record | Section |
 | --- | --- |
-| R + D-pad Down | Toggles the input display |
+| Controls and display | [Additions](#release-notes-rc8--new) |
 
 These notes cover rc.8 candidate `3f9d61dd` and CPU Pilot 0.2.3. The menu footer identified that build as
 `0.2.0-rc.6 · rc8` followed by its commit. How to use recording is
@@ -1115,12 +1114,12 @@ The CPU pilot is a separate plugin, `libssbu_cpu_pilot.nro`. Its 0.2.3 ships bes
 
 ## 0.2.0-rc.6
 
-| Addition | Recorded result |
+| rc.6 record | Section |
 | --- | --- |
-| Sequence drilling | Practise an ordered list of combos |
+| Sequence drilling and other additions | [New features](#release-notes-rc6--new) |
 
 Notes for players. 0.2.0-rc.5 was withdrawn before it ran on players' consoles, so rc.6 followed
-`0.2.0-rc.3.1`. Everything [rc.5 release notes](#release-notes-rc5) lists is in it, with the changes below. How to
+`0.2.0-rc.3.1`. Everything the [rc.5 release notes](#release-notes-rc5) lists is in it, with the changes below. How to
 use recording is [Recording guide](guide/recording.md), the Mii pages are [Mii technical notes](TECHNICAL.md#mii), and the pictures are the list in
 [MEDIA.md](MEDIA.md).
 
@@ -1386,9 +1385,9 @@ leaves the game's own level everywhere.
 
 ## 0.2.0-rc.5
 
-| Display | Recorded result |
+| rc.5 record | Section |
 | --- | --- |
-| Input history | Last second for Player 1 and the CPU |
+| Input history and timing | [Frame strip](#release-notes-rc5--frame-strip) |
 
 0.2.0-rc.5 was withdrawn before players ran it. Its contents were included in 0.2.0-rc.6, with the changes and corrections in
 [rc.6 release notes](#release-notes-rc6).

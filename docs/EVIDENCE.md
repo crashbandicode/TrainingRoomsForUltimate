@@ -231,9 +231,9 @@ Visual issue in this take: after the first handle action, the helper HUD redraws
 
 ## rc.15: what was installed and what was tested
 
-| Check | Result | Source |
-| --- | --- | --- |
-| Card readback, 2026-11-27 10:36 UTC | `dc5302f1`, release SHA-256 `1bc8e7b87780a9f4801679c9bb25db43223ac6f27110d9c2fa67a6478a66a8b7`; replaced install 6. | `artifacts/phase23/card-install/20261127-1036Z-card-dc5302f1/verify.json` |
+| rc.15 evidence | Record |
+| --- | --- |
+| Installed file and Eden results | [Fixed build](#evidence-rc15-installs--fixed-build) |
 
 Through 2026-11-27. The receipts behind [the rc.15 release notes](RELEASE-NOTES.md#release-notes-rc15) and the status on
 [Current release](CURRENT-RELEASE.md). Three claims are kept apart:
