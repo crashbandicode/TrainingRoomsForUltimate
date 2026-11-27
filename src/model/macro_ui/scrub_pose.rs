@@ -43,6 +43,15 @@ pub fn lets_partner_go(block: &Block) -> bool {
     block.target_slot().is_none()
 }
 
+/// The start of a hold, the same way: the role whose hold `began` on this callback (`held` after its own step)
+/// runs its partner's first hold step there too, when the partner has none yet. Held a frame apart, the body not
+/// yet held could be pushed by the one already placed, and that pushed place would be its origin: where it is put
+/// back at the release, and the group's home when it is the target.
+pub fn takes_partner(began: bool, held: bool, partner_held: bool) -> bool {
+    let _ = (began, held, partner_held);
+    false
+}
+
 /// One fighter frame of a held role. `asked_kind`, `asked`: the recorded fighter and its animation on the shown
 /// frame (`Spot`). `body_kind`: the fighter the body is now (below 0: not known). `asleep`: the hold reports the
 /// body held with its scripts asleep. `posed`: the scrub's own animation is on this body. `shown`: the animation
@@ -398,7 +407,47 @@ mod tests {
         if held[slot ^ 1] && lets_partner_go(block) {
             held[slot ^ 1] = false;
         }
+        let began = !held[slot];
         held[slot] = block.point(slot, |_| Some([0.0; 2]), |_| Some([0.0; 2])).is_some();
+        if takes_partner(began, held[slot], held[slot ^ 1]) {
+            held[slot ^ 1] = block.point(slot ^ 1, |_| Some([0.0; 2]), |_| Some([0.0; 2])).is_some();
+        }
+    }
+
+    /// tr-primary-2, 03:02:14Z: the hold's start is the same pattern. Held a frame apart, the body not yet held can
+    /// be pushed by the one already placed before its own first hold reads where it stands.
+    #[test]
+    fn both_fighters_are_held_from_the_frame_the_first_of_them_reads_the_request() {
+        use super::super::scrub_track::{Ask, Spot};
+        let spot = Some(Spot { at: [0.0; 2], facing: 1.0, kind: KIRBY, pose: pose(12.5) });
+        let both = Ask::Group { target: 0, deltas: [spot; 2] };
+        // The worker publishes the request on frame 1: before Player 1's callback (0), between the two (1), after both (2).
+        for published in 0..3 {
+            let block = Block::new();
+            let mut held = [false; 2];
+            for frame in 0..3 {
+                for step in 0..3 {
+                    if frame == 1 && step == published {
+                        block.set_ask(both);
+                    }
+                    if step < 2 {
+                        callback(&block, &mut held, step);
+                    }
+                }
+                assert_eq!(held[0], held[1], "published at {published}, frame {frame}: one fighter is held and the other not yet");
+                assert_eq!(held[0], frame == 2 || (frame == 1 && published < 2), "published at {published}, frame {frame}");
+            }
+        }
+        // A request for one role takes nobody else.
+        let block = Block::new();
+        let mut held = [false; 2];
+        block.set_ask(Ask::Group { target: 0, deltas: [spot, None] });
+        callback(&block, &mut held, 0);
+        callback(&block, &mut held, 1);
+        assert_eq!(held, [true, false]);
+        // Only on the callback its own hold begins, and only a partner that has no hold.
+        assert!(takes_partner(true, true, false));
+        assert!(!takes_partner(false, true, false) && !takes_partner(true, false, false) && !takes_partner(true, true, true));
     }
 
     /// The staggered release (place-t1a's trace C, 2026-11-27 02:53Z, rows a3 and u1; the base build's third
@@ -473,6 +522,21 @@ mod tests {
         let own = at("let seen = match point(block, &holds, slot, accessor) {").expect("the role's own point");
         assert!(forgot < first && first + together.len() <= own);
         assert_eq!(hold.matches("lets_partner_go(block)").count(), 1);
+        // The start of a hold, the same way: right after the role's own step, and before it reports.
+        let start = [
+            "if takes_partner(began, holds[slot].is_some(), holds[slot ^ 1].is_some()) {",
+            "if let Some(partner) = other_body(slot) {",
+            "if let Some(spot) = point(block, &holds, slot ^ 1, partner) {",
+            "let taken = hold(block, generation, slot ^ 1, &mut holds[slot ^ 1], partner, spot);",
+            "block.set_seen(slot ^ 1, taken);",
+            "}",
+            "}",
+            "}",
+        ];
+        let taken = at(start[0]).expect("the partner is taken in the role's callback");
+        assert_eq!(frame[taken..taken + start.len()], start);
+        assert_eq!(at("let began = holds[slot].is_none();"), Some(own - 1), "read before the role's own step");
+        assert!(own < taken && frame[taken - 1] == "};" && frame[taken + start.len()] == "block.set_seen(slot, seen);");
         // The other role's body is found the way the placement picker finds the two; the picker's call is as it was.
         assert_eq!(lines(item("unsafe fn other_body(slot: usize) -> Option<usize> {")),
             ["if slot == 0 {", "super::recorder::cpu_body().map(|body| body.accessor)", "} else {", "natives::module_accessor(0)", "}"]);
