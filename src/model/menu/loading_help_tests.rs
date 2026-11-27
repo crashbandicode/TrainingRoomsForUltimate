@@ -20,7 +20,7 @@ fn the_loading_help_lines_say_what_the_code_does() {
         ("Ready Hats", "How many Kirby hats are kept ready, apart from the fighters.\nA hat of a ready fighter shares its body."),
         ("Ready Fighter Bodies",
             "How many fighters each role keeps in its own slot, counting\nthe one on screen. More means quicker swaps. Off: no groups."),
-        ("Group Swap", "On: each role keeps extra groups ready besides its own slot.\nOff: no extra groups. The two bank entries below stay as set."),
+        ("Group Swap", "On: each role can keep extra groups beyond its own slot.\nOff: no extra groups. The two bank entries below stay as set."),
         ("Swap groups",
             "Which swaps are done as a group. A greyed entry says why.\nPT / Aegis groups need free Ready Fighters: PT 3, Aegis 2."),
     ] {
