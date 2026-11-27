@@ -15,7 +15,7 @@ Pick both fighters and the order the cycle chords step through ([Fighter cycles]
 | <a id="player-swapping"></a>Player Swapping | On, **Off** | Enables Cycle Player. Manual fighter picks work either way. [Clip](../media/rc13-player-swapping-gate.gif) |
 | Player Character | Any fighter | Pick Player 1's fighter on the portrait grid. It loads when the menu closes. [Clip](../media/rc12-player-character.gif) |
 | CPU Character | Any fighter | The same grid for the CPU. [Clip](../media/rc11-cpu-character.gif) |
-| <a id="character-cycles"></a>Character Cycles | **All**, or your own order | The order the cycle chords step through, per role. ZR switches role. |
+| <a id="character-cycles"></a>Character Cycles | **All**, or your own order | The order the cycle chords step through, per role. ZR switches role. [Clip](../media/rc11-cycle-switch.gif) |
 | <a id="solo-popo-original-ice-climbers"></a>Solo Popo (original Ice Climbers) | On, **Off** | On: Player 1's Ice Climbers from the character select are Popo alone. [Clip](../media/rc11-solo-popo.gif) |
 
 ## Extras
@@ -28,7 +28,7 @@ Kirby's hats, an item for Player 1, and the Mii of each class ([Mii fighters](..
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| <a id="kirby-hats"></a>Kirby Hats | **Mario**, All, or your own order | The hat order Kirby copies, for each role. |
+| <a id="kirby-hats"></a>Kirby Hats | **Mario**, All, or your own order | The hat order Kirby copies, for each role. [Clip](../media/rc7-kirby-hats.gif) |
 | <a id="give-item"></a>Give item | 39 items | A picks an item for Player 1. It arrives when the menu closes. [Clip](../media/rc11-give-item.gif) |
 | <a id="mii-brawler"></a>Mii Brawler | A saved, replay or new Mii | The Mii used for the Brawler. [Clip](../media/rc7-mii-editor.gif) |
 | <a id="mii-swordfighter"></a>Mii Swordfighter | A saved, replay or new Mii | The Mii used for the Swordfighter. [Clip](../media/rc11-mii-swordfighter.gif) |
@@ -44,7 +44,7 @@ Change the stage now, or set up practice in the waiting room ([Stages](../guide/
 
 | Setting | Values (default in bold) | What it does |
 | --- | --- | --- |
-| <a id="change-stage"></a>Change Stage | 117 game stages, plus Stage Builder stages | Y cycles available forms. A changes stage and closes the menu. |
+| <a id="change-stage"></a>Change Stage | 117 game stages, plus Stage Builder stages | Y cycles available forms. A changes stage and closes the menu. [Clip](../media/rc11-change-stage.gif) |
 | <a id="lobby-practice"></a>Lobby Practice | **On**, Off | On: practice runs in the waiting room too. Off: only in Training. [Clip](../media/rc11-lobby-practice.gif) |
 | <a id="lobby-stages"></a>Lobby Stages | **Waiting Room only**, All, or your own order | Set the rotation order. X switches to Direct for one fixed stage. [Clip](../media/rc11-lobby-stages.gif) |
 | <a id="training-stage-rotation"></a>Training Stage Rotation | On, **Off** | On: Training moves through the Lobby Stages order. [Clip](../media/rc11-stage-rotation.gif) |
