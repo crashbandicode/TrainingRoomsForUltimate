@@ -18,8 +18,9 @@ use super::hitbox::{self, want_hits, AttackReader, Counts, Effects, FighterGener
 use super::legend::{self, KIND_MARK, KIND_WIND};
 use super::pool_list::PoolList;
 
-/// Nodes of the runtime's command pool. PLACEHOLDER until the ordered Eden stress run on the release candidate: the size
-/// is that run's highest per-frame command count times at least 8 (lane overlay-handoff, tr-primary-2 2026-11-27 14:45:17Z).
+/// Nodes of the runtime's command pool: 32 times the most commands one frame handed over (2; 99.9th percentile 1) in Eden run
+/// `overlay-stress-xps-01` on the release NRO `4ffa754e` (Training, 35,020 frames; lane overlay-handoff, 2026-11-27). The waiting
+/// room was not measured.
 pub const COMMAND_NODES: usize = 64;
 
 /// A command recorded by an overlay hook for ordered application.
