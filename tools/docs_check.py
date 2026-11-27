@@ -237,7 +237,6 @@ BUDGET_PENDING = {
     "docs/guide/using-the-menu.md": 647,
     "docs/guide/waiting-rooms.md": 605,
     "docs/menu/practice-games.md": 1589,
-    "docs/menu/recording.md": 9606,
 }
 
 

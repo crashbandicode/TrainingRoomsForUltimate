@@ -80,6 +80,7 @@ Kept for the history of decisions and measurements; they describe the build of t
   [the menu mockup](menu-mockup/), the [roadmap](ROADMAP.md).
 - [Mii developer notes](MII.md).
 - [Input drill acceptance](EVIDENCE-rc15-input-drill.md): native recording, cropping, no-hit conversion and grading on the rc.15 feature build.
+- [Crop editor acceptance](EVIDENCE-rc15-crop-editor.md): the clip editor's crop of macros, combos and drills on the rc.15 feature build.
 - [Indexed article native seam](native/article-hurtboxes.md): ABI, version and guard evidence.
 - Measurements: [code reduction (rc.10)](CODE-REDUCTION-rc10.md), [coverage (rc.9)](COVERAGE-rc9.md),
   [size plan](SIZE-PLAN.md), [test cuts (rc.9)](TEST-CUT-LEDGER-rc9.md), [resource costs](resource-costs.md),
