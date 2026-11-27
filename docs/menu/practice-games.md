@@ -5,7 +5,7 @@ On Fighters & Stages, A on a game opens its screen: Start first, then the settin
 ## Eggs-ercise
 
 ![Practice games: A on Eggs-ercise opens its screen with Start first; A on Start closes the menu and the run begins](../media/rc15-practice-menu-start.gif)<br>
-*A on Eggs-ercise, then A on Start. Eden, build 9aa51374.*
+*A opens Eggs-ercise; A on Start begins the game.*
 
 Break the targets that appear ([guide](../guide/eggs-ercise.md)).
 
@@ -27,7 +27,7 @@ Break the targets that appear ([guide](../guide/eggs-ercise.md)).
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d8dc78d3f34bd83e7c687ed7ce791010bd1556e8" autoplay muted loop playsinline controls></video>
 
-*Mario punches the placed target. Eden, diagnostic `cc71537c`.* [Open the clip](../media/tut-break-the-targets.mp4)
+*Mario punches the placed target.* [Open the clip](../media/tut-break-the-targets.mp4)
 
 Place up to ten targets, then break them all against the clock ([guide](../guide/break-the-targets.md)).
 
@@ -44,7 +44,7 @@ Place up to ten targets, then break them all against the clock ([guide](../guide
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d0eca9a146fb35a73838b8f5fa51330d6455a5c5" autoplay muted loop playsinline controls></video>
 
-*Launches at 72%; the techs are missed. Eden, `5df3d9dc`.* [Open the clip](../media/tut-tech-practice.mp4)
+*The fighter launches at 72% and misses the tech.* [Open the clip](../media/tut-tech-practice.mp4)
 
 Tech a launch at a chosen or random surface; Set uses a range's low end, Random both ends ([guide](../guide/tech-practice.md)).
 
@@ -71,7 +71,7 @@ Tech a launch at a chosen or random surface; Set uses a range's low end, Random 
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/48415ed2d8d2476130d914666584abf824135ae4" autoplay muted loop playsinline controls></video>
 
-*Mash out: Good at 30f, Poor at 90f. Eden, `cc71537c`.* [Open the clip](../media/tut-mash-out.mp4)
+*Mash out: Good at 30 frames, Poor at 90.* [Open the clip](../media/tut-mash-out.mp4)
 
 Escape a capture, or parry the CPU's recorded move ([Mash out](../guide/mash-out.md), [Parry practice](../guide/parry-practice.md)).
 
@@ -88,7 +88,7 @@ Escape a capture, or parry the CPU's recorded move ([Mash out](../guide/mash-out
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/3609165db1d1675f019de9a7f3b7d1b6f7b8ebf0" autoplay muted loop playsinline controls></video>
 
-*Guard the Edge: set-up, then three attempts. Eden, `5df3d9dc`.* [Open the clip](../media/tut-guard-edge-setup-and-score.mp4)
+*Guard the Edge: placement, then three attempts.* [Open the clip](../media/tut-guard-edge-setup-and-score.mp4)
 
 Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.md), [Juggler](../guide/juggler.md)).
 
@@ -107,7 +107,7 @@ Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.
 ## Good to know
 
 ![While Eggs-ercise runs: its screen's first row reads Stop with Running in green; A stops it and the row reads Start, the menu still open](../media/rc15-practice-menu-stop.gif)<br>
-*A running game's first row reads Stop. Eden, build 9aa51374.*
+*Stopping Eggs-ercise changes its first row back to Start.*
 
 | If | Then |
 | --- | --- |

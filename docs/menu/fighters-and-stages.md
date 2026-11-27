@@ -6,7 +6,7 @@ From the CPU page, press L twice to open Fighters & Stages.
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6d08f7457ab8d11ca30c8d7ed1140dd4611397e9" autoplay muted loop playsinline controls></video>
 
-*Mario cycles to Donkey Kong. Eden, diagnostic `5df3d9dc`.* [Open the clip](../media/tut-fighter-cycle.mp4)
+*Mario cycles to Donkey Kong.* [Open the clip](../media/tut-fighter-cycle.mp4)
 
 Pick both fighters and the order the cycle chords step through ([Fighter cycles](../guide/fighter-cycles.md)).
 
@@ -22,7 +22,7 @@ Pick both fighters and the order the cycle chords step through ([Fighter cycles]
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0858b8e26cf6db1c8d16f3d935c486380ffa303f" autoplay muted loop playsinline controls></video>
 
-*Kirby gets Mario's cap. Eden, diagnostic `cc71537c`.* [Open the clip](../media/tut-kirby-hat.mp4)
+*Kirby gets Mario's cap.* [Open the clip](../media/tut-kirby-hat.mp4)
 
 Kirby's hats, an item for Player 1, and the Mii of each class ([Mii fighters](../guide/mii.md)).
 
@@ -38,7 +38,7 @@ Kirby's hats, an item for Player 1, and the Mii of each class ([Mii fighters](..
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e0de6dbeba09dd60aa5dc2ec3c5fbde73470d79a" autoplay muted loop playsinline controls></video>
 
-*Both fighters on Battlefield Ω. Eden, diagnostic `cc71537c`.* [Open the clip](../media/tut-stage-change.mp4)
+*Both fighters move to Battlefield Ω.* [Open the clip](../media/tut-stage-change.mp4)
 
 Change the stage now, or set up practice in the waiting room ([Stages](../guide/stages.md), [Waiting rooms](../guide/waiting-rooms.md)).
 
@@ -55,7 +55,7 @@ Change the stage now, or set up practice in the waiting room ([Stages](../guide/
 ## Loading
 
 ![The Link to Kirby swap with Ready Fighters at 4 and at 10](../media/rc12-ready-fighters.gif)<br>
-*Ready Fighters at 4 and at 10, side by side. Eden, rc.12.*
+*The same swap with Ready Fighters at 4 and at 10.*
 
 Keep fighters and hats ready to shorten swap times ([Fighter cycles](../guide/fighter-cycles.md#what-the-loading-rows-do)).
 
@@ -73,7 +73,7 @@ Keep fighters and hats ready to shorten swap times ([Fighter cycles](../guide/fi
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/48415ed2d8d2476130d914666584abf824135ae4" autoplay muted loop playsinline controls></video>
 
-*Mash out: Good at 30f, Poor at 90f. Eden, diag `cc71537c`.* [Open the clip](../media/tut-mash-out.mp4)
+*Mash out: Good at 30 frames, Poor at 90.* [Open the clip](../media/tut-mash-out.mp4)
 
 A on a game opens its screen: Start first, then its settings ([Practice games](practice-games.md)).
 
@@ -90,7 +90,7 @@ A on a game opens its screen: Start first, then its settings ([Practice games](p
 ## Reset page to defaults
 
 ![Confirming the reset restores the two switches and the CPU fighter](../media/rc13-reset-page-fighters-stages.gif)<br>
-*Reset restores the saved settings. Eden, rc.13.*
+*Reset restores this page's saved defaults.*
 
 | Setting | Values | What it does |
 | --- | --- | --- |
@@ -99,7 +99,7 @@ A on a game opens its screen: Start first, then its settings ([Practice games](p
 ## Good to know
 
 ![Player Swapping Off: the Cycle Player chord changes nothing; A turns the row On; the same chord replaces Mario with Donkey Kong](../media/rc13-player-swapping-gate.gif)<br>
-*Player Swapping Off, then On. Eden, rc.13.*
+*Cycle Player works after Player Swapping is turned on.*
 
 | If | Then |
 | --- | --- |

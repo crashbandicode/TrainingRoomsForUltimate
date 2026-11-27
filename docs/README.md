@@ -1,10 +1,10 @@
 # TrainingRooms documentation
 
-Start with [installation and controls](../README.md), or choose a menu page, guide or technical reference.
+Start with [installation](guide/getting-started.md#installing) or [menu controls](guide/using-the-menu.md).
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b5760c58e2de36d18ee1fc677043ffb7c7376dce" autoplay muted loop playsinline controls></video>
 
-*Hitboxes, grab boxes and hurtboxes drawn. Eden, 5df3d9dc.* [Open the clip](media/tut-hitbox-visualization.mp4)
+*Hitboxes, grab boxes and hurtboxes appear over the fighters.* [Open the clip](media/tut-hitbox-visualization.mp4)
 
 | Group | For | Pages |
 | --- | --- | --- |

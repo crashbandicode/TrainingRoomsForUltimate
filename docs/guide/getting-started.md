@@ -1,5 +1,5 @@
 # Getting started
-Install TrainingRooms for Smash Ultimate 13.0.5, then try one change in Training.
+Install TrainingRooms for Smash Ultimate 13.0.5 ([rc.15 release status](../CURRENT-RELEASE.md)), then try one change in Training.
 
 ## Your first practice
 
@@ -17,7 +17,7 @@ Install TrainingRooms for Smash Ultimate 13.0.5, then try one change in Training
 
 | Looking for | Where to look |
 |---|---|
-| <a id='which-build-you-have'></a>Your build | Menu footer: version, release name, then commit. Compare with [rc.15](../CURRENT-RELEASE.md). |
+| <a id='which-build-you-have'></a>Your build | Match the menu footer's commit to the [build list](../CURRENT-RELEASE.md#which-build-is-mine). |
 | Settings when updating | Replace the plugin, not `sd:/ultimate/TrainingRooms/`, which holds your data. |
 | An install that didn't load | [Check the install line](troubleshooting.md). |
 | A particular setting | [Menu pages and guides](../README.md). |
