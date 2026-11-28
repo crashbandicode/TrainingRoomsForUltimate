@@ -147,27 +147,9 @@ pub(crate) fn running() -> bool {
     STARTED.load(std::sync::atomic::Ordering::Acquire)
 }
 
-/// The nro-load provider's registration function (`libnro_hook`, docs/HOOK-SHARING.md): one pointer-sized argument, the callback.
-type AddNroLoadHook = extern "C" fn(usize);
-
-/// The turnip identity read needs the loaded `item` module's image (every read re-checks its code, `held_face`): ask the provider to
-/// tell us when it loads. Without the provider nothing registers and a turnip is saved as unsupported (the item engine's rule).
-fn register_nro_load() {
-    let mut address = 0usize;
-    // SAFETY: the name is a NUL-terminated literal; the loader writes one address.
-    unsafe { skyline::nn::ro::LookupSymbol(&mut address, b"add_nro_load_hook\0".as_ptr()) };
-    if address == 0 {
-        crate::engine::compat::logging::diagnostic(format_args!("[TrainingRooms] turnip identity: no nro-load provider"));
-        return;
-    }
-    // SAFETY: the provider exports `add_nro_load_hook(callback)`.
-    let add: AddNroLoadHook = unsafe { std::mem::transmute(address) };
-    add(on_nro_load as *const () as usize);
-}
-
-extern "Rust" fn on_nro_load(info: &skyline::nro::NroInfo<'_>) {
-    // SAFETY: called by the provider with the loader's own NRO record.
-    unsafe { turnip_identity::on_load(info) };
+pub(crate) fn on_nro_load(name: &str, module: *mut skyline::nn::ro::Module) {
+    // SAFETY: the module-load hook passes the loader's own module.
+    unsafe { turnip_identity::on_load(name, module) };
 }
 
 /// Start the cycle: sync the preload cache from the already published settings.json before anything asks for a snapshot,
@@ -177,7 +159,6 @@ extern "Rust" fn on_nro_load(info: &skyline::nro::NroInfo<'_>) {
 /// line.
 pub(crate) fn init() {
     STARTED.store(true, std::sync::atomic::Ordering::Release);
-    register_nro_load();
     cycle_preload_config::init();
     practice_trace::init();
     native_unlink_install::init();

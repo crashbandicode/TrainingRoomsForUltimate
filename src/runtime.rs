@@ -10,6 +10,7 @@ mod clock;
 mod developer;
 mod developer_reload;
 mod compat;
+mod cut_file;
 pub(crate) mod diag_log;
 #[cfg(feature = "diag")]
 mod diag_reload;
@@ -27,6 +28,7 @@ mod log_file;
 mod lobby;
 mod macros;
 mod mii;
+mod nro_load;
 mod p1;
 mod published;
 mod roster;

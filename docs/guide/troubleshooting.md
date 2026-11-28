@@ -2,7 +2,7 @@
 
 ## Start with what you see
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6bdcfb3a520887a441f56d87a5959a16d4ea4bff" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2424854e2dc29b8427a5a56989fb14195ba67d0f" autoplay muted loop playsinline controls></video>
 
 *The Save States notice identifies the disabled setting.* [Open the clip](../media/tut-notice-save-states-off.mp4)
 
@@ -16,5 +16,5 @@
 | Cycle Player does nothing | Check [Player Swapping](../menu/fighters-and-stages.md#player-swapping); wait for any current swap to finish. |
 | Fighters wait for memory | Open the game's pause menu so idle helpers can release memory; check [Loading](../menu/fighters-and-stages.md#loading). |
 | An input goes missing | Check [chord ownership](controls.md#online-deluxe) and [waiting-room controls](waiting-rooms.md). |
-| <a id='where-the-logs-are-and-what-to-send'></a>Still stuck? | Copy `events.log`, `practice-diagnostics.log` and `practice-diagnostics.previous.log` from `sd:/ultimate/TrainingRooms/` before starting again. |
+| <a id='where-the-logs-are-and-what-to-send'></a>Still stuck? | Copy `events.log`, `practice-diagnostics.log`, `practice-diagnostics.previous.log` and, if present, `cut-files.log` from `sd:/ultimate/TrainingRooms/` before starting again. |
 | With your report | Include game version, menu build tag, other plugins, steps and exact notice. |

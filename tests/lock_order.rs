@@ -974,8 +974,6 @@ const GAME_ENTRIES: &[&str] = &[
     "cpu_common::di_hook",
     "cpu_common::change_status_hook",
     "cpu_common::sub_guard_cont_hook",
-    "cpu_common::on_nro_load",
-    "roster::on_nro_load",
     "reset_hub::on_init",
     "native_service::training_mod_native_service_dispatch",
     "mii_ordinary_gate::mii_ordinary_gate_decide",
@@ -1404,6 +1402,57 @@ fn overlay_sampling_and_perfect_height_do_not_wait_for_overlay_data() {
     }
 }
 
+/// The overlay's command hooks (CATCH and an article's ATTACK, the four wind commands, the rebound) run on threads nobody has
+/// proven, so none of them waits for `STORE` or `ARTICLES`: they hand their command over and phase 8 applies it.
+#[test]
+fn overlay_command_hooks_never_wait_for_the_store_or_the_articles() {
+    const SHAPE: [&str; 2] = ["hitbox::hitbox_attack_hook", "hitbox::hitbox_catch_hook"];
+    const WIND: [&str; 4] = [
+        "hitbox::hitbox_area_wind_hook",
+        "hitbox::hitbox_area_wind_arg10_hook",
+        "hitbox::hitbox_area_wind_rad_hook",
+        "hitbox::hitbox_area_wind_rad_arg9_hook",
+    ];
+    const REBOUND: [&str; 1] = ["hitbox::hitbox_rebound_hook"];
+    let mut graph = runtime_graph();
+    let runtime = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime");
+    let locks = static_locks(&runtime);
+    let lock = |name: &str| locks.iter().position(|(file, lock)| file == "features/hitbox.rs" && lock == name).unwrap();
+    let one = |graph: &Graph, key: &str| {
+        let found = graph.find(key);
+        assert_eq!(found.len(), 1, "{key}");
+        found[0]
+    };
+    {
+        let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
+        let shared = shared_locks(&ctx, &scan);
+        for name in ["STORE", "ARTICLES"] {
+            let waits = shared.game_waits.get(&lock(name)).cloned().unwrap_or_default();
+            assert!(waits.is_empty(), "a game entry waits on the overlay's {name}: {waits:?}");
+            for hook in SHAPE.iter().chain(&WIND).chain(&REBOUND) {
+                assert!(!scan.reach[one(&graph, hook)].contains(&lock(name)), "{hook} can wait on {name}");
+            }
+        }
+    }
+    let seeds: [(&str, &str, &[&str]); 4] = [
+        ("hitbox::animation_command", "STORE", &SHAPE),
+        ("hitbox::animation_command", "ARTICLES", &SHAPE),
+        ("hitbox::wind_command", "ARTICLES", &WIND),
+        ("hitbox::hitbox_rebound_hook", "STORE", &REBOUND),
+    ];
+    for (function, name, roots) in seeds {
+        let f = one(&graph, function);
+        let original = graph.funcs[f].body.clone();
+        graph.funcs[f].body.extend(callgraph::lex(&format!("{name}.lock();")));
+        let (ctx, scan) = scan_with_locks(&graph, locks.clone(), false);
+        let hooks = shared_locks(&ctx, &scan).game_hooks.remove(&lock(name)).unwrap_or_default();
+        for root in roots {
+            assert!(hooks.contains(*root), "a blocking {name} seeded in {function} escaped {root}: {hooks:?}");
+        }
+        graph.funcs[f].body = original;
+    }
+}
+
 #[test]
 fn scrollback_review_both_history_lock_sites_are_game_callbacks_only() {
     for graph in [runtime_graph(), diag_runtime_graph()] {
@@ -1649,7 +1698,7 @@ fn unfollowed_ambiguous(ctx: &Ctx, s: &Scan) -> BTreeMap<(String, String), BTree
 #[test]
 fn every_function_handed_to_the_game_is_listed() {
     let handed = handed_out(&runtime_graph());
-    for known in ["cpu::on_frame", "cpu_common::on_nro_load", "native_service::training_mod_native_service_dispatch", "imp::detached"] {
+    for known in ["cpu::on_frame", "native_service::training_mod_native_service_dispatch", "imp::detached"] {
         assert!(handed.contains(known), "the scan of handed-out functions misses {known}: {handed:?}");
     }
     let listed: BTreeSet<String> =

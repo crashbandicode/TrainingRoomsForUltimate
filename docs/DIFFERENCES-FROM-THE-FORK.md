@@ -91,7 +91,7 @@ The original comparison used 0.2.0-rc.3 (`p23/rc3-candidate` `3c8f5bc`, 2026-11-
 
 
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4aa2f2e58ef1c505ac2b4e9dcc4fcf435232f904" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bca6f494f2f914709de37012e74c86ec555be46f" autoplay muted loop playsinline controls></video>
 
 *Cycle badges show the order of Player 1’s fighter swaps.* [Open the clip](media/rc11-cycle-switch.mp4)
 

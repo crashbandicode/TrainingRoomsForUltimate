@@ -2769,7 +2769,7 @@ rc.13 showed the same three-slot hint for both. See [Loading](menu/fighters-and-
 
 **Clip observations**
 
-- docs only: the existing <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a1da5255615e7fc1de2cb4a15248180eb67b3577" autoplay muted loop playsinline controls></video> [Open the clip](media/rc11-solo-popo.mp4) shows Solo Popo turned On; no rc.13 clip
+- docs only: the existing <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/53670adf8c30100715caf91c66260e880a11bf96" autoplay muted loop playsinline controls></video> [Open the clip](media/rc11-solo-popo.mp4) shows Solo Popo turned On; no rc.13 clip
 
 
 ## Install 4 additions

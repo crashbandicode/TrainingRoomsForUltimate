@@ -133,7 +133,16 @@ fn wizard_marks_every_step_obeys_the_typed_pool_capacity() {
 #[test]
 fn wizard_marks_ghost_matches_existing_planner_normal_offset() {
     use super::{planner, solver::Box2, surface::Surfaces};
-    let surfaces = Surfaces::EMPTY;
+    // The planner flies a manual launch: a floor under every start of the table.
+    let mut surfaces = Surfaces::EMPTY;
+    assert!(surfaces.push(Line {
+        id: 1,
+        ends: [Vec2 { x: -450., y: -60. }, Vec2 { x: 450., y: -60. }],
+        normal: Vec2 { x: 0., y: 1. },
+        floor: true,
+        wall: false,
+        passable: false,
+    }));
     let bounds = Box2 {
         min: Vec2 { x: -500., y: -500. },
         max: Vec2 { x: 500., y: 500. },

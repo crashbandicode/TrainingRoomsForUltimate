@@ -2,7 +2,7 @@
 
 ## Make a take and play it back
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/98458f1bb06f9d595e377ae7baf99022af5f3130" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0c6a5475c7c08fac64a812c366e8b6531aa7acc2" autoplay muted loop playsinline controls></video>
 
 *Record a forward smash, then stop the take.* [Open the clip](../media/tut-record-macro.mp4)
 
@@ -22,7 +22,7 @@
 
 ## Practise a combo or input drill
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b635893c4df02daaae5535f19b5b3f5c2346245b" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/9c0eea0a1b3fd7c87587f782473ce17abdf1e5e5" autoplay muted loop playsinline controls></video>
 
 *Kirby's input drill appears in the library.* [Open the clip](../media/tut-input-drill-record.mp4)
 
@@ -40,7 +40,7 @@
 
 ## Crop
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4a1682c8e3a70a876ed2764fc4e6629bbd6cfcdc" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/521a81974bc534f3011ed611c720feb3b7a584ee" autoplay muted loop playsinline controls></video>
 
 *Browse a take before setting its crop handles.* [Open the clip](../media/tut-clip-playhead.mp4)
 

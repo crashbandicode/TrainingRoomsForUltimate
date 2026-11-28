@@ -10,6 +10,8 @@ use super::practice_games::{record_max, record_time, result_tick, Game};
 pub mod perfect;
 #[path = "edge_juggle/picker.rs"]
 pub mod picker;
+#[path = "edge_juggle/trap.rs"]
+pub mod trap;
 #[path = "edge_juggle/zoom.rs"]
 pub mod zoom;
 #[cfg(test)]
@@ -18,6 +20,9 @@ mod crosshair_tests;
 #[cfg(test)]
 #[path = "edge_juggle/offstage_tests.rs"]
 mod offstage_tests;
+#[cfg(test)]
+#[path = "edge_juggle/trap_tests.rs"]
+mod trap_tests;
 
 const EDGE_TIMEOUT: u32 = 15 * 60;
 const RESULT_FRAMES: u16 = 90;
@@ -31,6 +36,7 @@ pub const PLAYER_INSET: f32 = 1.25;
 pub enum Drill {
     GuardEdge,
     Juggler,
+    LedgeTrap,
 }
 
 impl Drill {
@@ -38,6 +44,7 @@ impl Drill {
         match game {
             Game::GuardEdge => Some(Self::GuardEdge),
             Game::Juggler => Some(Self::Juggler),
+            Game::LedgeTrap => Some(Self::LedgeTrap),
             _ => None,
         }
     }
@@ -46,6 +53,7 @@ impl Drill {
         match self {
             Self::GuardEdge => Game::GuardEdge,
             Self::Juggler => Game::Juggler,
+            Self::LedgeTrap => Game::LedgeTrap,
         }
     }
 
@@ -54,14 +62,14 @@ impl Drill {
     pub const fn placed_jump_count(self, used: bool, max: i32) -> i32 {
         match self {
             Self::GuardEdge if used && max > 1 => max,
-            Self::GuardEdge => 1,
+            Self::GuardEdge | Self::LedgeTrap => 1,
             Self::Juggler => 0,
         }
     }
 
     pub const fn ready_frames(self) -> u16 {
         match self {
-            Self::GuardEdge => 60,
+            Self::GuardEdge | Self::LedgeTrap => 60,
             Self::Juggler => 45,
         }
     }
@@ -109,12 +117,18 @@ pub const JUGGLE_ROWS: DifficultyRows = DifficultyRows {
     reaction: "juggle_reaction",
     frames: "juggle_reaction_frames",
 };
+pub const TRAP_ROWS: DifficultyRows = DifficultyRows {
+    difficulty: "trap_difficulty",
+    reaction: "",
+    frames: "",
+};
 
 impl Drill {
     pub const fn difficulty_rows(self) -> &'static DifficultyRows {
         match self {
             Self::GuardEdge => &EDGE_ROWS,
             Self::Juggler => &JUGGLE_ROWS,
+            Self::LedgeTrap => &TRAP_ROWS,
         }
     }
 }
@@ -301,6 +315,9 @@ pub enum Outcome {
     Landed,
     GrabbedLedge,
     KnockedOut,
+    KeptOffKo,
+    KeptOffTime,
+    OnStage,
 }
 
 impl Outcome {
@@ -318,6 +335,9 @@ impl Outcome {
             Self::Landed => "landed",
             Self::GrabbedLedge => "grabbed_ledge",
             Self::KnockedOut => "knocked_out",
+            Self::KeptOffKo => "kept_off_ko",
+            Self::KeptOffTime => "kept_off_time",
+            Self::OnStage => "on_stage",
         }
     }
 }
@@ -328,6 +348,16 @@ pub struct Observation {
     pub grounded: bool,
     pub cliff_catch: bool,
     pub hit: bool,
+    /// The CPU hangs on a ledge.
+    pub hanging: bool,
+    /// The CPU's x is within the floor run's ends.
+    pub on_run: bool,
+    /// Player 1 holds or throws the CPU.
+    pub grabbed: bool,
+    /// The CPU is in hitlag or hitstun.
+    pub stunned: bool,
+    /// The CPU is knocked down or tripped, until its getup ends.
+    pub downed: bool,
     /// Player 1 stands on a floor or a platform, or holds a ledge.
     pub player_back: bool,
     /// Player 1 is KO'd: Dead, Standby or Rebirth.
@@ -406,6 +436,9 @@ impl Phase {
                 Outcome::Landed => "Landed",
                 Outcome::GrabbedLedge => "Ledge",
                 Outcome::KnockedOut => "KO",
+                Outcome::KeptOffKo => "Kept off · KO",
+                Outcome::KeptOffTime => "Kept off · time",
+                Outcome::OnStage => "On stage",
             },
             Self::Done => "Set complete · L+R+A restarts",
             _ => "",
@@ -514,6 +547,7 @@ pub struct Session {
     limit: Option<u16>,
     last: Option<Outcome>,
     rewrites: u16,
+    trap: trap::Trap,
     pub phase: Phase,
     pub attempts: u16,
     pub secured: u16,
@@ -530,6 +564,7 @@ impl Session {
             limit,
             last: None,
             rewrites: 0,
+            trap: trap::Trap::new(trap::Rules::DEFAULT),
             phase: Phase::Place,
             attempts: 0,
             secured: 0,
@@ -540,8 +575,17 @@ impl Session {
         }
     }
 
+    pub const fn with_rules(mut self, rules: trap::Rules) -> Self {
+        self.trap = trap::Trap::new(rules);
+        self
+    }
+
+    pub const fn trap(&self) -> trap::Trap {
+        self.trap
+    }
+
     pub fn restart_drill(&mut self) {
-        *self = Self::new(self.drill, self.limit);
+        *self = Self::new(self.drill, self.limit).with_rules(self.trap.rules);
     }
 
     pub fn discard_attempt(&mut self) {
@@ -555,6 +599,7 @@ impl Session {
             self.rewrites = 0;
             self.frames = 0;
             self.hits = 0;
+            self.trap = trap::Trap::new(self.trap.rules);
             self.phase = Phase::Ready(self.drill.ready_frames());
         }
     }
@@ -593,7 +638,7 @@ impl Session {
         self.last = Some(outcome);
         if outcome != Outcome::Unresolved {
             self.attempts = self.attempts.saturating_add(1);
-            if matches!(outcome, Outcome::Secured | Outcome::ZoomWin) {
+            if matches!(outcome, Outcome::Secured | Outcome::ZoomWin | Outcome::KeptOffKo | Outcome::KeptOffTime) {
                 self.secured = self.secured.saturating_add(1);
                 self.streak = self.streak.saturating_add(1);
                 self.best_streak = self.best_streak.max(self.streak);
@@ -630,6 +675,14 @@ impl Session {
             Phase::Live => {
                 self.frames = self.frames.saturating_add(1);
                 self.hits = self.hits.saturating_add(u16::from(observed.hit));
+                if self.drill == Drill::LedgeTrap {
+                    if observed.grabbed && self.hits == 0 {
+                        self.hits = 1;
+                    }
+                    let Some(outcome) = self.trap.step(self.frames, self.hits > 0, observed) else { return };
+                    self.finish_attempt(outcome);
+                    return;
+                }
                 let outcome = match (self.drill, observed) {
                     (
                         Drill::GuardEdge,
@@ -704,6 +757,9 @@ impl Session {
             Outcome::NotCountedKo => 9,
             Outcome::NoReturn => 10,
             Outcome::PlayerKo => 11,
+            Outcome::KeptOffKo => 12,
+            Outcome::KeptOffTime => 13,
+            Outcome::OnStage => 14,
             Outcome::ZoomWin | Outcome::ZoomMiss => return None,
         };
         Some((self.attempts, code))
@@ -736,12 +792,15 @@ impl Session {
         let (phase, remaining_frames) = match self.phase {
             Phase::Place => ("place", None),
             Phase::Ready(left) => ("ready", Some(u32::from(left))),
+            Phase::Live if self.drill == Drill::LedgeTrap => {
+                ("live", Some(u32::from(self.trap.rules.fail.saturating_sub(self.trap.clock()))))
+            }
             Phase::Live => ("live", None),
             Phase::Return(left) => ("return", Some(u32::from(left))),
             Phase::Result(_, left) => ("result", Some(u32::from(left))),
             Phase::Done => ("done", None),
         };
-        let edge = self.drill == Drill::GuardEdge;
+        let edge = self.drill != Drill::Juggler;
         Fields {
             phase,
             attempt_frames: Some(self.frames),
@@ -750,7 +809,7 @@ impl Session {
             streak: edge.then_some(u32::from(self.streak)),
             best,
             attempts: Some(u32::from(self.attempts)),
-            hits: (!edge).then_some(u32::from(self.hits)),
+            hits: (self.drill != Drill::GuardEdge).then_some(u32::from(self.hits)),
             last_outcome: self.last.map_or("", |outcome| outcome.bridge_name()),
             ..Fields::default()
         }
@@ -762,7 +821,7 @@ impl Session {
         key: K,
     ) -> Option<u32> {
         match self.phase {
-            Phase::Result(Outcome::Secured, RESULT_FRAMES) => {
+            Phase::Result(Outcome::Secured | Outcome::KeptOffKo, RESULT_FRAMES) => {
                 Some(record_time(bests, key, self.frames))
             }
             Phase::Result(
@@ -809,7 +868,7 @@ pub fn start_stage(
             *spot = geometry::default_spot(stage, blast, ledge).map_err(unread)?;
         }
     }
-    if drill == Drill::GuardEdge && spots == [None; 2] {
+    if drill != Drill::Juggler && spots == [None; 2] {
         return Err(StartRefusal::NoLedge);
     }
     let found = Stage::of_run(blast, camera, run.ends, spots).ok_or(StartRefusal::Unread)?;
@@ -839,6 +898,14 @@ impl Stage {
     /// The default CPU start beside an end; none where the end has no open air.
     pub fn spot(self, side: usize) -> Option<[f32; 2]> {
         self.spots[side]
+    }
+
+    /// Ledge Trap's CPU start beside an end; none where the end has no open air.
+    pub fn hang(self, side: usize) -> Option<[f32; 2]> {
+        self.spots[side].map(|_| {
+            let [x, y] = self.ledges[side];
+            [if side == 0 { x - trap::HANG_OUT } else { x + trap::HANG_OUT }, y]
+        })
     }
 
     /// Whether `x` lies on the floor run.
@@ -903,7 +970,7 @@ impl Stage {
     }
 
     pub fn player_x(self, drill: Drill, x: f32) -> f32 {
-        if drill == Drill::Juggler {
+        if drill != Drill::GuardEdge {
             return x;
         }
         let lo = self.ledges[0][0] + PLAYER_INSET;
@@ -1108,6 +1175,10 @@ impl Wizard {
         };
         let mut starts = [None; 2];
         for (side, start) in starts.iter_mut().enumerate() {
+            if drill == Drill::LedgeTrap {
+                *start = stage.hang(side);
+                continue;
+            }
             let Some(spot) = stage.spot(side) else { continue };
             let offset = if side == 0 { left_start.or(area_offset) } else { area_offset };
             let own = offset.map(|[outside, height]| {
@@ -1135,7 +1206,7 @@ impl Wizard {
                 percent: percent.min(300),
             },
         };
-        if drill == Drill::GuardEdge {
+        if drill != Drill::Juggler {
             wizard.setup.cpu = wizard.default_cpu(stage, 0).or_else(|| wizard.default_cpu(stage, 1))?;
             wizard.cross.jump(wizard.setup.cpu);
         }
@@ -1159,7 +1230,7 @@ impl Wizard {
     }
 
     pub fn unmoved(&self) -> bool {
-        self.drill == Drill::GuardEdge && !self.moved
+        self.drill != Drill::Juggler && !self.moved
     }
 
     pub fn cursor(&self) -> [f32; 2] {
@@ -1218,7 +1289,7 @@ impl Wizard {
     }
 
     pub fn set_side_default(&mut self, stage: Stage, other: bool) {
-        if self.drill != Drill::GuardEdge || self.step != WizardStep::Cpu || (other && self.starts.contains(&None)) {
+        if self.drill == Drill::Juggler || self.step != WizardStep::Cpu || (other && self.starts.contains(&None)) {
             return;
         }
         let side = stage.side(self.setup.cpu[0]) ^ usize::from(other);
@@ -1234,9 +1305,12 @@ impl Wizard {
     pub fn steer(&mut self, stage: Stage, pad: &btt::Pad) {
         match self.step {
             WizardStep::Cpu => {
+                if self.drill == Drill::LedgeTrap {
+                    return;
+                }
                 let changed = self.cross.step(pad, |p| match self.drill {
                     Drill::GuardEdge => stage.edge_cursor(p),
-                    Drill::Juggler => stage.camera_point(p),
+                    Drill::Juggler | Drill::LedgeTrap => stage.camera_point(p),
                 });
                 if changed {
                     self.setup.cpu = self.cross.at;
@@ -1256,6 +1330,7 @@ impl Wizard {
         match self.drill {
             Drill::GuardEdge => place.off_stage(options.under),
             Drill::Juggler => matches!(place, geometry::Place::OverStage | geometry::Place::Open),
+            Drill::LedgeTrap => true,
         }
     }
 

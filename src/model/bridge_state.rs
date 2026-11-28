@@ -489,9 +489,19 @@ impl Discovery {
 pub struct Publisher {
     last: u64,
     dirty: bool,
+    session: u64,
 }
 
 impl Publisher {
+    /// The bridge's toggle generation as read before a pass: 0 while the bridge is Off, or when it has none. What
+    /// landed in an earlier session reads as stale in this one, so a new generation keeps the snapshot dirty too.
+    pub fn session(&mut self, generation: u64) {
+        if generation != 0 && generation != self.session {
+            self.session = generation;
+            self.dirty = true;
+        }
+    }
+
     pub fn wants(&self, snapshot: &[u8]) -> bool {
         self.dirty || hash(snapshot) != self.last
     }

@@ -880,7 +880,7 @@ runs inside the CPU core's `cpu_frame` scope (primary inbox 19:13Z: own the root
 
 The fix:
 - request.json is read, validated and planned on the heartbeat. `service` is registered with `diag_log::set_tick`,
-  which now holds up to four steps, each called through its own pointer. The hook asks at its old cadence
+  which now holds up to six steps, each called through its own pointer. The hook asks at its old cadence
   (`READ_WANTED`) and takes the planned request (`POSTED`, `try_lock`).
 - The receipts are posted to `OUTBOX` (`compat::fixed::FixedQueue`: 8 owned values; a full queue hands the value back
   and counts it) and written there. Their JSON is the fork's, built off the hook.
@@ -1886,6 +1886,10 @@ The release watch now waits for both, and never counts passes:
 ## 2026-11-16: approved bounded events log
 
 The manually extracted `src/runtime/diag_log.rs` (the logging.rs range documented above; not a pkg4/pkg6 manifest destination) now calls the same extracted rotation primitive in `runtime/log_file.rs` as both events writers. The original remove-previous/rename-current/create-current algorithm and `storage::should_rotate` boundary remain unchanged. `report_failure` retains its exact uptime/error format and no-sync behavior; `install::write_text` retains Skyline output and sync_data. Events serialization is separate with only DIAGNOSTICS→EVENTS lock order, no recursive error logging. Existing oversized legacy events are preserved as the previous generation until its next replacement, not silently truncated. No frozen fork/source hash changed. New shared helper/runtime declarations/lib test inclusion are clean-room code; none of these paths has a carry-manifest destination. Parent owns host gates and final acceptance.
+
+## 2026-11-28: cut-file diagnostic drain
+
+The manually extracted `src/runtime/diag_log.rs` increases its tick slots from five to six for the common-load report and cut-file diagnostic's drain-thread steps. It is not a pkg4/pkg6 manifest destination.
 
 Menu-polish slider and pop-up code was written in this repository; no code was copied from the fork or upstream.
 

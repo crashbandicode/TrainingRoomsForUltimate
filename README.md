@@ -1,6 +1,6 @@
 # TrainingRooms for Ultimate
 Practise matchups, edit recordings and play training games in Super Smash Bros. Ultimate.<br>
-[Download a published release](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases) · [Player guide](docs/README.md) · [rc.15 status](docs/CURRENT-RELEASE.md)
+[Download a published release](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases) · [Player guide](docs/README.md) · [rc.16 status](docs/CURRENT-RELEASE.md)
 
 ## Notable features
 
@@ -14,7 +14,7 @@ Pick a spot offstage and practise denying the recovery; [Guard the Edge](docs/gu
 
 ### Recordings you can drill
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b635893c4df02daaae5535f19b5b3f5c2346245b" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/9c0eea0a1b3fd7c87587f782473ce17abdf1e5e5" autoplay muted loop playsinline controls></video>
 
 *Kirby's recording becomes a drill in the library.* [Open the clip](docs/media/tut-input-drill-record.mp4)
 
@@ -22,9 +22,9 @@ Record a dash-back or a string of short hops, then [try to match your timing](do
 
 ### Replay clip editor
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7c00d97bf3abf99b2191b84d54bf130ffe0620ed" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/56c7702603163fb7b08849a96e28f2ffabb91fc5" autoplay muted loop playsinline controls></video>
 
-*Snap to the aerial's start, then preview it on the CPU.* [Open the clip](docs/media/tut-clip-snap.mp4)
+*Scrub a replay, snap to a move's start, then make a macro.* [Open the clip](docs/media/tut-clip-snap.mp4)
 
 [Scrub through a take](docs/guide/recording.md#crop) to see a matching fighter's recorded pose, then snap the start or end of the clip to a move.
 
@@ -46,7 +46,7 @@ Stay on stage between matchups: pick a different fighter or [set a rotation](doc
 
 ### Waiting-room practice
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/21ebbad818e76b74c6860dbe8c64351e6f378fd1" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/ecaa99248dfc36086acb86b44280fec9c7be9e57" autoplay muted loop playsinline controls></video>
 
 *Lobby Practice on the menu in a local wireless room* [Open the clip](docs/media/rc11-lobby-practice.mp4)
 
@@ -78,9 +78,9 @@ Give Kirby a [lineup of copy abilities](docs/guide/fighter-cycles.md#kirby-hats)
 
 ### Items on demand
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a5d3db481e0b20627c2a38141a43170e872b3b9d" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2d795002aed42bf7095a161813f4f7f5d3dfff46" autoplay muted loop playsinline controls></video>
 
-*Captain Falcon takes Daisy's Bob-omb from the item grid* [Open the clip](docs/media/rc11-give-item.mp4)
+*Mario takes an item from the item grid* [Open the clip](docs/media/rc11-give-item.mp4)
 
 [Choose an item for Player 1](docs/menu/fighters-and-stages.md#give-item) and close the menu to use it, without loading a save.
 
@@ -97,5 +97,5 @@ Give Kirby a [lineup of copy abilities](docs/guide/fighter-cycles.md#kirby-hats)
 | ![Saved combos in the recording library](docs/media/readme-tour-recording.png) | [Recording](docs/menu/recording.md) · Keep a combo, edit a take or practise a sequence. |
 | ![Mirroring and damage beneath Save States](docs/media/readme-tour-saves.png) | [Saves](docs/menu/saves.md) · Set the damage and positions you return to. |
 
-Smash Ultimate 13.0.5 on Switch or emulator: [Downloads](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases) · [Install guide](docs/guide/getting-started.md#installing) · [Release notes](docs/RELEASE-NOTES.md#release-notes-rc15)<br>
+Smash Ultimate 13.0.5 on Switch or emulator: [Downloads](https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/releases) · [Install guide](docs/guide/getting-started.md#installing) · [Release notes](docs/RELEASE-NOTES.md#release-notes-rc16)<br>
 [MIT License](LICENSE) · Made with the assistance of AI · [Technical notes](docs/TECHNICAL.md) · [Build from source](docs/BUILD.md) (`cargo skyline build --release`)

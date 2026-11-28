@@ -51,8 +51,8 @@ features! {
     Mashout => "mashout",
     /// SPEC-cpu-03: the ledge options.
     CpuLedge => "cpu_ledge",
-    /// SPEC-cpu-04: tech, missed tech, hidden tech animations (the camera and the script status-change
-    /// hook need sites this table does not have yet, see `IMPLEMENTATION-PROGRESS.md (removed after v0.2.0-rc.1; see that tag)`).
+    /// SPEC-cpu-04: tech, missed tech, hidden tech animations (the fixed camera is `CpuCamera`; the script
+    /// status-change hook is in the `common` script module, `CpuCommon`).
     CpuTech => "cpu_tech",
     /// Optional Stage tech practicer and its guarded launch natives.
     TechPractice => "tech_practice",
@@ -61,7 +61,7 @@ features! {
     /// Recording placement and start states, on the frame, poll and save-state hooks.
     RecordPlace => "record_place",
     /// SPEC-cpu-05: shield hold, decay override and tilt (the out-of-shield hook is in the `common`
-    /// script module and the damage multiplier needs the param-hook plugin, see `IMPLEMENTATION-PROGRESS.md (removed after v0.2.0-rc.1; see that tag)`).
+    /// script module, `CpuCommon`; the damage multiplier is `CpuShieldDamage`).
     CpuShield => "cpu_shield",
     /// Package 3 (save states): the natives and hooks of SPEC-state-01 (`sites_pkg3.rs`).
     StateCore => "state_core",
@@ -88,10 +88,10 @@ features! {
     /// The run-time texture helper's rows (`sites_u4.rs`, `runtime/ui/texture.rs`): a unit of its own (they are the Ui feature's rows in
     /// their table), so the menu does not depend on a helper that is optional (R2-1 merge with u4).
     UiTexture => "ui_texture",
-    /// The hooks in the `common` script module (DI, tech status change, out of shield), installed when
-    /// that module loads through the `libnro_hook` provider.
     /// SPEC-cpu-01 and SPEC-cpu-06: the mash's command flags, aerial kind and attack angle.
     CpuMash => "cpu_mash",
+    /// The hooks in the `common` script module (DI, tech status change, out of shield), installed when
+    /// that module loads, seen at `nro_loaded`.
     CpuCommon => "cpu_common",
     /// Package 6: the CPU-as-P1 fallback's game calls (sites_pkg6.rs); its hook is the carried seam row cpu_pilot.ai_process_begin.
     P1Cpu => "p1_cpu",
@@ -109,6 +109,9 @@ features! {
     /// SPEC-cpu-04's fixed camera: the stage id, the stage table and the two camera hooks.
     CpuCamera => "cpu_camera",
     DeveloperDebug => "developer_debug",
+    /// The game's module-load site (main, after its only `nn::ro::LoadModule` call): a unit of its own,
+    /// so the `common` hooks and turnip identity each degrade apart; no provider plugin.
+    NroLoad => "nro_load",
 }
 
 /// One guarded site.

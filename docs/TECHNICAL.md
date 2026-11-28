@@ -292,9 +292,9 @@ If you choose a [CPU Level](menu/cpu.md#cpu-level) that differs from Training's 
 | Log | `state saved slot=1`, `state load_request`, `state placed`. No playback line. |
 | Edits | [Capture and cut details](MEDIA.md). |
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/44549e6a2c358d081df483fba1df8f9edd2350ba" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a967e585ecafebde5f40d33d7043d51e11440a1a" autoplay muted loop playsinline controls></video>
 
-*2026-11-11 · [Capture record](MEDIA.md)* [Open the clip](media/rc7-respawn-on.mp4)
+*2026-11-27 · [Capture record](MEDIA.md)* [Open the clip](media/rc7-respawn-on.mp4)
 
 | Topic | Details |
 | --- | --- |
@@ -503,9 +503,9 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 
 ### Fighters, cycles and Kirby hats
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/4aa2f2e58ef1c505ac2b4e9dcc4fcf435232f904" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bca6f494f2f914709de37012e74c86ec555be46f" autoplay muted loop playsinline controls></video>
 
-*Cycle Player 1 through three fighters* [Open the clip](media/rc11-cycle-switch.mp4)
+*Set a cycle order; Cycle Player switches to Donkey Kong* [Open the clip](media/rc11-cycle-switch.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -572,9 +572,9 @@ For the current priority rule, see [Settings override playback](menu/recording.m
 | Menu gates | `src/model/menu/mod.rs::swap_entry_grey` checks the conditions above. |
 | Defaults | `src/model/preload/cycle_preload_config.rs` enables all seven entries. |
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e68d8706eafc7ca46f542bddb55837747a11dd4e" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/020fa5d092472f535f640bbe279d831337fbcf97" autoplay muted loop playsinline controls></video>
 
-*2026-11-11 · [Capture record](MEDIA.md)* [Open the clip](media/rc7-kirby-hats.mp4)
+*2026-11-27 · [Capture record](MEDIA.md)* [Open the clip](media/rc7-kirby-hats.mp4)
 
 Kirby hats change with a chord, for Player 1 or the CPU.
 
@@ -603,9 +603,9 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 | Save | Saving immediately showed the notice "Same as 格斗, nothing new saved". |
 | Files | Every Mii file stayed byte-identical. |
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e0ef3a3d9d5e8db0ee927ffbac0b17bf241bb373" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/dcc4a26703433cc45df63ac6d9d779ad5a8150bf" autoplay muted loop playsinline controls></video>
 
-*Create a Mii with two new specials* [Open the clip](media/rc7-mii-editor.mp4)
+*The Mii Brawler list: the saved Mii and Add New…* [Open the clip](media/rc7-mii-editor.mp4)
 
 | Capture detail | Dated observation |
 | --- | --- |
@@ -621,9 +621,9 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 
 ### Stages
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bf22a53f788666f54bfc9e43f9ac2becfda8a701" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/afe6bc6e8801e38a325100bfed0fac9086280716" autoplay muted loop playsinline controls></video>
 
-*2026-11-13 · [Capture record](MEDIA.md)* [Open the clip](media/rc11-change-stage.mp4)
+*2026-11-27 · [Capture record](MEDIA.md)* [Open the clip](media/rc11-change-stage.mp4)
 
 | Row (Fighters & Stages › Stages) | What it does |
 | --- | --- |
@@ -632,11 +632,11 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 | Training Stage Rotation | Factory Off. When enabled, Training opens on the selected stage. |
 | Subsequent entries | Returning through character select advances Rotation, including when Lobby Stages uses Direct. |
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b9a9b3a226281ea66f6f806bf46a8d26958ca330" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e9f940e46cbd61bc1e9405c5cf353ab49dba1306" autoplay muted loop playsinline controls></video>
 
-*2026-11-13 · [Capture record](MEDIA.md)* [Open the clip](media/rc11-lobby-stages.mp4)
+*2026-11-27 · [Capture record](MEDIA.md)* [Open the clip](media/rc11-lobby-stages.mp4)
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d8f15216496edf205e35751151489d6519a9144f" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bfee93788060b154c10636c647576a60c768985b" autoplay muted loop playsinline controls></video>
 
 *Enter Training on the first rotation stage* [Open the clip](media/rc11-stage-rotation.mp4)
 
@@ -831,7 +831,7 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 | Release | Details |
 | --- | --- |
-| [Current release](CURRENT-RELEASE.md) | Installed build, rc.15 changes and known issues. |
+| [Current release](CURRENT-RELEASE.md) | Installed build, rc.16 changes and known issues. |
 
 ## Build
 

@@ -3,6 +3,8 @@ use core::fmt::{self, Write};
 
 pub const HOLD: u16 = 45;
 pub const LATE: u16 = 30;
+/// Frames after hitstun at which an attempt without a contact is abandoned.
+pub const ABANDON: u16 = 120;
 pub const PASSIVE_SPEED_LIMIT: f32 = 6.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

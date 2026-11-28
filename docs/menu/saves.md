@@ -16,7 +16,7 @@ Use [save states](../guide/save-states.md) to retry a position, or keep named se
 
 ## Damage on load
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/704f03f4d59c49e8351802d510df72dfc5eea9f5" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f3c84adb409c0422d29bcf0f85696d8e143511d9" autoplay muted loop playsinline controls></video>
 
 *Load at zero damage or restore the saved percentages.* [Open the clip](../media/rc11-damage-on-load.mp4)
 
@@ -50,9 +50,9 @@ Choose damage separately for each fighter; a range is editable only with Random 
 
 ## Setup library
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bd203d096cf07018ba024ec0e56c90eedf8ecb94" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/e45c03b0fbda390bc1179aad1ffd48557aa38f6f" autoplay muted loop playsinline controls></video>
 
-*Corner trap joins the library without changing Load.* [Open the clip](../media/rc14-save-setup-here.mp4)
+*Save setup here… adds Corner trap to the Setup library.* [Open the clip](../media/rc14-save-setup-here.mp4)
 
 Keep a [named setup](../guide/save-states.md#making-a-setup) from the fighters' current positions or the positions Load would restore.
 
@@ -77,7 +77,7 @@ Keep a [named setup](../guide/save-states.md#making-a-setup) from the fighters' 
 
 ## Good to know
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6bdcfb3a520887a441f56d87a5959a16d4ea4bff" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2424854e2dc29b8427a5a56989fb14195ba67d0f" autoplay muted loop playsinline controls></video>
 
 *Save is refused until Save States is turned on.* [Open the clip](../media/tut-notice-save-states-off.mp4)
 

@@ -65,8 +65,7 @@ pub struct SiteReport {
 pub struct FeatureReport {
     pub feature: &'static str,
     pub installed: bool,
-    /// Why a feature is not installed, when it has a reason to name (`no_nro_hook`, a provider that is
-    /// absent: the provider pattern of HOOK-SHARING, not a workaround).
+    /// Why a feature is not installed, when it has a reason to name (`no_nro_load`, the load site was refused).
     pub reason: Option<&'static str>,
     /// The first row of the feature's closure that its guard rejected (R2-1): `reason=site:<name>`. A
     /// feature is not installed when any row it can reach is rejected, whichever feature owns the row.

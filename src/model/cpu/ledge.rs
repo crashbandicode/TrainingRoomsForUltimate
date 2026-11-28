@@ -9,7 +9,7 @@ use super::facts::{FrameFacts, FrameOut, PlaybackStart};
 use super::ids::{Table, C};
 use super::mash::Step;
 use super::playback::PlaybackState;
-use super::settings::{situation, trigger, CpuSettings};
+use super::settings::{situation, trigger, Weights};
 use super::status::Situation;
 
 /// Indices of the Ledge Options row.
@@ -94,10 +94,10 @@ impl Ledge {
     /// native automatic climb while the CPU waits, delays, or waits for its playback to start, and (CPU-091,
     /// DECISIONS B11a) while TR holds a case it performs itself, before and after its request, for at most
     /// `UNREQUESTED_BOUND` frames; otherwise the original answer.
-    pub fn transition_term(&self, t: &Table, s: &CpuSettings, counters: &Counters, playback: PlaybackState, q: TermQuery) -> bool {
+    pub fn transition_term(&self, t: &Table, options: Weights<10>, counters: &Counters, playback: PlaybackState, q: TermQuery) -> bool {
         let TermQuery { status, term, original } = q;
         let on_ledge_wait = t.is(C::StatusCliffWait, status);
-        if !original || !on_ledge_wait || s.ledge_state.is_empty() || !t.is(C::TermContCliffClimb, term) {
+        if !original || !on_ledge_wait || options.is_empty() || !t.is(C::TermContCliffClimb, term) {
             return original;
         }
         // CPU-091: no case yet (B11 cleared it at the menu change) holds the climb until the next frame rolls.
@@ -119,10 +119,11 @@ impl Ledge {
 
     /// One frame of the ledge step (SPEC-cpu-03 §5). `playback_running` is an input playback that is
     /// not this feature's own: the feature yields entirely.
-    pub fn frame(&mut self, step: Step, f: &FrameFacts) -> FrameOut {
+    pub fn frame(&mut self, step: Step, f: &FrameFacts, trap: Option<Weights<10>>) -> FrameOut {
         let Step { t, s, rng, counters, mash, ctx } = step;
         let mut out = FrameOut::default();
-        if ctx.playback.running || s.ledge_state.is_empty() {
+        let options = trap.unwrap_or(s.ledge_state);
+        if ctx.playback.running || options.is_empty() {
             return out;
         }
         // 1. Not hanging: forget the grab.
@@ -134,7 +135,7 @@ impl Ledge {
         // 2. Hanging: hold a delay and a case for this grab.
         let delay = *self.delay.get_or_insert_with(|| s.ledge_delay.pick(rng));
         if self.case.is_none() {
-            self.case = s.ledge_state.pick(rng).map(|i| i as u8);
+            self.case = options.pick(rng).map(|i| i as u8);
             self.native_grab = self.case.is_none();
             if self.native_grab {
                 // An empty effective set: the CPU behaves natively this grab, the climb is not denied.
@@ -196,6 +197,7 @@ impl Ledge {
         }
         // 8. The mash after the getup: the override row of the performed kind if set, else the mash
         // action when the Ledge Option trigger is ticked, else nothing.
+        if trap.is_some() { return out; }
         let row = over.map(|i| s.overrides[i]).filter(|r| !r.is_empty());
         let row = row.or_else(|| s.trigger_on(trigger::LEDGE_OPTION).then_some(s.mash_state));
         if let Some(row) = row {

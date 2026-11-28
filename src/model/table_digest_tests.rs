@@ -102,10 +102,11 @@ fn every_data_row_has_a_64_byte_guard() {
         }
         files += 1;
     }
-    assert_eq!((files, rows), (31, SEAM_ROWS + EDGE_JUGGLE_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS
+    assert_eq!((files, rows), (32, SEAM_ROWS + EDGE_JUGGLE_ROWS + SITE_ROWS + UI_ROWS + COMMON_ROWS
         + crate::engine::seams::native_seams::rows_edge_zoom::ROWS.len()
         + crate::engine::seams::native_seams::rows_speed_frame::ROWS.len()
         + crate::engine::seams::native_seams::rows_speed_label::ROWS.len()
+        + crate::engine::seams::native_seams::rows_cut_file::ROWS.len()
         + crate::model::sites_mashout::SITES.len() + crate::model::sites_lockon::CALLEES.len()));
 }
 
@@ -114,8 +115,8 @@ const SEAM_DIGEST: &str = "cb2c75e34e6f3258900a157be9b79d08b7ed396c5500f98d132e7
 const EDGE_JUGGLE_ROWS: usize = 24;
 const EDGE_JUGGLE_DIGEST: &str = "e2f841548afadaa39460582c2df3cc5ec6d78090b78c388174d947a5f6478fde";
 // The shared overlay sampler adds the guarded stock process_end entry.
-const SITE_ROWS: usize = 285;
-const SITE_DIGEST: &str = "28319671dd2ac630462742a823d106052cbf078a1da7d4d4235cb8e3328fd70f";
+const SITE_ROWS: usize = 286;
+const SITE_DIGEST: &str = "433784a7c135bc1052671eda2c4d0f83c2b3aac15c98ac9aa8f674ca8e11ee65";
 const UI_ROWS: usize = 6;
 const UI_DIGEST: &str = "35ddb9f164a3ac26ba2e5c45c35066ee738e796589d58e2c697c82e486567b15";
 const COMMON_ROWS: usize = 4;

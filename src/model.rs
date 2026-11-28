@@ -41,6 +41,8 @@ pub mod developer_debug;
 pub mod developer_reload;
 #[path = "model/deluxe_overlay.rs"]
 pub mod deluxe_overlay;
+#[path = "model/cut_file.rs"]
+pub mod cut_file;
 #[path = "model/diag_ring.rs"]
 pub mod diag_ring;
 #[path = "model/factory.rs"]
@@ -109,6 +111,8 @@ pub mod lobby_flag;
 pub mod migration_run;
 #[path = "model/notify.rs"]
 pub mod notify;
+#[path = "model/nro_load.rs"]
+pub mod nro_load;
 #[path = "model/recording.rs"]
 pub mod recording;
 #[path = "model/trim.rs"]
@@ -289,6 +293,8 @@ pub mod menu_writeback;
 pub mod drop_ring;
 #[path = "model/box_handoff.rs"]
 pub mod box_handoff;
+#[path = "model/handoff.rs"]
+pub mod handoff;
 #[path = "model/owned_ring.rs"]
 pub mod owned_ring;
 /// The test-only reader's export table and line ring (ssbu-hw-bridge).

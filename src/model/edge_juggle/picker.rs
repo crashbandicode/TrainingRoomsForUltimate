@@ -172,6 +172,11 @@ pub const fn rows(game: Drill) -> &'static Rows {
             level: "juggle_cpu_level",
             window: "juggle_zoom_window",
         },
+        Drill::LedgeTrap => &Rows {
+            fighter: "trap_cpu_fighter",
+            level: "trap_cpu_level",
+            window: "",
+        },
     }
 }
 
@@ -180,10 +185,12 @@ pub struct Picker {
     pub fighter: Option<u32>,
     pub level: u8,
     pub choice: usize,
+    /// Only the stock CPU's levels are offered (Ledge Trap).
+    pub stock: bool,
 }
 
 impl Picker {
-    pub const DEFAULT: Self = Self { fighter: None, level: 9, choice: 0 };
+    pub const DEFAULT: Self = Self { fighter: None, level: 9, choice: 0, stock: false };
 
     pub fn read(snapshot: &Snapshot, game: Drill) -> Self {
         let rows = rows(game);
@@ -194,6 +201,7 @@ impl Picker {
                 .map(|&(kind, _)| kind),
             level: (selected(snapshot, rows.level).min(8) + 1) as u8,
             choice: selected(snapshot, game.difficulty_rows().difficulty),
+            stock: game == Drill::LedgeTrap,
         };
         pick.select_fighter(pick.fighter);
         pick
@@ -211,7 +219,7 @@ impl Picker {
     }
 
     pub fn count(self) -> usize {
-        2 + drills(self.fighter).len()
+        if self.stock { 1 } else { 2 + drills(self.fighter).len() }
     }
 
     pub fn mode_at(self, choice: usize) -> Mode {

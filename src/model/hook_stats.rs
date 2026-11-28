@@ -122,6 +122,7 @@ hook_ids! {
     LobbySpeed => "lobby_speed",
     /// rc.15: the battle task entry's 1 Frame hold (the waiting area's entry runs paused until a step, `speed_frame`).
     LobbyFrameHold => "lobby_frame_hold",
+    CutFile => "cut_file",
     /// Every hook that has no name of its own yet (`HookScope::enter()`): allocations inside them are
     /// still counted, their invocations are counted together.
     Other => "other",

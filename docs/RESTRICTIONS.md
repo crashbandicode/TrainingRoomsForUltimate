@@ -43,7 +43,7 @@ Find a restriction by subsystem, then look up its ID in the table.
 | `parry-mash-ignored` | (none: a behaviour) | [Reason](#restrictions-17) | Approved 2026-11-17 18:15Z, as recommended (DESIGN rev 2 Q3) |
 | `tech-surface-unavailable-after-rebuild` | "Selected surface unavailable after rebuild" / "Selected surface no longer exists" | [Reason](#restrictions-18) | [Approval](#restrictions-19) |
 | `tech-hit-damage-multiplier-unavailable` | "Hit damage unavailable" | [Reason](#restrictions-20) | [Approval](#restrictions-21) |
-| `tech-no-launch-fits` | "No launch fits these Tech practice values" | None of the eight candidates drawn for this attempt has a valid start. | Approved 2026-11-27 05:40 and 05:48Z; see [Tech practice](guide/tech-practice.md). |
+| `tech-no-launch-fits` | "No launch fits these Tech practice values" | None of the eight candidates drawn for this attempt has a launch: no valid start, or, with Start position Set or Random, a launch that would touch no surface before the attempt is abandoned. Random values stop only after every value in their ranges was checked. | Approved 2026-11-27 05:40 and 05:48Z; the manual start approved 2026-11-27 about 12:50Z; see [Tech practice](guide/tech-practice.md). |
 | `btt-projectile-guard` | "Projectile detection unavailable" | [Reason](#restrictions-22) | primary 2026-11-16, explicit isolated-boundary ruling; for operator review |
 | `drill-capacity` | "Drill too long: keep it to 16 steps" | Input drills share the existing combo bounds (LINKS × STEPS); overflow saves nothing. | operator 2026-11-15, keep 16 for rc.15 |
 | `combo-capacity` | "Combo too long: keep it to 16 links" | Hit combos share the same unit bound; an overfull exchange saves nothing. | operator 2026-11-15, keep 16 for rc.15 |

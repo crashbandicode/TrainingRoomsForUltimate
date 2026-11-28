@@ -449,6 +449,58 @@ fn wizard_plus_held_across_handoff_is_owned_until_release() {
     }
 }
 
+/// Eden boot 6 (ledge-trap): the A that confirmed a drill wizard's preview reached the game on the next poll; Player 1
+/// jabbed and the held CPU took 2.772%.
+#[test]
+fn a_press_the_wizard_took_is_owned_until_release() {
+    let set = ChordSet::factory();
+    for style in [0, 3, 5, STYLE_GAMECUBE] {
+        let a = physical_mask(style, 1 << logical::A);
+        let zl = physical_mask(style, 1 << logical::ZL);
+        let mut detector = Detector::new();
+        // The wizard's last poll takes A (the runtime keeps the whole pad from the game on that poll).
+        let confirm = Sample::of(style, a, a);
+        detector.poll_owned(&set, confirm, false, true);
+        // The wizard is gone and A is still down: the next poll hands the detector what the wizard took.
+        detector.own(confirm.held);
+        detector.poll_owned(&set, Sample::of(style, a, 0), false, false);
+        assert_ne!(physical_mask(style, detector.hidden()) & a, 0, "held after the wizard closed");
+        for blocked in [true, false] {
+            detector.own(0);
+            detector.poll_owned(&set, Sample::of(style, a | zl, zl), blocked, false);
+            assert_ne!(physical_mask(style, detector.hidden()) & a, 0, "still held");
+            assert_eq!(physical_mask(style, detector.hidden()) & zl, 0, "a button pressed after the wizard is the game's");
+        }
+        detector.own(0);
+        detector.poll_owned(&set, Sample::of(style, 0, 0), false, false);
+        assert_ne!(physical_mask(style, detector.hidden()) & a, 0, "the release edge belongs to the wizard");
+        detector.own(0);
+        detector.poll_owned(&set, confirm, false, false);
+        assert_eq!(physical_mask(style, detector.hidden()) & a, 0, "a fresh A reaches the game");
+        // A button the wizard took and already released costs nothing later.
+        let mut detector = Detector::new();
+        detector.own(confirm.held);
+        detector.poll_owned(&set, Sample::of(style, 0, 0), false, false);
+        detector.own(0);
+        detector.poll_owned(&set, confirm, false, false);
+        assert_eq!(physical_mask(style, detector.hidden()) & a, 0, "released before the handoff");
+    }
+}
+
+#[test]
+fn what_a_wizard_took_reaches_the_detector_inside_the_polls_one_lock() {
+    let runtime = include_str!("../src/runtime/features/chords.rs");
+    let poll = runtime.split_once("pub unsafe fn on_poll").unwrap().1.split_once("\n}\n").unwrap().0;
+    let took = poll.find("let took = if reentry { 0 } else { WIZARD_TOOK.load(Ordering::Relaxed) as u16 };").expect("nothing is carried over a re-entry");
+    let lock = poll.find("STATE.lock()").unwrap();
+    let own = poll.find("detector.own(took);").expect("the detector owns what the last poll's wizard took");
+    let owned = poll.find("detector.poll_owned(set, sample, block, wizard)").unwrap();
+    let hide = poll.find("let hide = placing ||").unwrap();
+    let store = poll.find("WIZARD_TOOK.store(if hide && wizard { u32::from(sample.held) } else { 0 }, Ordering::Relaxed);").expect("only a poll the wizard took is recorded");
+    assert!(took < lock && lock < own && own < owned && owned < hide && hide < store);
+    assert_eq!(poll.matches("STATE.lock()").count(), 1);
+}
+
 #[test]
 fn wizard_ownership_is_bound_before_native_mapping_and_combined_with_placing() {
     let runtime = include_str!("../src/runtime/features/chords.rs");

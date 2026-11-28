@@ -47,7 +47,7 @@ Learn to read the lanes, link timing and advantage in the [frame strip guide](..
 
 ## Input timing
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0ca11e31bdc0e881b596322c54f86afb84ee9a31" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/318d12de88d68335bb483d44306e1a4dcf9c9e45" autoplay muted loop playsinline controls></video>
 
 *Input Delay changes from zero to ten frames.* [Open the clip](../media/tut-input-delay.mp4)
 
@@ -57,7 +57,7 @@ Learn to read the lanes, link timing and advantage in the [frame strip guide](..
 
 ## Controls
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/73d6022ec181abd0660b1d5a28ea5cf67b28b937" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/29080356e56a20a8c0ecb4af993c1befcb61b18e" autoplay muted loop playsinline controls></video>
 
 *A different Save chord works after rebinding.* [Open the clip](../media/tut-controls-change-chord.mp4)
 

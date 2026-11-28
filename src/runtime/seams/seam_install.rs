@@ -63,6 +63,7 @@ const AUTHORITATIVE: &[&str] = &[
     "game_speed",
     // rc.15 1 Frame: the entry hold is installed and the Training resume calls the pause sync only when every row is stock.
     "speed_frame",
+    "cut_file",
     "speed_label",
     "native_body_bank",
     "character_roster",
