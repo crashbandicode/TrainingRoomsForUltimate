@@ -46,7 +46,7 @@ Stay on stage between matchups: pick a different fighter or [set a rotation](doc
 
 ### Waiting-room practice
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/21ebbad818e76b74c6860dbe8c64351e6f378fd1" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/ecaa99248dfc36086acb86b44280fec9c7be9e57" autoplay muted loop playsinline controls></video>
 
 *Lobby Practice on the menu in a local wireless room* [Open the clip](docs/media/rc11-lobby-practice.mp4)
 
@@ -78,7 +78,7 @@ Give Kirby a [lineup of copy abilities](docs/guide/fighter-cycles.md#kirby-hats)
 
 ### Items on demand
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d2cdc08aaff564cf23335ed8f9e9755e7b96d2cd" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2d795002aed42bf7095a161813f4f7f5d3dfff46" autoplay muted loop playsinline controls></video>
 
 *Mario takes an item from the item grid* [Open the clip](docs/media/rc11-give-item.mp4)
 

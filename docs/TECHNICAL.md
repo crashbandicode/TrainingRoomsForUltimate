@@ -640,7 +640,7 @@ Kirby hats change with a chord, for Player 1 or the CPU.
 
 *2026-11-27 · [Capture record](MEDIA.md)* [Open the clip](media/rc11-lobby-stages.mp4)
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/dc35c4e3efb92eff921fcc766f2de9fff93a4dc4" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bfee93788060b154c10636c647576a60c768985b" autoplay muted loop playsinline controls></video>
 
 *Enter Training on the first rotation stage* [Open the clip](media/rc11-stage-rotation.mp4)
 
