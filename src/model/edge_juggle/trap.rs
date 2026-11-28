@@ -56,11 +56,12 @@ pub struct Trap {
     pub rules: Rules,
     clock: u16,
     engaged: bool,
+    damaged: bool,
 }
 
 impl Trap {
     pub const fn new(rules: Rules) -> Self {
-        Self { rules, clock: 0, engaged: false }
+        Self { rules, clock: 0, engaged: false, damaged: false }
     }
 
     /// Frames the CPU has stood on the stage in the running count.
@@ -76,13 +77,14 @@ impl Trap {
         if observed.player_ko {
             return Some(Outcome::PlayerKo);
         }
+        self.damaged |= observed.hit;
         self.engaged |= observed.hanging || observed.grounded || touched;
         if !self.engaged {
             return (frames >= HANG_FRAMES).then_some(Outcome::Unresolved);
         }
         if observed.grabbed || observed.hanging || !observed.on_run {
             self.clock = 0;
-        } else if observed.grounded && !observed.stunned {
+        } else if observed.grounded && !observed.stunned && !(observed.downed && self.damaged) {
             self.clock = self.clock.saturating_add(1);
             if self.clock >= self.rules.fail {
                 return Some(Outcome::OnStage);
