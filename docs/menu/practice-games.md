@@ -86,7 +86,7 @@ Escape a capture, or parry the CPU's recorded move ([Mash out](../guide/mash-out
 
 ## Guard the Edge and Juggler
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/fdc7a4382ed255e1ebda8d4dc1dd87f43ca16e9c" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/bca2b000dbfbd520ab2801b4c24f23b1a0da777e" autoplay muted loop playsinline controls></video>
 
 *Guard the Edge: Set up…, the placing view, two attempts.* [Open the clip](../media/tut-guard-edge-setup-and-score.mp4)
 
