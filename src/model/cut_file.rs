@@ -122,12 +122,10 @@ pub struct Entry {
 pub trait Sink {
     /// Create the file if absent.
     fn create(&mut self);
-    /// Open the file for reading and writing.
+    /// Open for positioned writes that may extend the file.
     fn open(&mut self) -> Result<(), u32>;
     /// Read its current size.
     fn size(&mut self) -> Result<u64, u32>;
-    /// Extend it to the requested size.
-    fn grow(&mut self, size: u64) -> Result<(), u32>;
     /// Write and flush one line.
     fn write_flush(&mut self, offset: u64, bytes: &[u8]) -> Result<(), u32>;
     /// Close a successfully opened file.
@@ -135,13 +133,14 @@ pub trait Sink {
 }
 
 /// Append one line under the file cap and close after a successful open.
-pub fn persist<S: Sink>(sink: &mut S, line: &[u8; LINE]) -> u32 {
+fn persist<S: Sink>(sink: &mut S, tail: &AtomicU32, line: &[u8; LINE]) -> u32 {
     S::create(sink);
     if let Err(error) = S::open(sink) { return error; }
     let result = (|| {
-        let offset = S::size(sink)?;
-        let next = offset.checked_add(LINE as u64).filter(|&size| size <= FILE_CAP).ok_or(FILE_FULL)?;
-        S::grow(sink, next)?;
+        // Honor both earlier boots' bytes and this boot's reservations, even if their writes haven't landed yet.
+        tail.fetch_max(S::size(sink)?.min(FILE_CAP) as u32, Ordering::Relaxed);
+        let offset = tail.fetch_add(LINE as u32, Ordering::Relaxed) as u64;
+        if offset + LINE as u64 > FILE_CAP { return Err(FILE_FULL); }
         S::write_flush(sink, offset, line)
     })();
     S::close(sink);
@@ -236,6 +235,7 @@ impl Slot {
 pub struct Records {
     seen: AtomicU32,
     reported: AtomicU32,
+    tail: AtomicU32,
     slots: [Slot; CAP],
 }
 
@@ -246,7 +246,7 @@ impl Default for Records {
 impl Records {
     /// Start a fresh boot's records.
     pub const fn new() -> Self {
-        Self { seen: AtomicU32::new(0), reported: AtomicU32::new(0), slots: [const { Slot::new() }; CAP] }
+        Self { seen: AtomicU32::new(0), reported: AtomicU32::new(0), tail: AtomicU32::new(0), slots: [const { Slot::new() }; CAP] }
     }
 
     /// Persist a detection before publishing its claimed slot.
@@ -254,7 +254,7 @@ impl Records {
         let number = self.seen.fetch_add(1, Ordering::Relaxed) as usize;
         let slot = self.slots.get(number)?;
         let mut entry = Entry { finding, meta, guarantee, persisted: 0 };
-        entry.persisted = persist(sink, &line(&entry));
+        entry.persisted = persist(sink, &self.tail, &line(&entry));
         for (word, value) in slot.words.iter().zip(entry.pack()) { word.store(value, Ordering::Relaxed); }
         slot.ready.store(true, Ordering::Release);
         Some(number)
@@ -332,14 +332,11 @@ mod tests {
             self.call("size")?;
             Ok(self.bytes.len() as u64)
         }
-        fn grow(&mut self, size: u64) -> Result<(), u32> {
-            self.call("grow")?;
-            self.bytes.resize(size as usize, 0);
-            Ok(())
-        }
         fn write_flush(&mut self, offset: u64, bytes: &[u8]) -> Result<(), u32> {
             self.call("write")?;
-            self.bytes[offset as usize..offset as usize + bytes.len()].copy_from_slice(bytes);
+            let end = offset as usize + bytes.len();
+            self.bytes.resize(end.max(self.bytes.len()), 0);
+            self.bytes[offset as usize..end].copy_from_slice(bytes);
             Ok(())
         }
         fn close(&mut self) { self.calls.push("close"); self.open = false; }
@@ -398,7 +395,7 @@ mod tests {
         let records = Records::new();
         let mut sink = FakeSink::default();
         assert_eq!(records.detected(&mut sink, cut(), meta(0x27, 0xabc, 1234), None), Some(0));
-        assert_eq!(sink.calls, ["create", "open", "size", "grow", "write", "close"]);
+        assert_eq!(sink.calls, ["create", "open", "size", "write", "close"]);
         assert!(!sink.open);
         assert_eq!(sink.bytes.len(), LINE);
         assert_eq!(sink.bytes[LINE - 1], b'\n');
@@ -423,10 +420,6 @@ mod tests {
                 let observed = self.file.borrow().len();
                 if let Some(other) = self.after_size.take() { other(); }
                 Ok(observed as u64)
-            }
-            fn grow(&mut self, size: u64) -> Result<(), u32> {
-                self.file.borrow_mut().resize(size as usize, 0);
-                Ok(())
             }
             fn write_flush(&mut self, offset: u64, bytes: &[u8]) -> Result<(), u32> {
                 let mut file = self.file.borrow_mut();
@@ -459,14 +452,15 @@ mod tests {
     #[test]
     fn sink_failures_close_if_open_succeeded() {
         let line = [b' '; LINE];
-        for failure in ["size", "grow", "write"] {
+        let tail = AtomicU32::new(0);
+        for failure in ["size", "write"] {
             let mut sink = FakeSink { fail: Some(failure), ..FakeSink::default() };
-            assert_eq!(persist(&mut sink, &line), 42);
+            assert_eq!(persist(&mut sink, &tail, &line), 42);
             assert!(!sink.open);
             assert_eq!(sink.calls.last(), Some(&"close"));
         }
         let mut sink = FakeSink { fail: Some("open"), ..FakeSink::default() };
-        assert_eq!(persist(&mut sink, &line), 42);
+        assert_eq!(persist(&mut sink, &tail, &line), 42);
         assert_eq!(sink.calls, ["create", "open"]);
         assert!(sink.bytes.is_empty());
         assert!(!sink.open);
@@ -588,10 +582,11 @@ mod tests {
     fn file_stops_at_the_fixed_cap() {
         let mut sink = FakeSink { bytes: vec![0; FILE_CAP as usize - LINE], ..FakeSink::default() };
         let line = [b' '; LINE];
-        assert_eq!(persist(&mut sink, &line), 0);
+        let tail = AtomicU32::new(0);
+        assert_eq!(persist(&mut sink, &tail, &line), 0);
         assert_eq!(sink.bytes.len(), FILE_CAP as usize);
         sink.calls.clear();
-        assert_eq!(persist(&mut sink, &line), FILE_FULL);
+        assert_eq!(persist(&mut sink, &tail, &line), FILE_FULL);
         assert_eq!(sink.calls, ["create", "open", "size", "close"]);
         assert!(!sink.open);
         assert_eq!(sink.bytes.len(), FILE_CAP as usize);

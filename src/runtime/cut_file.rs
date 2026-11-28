@@ -71,8 +71,9 @@ impl Sink for NativeSink {
     }
 
     fn open(&mut self) -> Result<(), u32> {
+        let mode = fs::OpenMode_OpenMode_ReadWrite | fs::OpenMode_OpenMode_Append;
         // SAFETY: the path is NUL-terminated and the handle output is writable.
-        result(unsafe { fs::OpenFile(&mut self.handle, cut_file::PATH.as_ptr(), 3) })?;
+        result(unsafe { fs::OpenFile(&mut self.handle, cut_file::PATH.as_ptr(), mode as i32) })?;
         if self.handle.handle == 0 { return Err(0xffff_fffd); }
         Ok(())
     }
@@ -82,11 +83,6 @@ impl Sink for NativeSink {
         // SAFETY: this sink opened the handle and `size` is writable for the call.
         result(unsafe { fs::GetFileSize(&mut size, self.handle) })?;
         u64::try_from(size).map_err(|_| 0xffff_fffd)
-    }
-
-    fn grow(&mut self, size: u64) -> Result<(), u32> {
-        // SAFETY: this sink opened the handle; the bounded size fits i64.
-        result(unsafe { fs::SetFileSize(self.handle, size as i64) })
     }
 
     fn write_flush(&mut self, offset: u64, bytes: &[u8]) -> Result<(), u32> {
