@@ -104,6 +104,10 @@ Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.
 | Guard the Edge: CPU percent | 0 to 300%, **100%** | The CPU's damage at the start of each attempt. |
 | Guard the Edge: CPU midair jumps | **Kept**, Used | Used: the CPU starts with every midair jump already spent. |
 
+## Ledge Trap
+
+The CPU hangs on a ledge and takes ledge options. Keep it off stage.
+
 ## Good to know
 
 <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/37c5bfc34a34e2b10cdb124a7c96faaff3838dcb" autoplay muted loop playsinline controls></video>

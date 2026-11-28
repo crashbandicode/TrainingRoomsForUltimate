@@ -831,7 +831,7 @@ The *Replay capture* row and the Online Deluxe overlay show the same setting.
 
 | Release | Details |
 | --- | --- |
-| [Current release](CURRENT-RELEASE.md) | Installed build, rc.15 changes and known issues. |
+| [Current release](CURRENT-RELEASE.md) | Installed build, rc.16 changes and known issues. |
 
 ## Build
 
