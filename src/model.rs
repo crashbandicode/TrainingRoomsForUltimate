@@ -41,6 +41,8 @@ pub mod developer_debug;
 pub mod developer_reload;
 #[path = "model/deluxe_overlay.rs"]
 pub mod deluxe_overlay;
+#[path = "model/cut_file.rs"]
+pub mod cut_file;
 #[path = "model/diag_ring.rs"]
 pub mod diag_ring;
 #[path = "model/factory.rs"]

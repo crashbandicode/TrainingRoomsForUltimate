@@ -53,6 +53,7 @@ fn run_inner() {
     diag_log::set_tick(mashout::service);
     diag_log::set_tick(cpu::service_tech_init);
     diag_log::set_tick(cpu_common::drain_reports);
+    diag_log::set_tick(crate::runtime::cut_file::service);
     diag_log::start_drain_thread();
 
     // 1. The version guard: nothing else runs on another game.
@@ -776,6 +777,7 @@ fn init_roster_cycle() {
     roster::init();
     mii::init();
     lobby::init();
+    crate::runtime::cut_file::init();
 }
 /// The install line's buffer is sized for `install_capacity::MAX_FEATURE_REPORTS` feature reports: a boot that reports more does not
 /// build (`INSTALL_LINE_CAPACITY` would no longer be the worst case).
