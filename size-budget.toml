@@ -3304,3 +3304,11 @@ ceiling = 211078
 date = "2026-11-28"
 reason = "The cut-file diagnostic joins the fold for rc.16, on the 210614 of the entry above: +464 as granted (7d6a3d45: its own entry 210025 on 209561). 210614 + 464 = 211078. The branch's entry was counted on a base without the other items; this entry replaces it, and its text is in the merge's second parent 7d6a3d45."
 approved_by = "tr-primary-3 2026-11-28 (operator ~02:43Z: everything goes into rc.16; the budget is extended with the item's granted entry), on its grant of +464 for the cut-file diagnostic (tech-manual-reach's request 02:23:53Z; final head 03:31:23Z)."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 211586
+date = "2026-11-28"
+reason = "Ledge Trap e18c67b9 joins the fold for rc.16: +508 as granted, on the 211078 of the entry above. Its own entries were counted on a base without the other items; this entry replaces them, and their text is in the merge's second parent e18c67b9."
+approved_by = "tr-primary-3 2026-11-28 (the merge order of 03:4xZ: Ledge Trap e18c67b9, +508 lines, NRO +12,288 B accepted)"
