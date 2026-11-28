@@ -354,6 +354,8 @@ pub struct Observation {
     pub on_run: bool,
     /// Player 1 holds or throws the CPU.
     pub grabbed: bool,
+    /// The CPU is in hitlag or hitstun.
+    pub stunned: bool,
     /// Player 1 stands on a floor or a platform, or holds a ledge.
     pub player_back: bool,
     /// Player 1 is KO'd: Dead, Standby or Rebirth.

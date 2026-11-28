@@ -162,4 +162,32 @@ fn trap_player_start_takes_a_floor_or_open_air() {
     assert_eq!(trap::player_start(None, Err(geometry::Unread), at), None);
     assert_eq!(stage().player_cursor(Drill::LedgeTrap, at), Some(at));
 }
+
+/// Eden boot 5, row 4: a smash at 300% landed with 4 frames left and the attempt was graded On stage.
+#[test]
+fn a_ko_hit_with_four_frames_left_is_kept_off_not_on_stage() {
+    let mut session = live(Rules::DEFAULT);
+    for _ in 0..116 { session.advance_attempt(ground()); }
+    assert_eq!((session.trap().clock(), session.phase), (116, Phase::Live));
+    // The hit: the CPU is frozen on the ground for the hit's own frames, then flies in hitstun, then is KO'd.
+    session.advance_attempt(Observation { hit: true, stunned: true, ..ground() });
+    for _ in 0..24 { session.advance_attempt(Observation { stunned: true, ..ground() }); }
+    assert_eq!((session.trap().clock(), session.phase, session.hits), (116, Phase::Live, 1), "hitlag holds the clock");
+    for _ in 0..40 { session.advance_attempt(Observation { stunned: true, on_run: true, ..Observation::default() }); }
+    session.advance_attempt(Observation { dead_or_rebirthing: true, ..Observation::default() });
+    assert!(matches!(session.phase, Phase::Result(Outcome::KeptOffKo, _)));
+    assert_eq!((session.attempts, session.secured, session.streak), (1, 1, 1));
+    assert_eq!(session.phase.card(), "Kept off · KO");
+}
+
+#[test]
+fn a_hit_holds_the_clock_but_does_not_clear_it() {
+    let mut trap = Trap::new(Rules::DEFAULT);
+    for frame in 1..=60 { assert_eq!(trap.step(frame, false, ground()), None); }
+    // A jab: ten frames of hitlag and grounded hitstun. Held, not cleared; only a grab clears.
+    for frame in 61..=70 { assert_eq!(trap.step(frame, true, Observation { stunned: true, ..ground() }), None); }
+    assert_eq!(trap.clock(), 60);
+    for frame in 71..=129 { assert_eq!(trap.step(frame, true, ground()), None); }
+    assert_eq!(trap.step(130, true, ground()), Some(Outcome::OnStage));
+}
 }
