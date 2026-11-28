@@ -103,6 +103,7 @@ Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.
 | Guard the Edge: Under the stage | On, **Off** | On: the CPU's start may be under the stage. |
 | Guard the Edge: CPU percent | 0 to 300%, **100%** | The CPU's damage at the start of each attempt. |
 | Guard the Edge: CPU midair jumps | **Kept**, Used | Used: the CPU starts with every midair jump already spent. |
+| <a id="ledge-trap"></a>Ledge Trap | A practice game | The CPU takes ledge options; keep it off stage. |
 
 ## Good to know
 
@@ -111,7 +112,6 @@ Keep the CPU off stage, or in the air ([Guard the Edge](../guide/guard-the-edge.
 
 | If | Then |
 | --- | --- |
-| <a id="ledge-trap"></a>Ledge Trap | The CPU hangs on a ledge and takes ledge options; keep it off stage. |
 | You start a second game | The first one stops. Only one game runs at a time. |
 | You close the menu with B after browsing settings | Browsing alone starts nothing; using a saved parry practice starts it on close. |
 | You change a setting while a game runs | It applies at the next Start. |
