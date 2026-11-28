@@ -254,4 +254,25 @@ fn an_undamaged_trip_runs_the_clock() {
     for frame in 2..=120 { assert_eq!(held.step(frame, true, tripped), None); }
     assert_eq!(held.step(121, true, tripped), Some(Outcome::OnStage));
 }
+
+#[test]
+fn named_down_transitions_at_the_fail_boundary() {
+    let id = |c: C| match crate::model::cpu::ids::NAMES[c as usize] {
+        "FIGHTER_STATUS_KIND_DOWN_CONTINUE" => 0x52,
+        "FIGHTER_STATUS_KIND_SLIP_DAMAGE" => 0x87,
+        _ => UNRESOLVED,
+    };
+    for status in [0x52, 0x87] {
+        for hit in [false, true] {
+            let mut trap = Trap::new(Rules::DEFAULT);
+            for frame in 1..120 { assert_eq!(trap.step(frame, false, ground()), None); }
+            if hit {
+                assert_eq!(trap.step(120, true, Observation { hit, stunned: true, ..ground() }), None);
+            }
+            let frame = Observation { downed: trap::downed(status, id), ..ground() };
+            assert_eq!(trap.step(121, hit, frame), (!hit).then_some(Outcome::OnStage), "{status:#x} hit={hit}");
+            if hit { assert_eq!(trap.step(122, true, ground()), Some(Outcome::OnStage)); }
+        }
+    }
+}
 }
