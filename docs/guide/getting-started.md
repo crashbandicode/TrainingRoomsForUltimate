@@ -3,7 +3,7 @@ Install TrainingRooms for Smash Ultimate 13.0.5 ([rc.16 release status](../CURRE
 
 ## Your first practice
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/fb0ab233b38aa338d227f0ad5a490aaab56cecb0" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/6b580f2c8fed3320fbd6934a9e9bac249315fd2a" autoplay muted loop playsinline controls></video>
 
 *Open the menu, turn a page and return to practice.* [Open the clip](../media/tut-menu-tour.mp4)
 
