@@ -3304,3 +3304,11 @@ ceiling = 210051
 date = "2026-11-28"
 reason = "Ledge Trap: the stage clock holds through hitlag, hitstun and a damaged knockdown, on the reviewed phase 1 head 1c75a6be (210016): +35, measured by the size step of the gate on eb34da43. Eden showed a KO hit in the last frames of the window graded On stage. The two status rules moved into the model (trap::stunned, trap::downed, fourteen down and trip statuses), the attempt remembers damage, and the observation carries the two facts. The new test lines are excluded."
 approved_by = "tr-primary-3 2026-11-28 00:33Z (+6 for a492d4f3) and 00:57Z (+29 more for eb34da43); release NRO +0 B, raw bss +0."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 210069
+date = "2026-11-28"
+reason = "A press a wizard took stays from the game until it is released, on f87e91bf (210051): +18, measured by the size step of the gate on 01082d6c. Eden showed the A that confirms a drill wizard's preview reaching the game as a jab. P1's poll records the buttons held on a poll a wizard took and hands them to the chord detector's existing per-button ownership on the next poll (Detector::own). The new test lines are excluded."
+approved_by = "tr-primary-3 2026-11-28 03:03Z (+18 counted lines; release NRO +0 B; raw bss +16 B)."
