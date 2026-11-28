@@ -12,17 +12,14 @@ pub const HANG_FRAMES: u32 = 120;
 
 /// The CPU is in hitlag or hitstun.
 pub fn stunned(damage_stop: bool, status: i32, id: impl Fn(C) -> i32) -> bool {
-    if damage_stop {
-        return true;
-    }
-    let [first, end] = [C::StatusDamage, C::StatusDamageFall].map(&id);
-    ![status, first, end].contains(&UNRESOLVED) && first <= status && status < end
+    let first = id(C::StatusDamage);
+    damage_stop || first != UNRESOLVED && (first..id(C::StatusDamageFall)).contains(&status)
 }
 
 /// A CPU knocked down or tripped, from the floor to the end of its getup.
-const DOWNED: [C; 14] = [
-    C::StatusDown, C::StatusDownWait, C::StatusDownWaitContinue, C::StatusDownDamage, C::StatusLayDown,
-    C::StatusDownStand, C::StatusDownStandFb, C::StatusDownStandAttack, C::StatusSlip, C::StatusSlipWait,
+const DOWNED: [C; 16] = [
+    C::StatusDown, C::StatusDownContinue, C::StatusDownWait, C::StatusDownWaitContinue, C::StatusDownDamage, C::StatusLayDown,
+    C::StatusDownStand, C::StatusDownStandFb, C::StatusDownStandAttack, C::StatusSlip, C::StatusSlipDamage, C::StatusSlipWait,
     C::StatusSlipStand, C::StatusSlipStandAttack, C::StatusSlipStandF, C::StatusSlipStandB,
 ];
 
