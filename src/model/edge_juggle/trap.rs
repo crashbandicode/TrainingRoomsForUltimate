@@ -60,7 +60,7 @@ impl Trap {
         }
         if observed.grabbed || observed.hanging || !observed.on_run {
             self.clock = 0;
-        } else if observed.grounded {
+        } else if observed.grounded && !observed.stunned {
             self.clock = self.clock.saturating_add(1);
             if self.clock >= self.rules.fail {
                 return Some(Outcome::OnStage);
