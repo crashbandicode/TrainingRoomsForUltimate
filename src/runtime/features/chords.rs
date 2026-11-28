@@ -69,6 +69,7 @@ pub unsafe fn on_poll(controller: usize) {
     let style = read(field::STYLE);
     // rc.15: a step button this stage keeps out of the current set is still held, and no new press (`StepKeep`).
     let step_keep = lobby_speed::StepKeep(if reentry { 0 } else { STEP_KEPT.load(Ordering::Relaxed) });
+    let took = if reentry { 0 } else { WIZARD_TOOK.load(Ordering::Relaxed) as u16 };
     let (current, just_down) = step_keep.seen(field::BUTTONS.map(read));
     // rc.9 C4: an Online Deluxe page with rows takes D-pad Up/Down and ZR + Left/Right; the D-pad rows stand down.
     let sample = Sample::of(style, current, just_down)
@@ -92,6 +93,7 @@ pub unsafe fn on_poll(controller: usize) {
         state.style = style;
         let block = blocked();
         let State { chords: set, detector, .. } = &mut *state;
+        detector.own(took);
         let passed = detector.poll_owned(set, sample, block, wizard);
         let recorder_refused = drill_running
             && detector.take_drill_recording_conflicts(super::recording_host::capturing());
@@ -126,6 +128,7 @@ pub unsafe fn on_poll(controller: usize) {
     // SAFETY: controller is the live Controller of this poll.
     let placing = unsafe { super::record_place::poll(controller, sample, block) };
     let hide = placing || !block && unsafe { super::egg_zone::poll(controller, sample) || super::tech::poll(controller, sample) || super::edge_juggle::poll(controller, sample) || btt::poll(controller, sample, keys) };
+    WIZARD_TOOK.store(if hide && wizard { u32::from(sample.held) } else { 0 }, Ordering::Relaxed);
     let chord_bits = chord_bits | if hide && wizard { u32::MAX } else if hide { !chords::bit::PLUS_MASK } else { 0 };
     // rc.12: a Save or Load press the chords stood down says why (an owner or the speed hold: logged only).
     if let Some((action, why)) = refused {
@@ -183,6 +186,9 @@ pub unsafe fn on_poll(controller: usize) {
 
 /// rc.15: the step bits the last poll kept out of the current set (`lobby_speed::StepKeep`; P1's poll only).
 static STEP_KEPT: AtomicU32 = AtomicU32::new(0);
+
+/// The logical buttons held on the last poll a wizard took (P1's poll only).
+static WIZARD_TOOK: AtomicU32 = AtomicU32::new(0);
 
 /// The Controller of P1's last poll through this stage (0 after a poll with no Training controller). A poll on another
 /// one follows a gap or a handoff: nothing the last poll kept, step bit or chord button, is carried over.

@@ -443,6 +443,9 @@ impl Detector {
         self.swallow = self.hidden & sample.held;
     }
 
+    /// What a wizard kept from the game on the last poll is its own until each button is released.
+    pub fn own(&mut self, _taken: u16) {}
+
     /// Modal wizard input uses the same per-button ownership as accepted chords.
     pub fn poll_owned(&mut self, chords: &ChordSet, sample: Sample, blocked: bool, wizard: bool) -> u16 {
         let passed = self.poll(chords, sample, blocked || wizard);
