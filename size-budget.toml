@@ -3296,3 +3296,11 @@ ceiling = 210614
 date = "2026-11-27"
 reason = "The fold of the six reviewed items for the build after rc.15, on main 946a28a9 (209561): one total, the sum of what each item was granted. Tech practice's manual start +244 (f9301d71: 209802, then 209805); the menu's bridge republish +14 (71366b22: 209575); the param-hook comments and host test +0 (a02a3863: no entry); memory hygiene, a live capture track that grows with the frames it records, +5 (bb56d917: 209566); the module-load observation at the plugin's own site with its queued common-load report +31 (cf9742a2: 209587, then 209592); the overlay's lossless command handoff +759 (9e488094: 209857, then 210320). 209561 + 244 + 14 + 0 + 5 + 31 + 759 = 210614. The entries the branches carried were each counted on a base without the other items; this entry replaces them, and their text is in the merges' second parents f9301d71, 71366b22, bb56d917, cf9742a2 and 9e488094."
 approved_by = "tr-primary-3 2026-11-27 (the next-build integration brief: the budget is the union of the granted entries, as one total), on the grants of tr-primary-2 15:07:32Z (+241) and 15:50:39Z (+3) for Tech practice, and of tr-primary-3 18:14:36Z (+14) for the bridge republish, 21:24Z (+5) for memory hygiene, 19:47:18Z (+26) and 21:56Z (+5) for the module-load observation, 16:00:40Z (+296) and 19:57:57Z (to 210320) for the overlay handoff."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 211078
+date = "2026-11-28"
+reason = "The cut-file diagnostic joins the fold for rc.16, on the 210614 of the entry above: +464 as granted (7d6a3d45: its own entry 210025 on 209561). 210614 + 464 = 211078. The branch's entry was counted on a base without the other items; this entry replaces it, and its text is in the merge's second parent 7d6a3d45."
+approved_by = "tr-primary-3 2026-11-28 (operator ~02:43Z: everything goes into rc.16; the budget is extended with the item's granted entry), on its grant of +464 for the cut-file diagnostic (tech-manual-reach's request 02:23:53Z; final head 03:31:23Z)."
