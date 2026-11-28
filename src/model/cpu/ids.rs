@@ -150,6 +150,7 @@ game_constants! {
     StatusStopCeil = "FIGHTER_STATUS_KIND_STOP_CEIL",
     StatusDownWait = "FIGHTER_STATUS_KIND_DOWN_WAIT",
     StatusDownWaitContinue = "FIGHTER_STATUS_KIND_DOWN_WAIT_CONTINUE",
+    StatusDownDamage = "FIGHTER_STATUS_KIND_DOWN_DAMAGE",
     StatusDownStandFb = "FIGHTER_STATUS_KIND_DOWN_STAND_FB",
     StatusLayDown = "FIGHTER_STATUS_KIND_LAY_DOWN",
     StatusSlipWait = "FIGHTER_STATUS_KIND_SLIP_WAIT",

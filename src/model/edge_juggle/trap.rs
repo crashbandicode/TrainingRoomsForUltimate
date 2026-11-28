@@ -1,6 +1,7 @@
 //! Ledge Trap: the stage clock, the round time and the CPU's pad on its way to the ledge.
 use super::perfect::{Correction, FLICK_JUMP};
 use super::{Observation, Outcome};
+use crate::model::cpu::ids::{C, UNRESOLVED};
 use crate::model::cpu::settings::Weights;
 use crate::model::stage_geometry::{Place, Unread};
 
@@ -8,6 +9,27 @@ use crate::model::stage_geometry::{Place, Unread};
 pub const HANG_OUT: f32 = 8.0;
 /// Frames after release in which the CPU has to hang, stand or be touched; else the attempt is not counted.
 pub const HANG_FRAMES: u32 = 120;
+
+/// The CPU is in hitlag or hitstun.
+pub fn stunned(damage_stop: bool, status: i32, id: impl Fn(C) -> i32) -> bool {
+    if damage_stop {
+        return true;
+    }
+    let [first, end] = [C::StatusDamage, C::StatusDamageFall].map(&id);
+    ![status, first, end].contains(&UNRESOLVED) && first <= status && status < end
+}
+
+/// A CPU knocked down or tripped, from the floor to the end of its getup.
+const DOWNED: [C; 14] = [
+    C::StatusDown, C::StatusDownWait, C::StatusDownWaitContinue, C::StatusDownDamage, C::StatusLayDown,
+    C::StatusDownStand, C::StatusDownStandFb, C::StatusDownStandAttack, C::StatusSlip, C::StatusSlipWait,
+    C::StatusSlipStand, C::StatusSlipStandAttack, C::StatusSlipStandF, C::StatusSlipStandB,
+];
+
+/// The CPU is knocked down or tripped and has not finished getting up.
+pub fn downed(status: i32, id: impl Fn(C) -> i32) -> bool {
+    status != UNRESOLVED && DOWNED.iter().any(|c| id(*c) == status)
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Rules {

@@ -1,6 +1,13 @@
 lib_unit_tests! {
 use super::*;
 use super::trap::{self, Rules, Trap};
+use crate::model::cpu::ids::{C, UNRESOLVED};
+
+const DOWN: [C; 14] = [
+    C::StatusDown, C::StatusDownWait, C::StatusDownWaitContinue, C::StatusDownDamage, C::StatusLayDown,
+    C::StatusDownStand, C::StatusDownStandFb, C::StatusDownStandAttack, C::StatusSlip, C::StatusSlipWait,
+    C::StatusSlipStand, C::StatusSlipStandAttack, C::StatusSlipStandF, C::StatusSlipStandB,
+];
 
 fn ground() -> Observation {
     Observation { grounded: true, on_run: true, ..Observation::default() }
@@ -189,5 +196,62 @@ fn a_hit_holds_the_clock_but_does_not_clear_it() {
     assert_eq!(trap.clock(), 60);
     for frame in 71..=129 { assert_eq!(trap.step(frame, true, ground()), None); }
     assert_eq!(trap.step(130, true, ground()), Some(Outcome::OnStage));
+}
+
+#[test]
+fn stun_and_down_follow_the_statuses() {
+    let id = |c: C| c as i32 * 10;
+    assert!(trap::stunned(true, id(C::StatusWait), id));
+    assert!(trap::stunned(false, id(C::StatusDamage), id));
+    assert!(trap::stunned(false, id(C::StatusDamageFall) - 1, id));
+    assert!(!trap::stunned(false, id(C::StatusDamageFall), id));
+    assert!(!trap::stunned(false, id(C::StatusWait), id));
+    assert!(!trap::stunned(false, UNRESOLVED, id));
+    assert!(!trap::stunned(false, id(C::StatusDamage), |_| UNRESOLVED));
+    for status in DOWN {
+        assert!(trap::downed(id(status), id) && !trap::stunned(false, id(status), id), "{status:?}");
+    }
+    assert!(!trap::downed(id(C::StatusWait), id) && !trap::downed(id(C::StatusDamage), id));
+    assert!(!trap::downed(UNRESOLVED, id) && !trap::downed(UNRESOLVED, |_| UNRESOLVED));
+}
+
+/// tr-primary-3 2026-11-28 00:33Z: a CPU knocked down by Player 1's hit is not back in control until its getup ends.
+#[test]
+fn a_damaged_knockdown_holds_the_clock_until_the_getup_ends() {
+    let id = |c: C| c as i32 * 10;
+    let mut trap = Trap::new(Rules::DEFAULT);
+    for frame in 1..=50 { assert_eq!(trap.step(frame, false, ground()), None); }
+    let mut frame = 50;
+    let mut step = |trap: &mut Trap, observed| { frame += 1; trap.step(frame, true, observed) };
+    assert_eq!(step(&mut trap, Observation { hit: true, stunned: true, ..ground() }), None);
+    for _ in 0..30 { assert_eq!(step(&mut trap, Observation { stunned: true, ..ground() }), None); }
+    for status in DOWN {
+        for _ in 0..20 {
+            let downed = trap::downed(id(status), id);
+            assert_eq!(step(&mut trap, Observation { downed, ..ground() }), None, "{status:?}");
+        }
+        assert_eq!(trap.clock(), 50, "{status:?} holds the clock");
+    }
+    // Standing again: the clock runs on from 50; it was held, not cleared.
+    for _ in 0..69 { assert_eq!(step(&mut trap, ground()), None); }
+    assert_eq!(step(&mut trap, ground()), Some(Outcome::OnStage));
+}
+
+/// The same ruling's scope: with no damage in this attempt a trip is the CPU's own and the clock runs.
+#[test]
+fn an_undamaged_trip_runs_the_clock() {
+    let id = |c: C| c as i32 * 10;
+    let mut trap = Trap::new(Rules::DEFAULT);
+    for frame in 1..=50 { assert_eq!(trap.step(frame, false, ground()), None); }
+    let tripped = Observation { downed: trap::downed(id(C::StatusSlipWait), id), ..ground() };
+    assert!(tripped.downed);
+    for frame in 51..=119 { assert_eq!(trap.step(frame, false, tripped), None); }
+    assert_eq!(trap.clock(), 119);
+    assert_eq!(trap.step(120, false, tripped), Some(Outcome::OnStage));
+    // A grab without damage does not make a later trip count as Player 1's.
+    let mut held = Trap::new(Rules::DEFAULT);
+    assert_eq!(held.step(1, true, Observation { grabbed: true, ..ground() }), None);
+    for frame in 2..=120 { assert_eq!(held.step(frame, true, tripped), None); }
+    assert_eq!(held.step(121, true, tripped), Some(Outcome::OnStage));
 }
 }

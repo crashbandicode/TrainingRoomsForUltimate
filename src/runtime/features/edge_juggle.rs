@@ -476,11 +476,6 @@ fn falling(status: i32) -> bool {
             .contains(&status)
 }
 
-fn in_hitstun(status: i32) -> bool {
-    let [first, end] = [C::StatusDamage, C::StatusDamageFall].map(konst);
-    ![status, first, end].contains(&UNRESOLVED) && first <= status && status < end
-}
-
 unsafe fn airborne_recovery(cpu: usize, status: i32) -> bool {
     let air = konst(C::SituationAir);
     status != UNRESOLVED
@@ -2268,7 +2263,8 @@ pub unsafe fn frame(fighter: usize) {
         hanging: situation == konst(C::SituationCliff),
         on_run: run.stage.on_run(natives::pos_x(cpu)),
         grabbed: drill == Drill::LedgeTrap && held_by(cpu, status, natives::battle_object_id(p1)),
-        stunned: drill == Drill::LedgeTrap && (damage_stop || in_hitstun(status)),
+        stunned: drill == Drill::LedgeTrap && trap::stunned(damage_stop, status, konst),
+        downed: drill == Drill::LedgeTrap && trap::downed(status, konst),
         hit: damage_stop && !run.damage_stop
             || damage
                 .zip(run.previous_damage)

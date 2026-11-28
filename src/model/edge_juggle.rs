@@ -356,6 +356,8 @@ pub struct Observation {
     pub grabbed: bool,
     /// The CPU is in hitlag or hitstun.
     pub stunned: bool,
+    /// The CPU is knocked down or tripped, until its getup ends.
+    pub downed: bool,
     /// Player 1 stands on a floor or a platform, or holds a ledge.
     pub player_back: bool,
     /// Player 1 is KO'd: Dead, Standby or Rebirth.
