@@ -60,7 +60,7 @@ index is not a path hash; resolving a path is outside this diagnostic.
 
 | Event and marker | Sentence |
 | --- | --- |
-| Cut file, no guarantee | `A mod file reached the game cut short (declares N bytes, M copied): an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) refuses cut files.` |
+| Cut file, no guarantee | `A mod file reached the game cut short (declares N bytes, M copied): an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) keeps the stock file instead of a cut one.` |
 | Cut file, guarantee present | `Unexpected cut file with the fork (declares N bytes, M copied); please report.` |
 | Broken end | `A picture file reached the game with a broken end (N bytes, relocation table not found): not the ARCropolis cut; please report.` |
 

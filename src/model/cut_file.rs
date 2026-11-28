@@ -183,7 +183,7 @@ impl fmt::Display for Entry {
         write!(out, " tr={TR_VERSION} | ")?;
         match (event, self.guarantee.filter(|&value| value != 0)) {
             (Event::CutFile, None) => write!(out,
-                "A mod file reached the game cut short (declares {declared} bytes, {copied} copied): an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) refuses cut files."),
+                "A mod file reached the game cut short (declares {declared} bytes, {copied} copied): an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) keeps the stock file instead of a cut one."),
             (Event::CutFile, Some(_)) => write!(out,
                 "Unexpected cut file with the fork (declares {declared} bytes, {copied} copied); please report."),
             (Event::BrokenEnd, _) => write!(out,
@@ -482,7 +482,7 @@ mod tests {
         };
         let text = entry.to_string();
         assert_eq!(text, format!(
-            "{} cut_file declares={} copied={} table={:#x} index={:#x} copy={:#x} arcropolis=upstream-or-older-fork tr={} | A mod file reached the game cut short (declares {} bytes, {} copied): an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) refuses cut files.",
+            "{} cut_file declares={} copied={} table={:#x} index={:#x} copy={:#x} arcropolis=upstream-or-older-fork tr={} | A mod file reached the game cut short (declares {} bytes, {} copied): an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) keeps the stock file instead of a cut one.",
             u64::MAX, u32::MAX, u64::MAX, u32::MAX, u32::MAX, u64::MAX, TR_VERSION, u32::MAX, u64::MAX
         ));
         assert!(text.len() < LINE);
