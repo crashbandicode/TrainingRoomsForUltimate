@@ -388,7 +388,7 @@ fn report_drops() {
 const HOOK_STATS_TICKS: u32 = 200;
 
 /// The steps the drain thread runs on every tick, in registration order (registered at boot).
-static TICKS: [std::sync::OnceLock<fn()>; 4] = [const { std::sync::OnceLock::new() }; 4];
+static TICKS: [std::sync::OnceLock<fn()>; 5] = [const { std::sync::OnceLock::new() }; 5];
 
 /// Register a step the drain thread runs on every 50 ms tick, after the drain. Each step is its own call through its pointer, so
 /// the steps' frames never stack on this thread's stack. False when every slot is taken.

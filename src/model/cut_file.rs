@@ -1,3 +1,6 @@
+use core::fmt;
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+
 pub const SITE: usize = 0x37a2dd4;
 pub const CAP: usize = 8;
 pub const MIN_BYTES: usize = 0x20;
@@ -19,7 +22,26 @@ pub struct Finding {
     pub table: u32,
 }
 
-pub fn inspect(_copy: &[u8]) -> Option<Finding> { None }
+pub fn inspect(copy: &[u8]) -> Option<Finding> {
+    if copy.len() < MIN_BYTES || copy.get(..4)? != b"BNTX" || copy.get(0xc..0xe)? != [0xff, 0xfe] {
+        return None;
+    }
+    let table = u32::from_le_bytes(copy.get(0x18..0x1c)?.try_into().ok()?);
+    let declared = u32::from_le_bytes(copy.get(0x1c..0x20)?.try_into().ok()?);
+    let copied = copy.len() as u64;
+    let event = if u64::from(declared) > copied || u64::from(table) + 0x10 > copied {
+        Event::CutFile
+    } else {
+        let offset = table as usize;
+        let magic = copy.get(offset..offset + 4)?;
+        let sections = i32::from_le_bytes(copy.get(offset + 8..offset + 12)?.try_into().ok()?);
+        if magic == b"_RLT" && sections >= 1 {
+            return None;
+        }
+        Event::BrokenEnd
+    };
+    Some(Finding { event, copied, declared, table })
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Arcropolis {
@@ -28,12 +50,30 @@ pub enum Arcropolis {
     Fork { api: Option<(u32, u32)>, guarantee: u32 },
 }
 
-pub fn classify(_api: Option<(u32, u32)>, _guarantee: Option<u32>) -> Arcropolis {
-    Arcropolis::NotLoaded
+pub fn classify(api: Option<(u32, u32)>, guarantee: Option<u32>) -> Arcropolis {
+    match (api, guarantee.filter(|&value| value != 0)) {
+        (api, Some(guarantee)) => Arcropolis::Fork { api, guarantee },
+        (Some(api), None) => Arcropolis::UpstreamOrOlderFork { api: Some(api) },
+        (None, None) => Arcropolis::NotLoaded,
+    }
 }
 
 impl core::fmt::Display for Arcropolis {
-    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result { Ok(()) }
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NotLoaded => f.write_str("ARCropolis not loaded"),
+            Self::UpstreamOrOlderFork { api } => {
+                f.write_str("ARCropolis")?;
+                if let Some((major, minor)) = api { write!(f, " API {major}.{minor}")?; }
+                f.write_str(" (upstream or older fork)")
+            }
+            Self::Fork { api, guarantee } => {
+                f.write_str("ARCropolis")?;
+                if let Some((major, minor)) = api { write!(f, " API {major}.{minor}")?; }
+                write!(f, " (fork, cut-file guarantee v{guarantee})")
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -55,33 +95,153 @@ pub trait Sink {
     fn close(&mut self);
 }
 
-pub fn persist<S: Sink>(_sink: &mut S, _line: &[u8; LINE]) -> u32 { 0 }
-
-pub fn line(_entry: &Entry, _tr_version: &str) -> [u8; LINE] { [b' '; LINE] }
-
-pub fn write_text(_out: &mut impl core::fmt::Write, _entry: &Entry, _tr_version: &str) -> core::fmt::Result {
-    Ok(())
+pub fn persist<S: Sink>(sink: &mut S, line: &[u8; LINE]) -> u32 {
+    S::create(sink);
+    if let Err(error) = S::open(sink) { return error; }
+    let result = (|| {
+        let offset = S::size(sink)?;
+        let next = offset.checked_add(LINE as u64).filter(|&size| size <= FILE_CAP).ok_or(FILE_FULL)?;
+        S::grow(sink, next)?;
+        S::write_flush(sink, offset, line)
+    })();
+    S::close(sink);
+    result.err().unwrap_or(0)
 }
 
-pub struct Records;
+struct LineWriter {
+    bytes: [u8; LINE],
+    len: usize,
+}
+
+impl fmt::Write for LineWriter {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        let count = text.len().min(LINE - 1 - self.len);
+        self.bytes[self.len..self.len + count].copy_from_slice(&text.as_bytes()[..count]);
+        self.len += count;
+        if count == text.len() { Ok(()) } else { Err(fmt::Error) }
+    }
+}
+
+pub fn line(entry: &Entry, tr_version: &str) -> [u8; LINE] {
+    let mut output = LineWriter { bytes: [b' '; LINE], len: 0 };
+    let _ = write_text(&mut output, entry, tr_version);
+    output.bytes[LINE - 1] = b'\n';
+    output.bytes
+}
+
+pub fn write_text(out: &mut impl core::fmt::Write, entry: &Entry, tr_version: &str) -> core::fmt::Result {
+    let Finding { event, copied, declared, table } = entry.finding;
+    let event_name = match event { Event::CutFile => "cut_file", Event::BrokenEnd => "broken_end" };
+    write!(out, "{} {event_name} declares={declared} copied={copied} table={table:#x} index={:#x} copy={:#x} arcropolis=",
+        entry.at_ms, entry.index, entry.copy)?;
+    match entry.guarantee.filter(|&value| value != 0) {
+        Some(value) => write!(out, "fork-guarantee-v{value}")?,
+        None => out.write_str("upstream-or-older-fork")?,
+    }
+    write!(out, " tr={tr_version} | ")?;
+    match (event, entry.guarantee.filter(|&value| value != 0)) {
+        (Event::CutFile, None) => write!(out,
+            "A mod file reached the game cut short (declares {declared} bytes, {copied} copied): an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) refuses cut files."),
+        (Event::CutFile, Some(_)) => write!(out,
+            "Unexpected cut file with the fork (declares {declared} bytes, {copied} copied); please report."),
+        (Event::BrokenEnd, _) => write!(out,
+            "A picture file reached the game with a broken end ({declared} bytes, relocation table not found): not the ARCropolis cut; please report."),
+    }
+}
+
+struct Slot {
+    ready: AtomicBool,
+    event: AtomicU32,
+    copied: AtomicU64,
+    declared: AtomicU32,
+    table: AtomicU32,
+    index: AtomicU32,
+    copy: AtomicU64,
+    at_ms: AtomicU64,
+    has_guarantee: AtomicBool,
+    guarantee: AtomicU32,
+    persisted: AtomicU32,
+}
+
+impl Slot {
+    const fn new() -> Self {
+        Self {
+            ready: AtomicBool::new(false), event: AtomicU32::new(0), copied: AtomicU64::new(0),
+            declared: AtomicU32::new(0), table: AtomicU32::new(0), index: AtomicU32::new(0),
+            copy: AtomicU64::new(0), at_ms: AtomicU64::new(0), has_guarantee: AtomicBool::new(false),
+            guarantee: AtomicU32::new(0), persisted: AtomicU32::new(0),
+        }
+    }
+}
+
+pub struct Records {
+    seen: AtomicU32,
+    reported: AtomicU32,
+    slots: [Slot; CAP],
+}
+
+impl Default for Records {
+    fn default() -> Self { Self::new() }
+}
 
 impl Records {
-    pub const fn new() -> Self { Self }
+    pub const fn new() -> Self {
+        Self { seen: AtomicU32::new(0), reported: AtomicU32::new(0), slots: [const { Slot::new() }; CAP] }
+    }
 
     pub fn detected<S: Sink>(
-        &self, _sink: &mut S, _finding: Finding, _index: u32, _copy: u64, _at_ms: u64,
-        _guarantee: Option<u32>, _tr_version: &str,
-    ) -> Option<usize> { None }
+        &self, sink: &mut S, finding: Finding, index: u32, copy: u64, at_ms: u64,
+        guarantee: Option<u32>, tr_version: &str,
+    ) -> Option<usize> {
+        let number = self.seen.fetch_add(1, Ordering::Relaxed) as usize;
+        let slot = self.slots.get(number)?;
+        let entry = Entry { finding, index, copy, at_ms, guarantee, persisted: 0 };
+        let persisted = persist(sink, &line(&entry, tr_version));
+        slot.event.store(u32::from(finding.event == Event::BrokenEnd), Ordering::Relaxed);
+        slot.copied.store(finding.copied, Ordering::Relaxed);
+        slot.declared.store(finding.declared, Ordering::Relaxed);
+        slot.table.store(finding.table, Ordering::Relaxed);
+        slot.index.store(index, Ordering::Relaxed);
+        slot.copy.store(copy, Ordering::Relaxed);
+        slot.at_ms.store(at_ms, Ordering::Relaxed);
+        slot.has_guarantee.store(guarantee.is_some(), Ordering::Relaxed);
+        slot.guarantee.store(guarantee.unwrap_or(0), Ordering::Relaxed);
+        slot.persisted.store(persisted, Ordering::Relaxed);
+        slot.ready.store(true, Ordering::Release);
+        Some(number)
+    }
 
-    pub fn take(&self) -> Option<Entry> { None }
+    pub fn take(&self) -> Option<Entry> {
+        let number = self.reported.load(Ordering::Relaxed);
+        let slot = self.slots.get(number as usize)?;
+        if !slot.ready.load(Ordering::Acquire) { return None; }
+        let entry = Entry {
+            finding: Finding {
+                event: if slot.event.load(Ordering::Relaxed) == 0 { Event::CutFile } else { Event::BrokenEnd },
+                copied: slot.copied.load(Ordering::Relaxed),
+                declared: slot.declared.load(Ordering::Relaxed),
+                table: slot.table.load(Ordering::Relaxed),
+            },
+            index: slot.index.load(Ordering::Relaxed),
+            copy: slot.copy.load(Ordering::Relaxed),
+            at_ms: slot.at_ms.load(Ordering::Relaxed),
+            guarantee: slot.has_guarantee.load(Ordering::Relaxed).then(|| slot.guarantee.load(Ordering::Relaxed)),
+            persisted: slot.persisted.load(Ordering::Relaxed),
+        };
+        self.reported.store(number + 1, Ordering::Relaxed);
+        Some(entry)
+    }
 
-    pub fn overflow(&self) -> u32 { 0 }
+    pub fn overflow(&self) -> u32 { self.seen.load(Ordering::Relaxed).saturating_sub(CAP as u32) }
 }
 
 pub fn on_copy<S: Sink>(
-    _records: &Records, _sink: &mut S, _copy: &[u8], _index: u32, _address: u64,
-    _at_ms: u64, _guarantee: impl FnOnce() -> Option<u32>, _tr_version: &str,
-) -> Option<usize> { None }
+    records: &Records, sink: &mut S, copy: &[u8], index: u32, address: u64,
+    at_ms: u64, guarantee: impl FnOnce() -> Option<u32>, tr_version: &str,
+) -> Option<usize> {
+    let finding = inspect(copy)?;
+    records.detected(sink, finding, index, address, at_ms, guarantee(), tr_version)
+}
 
 #[cfg(test)]
 mod tests {

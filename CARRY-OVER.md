@@ -1887,6 +1887,10 @@ The release watch now waits for both, and never counts passes:
 
 The manually extracted `src/runtime/diag_log.rs` (the logging.rs range documented above; not a pkg4/pkg6 manifest destination) now calls the same extracted rotation primitive in `runtime/log_file.rs` as both events writers. The original remove-previous/rename-current/create-current algorithm and `storage::should_rotate` boundary remain unchanged. `report_failure` retains its exact uptime/error format and no-sync behavior; `install::write_text` retains Skyline output and sync_data. Events serialization is separate with only DIAGNOSTICS→EVENTS lock order, no recursive error logging. Existing oversized legacy events are preserved as the previous generation until its next replacement, not silently truncated. No frozen fork/source hash changed. New shared helper/runtime declarations/lib test inclusion are clean-room code; none of these paths has a carry-manifest destination. Parent owns host gates and final acceptance.
 
+## 2026-11-28: cut-file diagnostic drain
+
+The manually extracted `src/runtime/diag_log.rs` increases its tick slots from four to five for the cut-file diagnostic's drain-thread step. It is not a pkg4/pkg6 manifest destination.
+
 Menu-polish slider and pop-up code was written in this repository; no code was copied from the fork or upstream.
 
 Preview-stop and pop-up chord-hint code was written in this repository; nothing was copied from the fork or upstream. The carried `clip_panel.rs` was changed through the pkg4 manifest.

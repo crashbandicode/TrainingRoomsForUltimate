@@ -1,5 +1,16 @@
 # Decisions for the operator
 
+<a id="rc16-cut-file-diagnostic"></a>
+## Cut-file diagnostic — 2026-11-28
+
+The picture-copy observer checks the copied BNTX header and relocation-table end without changing game state.
+At most eight detections per boot synchronously append a flushed, fixed-size line to
+`sd:/ultimate/TrainingRooms/cut-files.log`, capped at 64 KiB; later detections are counted only. A later
+diagnostic line reports the persistence result if the game survives. For a cut file the message distinguishes
+the guarantee marker from an upstream or older fork; a broken end is distinct and does not attribute the
+damage to that defect. The guarded inline hook requires the five overwritten words to be stock; an occupied
+or foreign site is left untouched.
+
 - 2026-11-26. Scrub positions: operator ruling 2026-11-26 ~02:45Z (raising stack limit is fine).
 - Only the diagnostic trace writer's recorded static bound changes: 2,880 to 2,896 bytes, as measured on the `bac7a4d5` ELF. Its allocation stays at 28,672 bytes.
 - Restoring the direct combo decoder keeps the menu worker at 56,432 bytes in both ELFs, within its unchanged 57,152-byte bound and 90,112-byte allocation.
