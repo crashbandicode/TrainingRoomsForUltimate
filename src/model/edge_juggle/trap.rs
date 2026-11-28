@@ -112,9 +112,8 @@ pub fn player_start(floor: Option<[f32; 2]>, place: Result<Place, Unread>, at: [
 /// The Ledge options row as the CPU ledge step's weights: none ticked reads as all four.
 pub fn options(row: &[u8]) -> Weights<10> {
     let mut weights = [0; 10];
-    for (slot, value) in weights[..4].iter_mut().zip(row) {
-        *slot = *value;
-    }
+    let n = row.len().min(4);
+    weights[..n].copy_from_slice(&row[..n]);
     if weights[..4].iter().all(|weight| *weight == 0) {
         weights[..4].fill(1);
     }
