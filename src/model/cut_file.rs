@@ -445,7 +445,7 @@ mod tests {
         assert_eq!(bytes.len(), 3 * LINE, "two successful appends must leave two lines after the old contents");
         assert_eq!(&bytes[..LINE], &[b'P'; LINE]);
         for entry in &entries {
-            assert!(bytes[LINE..].chunks_exact(LINE).any(|chunk| chunk == line(entry)));
+            assert!(bytes[LINE..].as_chunks::<LINE>().0.contains(&line(entry)));
         }
     }
 
