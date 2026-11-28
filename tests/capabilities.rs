@@ -246,6 +246,13 @@ impl Analysis {
         let mut out = Vec::new();
         for (i, f) in self.graph.funcs.iter().enumerate() {
             if f.attrs.contains("skyline::hook") {
+                if f.key() == "cut_file::picture_copied" {
+                    let (offsets, boundaries) = self.reach(i);
+                    let called: Vec<_> = offsets.into_iter().filter_map(capabilities::call_name).collect();
+                    assert!(called.is_empty() && boundaries.is_empty(),
+                        "seam-guarded cut-file hook reaches capability calls {called:?} or boundaries {boundaries:?}");
+                    continue;
+                }
                 let unit = unit_of_hook(f).unwrap_or_else(|| panic!("hook {} has no declared unit", f.key()));
                 out.push((i, unit));
             }
@@ -421,6 +428,14 @@ fn every_entry_point_has_a_declared_unit_and_exists() {
     for b in BOUNDARIES {
         assert_eq!(a.graph.find(b.function).len(), 1, "boundary {}", b.function);
     }
+}
+
+#[test]
+fn the_seam_guarded_cut_file_hook_rejects_a_seeded_capability_dependency() {
+    let mut a = Analysis::new();
+    let hook = a.graph.find("cut_file::picture_copied")[0];
+    a.graph.funcs[hook].body = callgraph::lex("MOTION_KIND_OFFSET");
+    assert!(std::panic::catch_unwind(|| a.entries()).is_err());
 }
 
 #[test]
