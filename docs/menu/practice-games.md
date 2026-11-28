@@ -42,7 +42,7 @@ Place up to ten targets, then break them all against the clock ([guide](../guide
 
 ## Tech practice
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/d0eca9a146fb35a73838b8f5fa51330d6455a5c5" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/06f2e177fd688cb83df11218d9683acbd09a3c47" autoplay muted loop playsinline controls></video>
 
 *The counter reads 3/20 after a missed tech.* [Open the clip](../media/tut-tech-practice.mp4)
 
