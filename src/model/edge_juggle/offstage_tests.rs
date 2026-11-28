@@ -265,6 +265,7 @@ fn a_kept_start_is_reused_only_on_its_own_floor_run() {
         let (long_cpu, island_cpu) = match drill {
             Drill::GuardEdge => ([-125.0, -60.0], [-375.0, -60.0]),
             Drill::Juggler => ([0.0, 80.0], [-250.0, 80.0]),
+            Drill::LedgeTrap => unreachable!("this loop runs the two older drills"),
         };
         let made_on_long = Setup { cpu: long_cpu, p1: [0.0, 0.0], percent: 100 };
         let made_on_island = Setup { cpu: island_cpu, p1: [-250.0, 0.014], percent: 100 };
@@ -285,6 +286,7 @@ fn a_kept_start_is_reused_only_on_its_own_floor_run() {
                 assert_eq!(on_long.setup.cpu, long.default_juggle(long_p1));
                 assert_eq!(on_island.setup.cpu, island.default_juggle(island_p1));
             }
+            Drill::LedgeTrap => unreachable!("this loop runs the two older drills"),
         }
     }
     // The run's ends are kept with the setup and compared at Start; nothing is read again for it.

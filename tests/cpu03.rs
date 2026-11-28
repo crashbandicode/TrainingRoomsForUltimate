@@ -11,7 +11,7 @@ use model::cpu::ids::{Table, C};
 use model::cpu::ledge::{option, UNREQUESTED_BOUND, BUFFER_PLAYBACK_FRAME, BUFFER_REGULAR_FRAME, BUFFER_TETHER_FRAME};
 use model::cpu::playback::PlaybackState;
 use model::cpu::role::FighterKey;
-use model::cpu::settings::{CpuSettings, DelayRow};
+use model::cpu::settings::{CpuSettings, DelayRow, Weights};
 use model::cpu::state::Cpu;
 use model::cpu::status::Situation;
 use model::lra_reset::HubStep;
@@ -503,6 +503,54 @@ fn cpu03_whole_settings_replacement_yields_the_menus_reroll_bits() {
     assert_eq!(model::menu::rerolls_between(&delayed, &both), reroll::LEDGE_OPTIONS | reroll::SDI_DIRECTION);
 }
 
+fn trap_rolls_only_ticked_options() {
+    let options = model::edge_juggle::trap::options(&[0, 1, 0, 0]);
+    assert_eq!(model::edge_juggle::trap::options(&[0, 0, 0, 0]), Weights([1, 1, 1, 1, 0, 0, 0, 0, 0, 0]));
+    for user in [ledge_row(&[]), ledge_row(&[option::WAIT as usize])] {
+        let (mut cpu, key) = cpu_with(settings(&[("ledge_state", user)]));
+        for _ in 0..100 {
+            let out = cpu.trap_frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 30, true, false), options);
+            assert_eq!(out.request_status, Some(CLIFF_ESCAPE));
+            cpu.trap_frame(key, &grounded(), options);
+        }
+    }
+}
+
+fn trap_normal_options_match_the_cpu_ledge_row() {
+    for option in 0..4 {
+        for delay in [0, 10] {
+            let state = settings(&[("ledge_state", ledge_row(&[option])), ("ledge_delay", delay_row(&[delay]))]);
+            let (mut normal, key) = cpu_with(state);
+            let (mut trap, _) = cpu_with(state);
+            let mut row = [0; 4];
+            row[option] = 1;
+            let options = model::edge_juggle::trap::options(&row);
+            for frame in 0..25 {
+                let facts = hanging(CLIFF_WAIT, CLIFF_CATCH, 30, true, false);
+                assert_eq!(normal.frame(key, &facts).request_status, trap.trap_frame(key, &facts, options).request_status, "option {option} delay {delay} frame {frame}");
+                assert_eq!(
+                    normal.ledge_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true, false),
+                    trap.trap_transition_term(key, CLIFF_WAIT, TERM_CLIMB, true, options),
+                    "option {option} delay {delay} frame {frame}"
+                );
+                normal.tick_clock();
+                trap.tick_clock();
+            }
+        }
+    }
+    let mut triggers = vec![0; 17];
+    triggers[model::cpu::settings::trigger::LEDGE_OPTION as usize] = 1;
+    let state = settings(&[
+        ("ledge_state", ledge_row(&[option::NEUTRAL as usize])),
+        ("mash_triggers", triggers),
+        ("ledge_neutral_override", action_row(&[0])),
+    ]);
+    let (mut cpu, key) = cpu_with(state);
+    let options = model::edge_juggle::trap::options(&[1, 0, 0, 0]);
+    assert_eq!(cpu.trap_frame(key, &hanging(CLIFF_WAIT, CLIFF_CATCH, 30, true, false), options).request_status, Some(CLIFF_CLIMB));
+    assert!(cpu.fighters[key.index()].mash.queue.is_empty());
+}
+
 /// rc.9: this module's cases in one table. Each case runs on its own thread, as the test harness ran it.
 #[test]
 fn case_table() {
@@ -526,5 +574,7 @@ fn case_table() {
         ("cpu03_ledge_options_emptied_clears_case", cpu03_ledge_options_emptied_clears_case as fn()),
         ("cpu03_playback_yield_and_reset", cpu03_playback_yield_and_reset as fn()),
         ("cpu03_whole_settings_replacement_yields_the_menus_reroll_bits", cpu03_whole_settings_replacement_yields_the_menus_reroll_bits as fn()),
+        ("trap_rolls_only_ticked_options", trap_rolls_only_ticked_options as fn()),
+        ("trap_normal_options_match_the_cpu_ledge_row", trap_normal_options_match_the_cpu_ledge_row as fn()),
     ]);
 }

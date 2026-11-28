@@ -14,11 +14,12 @@ pub enum Game {
     Parry,
     GuardEdge,
     Juggler,
+    LedgeTrap,
 }
 
 impl Game {
-    pub const ALL: [Game; 7] = [
-        Game::Eggs, Game::Btt, Game::Tech, Game::Mashout, Game::Parry, Game::GuardEdge, Game::Juggler,
+    pub const ALL: [Game; 8] = [
+        Game::Eggs, Game::Btt, Game::Tech, Game::Mashout, Game::Parry, Game::GuardEdge, Game::Juggler, Game::LedgeTrap,
     ];
 
     pub const fn title(self) -> &'static str {
@@ -30,6 +31,7 @@ impl Game {
             Game::Parry => "Parry practice",
             Game::GuardEdge => "Guard the Edge",
             Game::Juggler => "Juggler",
+            Game::LedgeTrap => "Ledge Trap",
         }
     }
 
@@ -47,7 +49,7 @@ impl Game {
     pub const fn mode_row(self) -> Option<&'static str> {
         match self {
             Game::Eggs => Some("eggsercise"),
-            Game::Btt | Game::Mashout | Game::GuardEdge | Game::Juggler => None,
+            Game::Btt | Game::Mashout | Game::GuardEdge | Game::Juggler | Game::LedgeTrap => None,
             Game::Tech => Some("tech_practice"),
             Game::Parry => Some("parry_practice"),
         }
@@ -121,6 +123,14 @@ pub fn result_tick(left: &mut u16, tick: bool) -> bool {
 mod tests {
     lib_unit_tests! {
     use super::*;
+
+    #[test]
+    fn ledge_trap_is_its_own_practice_game() {
+        let trap = Game::ALL.iter().copied().find(|game| game.title() == "Ledge Trap")
+            .expect("Ledge Trap has its own practice game entry");
+        assert_eq!((trap.code(), Game::from_code(trap.code())), (8, Some(trap)), "appended: the seven older codes stay");
+        assert_eq!(Game::from_code(7).map(Game::title), Some("Juggler"));
+    }
 
     #[test]
     fn edge_juggle_are_independent_practice_games() {

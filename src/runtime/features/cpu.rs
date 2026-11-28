@@ -654,6 +654,7 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
     let practice_owned = super::mashout::owns_cpu(accessor)
         || super::edge_juggle::suspends_cpu_settings(key)
         || key.entry == primary_entry(lobby) && super::btt_camera::placing();
+    let trap = super::edge_juggle::trap_options(accessor);
 
     let out = with(|cpu| {
         if !cpu.roles.set(receipt, accessor, key) { return None; }
@@ -686,7 +687,11 @@ unsafe fn fighter_frame(fighter: usize, receipt: Option<FrameReceipt>) {
                 counts::bump(counts::FRAME);
             }
         }
-        let out = if practice_owned { cpu.practice_frame(key) } else { cpu.frame(key, &facts) };
+        let out = match trap {
+            Some(options) if practice_owned => cpu.trap_frame(key, &facts, options),
+            _ if practice_owned => cpu.practice_frame(key),
+            _ => cpu.frame(key, &facts),
+        };
         hide_cpu::publish_frame(cpu, key, accessor);
         Some(out)
     }).flatten();
@@ -756,6 +761,10 @@ unsafe fn cursor_probe(key: FighterKey, accessor: usize) {
 static LEDGE_ON: AtomicBool = AtomicBool::new(false);
 /// SPEC-cpu-02's hooks and natives were installed (the wrapper applies the clatter only then).
 static DEFENCE_ON: AtomicBool = AtomicBool::new(false);
+
+pub(super) fn ledge_on() -> bool {
+    LEDGE_ON.load(Ordering::Acquire)
+}
 
 pub fn set_ledge_on(on: bool) {
     LEDGE_ON.store(on, Ordering::Release);
@@ -1040,11 +1049,31 @@ pub unsafe fn cpu_transition_term_hook(accessor: usize, term: i32) -> bool {
     if term != konst(C::TermContCliffClimb) {
         return !taunt_denied(accessor, term);
     }
+    if let Some(options) = super::edge_juggle::trap_options(accessor) {
+        return trap_climb(accessor, term, original, options).unwrap_or(original);
+    }
     let Some(key) = role_of(accessor) else { return original };
     let status = natives::status_kind(accessor);
     let owed = crate::engine::rr_host::slot_owed();
     let answer = with(|cpu| cpu.ledge_transition_term(key, status, term, original, owed)).unwrap_or(original);
-    if answer && with(|cpu| cpu.fighters[key.index()].ledge.bound_released()).unwrap_or(false) {
+    let released = answer && with(|cpu| cpu.fighters[key.index()].ledge.bound_released()).unwrap_or(false);
+    climb_answer(key, status, answer, released)
+}
+
+unsafe fn trap_climb(accessor: usize, term: i32, original: bool, options: crate::model::cpu::settings::Weights<10>) -> Option<bool> {
+    let scene = try_role_scene().ok()?;
+    let status = natives::status_kind(accessor);
+    let (key, answer, released) = {
+        let mut guard = CPU.try_lock()?;
+        let cpu = guard.as_mut()?;
+        let key = role_adapter::role(cpu, scene, accessor)?;
+        (key, cpu.trap_transition_term(key, status, term, original, options), cpu.fighters[key.index()].ledge.bound_released())
+    };
+    Some(climb_answer(key, status, answer, released))
+}
+
+fn climb_answer(key: FighterKey, status: i32, answer: bool, released: bool) -> bool {
+    if answer && released {
         cpu_event_on_change!(ev::CLIMB_DENIED, key.index(), Some(2), "climb_bound_release entry={} status={status}", key.entry);
     } else if answer {
         cpu_event_rearm!(ev::CLIMB_DENIED, key.index());

@@ -69,6 +69,7 @@ const BOUNDARIES: &[Boundary] = &[
     // Zoom alone requires Hero's menu rows and the damage/capture readers.
     Boundary { function: "zoom::zoom_pad", owner: None, gate: Gate::Flag("installed") },
     Boundary { function: "zoom::observe_zoom", owner: None, gate: Gate::Flag("installed") },
+    Boundary { function: "edge_juggle::held_by", owner: None, gate: Gate::Flag("capture_parent_granted") },
     // Steering PK Thunder needs the existing article grants. If any are missing,
     // the read yields to stock; other drill corrections do not depend on them.
     Boundary { function: "niche_pad::bolt_input", owner: None, gate: Gate::Flag("bolt_reads_granted") },
@@ -672,6 +673,22 @@ fn the_install_line_names_the_row_that_blocked_a_feature() {
     }
     .to_string();
     assert!(line.contains(" cpu_mash=not_installed reason=site:motion_kind "), "{line}");
+}
+
+#[test]
+fn trap_review_capture_needs_the_parent_read_not_heros_commands() {
+    let a = Analysis::new();
+    let boundary = BOUNDARIES.iter().find(|b| b.function.ends_with("::held_by")).unwrap();
+    let module = boundary.function.split_once("::").unwrap().0;
+    let Gate::Flag(name) = boundary.gate;
+    let guard_key = format!("{module}::{name}");
+    let guard = &a.graph.funcs[a.graph.find(&guard_key)[0]];
+    let parent = capabilities::find("state_link_parent_object_id").unwrap();
+    assert_eq!(a.own_offsets(guard), BTreeSet::from([parent.offset]), "a rejected Hero command must not disable grab scoring");
+    let check = callgraph::lex("game::granted(");
+    assert!(guard.body.windows(check.len()).any(|tokens| tokens == check));
+    let start = a.graph.find("edge_juggle::allowed")[0];
+    assert!(a.graph.callees(start).contains(&a.graph.find(&guard_key)[0]), "do not start a trap that cannot score grabs");
 }
 
 #[test]

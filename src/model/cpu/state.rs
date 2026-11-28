@@ -14,7 +14,7 @@ use super::mash::{BufferContext, Mash, Step};
 use super::playback::{covered_setting_applies, PlaybackState};
 use super::rng::Rng;
 use super::role::{FighterKey, RoleTable, Scene};
-use super::settings::{situation, trigger, CpuSettings};
+use super::settings::{situation, trigger, CpuSettings, Weights};
 use super::advantage::FrameAdvantage;
 use super::command::{self, CmdFacts, CmdOut};
 use super::shield::{self, ButtonAnswer, HoldFacts, OosFacts, OosOut, Shield};
@@ -320,6 +320,16 @@ impl Cpu {
         FrameOut { vanish: hide::step(&mut fighter.away, false, false), ..FrameOut::default() }
     }
 
+    /// Ledge Trap owns this body: as `practice_frame`, and the ledge step alone runs, on the drill's options.
+    pub fn trap_frame(&mut self, key: FighterKey, f: &FrameFacts, options: Weights<10>) -> FrameOut {
+        let mut out = self.practice_frame(key);
+        let ctx = self.context();
+        let fighter = &mut self.fighters[key.index()];
+        let step = Step { t: &self.ids, s: &self.settings, rng: &mut self.rng, counters: &mut fighter.counters, mash: &mut fighter.mash, ctx };
+        out.request_status = fighter.ledge.frame(step, f, Some(options)).request_status;
+        out
+    }
+
     /// The once-per-frame dispatch for the CPU-role body `key` (SPEC-cpu-01 §5 "Ordering": dodge
     /// staling, hide tech (primary body), mistech, clatter, ledge, then the DI case reset).
     pub fn frame(&mut self, key: FighterKey, f: &FrameFacts) -> FrameOut {
@@ -366,7 +376,7 @@ impl Cpu {
             out.clatter = fighter.defence.clatter_frame(settings);
         }
         let step = Step { t: ids, s: settings, rng: &mut *rng, counters: &mut fighter.counters, mash: &mut fighter.mash, ctx };
-        let ledge = fighter.ledge.frame(step, f);
+        let ledge = fighter.ledge.frame(step, f, None);
         out.request_status = ledge.request_status;
         out.playback = ledge.playback;
         if fighter.pending & reroll::SHIELD_TILT != 0 {
@@ -438,7 +448,13 @@ impl Cpu {
         let q = TermQuery { status, term, original };
         // The live bit decides: the cached state trails a request and a cancel until the next AI frame.
         let playback = PlaybackState { owed, running: self.playback.running || owed, ..self.playback };
-        fighter.ledge.transition_term(&self.ids, &self.settings, &fighter.counters, playback, q)
+        fighter.ledge.transition_term(&self.ids, self.settings.ledge_state, &fighter.counters, playback, q)
+    }
+
+    /// The transition-term hook for a body Ledge Trap owns.
+    pub fn trap_transition_term(&self, key: FighterKey, status: i32, term: i32, original: bool, options: Weights<10>) -> bool {
+        let fighter = &self.fighters[key.index()];
+        fighter.ledge.transition_term(&self.ids, options, &fighter.counters, self.playback, TermQuery { status, term, original })
     }
 }
 

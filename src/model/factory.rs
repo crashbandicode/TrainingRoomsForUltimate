@@ -48,7 +48,7 @@ pub const LRA_RESET: usize = 1;
 pub const STAGE_HAZARDS: usize = 2;
 
 /// Number of rows.
-pub const COUNT: usize = 183;
+pub const COUNT: usize = 191;
 
 /// The rows this build knows, in menu order of their first appearance in SPEC-core-02 §2.7. The
 /// first three keep the indices the earlier packages use.
@@ -293,4 +293,13 @@ pub static DEFS: [Def; COUNT] = [
     row!("move_names", Single, 2, [1]),
     row!("playback_indicator", Single, 2, [0]),
     row!("playback_delay", Single, 8, [0]),
+    // Ledge Trap (phase 1): the CPU picker's three rows, the ticked getups, 2.0 / 2.5 / 3.0 s, 20 / 30 / 60 s / Until KO.
+    row!("trap_difficulty", Single, super::edge_juggle::picker::MODE_CHOICES, [0]),
+    row!("trap_cpu_fighter", Single, super::edge_juggle::picker::FIGHTER_CHOICES, [0]),
+    row!("trap_cpu_level", Single, 9, [8]),
+    row!("trap_options", Weighted, 4, [0, 1, 2, 3]),
+    row!("trap_fail", Single, 3, [0]),
+    row!("trap_time", Single, 4, [1]),
+    row!("trap_cpu_percent", Single, 301, [60]),
+    row!("trap_attempts", Single, 3, [0]),
 ];

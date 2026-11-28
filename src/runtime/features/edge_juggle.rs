@@ -13,6 +13,7 @@ use crate::model::cpu::{
     ids::{C, UNRESOLVED},
     rng::Rng,
     role::{FighterKey, Scene, LOBBY_CPU_ENTRY},
+    settings::Weights,
 };
 use crate::model::edge_juggle::perfect::game_watch::{self, OilInputs, OilStall};
 use crate::model::edge_juggle::perfect::recovery::{
@@ -24,6 +25,7 @@ use crate::model::edge_juggle::perfect::{
     PlanHeight, PlanInput, Route, RouteFacts, ThreatClock,
 };
 use crate::model::edge_juggle::picker::{self, DrillId, Mode, Picker};
+use crate::model::edge_juggle::trap;
 use crate::model::edge_juggle::{
     CpuObject, Drill, Kept, Observation, Outcome, Phase, PlacedPlayer, Placement, PlacementAction, PlacementFrame,
     Reaction, Session, Setup, Stage, StartOptions, StartRefusal, Wizard, WizardStep,
@@ -78,7 +80,11 @@ struct Config {
     edge_percent: u16,
     edge_limit: Option<u16>,
     juggle_limit: Option<u16>,
-    opponent: [Opponent; 2],
+    trap_percent: u16,
+    trap_limit: Option<u16>,
+    trap_rules: trap::Rules,
+    trap_options: Weights<10>,
+    opponent: [Opponent; 3],
     reaction: [Reaction; 2],
     options: StartOptions,
 }
@@ -86,7 +92,11 @@ static CONFIG: Published<Config> = Published::new(Config {
     edge_percent: 100,
     edge_limit: Some(10),
     juggle_limit: Some(10),
-    opponent: [Opponent::DEFAULT; 2],
+    trap_percent: 60,
+    trap_limit: Some(10),
+    trap_rules: trap::Rules::DEFAULT,
+    trap_options: Weights([1, 1, 1, 1, 0, 0, 0, 0, 0, 0]),
+    opponent: [Opponent::DEFAULT; 3],
     reaction: [Reaction::Human; 2],
     options: StartOptions { under: false, jumps_used: false },
 });
@@ -101,7 +111,7 @@ static BACK: AtomicBool = AtomicBool::new(false);
 struct Engine {
     run: Option<Run>,
     /// Per drill: the stage and the setup kept on it (`edge_juggle::Kept`).
-    kept: [Option<(StageKey, Kept)>; 2],
+    kept: [Option<(StageKey, Kept)>; 3],
     bests: [Option<(BestKey, u32)>; 24],
     streaks: [Option<(BestKey, u32)>; 24],
     held_cpu: Option<CpuBody>,
@@ -111,7 +121,7 @@ struct Engine {
 }
 static ENGINE: Mutex<Engine> = Mutex::new(Engine {
     run: None,
-    kept: [None; 2],
+    kept: [None; 3],
     bests: [None; 24],
     streaks: [None; 24],
     held_cpu: None,
@@ -247,7 +257,11 @@ pub fn publish(snapshot: &Snapshot) {
         edge_percent: select("edge_cpu_percent").min(300) as u16,
         edge_limit: limit("edge_attempts"),
         juggle_limit: limit("juggle_attempts"),
-        opponent: [Drill::GuardEdge, Drill::Juggler].map(|drill| {
+        trap_percent: select("trap_cpu_percent").min(300) as u16,
+        trap_limit: limit("trap_attempts"),
+        trap_rules: trap::Rules::from_settings(select("trap_fail"), select("trap_time")),
+        trap_options: trap::options(snapshot.get("trap_options").unwrap_or(&[])),
+        opponent: [Drill::GuardEdge, Drill::Juggler, Drill::LedgeTrap].map(|drill| {
             let picker = Picker::read(snapshot, drill);
             Opponent {
                 fighter: picker.fighter,
@@ -309,8 +323,23 @@ pub(super) fn cpu_entry() -> i32 {
     if scene::practice_scene() == Some(Scene::Lobby) { LOBBY_CPU_ENTRY } else { 1 }
 }
 
+fn capture_parent_granted() -> bool {
+    game::granted(crate::model::sites_pkg3::STATE_LINK_PARENT_OBJECT_ID_OFFSET)
+}
+
+/// Player 1 holds this CPU in a grab, or the CPU is being thrown.
+unsafe fn held_by(cpu: usize, status: i32, player: u32) -> bool {
+    if !capture_parent_granted() || status == UNRESOLVED { return false; }
+    let captured = [C::ClatterCapturePulled, C::ClatterCaptureWait, C::ClatterCapturePulledYoshi,
+        C::ClatterCaptureWaitYoshi, C::ClatterCaptureDamage, C::ClatterCaptureDamageYoshi];
+    status == konst(C::StatusThrown)
+        || captured.map(konst).contains(&status) && state::link_parent_object_id(cpu, 0) as u32 == player
+}
+
 pub fn allowed(drill: Drill) -> bool {
-    if !INSTALLED.load(Ordering::Acquire) || scene::practice_scene().is_none() {
+    if !INSTALLED.load(Ordering::Acquire) || scene::practice_scene().is_none()
+        || drill == Drill::LedgeTrap && !(super::cpu::ledge_on() && capture_parent_granted())
+    {
         return false;
     }
     if super::recording_host::cpu_playback_blocks_drill() {
@@ -369,6 +398,11 @@ pub unsafe fn controls_cpu(accessor: usize) -> bool {
     running()
         && !published::HOT_SWAP_IN_PROGRESS.load(Ordering::Acquire)
         && natives::module_accessor(cpu_entry()) == Some(accessor)
+}
+
+/// The Ledge options of the running Ledge Trap, for the body it controls.
+pub(super) unsafe fn trap_options(accessor: usize) -> Option<Weights<10>> {
+    (wanted() == Some(Drill::LedgeTrap) && controls_cpu(accessor)).then(|| CONFIG.read().trap_options)
 }
 
 pub(super) fn suspends_cpu_settings(key: FighterKey) -> bool {
@@ -584,6 +618,15 @@ pub(super) unsafe fn ai_correction(ai: usize, accessor: usize, stock: StockPad) 
     }
     if run.rounds.phase != Phase::Live {
         return Correction::default();
+    }
+    if run.drill == Drill::LedgeTrap {
+        let cliff = konst(C::SituationCliff);
+        if !game::granted(sites::SITUATION_KIND_OFFSET) || cliff == UNRESOLVED {
+            return Correction::default();
+        }
+        let hanging = natives::situation_kind(accessor) == cliff;
+        let toward = if run.stage.side(natives::pos_x(accessor)) == 0 { 1.0 } else { -1.0 };
+        return run.rounds.trap().pad(hanging, toward, buttons);
     }
     match run.opponent.mode {
         Mode::Drill(DrillId::Zoom) => return run.zoom.zoom_pad(accessor, buttons),
@@ -1534,7 +1577,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         return true;
     }
     if key_down(key::X) {
-        if run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu {
+        if run.drill != Drill::Juggler && wizard.step == WizardStep::Cpu {
             wizard.set_side_default(run.stage, false);
         } else {
             wizard.back_to_defaults(run.defaults);
@@ -1543,7 +1586,7 @@ pub unsafe fn poll(controller: usize, sample: Sample) -> bool {
         run.confirm_cpu = None;
         return true;
     }
-    if key_down(key::Y) && run.drill == Drill::GuardEdge && wizard.step == WizardStep::Cpu {
+    if key_down(key::Y) && matches!(run.drill, Drill::GuardEdge | Drill::LedgeTrap) && wizard.step == WizardStep::Cpu {
         wizard.set_side_default(run.stage, true);
         run.confirm_cpu = None;
         return true;
@@ -1587,6 +1630,20 @@ unsafe fn snap_player(p1: usize, drill: Drill, stage: Stage, [x, y]: [f32; 2]) -
     placement::floor_under(p1, [x, y], drill == Drill::Juggler)
 }
 
+unsafe fn trap_player(p1: usize, stage: Stage, at: [f32; 2]) -> Option<[f32; 2]> {
+    trap::player_start(
+        placement::floor_under(p1, at, true),
+        RayProbe::new(p1).ok_or(geometry::Unread)
+            .and_then(|mut probe| geometry::classify(&mut probe, stage.blast(), at)),
+        at,
+    )
+}
+
+fn middle_cursor(stage: Stage) -> [f32; 2] {
+    let [left, right] = stage.ledges;
+    [left[0].midpoint(right[0]), left[1].midpoint(right[1])]
+}
+
 /// Give the native fighter scripts one grounded transition before a new fall.
 unsafe fn reset_recovery_resources(p1: usize, cpu: usize, stage: Stage) -> bool {
     use crate::model::sites_pkg3 as s;
@@ -1603,8 +1660,7 @@ unsafe fn reset_recovery_resources(p1: usize, cpu: usize, stage: Stage) -> bool 
     {
         return false;
     }
-    let [left, right] = stage.ledges;
-    let cursor = [left[0].midpoint(right[0]), left[1].midpoint(right[1])];
+    let cursor = middle_cursor(stage);
     let Some([x, y]) = snap_player(p1, Drill::GuardEdge, stage, cursor) else {
         return false;
     };
@@ -1644,7 +1700,13 @@ unsafe fn on_start(p1: usize, [x, y]: [f32; 2]) -> Option<bool> {
 }
 
 unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: Stage, setup: Setup, options: StartOptions) -> Option<[f32; 2]> {
-    let Some([x, y]) = snap_player(bodies.p1, drill, stage, setup.p1) else {
+    let floor = if drill == Drill::LedgeTrap {
+        placement::floor_under(bodies.p1, setup.p1, true)
+            .or_else(|| snap_player(bodies.p1, Drill::GuardEdge, stage, middle_cursor(stage)))
+    } else {
+        snap_player(bodies.p1, drill, stage, setup.p1)
+    };
+    let Some([x, y]) = floor else {
         return None;
     };
     let [wait, fall, ground, air] = [
@@ -1685,9 +1747,13 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
     }
     let facing = if cx < x { -1.0 } else { 1.0 };
     placement::stand(bodies.p1, [x, y], facing);
-    let cpu_facing = crate::model::edge_juggle::recovery_away_facing(
-        drill, stage_key, stage, setup, natives::fighter_kind(bodies.cpu),
-    ).unwrap_or(-facing);
+    let cpu_facing = if drill == Drill::LedgeTrap {
+        if stage.side(cx) == 0 { 1.0 } else { -1.0 }
+    } else {
+        crate::model::edge_juggle::recovery_away_facing(
+            drill, stage_key, stage, setup, natives::fighter_kind(bodies.cpu),
+        ).unwrap_or(-facing)
+    };
     placement::lift(bodies.cpu, setup.cpu, cpu_facing);
     let jump_max = if options.jumps_used { state::get_param_int(bodies.cpu, crate::model::hash40::hash40("jump_count_max"), 0) } else { 0 };
     natives::set_int(bodies.cpu, drill.placed_jump_count(options.jumps_used, jump_max), jump_count);
@@ -1700,7 +1766,7 @@ unsafe fn try_place(bodies: &Bodies, drill: Drill, stage_key: StageKey, stage: S
 fn report_drill_state(capture: PracticeCapture, run: &Run, best: Option<u32>, best_streak: Option<u32>) {
     capture.submit(|| {
         let best = match run.drill {
-            Drill::GuardEdge => best_streak,
+            Drill::GuardEdge | Drill::LedgeTrap => best_streak,
             Drill::Juggler => best,
         };
         let mut fields = run.rounds.practice_fields(run.wizard, best);
@@ -1744,11 +1810,12 @@ fn post_notice(capture: PracticeCapture, run: &mut Run, best: Option<u32>, best_
         let number = match wizard.step {
             WizardStep::Cpu => 0,
             WizardStep::Percent => 1,
-            WizardStep::Player => if run.drill == Drill::GuardEdge { 1 } else { 2 },
-            WizardStep::Preview => if run.drill == Drill::GuardEdge { 2 } else { 3 },
+            WizardStep::Player => if run.drill != Drill::Juggler { 1 } else { 2 },
+            WizardStep::Preview => if run.drill != Drill::Juggler { 2 } else { 3 },
         };
         header = match run.drill {
             Drill::GuardEdge => ["Edge · 1/3", "Edge · 2/3", "Edge · 3/3"][number],
+            Drill::LedgeTrap => ["Trap · 1/3", "Trap · 2/3", "Trap · 3/3"][number],
             Drill::Juggler => [
                 "Juggle · 1/4",
                 "Juggle · 2/4",
@@ -1762,9 +1829,17 @@ fn post_notice(capture: PracticeCapture, run: &mut Run, best: Option<u32>, best_
                 "CPU x {x:.0} · Height {:+.0} · Stick or D-pad move · A next",
                 y - run.stage_floor_y,
             ),
+            WizardStep::Cpu if run.drill == Drill::LedgeTrap => write!(
+                text, "CPU on the {} ledge · Y other side · A next",
+                if run.stage.side(x) == 0 { "left" } else { "right" },
+            ),
             WizardStep::Cpu => write!(text, "CPU ({x:.0}, {y:.0}) · Stick or D-pad move · A next · X default start · Y other side"),
             WizardStep::Percent => write!(text, "{percent}% · D-pad change · A next"),
             WizardStep::Player => write!(text, "P1 ({px:.0}, {py:.0}) · Stick or D-pad move · A next"),
+            WizardStep::Preview if run.drill == Drill::LedgeTrap => write!(
+                text, "{} ledge · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start",
+                if run.stage.side(x) == 0 { "Left" } else { "Right" },
+            ),
             WizardStep::Preview => write!(
                 text,
                 "CPU ({x:.0}, {y:.0}) · {percent}% · P1 ({px:.0}, {py:.0}) · A/+ start"
@@ -1778,16 +1853,22 @@ fn post_notice(capture: PracticeCapture, run: &mut Run, best: Option<u32>, best_
         );
     } else if matches!(run.opponent.mode, Mode::Drill(DrillId::Zoom)) {
         let _ = write!(text, "{outcome}  Zoom wins {secured}/{attempts} · 8 MP minimum before cast");
-    } else if run.drill == Drill::GuardEdge {
+    } else if run.drill != Drill::Juggler {
         let _ = write!(
             text,
             "{outcome}  {secured}/{attempts} · Streak {streak} · Best {best_streak}"
         );
-        if matches!(phase, Phase::Result(Outcome::Secured, _)) {
+        if matches!(phase, Phase::Result(Outcome::Secured | Outcome::KeptOffKo, _)) {
             let _ = write!(text, " · {time:.2} s");
         }
         if let Some(best) = best {
             let _ = write!(text, " · Fastest {:.2} s", best as f32 / 60.0);
+        }
+        let trap = run.rounds.trap();
+        if run.drill == Drill::LedgeTrap && phase == Phase::Live && trap.clock() > 0 {
+            let clock = f32::from(trap.clock() / 30) * 0.5;
+            let fail = f32::from(trap.rules.fail) / 60.0;
+            let _ = write!(text, " · On stage {clock:.1}/{fail:.1} s");
         }
     } else {
         let _ = write!(text, "{outcome}  Airtime {time:.2} s · Hits {hits}");
@@ -1984,6 +2065,7 @@ pub unsafe fn frame(fighter: usize) {
         let (percent, limit) = match drill {
             Drill::GuardEdge => (config.edge_percent, config.edge_limit),
             Drill::Juggler => (JUGGLE_PERCENT, config.juggle_limit),
+            Drill::LedgeTrap => (config.trap_percent, config.trap_limit),
         };
         let open = |point| {
             RayProbe::new(p1).is_some_and(|mut probe| {
@@ -1998,14 +2080,14 @@ pub unsafe fn frame(fighter: usize) {
             .and_then(|(_, kept)| wizard.kept_setup(stage, kept, config.options));
         let editing = start == 2 || last.is_none();
         let mut setup = last.unwrap_or(wizard.setup);
-        if drill == Drill::GuardEdge {
+        if drill != Drill::Juggler {
             setup.percent = percent;
         }
         engine.run = Some(Run {
             drill,
             opponent,
             zoom: zoom::NativeAttempt::default(),
-            reaction: config.reaction[drill as usize],
+            reaction: config.reaction.get(drill as usize).copied().unwrap_or(Reaction::Human),
             threat: ThreatClock::default(),
             stage,
             stage_floor_y: p1_start[1],
@@ -2017,7 +2099,7 @@ pub unsafe fn frame(fighter: usize) {
             options: config.options,
             confirm_cpu: None,
             cpu_view: CpuView::NotHeld,
-            rounds: Session::new(drill, limit),
+            rounds: Session::new(drill, limit).with_rules(config.trap_rules),
             body,
             previous_damage: None,
             damage_stop: false,
@@ -2108,12 +2190,18 @@ pub unsafe fn frame(fighter: usize) {
         run.damage_stop = false;
         run.player_ledge = None;
     }
-    let bucket = if drill == Drill::GuardEdge { run.stage.bucket(run.setup.cpu) } else { 0 };
+    let bucket = if drill != Drill::Juggler { run.stage.bucket(run.setup.cpu) } else { 0 };
     let key = (drill, kind, bucket, run.opponent.mode);
     if let Some(wizard) = &mut run.wizard {
         if wizard.step == WizardStep::Player {
             let confirm = std::mem::take(&mut run.confirm_player);
-            let placed = wizard.settle_player(|point| snap_player(p1, drill, run.stage, point));
+            let placed = wizard.settle_player(|point| {
+                if drill == Drill::LedgeTrap {
+                    trap_player(p1, run.stage, point)
+                } else {
+                    snap_player(p1, drill, run.stage, point)
+                }
+            });
             if placed && confirm {
                 wizard.advance();
             } else if confirm {
@@ -2121,12 +2209,17 @@ pub unsafe fn frame(fighter: usize) {
             }
         }
         if let Some(at) = run.confirm_cpu.take() {
-            let place = RayProbe::new(p1).ok_or(geometry::Unread)
-                .and_then(|mut stage| geometry::classify(&mut stage, run.stage.blast(), at));
+            let place = if drill == Drill::LedgeTrap {
+                Ok(geometry::Place::Open)
+            } else {
+                RayProbe::new(p1).ok_or(geometry::Unread)
+                    .and_then(|mut stage| geometry::classify(&mut stage, run.stage.blast(), at))
+            };
             if wizard.confirm_start(at, place, run.options) == Some(false) {
                 match drill {
                     Drill::GuardEdge => notices::refuse("Pick a point off the stage"), // restriction: edge-juggle-start-over-stage
                     Drill::Juggler => notices::refuse("Pick a point over the stage or beside it"), // restriction: edge-juggle-juggler-start
+                    Drill::LedgeTrap => {}
                 }
             }
         }
@@ -2167,6 +2260,11 @@ pub unsafe fn frame(fighter: usize) {
         cliff_catch: status == konst(C::StatusCliffCatch) && !trump,
         player_back: p1_situation == konst(C::SituationGround) || p1_situation == konst(C::SituationCliff),
         player_ko: player_ko(p1),
+        hanging: situation == konst(C::SituationCliff),
+        on_run: run.stage.on_run(natives::pos_x(cpu)),
+        grabbed: drill == Drill::LedgeTrap && held_by(cpu, status, natives::battle_object_id(p1)),
+        stunned: drill == Drill::LedgeTrap && trap::stunned(damage_stop, status, konst),
+        downed: drill == Drill::LedgeTrap && trap::downed(status, konst),
         hit: damage_stop && !run.damage_stop
             || damage
                 .zip(run.previous_damage)
@@ -2263,6 +2361,15 @@ pub unsafe fn frame(fighter: usize) {
         }
         if matches!(before, Phase::Ready(_)) && run.rounds.phase == Phase::Live {
             run.route_history.start();
+            let jump_count = konst(C::WorkIntJumpCount);
+            if drill == Drill::LedgeTrap && jump_count != UNRESOLVED
+                && placement::floor_under(p1, run.setup.p1, true).is_none()
+            {
+                let facing = if run.setup.cpu[0] < run.setup.p1[0] { -1.0 } else { 1.0 };
+                placement::lift(p1, run.setup.p1, facing);
+                placement::fall(p1);
+                natives::set_int(p1, 1, jump_count);
+            }
             if kind == game_watch::KIND && drill == Drill::GuardEdge && run.opponent.mode == Mode::Perfect {
                 run.oil_stall.next_attempt();
                 run.oil_draw = [rng.next_u32(), rng.next_u32()];
@@ -2287,7 +2394,10 @@ pub unsafe fn frame(fighter: usize) {
                 state::set_sleep(cpu, false);
             }
         }
-        if run.rounds.record_result(bests, key).is_some() && drill == Drill::GuardEdge {
+        let recorded = run.rounds.record_result(bests, key).is_some();
+        if drill != Drill::Juggler && (recorded
+            || matches!((drill, before, run.rounds.phase), (Drill::LedgeTrap, Phase::Live, Phase::Result(Outcome::KeptOffTime, _))))
+        {
             crate::model::practice_games::record_max(streaks, key, u32::from(run.rounds.streak));
         }
     }
