@@ -1,27 +1,57 @@
+//! Detects cut picture files before the game casts them and records a diagnostic without changing game state.
+//! The guarded hook at `main+0x37a2dd4` uses a stack line and a fixed, lock-free record.
+//! See `docs/DECISIONS.md#rc16-cut-file-diagnostic`.
+
 use core::fmt;
+use core::fmt::Write;
 use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
+/// The picture-copy seam in 13.0.5.
 pub const SITE: usize = 0x37a2dd4;
+/// Maximum card lines per boot.
 pub const CAP: usize = 8;
+/// Minimum BNTX header length.
 pub const MIN_BYTES: usize = 0x20;
+/// Fixed card-line length.
 pub const LINE: usize = 512;
+/// Maximum card-file size.
 pub const FILE_CAP: u64 = 64 * 1024;
+/// Persistence result when another line would exceed the cap.
 pub const FILE_FULL: u32 = 0xffff_fffe;
+/// NUL-terminated card-file path.
 pub const PATH: &[u8] = b"sd:/ultimate/TrainingRooms/cut-files.log\0";
+/// NUL-terminated ARCropolis API version export.
 pub const API_SYMBOL: &[u8] = b"arcrop_api_version\0";
+/// NUL-terminated fork guarantee export.
 pub const GUARANTEE_SYMBOL: &[u8] = b"arcrop_refuses_cut_files\0";
+/// The crate's version, in every line.
+pub const TR_VERSION: &str = env!("CARGO_PKG_VERSION");
+/// The row's label (`seam_install::gate` takes labels).
+pub const ROW: &str = "cut_file.picture_copied";
 
+/// The two distinct picture-file findings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Event { CutFile, BrokenEnd }
+pub enum Event {
+    /// The declared data or relocation table extends beyond the copy.
+    CutFile,
+    /// The relocation table is missing or has no sections.
+    BrokenEnd,
+}
 
+/// Header and copy sizes for a finding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Finding {
+    /// The kind of finding.
     pub event: Event,
+    /// Bytes copied by the game.
     pub copied: u64,
+    /// Size declared in the header.
     pub declared: u32,
+    /// Relocation table offset.
     pub table: u32,
 }
 
+/// Inspect only the copied bytes, returning the first matching finding.
 pub fn inspect(copy: &[u8]) -> Option<Finding> {
     if copy.len() < MIN_BYTES || copy.get(..4)? != b"BNTX" || copy.get(0xc..0xe)? != [0xff, 0xfe] {
         return None;
@@ -43,58 +73,68 @@ pub fn inspect(copy: &[u8]) -> Option<Finding> {
     Some(Finding { event, copied, declared, table })
 }
 
+/// What the hook knows about one copy besides its bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Arcropolis {
-    NotLoaded,
-    UpstreamOrOlderFork { api: Option<(u32, u32)> },
-    Fork { api: Option<(u32, u32)>, guarantee: u32 },
+pub struct CopyMeta {
+    /// File-table index.
+    pub index: u32,
+    /// Address of the game's copy.
+    pub address: u64,
+    /// Console uptime in milliseconds.
+    pub at_ms: u64,
 }
 
-pub fn classify(api: Option<(u32, u32)>, guarantee: Option<u32>) -> Arcropolis {
-    match (api, guarantee.filter(|&value| value != 0)) {
-        (api, Some(guarantee)) => Arcropolis::Fork { api, guarantee },
-        (Some(api), None) => Arcropolis::UpstreamOrOlderFork { api: Some(api) },
-        (None, None) => Arcropolis::NotLoaded,
-    }
+/// The boot line's ARCropolis API and fork marker.
+pub struct BootLine {
+    /// API version if exported.
+    pub api: Option<(u32, u32)>,
+    /// Nonzero fork guarantee version, if exported.
+    pub guarantee: Option<u32>,
 }
 
-impl core::fmt::Display for Arcropolis {
+impl core::fmt::Display for BootLine {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::NotLoaded => f.write_str("ARCropolis not loaded"),
-            Self::UpstreamOrOlderFork { api } => {
-                f.write_str("ARCropolis")?;
-                if let Some((major, minor)) = api { write!(f, " API {major}.{minor}")?; }
-                f.write_str(" (upstream or older fork)")
-            }
-            Self::Fork { api, guarantee } => {
-                f.write_str("ARCropolis")?;
-                if let Some((major, minor)) = api { write!(f, " API {major}.{minor}")?; }
-                write!(f, " (fork, cut-file guarantee v{guarantee})")
-            }
+        let guarantee = self.guarantee.filter(|&value| value != 0);
+        if self.api.is_none() && guarantee.is_none() { return f.write_str("ARCropolis not loaded"); }
+        f.write_str("ARCropolis")?;
+        if let Some((major, minor)) = self.api { write!(f, " API {major}.{minor}")?; }
+        match guarantee {
+            Some(value) => write!(f, " (fork, cut-file guarantee v{value})"),
+            None => f.write_str(" (upstream or older fork)"),
         }
     }
 }
 
+/// One detection and its persistence result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Entry {
+    /// The detected header condition.
     pub finding: Finding,
-    pub index: u32,
-    pub copy: u64,
-    pub at_ms: u64,
+    /// File index, copy address and uptime.
+    pub meta: CopyMeta,
+    /// Fork guarantee version, if present.
     pub guarantee: Option<u32>,
+    /// Zero on success, otherwise a persistence error.
     pub persisted: u32,
 }
 
+/// The append operations used by the hook and the fake sink.
 pub trait Sink {
+    /// Create the file if absent.
     fn create(&mut self);
+    /// Open the file for reading and writing.
     fn open(&mut self) -> Result<(), u32>;
+    /// Read its current size.
     fn size(&mut self) -> Result<u64, u32>;
+    /// Extend it to the requested size.
     fn grow(&mut self, size: u64) -> Result<(), u32>;
+    /// Write and flush one line.
     fn write_flush(&mut self, offset: u64, bytes: &[u8]) -> Result<(), u32>;
+    /// Close a successfully opened file.
     fn close(&mut self);
 }
 
+/// Append one line under the file cap and close after a successful open.
 pub fn persist<S: Sink>(sink: &mut S, line: &[u8; LINE]) -> u32 {
     S::create(sink);
     if let Err(error) = S::open(sink) { return error; }
@@ -122,58 +162,77 @@ impl fmt::Write for LineWriter {
     }
 }
 
-pub fn line(entry: &Entry, tr_version: &str) -> [u8; LINE] {
+/// Format one space-padded, newline-terminated card line.
+pub fn line(entry: &Entry) -> [u8; LINE] {
     let mut output = LineWriter { bytes: [b' '; LINE], len: 0 };
-    let _ = write_text(&mut output, entry, tr_version);
+    let _ = write!(output, "{entry}");
     output.bytes[LINE - 1] = b'\n';
     output.bytes
 }
 
-pub fn write_text(out: &mut impl core::fmt::Write, entry: &Entry, tr_version: &str) -> core::fmt::Result {
-    let Finding { event, copied, declared, table } = entry.finding;
-    let event_name = match event { Event::CutFile => "cut_file", Event::BrokenEnd => "broken_end" };
-    write!(out, "{} {event_name} declares={declared} copied={copied} table={table:#x} index={:#x} copy={:#x} arcropolis=",
-        entry.at_ms, entry.index, entry.copy)?;
-    match entry.guarantee.filter(|&value| value != 0) {
-        Some(value) => write!(out, "fork-guarantee-v{value}")?,
-        None => out.write_str("upstream-or-older-fork")?,
+impl fmt::Display for Entry {
+    fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Finding { event, copied, declared, table } = self.finding;
+        let event_name = match event { Event::CutFile => "cut_file", Event::BrokenEnd => "broken_end" };
+        write!(out, "{} {event_name} declares={declared} copied={copied} table={table:#x} index={:#x} copy={:#x} arcropolis=",
+            self.meta.at_ms, self.meta.index, self.meta.address)?;
+        match self.guarantee.filter(|&value| value != 0) {
+            Some(value) => write!(out, "fork-guarantee-v{value}")?,
+            None => out.write_str("upstream-or-older-fork")?,
+        }
+        write!(out, " tr={TR_VERSION} | ")?;
+        match (event, self.guarantee.filter(|&value| value != 0)) {
+            (Event::CutFile, None) => write!(out,
+                "A mod file reached the game cut short (declares {declared} bytes, {copied} copied): an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) refuses cut files."),
+            (Event::CutFile, Some(_)) => write!(out,
+                "Unexpected cut file with the fork (declares {declared} bytes, {copied} copied); please report."),
+            (Event::BrokenEnd, _) => write!(out,
+                "A picture file reached the game with a broken end ({declared} bytes, relocation table not found): not the ARCropolis cut; please report."),
+        }
     }
-    write!(out, " tr={tr_version} | ")?;
-    match (event, entry.guarantee.filter(|&value| value != 0)) {
-        (Event::CutFile, None) => write!(out,
-            "A mod file reached the game cut short (declares {declared} bytes, {copied} copied): an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) refuses cut files."),
-        (Event::CutFile, Some(_)) => write!(out,
-            "Unexpected cut file with the fork (declares {declared} bytes, {copied} copied); please report."),
-        (Event::BrokenEnd, _) => write!(out,
-            "A picture file reached the game with a broken end ({declared} bytes, relocation table not found): not the ARCropolis cut; please report."),
+}
+
+impl Entry {
+    fn pack(&self) -> [u64; 6] {
+        [
+            self.finding.copied,
+            u64::from(self.finding.declared) | (u64::from(self.finding.table) << 32),
+            u64::from(self.meta.index) | (u64::from(self.persisted) << 32),
+            self.meta.address,
+            self.meta.at_ms,
+            u64::from(self.finding.event == Event::BrokenEnd)
+                | (u64::from(self.guarantee.is_some()) << 8)
+                | (u64::from(self.guarantee.unwrap_or(0)) << 32),
+        ]
+    }
+
+    fn unpack(words: [u64; 6]) -> Entry {
+        Entry {
+            finding: Finding {
+                event: if words[5] & 1 == 0 { Event::CutFile } else { Event::BrokenEnd },
+                copied: words[0],
+                declared: words[1] as u32,
+                table: (words[1] >> 32) as u32,
+            },
+            meta: CopyMeta { index: words[2] as u32, address: words[3], at_ms: words[4] },
+            guarantee: (words[5] & (1 << 8) != 0).then_some((words[5] >> 32) as u32),
+            persisted: (words[2] >> 32) as u32,
+        }
     }
 }
 
 struct Slot {
     ready: AtomicBool,
-    event: AtomicU32,
-    copied: AtomicU64,
-    declared: AtomicU32,
-    table: AtomicU32,
-    index: AtomicU32,
-    copy: AtomicU64,
-    at_ms: AtomicU64,
-    has_guarantee: AtomicBool,
-    guarantee: AtomicU32,
-    persisted: AtomicU32,
+    words: [AtomicU64; 6],
 }
 
 impl Slot {
     const fn new() -> Self {
-        Self {
-            ready: AtomicBool::new(false), event: AtomicU32::new(0), copied: AtomicU64::new(0),
-            declared: AtomicU32::new(0), table: AtomicU32::new(0), index: AtomicU32::new(0),
-            copy: AtomicU64::new(0), at_ms: AtomicU64::new(0), has_guarantee: AtomicBool::new(false),
-            guarantee: AtomicU32::new(0), persisted: AtomicU32::new(0),
-        }
+        Self { ready: AtomicBool::new(false), words: [const { AtomicU64::new(0) }; 6] }
     }
 }
 
+/// Eight lock-free published slots and their overflow count.
 pub struct Records {
     seen: AtomicU32,
     reported: AtomicU32,
@@ -185,62 +244,40 @@ impl Default for Records {
 }
 
 impl Records {
+    /// Start a fresh boot's records.
     pub const fn new() -> Self {
         Self { seen: AtomicU32::new(0), reported: AtomicU32::new(0), slots: [const { Slot::new() }; CAP] }
     }
 
-    pub fn detected<S: Sink>(
-        &self, sink: &mut S, finding: Finding, index: u32, copy: u64, at_ms: u64,
-        guarantee: Option<u32>, tr_version: &str,
-    ) -> Option<usize> {
+    /// Persist a detection before publishing its claimed slot.
+    pub fn detected<S: Sink>(&self, sink: &mut S, finding: Finding, meta: CopyMeta, guarantee: Option<u32>) -> Option<usize> {
         let number = self.seen.fetch_add(1, Ordering::Relaxed) as usize;
         let slot = self.slots.get(number)?;
-        let entry = Entry { finding, index, copy, at_ms, guarantee, persisted: 0 };
-        let persisted = persist(sink, &line(&entry, tr_version));
-        slot.event.store(u32::from(finding.event == Event::BrokenEnd), Ordering::Relaxed);
-        slot.copied.store(finding.copied, Ordering::Relaxed);
-        slot.declared.store(finding.declared, Ordering::Relaxed);
-        slot.table.store(finding.table, Ordering::Relaxed);
-        slot.index.store(index, Ordering::Relaxed);
-        slot.copy.store(copy, Ordering::Relaxed);
-        slot.at_ms.store(at_ms, Ordering::Relaxed);
-        slot.has_guarantee.store(guarantee.is_some(), Ordering::Relaxed);
-        slot.guarantee.store(guarantee.unwrap_or(0), Ordering::Relaxed);
-        slot.persisted.store(persisted, Ordering::Relaxed);
+        let mut entry = Entry { finding, meta, guarantee, persisted: 0 };
+        entry.persisted = persist(sink, &line(&entry));
+        for (word, value) in slot.words.iter().zip(entry.pack()) { word.store(value, Ordering::Relaxed); }
         slot.ready.store(true, Ordering::Release);
         Some(number)
     }
 
+    /// Take the next published slot on the single drain thread.
     pub fn take(&self) -> Option<Entry> {
         let number = self.reported.load(Ordering::Relaxed);
         let slot = self.slots.get(number as usize)?;
         if !slot.ready.load(Ordering::Acquire) { return None; }
-        let entry = Entry {
-            finding: Finding {
-                event: if slot.event.load(Ordering::Relaxed) == 0 { Event::CutFile } else { Event::BrokenEnd },
-                copied: slot.copied.load(Ordering::Relaxed),
-                declared: slot.declared.load(Ordering::Relaxed),
-                table: slot.table.load(Ordering::Relaxed),
-            },
-            index: slot.index.load(Ordering::Relaxed),
-            copy: slot.copy.load(Ordering::Relaxed),
-            at_ms: slot.at_ms.load(Ordering::Relaxed),
-            guarantee: slot.has_guarantee.load(Ordering::Relaxed).then(|| slot.guarantee.load(Ordering::Relaxed)),
-            persisted: slot.persisted.load(Ordering::Relaxed),
-        };
+        let entry = Entry::unpack(slot.words.each_ref().map(|word| word.load(Ordering::Relaxed)));
         self.reported.store(number + 1, Ordering::Relaxed);
         Some(entry)
     }
 
+    /// Number of detections after the eighth.
     pub fn overflow(&self) -> u32 { self.seen.load(Ordering::Relaxed).saturating_sub(CAP as u32) }
 }
 
-pub fn on_copy<S: Sink>(
-    records: &Records, sink: &mut S, copy: &[u8], index: u32, address: u64,
-    at_ms: u64, guarantee: impl FnOnce() -> Option<u32>, tr_version: &str,
-) -> Option<usize> {
+/// Inspect a copy, asking for the marker and touching the sink only on a finding.
+pub fn on_copy<S: Sink>(records: &Records, sink: &mut S, copy: &[u8], meta: CopyMeta, guarantee: impl FnOnce() -> Option<u32>) -> Option<usize> {
     let finding = inspect(copy)?;
-    records.detected(sink, finding, index, address, at_ms, guarantee(), tr_version)
+    records.detected(sink, finding, meta, guarantee())
 }
 
 #[cfg(test)]
@@ -263,6 +300,10 @@ mod tests {
 
     fn cut() -> Finding {
         Finding { event: Event::CutFile, copied: 4096, declared: 8296, table: 0x2000 }
+    }
+
+    fn meta(index: u32, address: u64, at_ms: u64) -> CopyMeta {
+        CopyMeta { index, address, at_ms }
     }
 
     #[derive(Default)]
@@ -356,14 +397,14 @@ mod tests {
     fn detection_persists_a_fixed_line_before_publication() {
         let records = Records::new();
         let mut sink = FakeSink::default();
-        assert_eq!(records.detected(&mut sink, cut(), 0x27, 0xabc, 1234, None, "1.2.3"), Some(0));
+        assert_eq!(records.detected(&mut sink, cut(), meta(0x27, 0xabc, 1234), None), Some(0));
         assert_eq!(sink.calls, ["create", "open", "size", "grow", "write", "close"]);
         assert!(!sink.open);
         assert_eq!(sink.bytes.len(), LINE);
         assert_eq!(sink.bytes[LINE - 1], b'\n');
         assert!(sink.bytes.starts_with(b"1234 cut_file declares=8296 copied=4096"));
         assert_eq!(records.take(), Some(Entry {
-            finding: cut(), index: 0x27, copy: 0xabc, at_ms: 1234, guarantee: None, persisted: 0,
+            finding: cut(), meta: meta(0x27, 0xabc, 1234), guarantee: None, persisted: 0,
         }));
         assert_eq!(records.take(), None);
     }
@@ -384,7 +425,7 @@ mod tests {
         assert!(!sink.open);
         let records = Records::new();
         let mut sink = FakeSink { fail: Some("write"), ..FakeSink::default() };
-        assert_eq!(records.detected(&mut sink, cut(), 0, 1, 2, None, "1"), Some(0));
+        assert_eq!(records.detected(&mut sink, cut(), meta(0, 1, 2), None), Some(0));
         assert_eq!(records.take().map(|entry| entry.persisted), Some(42));
         assert!(!sink.open);
     }
@@ -394,16 +435,16 @@ mod tests {
         let records = Records::new();
         let mut sink = FakeSink::default();
         for i in 0..CAP {
-            assert_eq!(records.detected(&mut sink, cut(), i as u32, 4, 9, None, "1"), Some(i));
+            assert_eq!(records.detected(&mut sink, cut(), meta(i as u32, 4, 9), None), Some(i));
         }
         let calls = sink.calls.len();
         let length = sink.bytes.len();
-        assert_eq!(records.detected(&mut sink, cut(), 99, 4, 9, None, "1"), None);
+        assert_eq!(records.detected(&mut sink, cut(), meta(99, 4, 9), None), None);
         assert_eq!(sink.calls.len(), calls);
         assert_eq!(sink.bytes.len(), length);
         assert_eq!(records.overflow(), 1);
         for i in 0..CAP {
-            assert_eq!(records.take().map(|entry| entry.index), Some(i as u32));
+            assert_eq!(records.take().map(|entry| entry.meta.index), Some(i as u32));
         }
         assert_eq!(records.take(), None);
     }
@@ -413,23 +454,23 @@ mod tests {
         let records = Records::new();
         let mut sink = FakeSink::default();
         let asked = Cell::new(false);
-        let result = on_copy(&records, &mut sink, &bntx(), 0, 0, 0, || {
+        let result = on_copy(&records, &mut sink, &bntx(), meta(0, 0, 0), || {
             asked.set(true);
             Some(1)
-        }, "1");
+        });
         assert_eq!(result, None);
         assert!(!asked.get());
         assert!(sink.calls.is_empty());
         assert_eq!(records.take(), None);
         let bytes = bntx();
-        let result = on_copy(&records, &mut sink, &bytes[..4096], 7, 0x1234, 55, || {
+        let result = on_copy(&records, &mut sink, &bytes[..4096], meta(7, 0x1234, 55), || {
             asked.set(true);
             Some(1)
-        }, "1");
+        });
         assert_eq!(result, Some(0));
         assert!(asked.get());
         assert_eq!(records.take(), Some(Entry {
-            finding: cut(), index: 7, copy: 0x1234, at_ms: 55, guarantee: Some(1), persisted: 0,
+            finding: cut(), meta: meta(7, 0x1234, 55), guarantee: Some(1), persisted: 0,
         }));
     }
 
@@ -437,39 +478,63 @@ mod tests {
     fn sentences_are_event_specific_and_the_longest_line_fits() {
         let entry = Entry {
             finding: Finding { event: Event::CutFile, copied: u64::MAX, declared: u32::MAX, table: u32::MAX },
-            index: u32::MAX, copy: u64::MAX, at_ms: u64::MAX, guarantee: None, persisted: 0,
+            meta: meta(u32::MAX, u64::MAX, u64::MAX), guarantee: None, persisted: u32::MAX,
         };
-        let mut text = String::new();
-        write_text(&mut text, &entry, "255.255.255").unwrap();
-        assert!(text.contains("an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) refuses cut files."));
+        let text = entry.to_string();
+        assert_eq!(text, format!(
+            "{} cut_file declares={} copied={} table={:#x} index={:#x} copy={:#x} arcropolis=upstream-or-older-fork tr={} | A mod file reached the game cut short (declares {} bytes, {} copied): an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) refuses cut files.",
+            u64::MAX, u32::MAX, u64::MAX, u32::MAX, u32::MAX, u64::MAX, TR_VERSION, u32::MAX, u64::MAX
+        ));
         assert!(text.len() < LINE);
-        let fixed = line(&entry, "255.255.255");
+        let fixed = line(&entry);
         assert_eq!(&fixed[..text.len()], text.as_bytes());
         assert!(fixed[text.len()..LINE - 1].iter().all(|&byte| byte == b' '));
         assert_eq!(fixed[LINE - 1], b'\n');
-        let mut fork = String::new();
-        write_text(&mut fork, &Entry { guarantee: Some(1), ..entry }, "1").unwrap();
-        assert!(fork.contains("Unexpected cut file with the fork"));
-        assert!(!fork.contains("ARCropolis defect"));
-        let mut zero = String::new();
-        write_text(&mut zero, &Entry { guarantee: Some(0), ..entry }, "1").unwrap();
-        assert!(zero.contains("arcropolis=upstream-or-older-fork"));
-        assert!(zero.contains("an ARCropolis defect"));
-        let mut broken = String::new();
-        write_text(&mut broken, &Entry { finding: Finding { event: Event::BrokenEnd, ..entry.finding }, ..entry }, "1").unwrap();
-        assert!(broken.contains("not the ARCropolis cut; please report."));
-        assert!(!broken.contains("ARCropolis defect"));
-        assert!(!broken.contains("refuses cut files"));
+        let fork = Entry { guarantee: Some(u32::MAX), ..entry }.to_string();
+        assert_eq!(fork, format!(
+            "{} cut_file declares={} copied={} table={:#x} index={:#x} copy={:#x} arcropolis=fork-guarantee-v{} tr={} | Unexpected cut file with the fork (declares {} bytes, {} copied); please report.",
+            u64::MAX, u32::MAX, u64::MAX, u32::MAX, u32::MAX, u64::MAX, u32::MAX, TR_VERSION, u32::MAX, u64::MAX
+        ));
+        assert_eq!(Entry { guarantee: Some(0), ..entry }.to_string(), text);
+        let broken = Entry { finding: Finding { event: Event::BrokenEnd, ..entry.finding }, guarantee: Some(1), ..entry }.to_string();
+        assert_eq!(broken, format!(
+            "{} broken_end declares={} copied={} table={:#x} index={:#x} copy={:#x} arcropolis=fork-guarantee-v1 tr={} | A picture file reached the game with a broken end ({} bytes, relocation table not found): not the ARCropolis cut; please report.",
+            u64::MAX, u32::MAX, u64::MAX, u32::MAX, u32::MAX, u64::MAX, TR_VERSION, u32::MAX
+        ));
+        for value in [Entry { guarantee: Some(u32::MAX), ..entry },
+            Entry { finding: Finding { event: Event::BrokenEnd, ..entry.finding }, guarantee: Some(u32::MAX), ..entry }] {
+            let text = value.to_string();
+            let fixed = line(&value);
+            assert!(text.len() < LINE);
+            assert_eq!(&fixed[..text.len()], text.as_bytes());
+            assert_eq!(fixed[text.len() - 1], b'.');
+        }
     }
 
     #[test]
     fn boot_line_classifies_api_and_real_guarantee() {
-        assert_eq!(classify(None, None).to_string(), "ARCropolis not loaded");
-        assert_eq!(classify(None, Some(0)).to_string(), "ARCropolis not loaded");
-        assert_eq!(classify(Some((1, 9)), None).to_string(), "ARCropolis API 1.9 (upstream or older fork)");
-        assert_eq!(classify(Some((1, 9)), Some(0)).to_string(), "ARCropolis API 1.9 (upstream or older fork)");
-        assert_eq!(classify(Some((1, 9)), Some(1)).to_string(), "ARCropolis API 1.9 (fork, cut-file guarantee v1)");
-        assert_eq!(classify(None, Some(2)).to_string(), "ARCropolis (fork, cut-file guarantee v2)");
+        assert_eq!(BootLine { api: None, guarantee: None }.to_string(), "ARCropolis not loaded");
+        assert_eq!(BootLine { api: None, guarantee: Some(0) }.to_string(), "ARCropolis not loaded");
+        assert_eq!(BootLine { api: Some((1, 9)), guarantee: None }.to_string(), "ARCropolis API 1.9 (upstream or older fork)");
+        assert_eq!(BootLine { api: Some((1, 9)), guarantee: Some(0) }.to_string(), "ARCropolis API 1.9 (upstream or older fork)");
+        assert_eq!(BootLine { api: Some((1, 9)), guarantee: Some(1) }.to_string(), "ARCropolis API 1.9 (fork, cut-file guarantee v1)");
+        assert_eq!(BootLine { api: None, guarantee: Some(1) }.to_string(), "ARCropolis (fork, cut-file guarantee v1)");
+    }
+
+    #[test]
+    fn packed_entries_round_trip_every_field() {
+        let entry = Entry {
+            finding: Finding { event: Event::BrokenEnd, copied: u64::MAX, declared: u32::MAX, table: u32::MAX },
+            meta: meta(u32::MAX, u64::MAX, u64::MAX),
+            guarantee: Some(u32::MAX),
+            persisted: u32::MAX,
+        };
+        for guarantee in [Some(u32::MAX), None, Some(1), Some(0)] {
+            for event in [Event::CutFile, Event::BrokenEnd] {
+                let value = Entry { finding: Finding { event, ..entry.finding }, guarantee, ..entry };
+                assert_eq!(Entry::unpack(value.pack()), value);
+            }
+        }
     }
 
     #[test]

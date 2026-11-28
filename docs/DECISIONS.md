@@ -3,13 +3,87 @@
 <a id="rc16-cut-file-diagnostic"></a>
 ## Cut-file diagnostic — 2026-11-28
 
-The picture-copy observer checks the copied BNTX header and relocation-table end without changing game state.
-At most eight detections per boot synchronously append a flushed, fixed-size line to
-`sd:/ultimate/TrainingRooms/cut-files.log`, capped at 64 KiB; later detections are counted only. A later
-diagnostic line reports the persistence result if the game survives. For a cut file the message distinguishes
-the guarantee marker from an upstream or older fork; a broken end is distinct and does not attribute the
-damage to that defect. The guarded inline hook requires the five overwritten words to be stock; an occupied
-or foreign site is left untouched.
+Stock ARCropolis can copy only the beginning of a too-long mod file and let the game use it. A cut BNTX can
+crash the game's texture setup; the crashbandicode ARCropolis fork refuses such a file with the buffer untouched.
+TrainingRooms observes picture copies without changing game state, and records a detection before the game
+continues. The fork advertises the fix through `arcrop_refuses_cut_files() -> u32`; version 1 is the cut-file
+guarantee. An absent or zero marker is an upstream or older fork, not a parsed version string.
+
+### Site (13.0.5)
+
+| Address | Instruction | Purpose |
+| --- | --- | --- |
+| `main+0x37a2dc0` | `ldr x1, [x8]` | source: loaded file |
+| `main+0x37a2dc8` | `mov x0, x21` | destination: game's fresh block |
+| `main+0x37a2dcc` | `mov x2, x20` | bytes: size in the game's file table |
+| `main+0x37a2dd0` | `bl memcpy` | copy |
+| `main+0x37a2dd4` | `mov x0, x21` | hook after the copy, before the cast |
+| `main+0x37a2dd8` | `str x20, [x19, #0x10]` | |
+| `main+0x37a2ddc` | `bl main+0x31100` | relocation cast |
+
+At the hook `x21` is the copy, `x20` its length and `x19` the texture record, whose first u32 is the file-table
+index. After the copy, the bytes in the game's own block are the source bytes; reading them needs no volatile
+register. Before the cast, a cut file can be logged before the cast reads beyond the block and faults.
+
+Skyline writes one branch or a far jump: here 20 bytes, because the site is four past an eight-byte boundary.
+The five guarded words `0x37a2dd4..0x37a2de8` contain one PC-relative `bl main+0x31100`, which the trampoline
+relocates. The owned 13.0.5 ELF scan found no direct branch into `0x37a2dd8..0x37a2de8` and no x16 or x17
+in the enclosing function `0x37a2c70..0x37a2e18`. TrainingRooms hooks nothing else in that function; another
+plugin's write in the five words makes the guard refuse the hook and its install line says so. The second
+similar copy at `main+0x37a35e4` is not hooked: it did not run in the replay-memory boots and crash 3 took
+the first.
+
+### Detection and record
+
+Reads are bounded by the copied slice; the first match wins.
+
+| Test | Result |
+| --- | --- |
+| Less than `0x20` bytes | none |
+| Magic is not `BNTX`, or byte order at `0xc` is not `ff fe` | none |
+| Declared u32 size at `0x1c` exceeds the copy, or table u32 offset at `0x18` plus `0x10` exceeds it | cut file |
+| Table magic is not `_RLT`, or its i32 section count at `+8` is below 1 | broken end |
+| Otherwise, including a declared size smaller than the copy | none |
+
+On a finding, the hook claims one of eight slots per boot and synchronously appends one 512-byte, space-padded,
+newline-terminated line with flush and close to `sd:/ultimate/TrainingRooms/cut-files.log`. The file is capped at
+64 KiB; later findings after the eighth only increment a counter. The normal path does not touch the file.
+The line is:
+
+```text
+<uptime ms> cut_file declares=<N> copied=<M> table=<0x…> index=<0x…> copy=<0x…> arcropolis=<state> tr=<version> | <sentence>
+```
+
+`broken_end` replaces `cut_file` for that event. The marker state is `fork-guarantee-v<n>` or
+`upstream-or-older-fork`; the hook does not distinguish the latter from ARCropolis not being loaded. The file
+index is not a path hash; resolving a path is outside this diagnostic.
+
+| Event and marker | Sentence |
+| --- | --- |
+| Cut file, no guarantee | `A mod file reached the game cut short (declares N bytes, M copied): an ARCropolis defect that can crash the game; the crashbandicode ARCropolis fork (cut-file guarantee v1) refuses cut files.` |
+| Cut file, guarantee present | `Unexpected cut file with the fork (declares N bytes, M copied); please report.` |
+| Broken end | `A picture file reached the game with a broken end (N bytes, relocation table not found): not the ARCropolis cut; please report.` |
+
+The drain thread reports the API and fork marker once (checking at most once a second until found or 30 seconds
+after initialization), with the API version actually exported rather than a guessed build version:
+
+```text
+[TrainingRooms] ARCropolis API <major>.<minor> (fork, cut-file guarantee v<n>)
+[TrainingRooms] ARCropolis API <major>.<minor> (upstream or older fork)
+[TrainingRooms] ARCropolis not loaded
+```
+
+A guarantee with no API answer is still a fork and omits the API part. The drain thread also writes each
+published line as `[TrainingRooms] <line> persisted=<0x code>` (`0x0` means written), and reports an increased
+overflow count as `[TrainingRooms] cut_file more=<count>`, if the game survives.
+
+| Hook rule | How |
+| --- | --- |
+| No heap | Slices, atomics, a stack line and `nn::fs`; `HookScope` counts allocations. |
+| No plugin lock | No mutex or diagnostic-log call in the hook. |
+| Fixed, lock-free, capped record | Eight atomic slots and an overflow counter. |
+| Whole files cost a few loads and compares | Inspection returns at the first matching rule. |
+| Guard, then hook | Authoritative group `cut_file`; an occupied or foreign site is left untouched. |
 
 - 2026-11-26. Scrub positions: operator ruling 2026-11-26 ~02:45Z (raising stack limit is fine).
 - Only the diagnostic trace writer's recorded static bound changes: 2,880 to 2,896 bytes, as measured on the `bac7a4d5` ELF. Its allocation stays at 28,672 bytes.
