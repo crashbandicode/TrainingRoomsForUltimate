@@ -3296,3 +3296,11 @@ ceiling = 210017
 date = "2026-11-27"
 reason = "Ledge Trap, phase 1, on main 30f7f21a (209561): +456, measured by the size step of the gate on 2efa5370. A third drill of the Guard the Edge and Juggler engine: the stage clock, the round time and the CPU's pad to the ledge (model/edge_juggle/trap.rs), the drill's arms in the session, wizard and placement, the CPU ledge step run alone for the drill's body, its game entry, nine menu rows and eight settings. The new test lines are excluded."
 approved_by = "tr-primary-3 2026-11-27 16:44Z (direct message to the lane) (+456 counted lines; release NRO +12,288 B; raw bss +0), on tr-primary-2's phase 1 order of 2026-11-27 15:07:32Z."
+
+[[budget]]
+scope = "total"
+basis = "rustfmt-sloc4"
+ceiling = 210051
+date = "2026-11-28"
+reason = "Ledge Trap: the stage clock holds through hitlag, hitstun and a damaged knockdown, on the reviewed phase 1 head 1c75a6be (210016): +35, measured by the size step of the gate on eb34da43. Eden showed a KO hit in the last frames of the window graded On stage. The two status rules moved into the model (trap::stunned, trap::downed, fourteen down and trip statuses), the attempt remembers damage, and the observation carries the two facts. The new test lines are excluded."
+approved_by = "tr-primary-3 2026-11-28 00:33Z (+6 for a492d4f3) and 00:57Z (+29 more for eb34da43); release NRO +0 B, raw bss +0."
