@@ -18,7 +18,7 @@ Open the library during practice with your [Recording pop-up chord](display-and-
 
 ## Save states & Macros
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/98458f1bb06f9d595e377ae7baf99022af5f3130" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0c6a5475c7c08fac64a812c366e8b6531aa7acc2" autoplay muted loop playsinline controls></video>
 
 *Record tints Player 1 red.* [Open the clip](../media/tut-record-macro.mp4)
 
@@ -38,11 +38,11 @@ Press A on a save, macro or chain for its [file controls](../guide/recording.md#
 | Crop | Opens the clip editor | Saves a shorter copy; the original stays ([Crop](../guide/recording.md#crop)). |
 | Make combo | Plays once on Player 1 | [What the take can save](../guide/recording.md#practise-a-combo-or-input-drill). |
 | + New chain, Edit chain | Opens the numbered picker | [Put macros in playback order](../guide/recording.md#chains). |
-| Duplicate, Rename, Delete | | Delete removes the file at once, without asking. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/c03fa6ac1f34b176b612ebf960b84b8f4ded74b2" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc13-save-duplicate-delete.mp4) |
+| Duplicate, Rename, Delete | | Delete removes the file at once, without asking. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/a1ceecd505819565c610fa1fc8e6ae00aadadd08" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc13-save-duplicate-delete.mp4) |
 
 ## Combos & Sequences
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b635893c4df02daaae5535f19b5b3f5c2346245b" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/9c0eea0a1b3fd7c87587f782473ce17abdf1e5e5" autoplay muted loop playsinline controls></video>
 
 *The recorded drill appears in the list.* [Open the clip](../media/tut-input-drill-record.mp4)
 
@@ -56,7 +56,7 @@ In Player view, the Combo helper grades combos, input drills and sequences ([Com
 | <a id="input-drills"></a>DRILLS > + Record drill… | | Arms a Player 1 take that needs no hit. Record starts and stops it. |
 | + New sequence | Opens the numbered picker | A sequence is combos drilled one after another. |
 | Drill, Drill sequence | A selects | Makes this the file the helper grades, replacing the previous choice. |
-| Crop | Opens the clip editor | Whole links for a combo, whole steps for a drill. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b01d3788d21072c6f728edd38e2ba35aa3a89f94" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc15-input-drill.mp4) |
+| Crop | Opens the clip editor | Whole links for a combo, whole steps for a drill. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f4b3b9315f6ff0cd1b97d7c7307503e8bea101be" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc15-input-drill.mp4) |
 | X on an input drill | A recorded take is required | Previews the inputs on Player 1. B or X stops it. |
 
 ## Replays
@@ -91,7 +91,7 @@ Playback and grading settings.
 | --- | --- | --- |
 | <a id="trim-trailing-neutral"></a>Trim trailing neutral | Start, **End**, Both, Off | Removes idle frames from those sides of a new take. |
 | <a id="place-fighters-before-record"></a>Place fighters before Record | On, **Off** | On: Record first opens the placement picker. |
-| <a id="hitstun-timing"></a>Hitstun timing | **As Hitstun Ends**, As Hitstop Ends, As Hitstop Begins | When playback starts after the CPU is hit. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/90c372d1da1d4a97f6403f94bbcfc985678aceec" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-hitstun-timing.mp4) |
+| <a id="hitstun-timing"></a>Hitstun timing | **As Hitstun Ends**, As Hitstop Ends, As Hitstop Begins | When playback starts after the CPU is hit. <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/0c7a33b501bd074e2fe1fcf3fc920daa123742b9" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc12-hitstun-timing.mp4) |
 | <a id="mash-interrupts-playback"></a>Mash interrupts playback | **On**, Off | On: Mash stops CPU playback, except during [Parry practice](../guide/parry-practice.md). <video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/2af5cb699f793423755a53b4f52cef141cc6d29c" autoplay muted loop playsinline controls></video> [Open the clip](../media/rc11-mash-interrupts.mp4) |
 | <a id="loop"></a>Loop | ∞, **1**, 2, 3, 5, 10 | How many times the active macro plays. X cycles it in MACROS. |
 | <a id="settings-override-playback"></a>Settings override playback | On, **Off** | Off: a playing recording wins over the DI, SDI, air-dodge, tech and throw settings. |
@@ -107,7 +107,7 @@ Playback and grading settings.
 
 ## Reset page to defaults
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/86dc476dd4a6065467ff4b1fba402925b0af2ea1" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/9d23e7edb9ab82fb931df76918656f3a3bf727bf" autoplay muted loop playsinline controls></video>
 *A opens the reset question; A again confirms.* [Open the clip](../media/rc13-reset-page-recording.mp4)
 
 | Setting | Values | What it does |

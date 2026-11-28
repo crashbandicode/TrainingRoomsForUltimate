@@ -14,7 +14,7 @@ Pick a spot offstage and practise denying the recovery; [Guard the Edge](docs/gu
 
 ### Recordings you can drill
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b635893c4df02daaae5535f19b5b3f5c2346245b" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/9c0eea0a1b3fd7c87587f782473ce17abdf1e5e5" autoplay muted loop playsinline controls></video>
 
 *Kirby's recording becomes a drill in the library.* [Open the clip](docs/media/tut-input-drill-record.mp4)
 
@@ -22,9 +22,9 @@ Record a dash-back or a string of short hops, then [try to match your timing](do
 
 ### Replay clip editor
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/7c00d97bf3abf99b2191b84d54bf130ffe0620ed" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/56c7702603163fb7b08849a96e28f2ffabb91fc5" autoplay muted loop playsinline controls></video>
 
-*Snap to the aerial's start, then preview it on the CPU.* [Open the clip](docs/media/tut-clip-snap.mp4)
+*Scrub a replay, snap to a move's start, then make a macro.* [Open the clip](docs/media/tut-clip-snap.mp4)
 
 [Scrub through a take](docs/guide/recording.md#crop) to see a matching fighter's recorded pose, then snap the start or end of the clip to a move.
 

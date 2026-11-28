@@ -203,9 +203,9 @@ The original late-before still already had streak0 after source selection, so th
 - R3 records both host timestamps and observes request→receipt about0.405s.
 - The original decisive frames already contained completion and the initial late fault.
 
-<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/b01d3788d21072c6f728edd38e2ba35aa3a89f94" autoplay muted loop playsinline controls></video>
+<video src="https://git.syntaxbyexample.com/intpa/TrainingRoomsForUltimate/media/blob/f4b3b9315f6ff0cd1b97d7c7307503e8bea101be" autoplay muted loop playsinline controls></video>
 
-*Drill 1 range changes from 4 to 3, back to 4, then to 3.* [Open the clip](media/rc15-input-drill.mp4)
+*Drill 2's crop range changes from 4 steps to 3.* [Open the clip](media/rc15-input-drill.mp4)
 
 - Original GIF, 2026-11-15: rc.15 `2eb3903e`, Eden, 1280×720, 3.78 s. Hardware was untested. The capture requested 5 fps and encoded nine of 19 frames. The review covered the start, middle, end and contact sheet.
 - Original GIF SHA-256: `a7f8a550de084758ed076c81b4dff39bc4503b2eacc80a8b7c9bb317b4fa9ccc`.
