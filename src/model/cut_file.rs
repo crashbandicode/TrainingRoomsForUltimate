@@ -410,6 +410,53 @@ mod tests {
     }
 
     #[test]
+    fn overlapping_successful_detections_keep_both_card_lines() {
+        use std::cell::RefCell;
+        struct Handle<'a> {
+            file: &'a RefCell<Vec<u8>>,
+            after_size: Option<&'a mut dyn FnMut()>,
+        }
+        impl Sink for Handle<'_> {
+            fn create(&mut self) {}
+            fn open(&mut self) -> Result<(), u32> { Ok(()) }
+            fn size(&mut self) -> Result<u64, u32> {
+                let observed = self.file.borrow().len();
+                if let Some(other) = self.after_size.take() { other(); }
+                Ok(observed as u64)
+            }
+            fn grow(&mut self, size: u64) -> Result<(), u32> {
+                self.file.borrow_mut().resize(size as usize, 0);
+                Ok(())
+            }
+            fn write_flush(&mut self, offset: u64, bytes: &[u8]) -> Result<(), u32> {
+                let mut file = self.file.borrow_mut();
+                let from = offset as usize;
+                let end = from + bytes.len();
+                if end > file.len() { file.resize(end, 0); }
+                file[from..end].copy_from_slice(bytes);
+                Ok(())
+            }
+            fn close(&mut self) {}
+        }
+        let records = Records::new();
+        let file = RefCell::new(vec![b'P'; LINE]);
+        let mut other = || {
+            let mut handle = Handle { file: &file, after_size: None };
+            assert_eq!(records.detected(&mut handle, cut(), meta(2, 0, 2), None), Some(1));
+        };
+        let mut first = Handle { file: &file, after_size: Some(&mut other) };
+        assert_eq!(records.detected(&mut first, cut(), meta(1, 0, 1), None), Some(0));
+        let entries = [records.take().unwrap(), records.take().unwrap()];
+        assert!(entries.iter().all(|entry| entry.persisted == 0));
+        let bytes = file.borrow();
+        assert_eq!(bytes.len(), 3 * LINE, "two successful appends must leave two lines after the old contents");
+        assert_eq!(&bytes[..LINE], &[b'P'; LINE]);
+        for entry in &entries {
+            assert!(bytes[LINE..].chunks_exact(LINE).any(|chunk| chunk == line(entry)));
+        }
+    }
+
+    #[test]
     fn sink_failures_close_if_open_succeeded() {
         let line = [b' '; LINE];
         for failure in ["size", "grow", "write"] {
